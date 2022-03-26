@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-07 15:10:39 Ryo KOBAYASHI>
+!                     Last modified: <2022-03-26 09:14:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -179,7 +179,7 @@ contains
   end subroutine write_pmdtot_bin
 !=======================================================================
   subroutine write_dump(ionum,cfname,ntot,hunit,h,tagtot,rtot,vtot, &
-       stot,ekitot,epitot,naux,auxtot)
+       atot,stot,ekitot,epitot,naux,auxtot)
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
@@ -193,7 +193,8 @@ contains
     character(len=*),intent(in) :: cfname
     real(8),intent(in):: hunit,h(3,3,0:1)
     real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
-         stot(3,3,ntot),ekitot(3,3,ntot),epitot(ntot),auxtot(naux,ntot)
+         atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot), &
+         epitot(ntot),auxtot(naux,ntot)
 
     integer:: i,j,k,l,is,idlmp
     real(8):: xi(3),ri(3),xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
@@ -248,6 +249,12 @@ contains
       else if( trim(caux).eq.'vx' .or. trim(caux).eq.'vy' .or. trim(caux).eq.'vz' ) then
 !.....velocity data are already stored at dlmp(4:6,:) and they must be always at 4:6
         cycle
+      else if( trim(caux).eq.'fx' ) then
+        dlmp(idlmp,:) =h(1,1,0)*atot(1,:)+h(1,2,0)*atot(2,:)+h(1,3,0)*atot(3,:)
+      else if( trim(caux).eq.'fy' ) then
+        dlmp(idlmp,:) =h(2,1,0)*atot(1,:)+h(2,2,0)*atot(2,:)+h(2,3,0)*atot(3,:)
+      else if( trim(caux).eq.'fz' ) then
+        dlmp(idlmp,:) =h(3,1,0)*atot(1,:)+h(3,2,0)*atot(2,:)+h(3,3,0)*atot(3,:)
       else if( trim(caux).eq.'sxx' ) then
         dlmp(idlmp,:) = stot(1,1,:)
       else if( trim(caux).eq.'syy' ) then

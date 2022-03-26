@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-17 15:48:05 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-26 11:28:39 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -1140,8 +1140,8 @@ contains
     esrl= 0d0
 !.....Loop over resident atoms
 !$omp parallel
-!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi,dxdj,rhoij,terfc, &
-!$omp     vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
+!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp     dxdj,rhoij,terfc,vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
 !$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -1150,8 +1150,8 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j=lspr(jj,i)
-        if(j.eq.0) exit
-        if(j.le.i) cycle
+!!$        if(j.eq.0) exit
+!!$        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1172,27 +1172,27 @@ contains
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
 !.....potential
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
-!!$        epi(i)= epi(i) +tmp
-!!$        esrl = esrl +tmp
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl = esrl +tmp
 !.....force
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
         if( lstrs ) then
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                    -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+!!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -1602,6 +1602,9 @@ contains
     sgmsq2 = sqrt(2d0)*sgm_ew
     ss2i = 1d0 /sgmsq2
     esr = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
+!$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1610,16 +1613,11 @@ contains
         dij2 = d2lspr(jj,i)
         if( dij2.ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
+!!$        if( j.eq.0 ) exit
+!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
-!!$        xj(1:3) = ra(1:3,j)
-!!$        xij(1:3)= xj(1:3)-xi(1:3)
-!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-!!$        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        dij = sqrt(dij)
         dij = sqrt(dij2)
         diji = 1d0/dij
         rhoij = rho_scr(is,js)
@@ -1628,16 +1626,19 @@ contains
         dvdrc = dvdrcs(is,js)
 !.....potential
         tmp = acc*diji*terfc -vrc -dvdrc*(dij-rc)
-        if( j.le.natm ) then
-          esr = esr +tmp*qi*qj
-        else
-          esr = esr +0.5d0*tmp*qi*qj
-        endif
+!!$        if( j.le.natm ) then
+!!$          esr = esr +tmp*qi*qj
+!!$        else
+!!$          esr = esr +0.5d0*tmp*qi*qj
+!!$        endif
+        esr = esr +0.5d0*tmp*qi*qj        
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
-        fq(j) = fq(j) -tmp*qi
+!!$        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     return
   end subroutine qforce_screened_cut

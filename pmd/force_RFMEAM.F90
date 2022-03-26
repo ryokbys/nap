@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-25 18:33:30 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-26 11:23:50 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -45,7 +45,6 @@ module RFMEAM
 
   logical:: interact(nspmax,nspmax), &
        interact3(nspmax,nspmax,nspmax)
-
 
 contains
 !=======================================================================
@@ -515,6 +514,15 @@ contains
     aal(:,:) = 0d0
     strsl(:,:,:) = 0d0
 
+!$omp parallel 
+!$omp do reduction(+:epot2l,epotml,epil,aal,strsl) &
+!$omp    private(i,xi,is,sij,dsij,dsfc,sfc,fl,dfl,rijs,nni,jj,j,js,xj, &
+!$omp            xij,rij,dij2,dij,fcij,dfcij,driji,drijj,ep,alpha, &
+!$omp            c2,c3,dp,eta,expeta,phi,tmp,dphi,dtmp,phifc,kk,k, &
+!$omp            ixyz,jxyz,l,eqjr,ks,dik2,dik,rik,rhoi2,cs,cs2,plcs,sfcjk, &
+!$omp            rhoi0,gam,egam,ggam,rhoi,yi,gyi,fyi,frhoi,drhoi2,drhoi0, &
+!$omp            fcik,pcs,pcsi,dcsdij,dcsdik,dplcs,strho2,dstrho2, &
+!$omp            dgam,dgdgam,drho,dgdy,dfdy,atmp,phi2,dphi2)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
@@ -815,6 +823,8 @@ contains
       enddo ! jj-loop
 !!$      stop
     enddo  ! i-loop
+!$omp end do
+!$omp end parallel
 
 !.....Send back epi on immigrants
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -865,9 +875,6 @@ contains
     real(8),intent(in):: tag(namax)
     real(8),intent(out):: sij,dsij(3,nnmax)
 
-    logical,save:: l1st = .true.
-    real(8),allocatable,save:: skij(:)
-
     integer:: kk,k,ks
     real(8):: dij4,cmaxkij,cminkij,dij,dij2,rij(3)
     real(8):: xk(3),xik(3),rik(3),dik2,dik
@@ -875,12 +882,7 @@ contains
     real(8):: dc,driki(3),drikk(3),pcs,pcsi,qcs,cs,sn, &
          ddij,ddik,dcsdij(3),dcsdik(3), &
          dcdij(3),dcdik(3),dbdy,tmp,dnumdcs,ddendcs,dcdcs, &
-         dydc,sijperkij
-
-    if( l1st ) then
-      allocate(skij(nnmax))
-      l1st = .false.
-    endif
+         dydc,sijperkij,skij(nnmax)
 
 !!$    print *,' compute_...'
     rij(1:3) = rijs(1:3,jj)

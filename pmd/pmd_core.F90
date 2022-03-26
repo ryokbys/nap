@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-03-25 18:42:59 KOBAYASHI Ryo>
+!                     Last-modified: <2022-03-26 09:10:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -475,7 +475,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
-           rtot,vtot,stot,ekitot,epitot,naux,auxtot)
+           rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
     endif
     call accum_time('write_xxx',mpi_wtime() -tmp)
   endif
@@ -1010,7 +1010,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
-           rtot,vtot,stot,ekitot,epitot,naux,auxtot)
+               rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
         endif
         call accum_time('write_xxx',mpi_wtime() -tmp)
       endif

@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-24 14:08:23 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-26 08:47:51 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -112,9 +112,10 @@ contains
 !.....Loop over i
 !$omp parallel
 !$omp do reduction(+:epotl3,aa3,strsl) &
-!$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k,ks,rc3, &
-!$omp            xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm,shft,csn,tcsn,tcsn2, &
-!$omp            vexp,tmp,dhrij,dhrik,dhcsn,drikk,dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
+!$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k, &
+!$omp            ks,rc3,xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm, &
+!$omp            shft,csn,tcsn,tcsn2,vexp,tmp,dhrij,dhrik,dhcsn,drikk, &
+!$omp            dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
       is= int(tag(i))

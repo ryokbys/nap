@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-21 12:58:48 Ryo KOBAYASHI>
+!                     Last modified: <2022-03-26 08:45:30 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -157,8 +157,8 @@ contains
 
 !.....Loop over resident atoms
 !$omp parallel
-!$omp do private(i,xi,is,k,j,js,xj,xij,rij,dij2,dij,diji,dxdi,d0ij,alpij,rminij, &
-!$omp     vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
+!$omp do private(i,xi,is,k,j,js,xj,xij,rij,dij2,dij,diji,dxdi, &
+!$omp     d0ij,alpij,rminij,vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -166,7 +166,7 @@ contains
       do k=1,lspr(0,i)
         if( d2lspr(k,i).ge.rc2 ) cycle
         j=lspr(k,i)
-        if(j.eq.0) exit
+!!$        if(j.eq.0) exit
         js= int(tag(j))
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
@@ -174,7 +174,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2.gt.rc2 ) cycle
+!!$        if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
