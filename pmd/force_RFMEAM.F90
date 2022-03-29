@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-26 11:23:50 KOBAYASHI Ryo>
+!                     Last modified: <2022-03-26 13:58:27 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -39,7 +39,7 @@ module RFMEAM
        c3ij(nspmax,nspmax), rpij(nspmax,nspmax), pj(0:lmax,nspmax), &
        qj(0:lmax,nspmax), e0(nspmax), e1(nspmax), e2(nspmax), &
        ni(nspmax), ti(lmax,nspmax), rcfac2(nspmax,nspmax), &
-       wij(nspmax,nspmax)
+       wij(0:lmax,nspmax,nspmax)
   real(8):: srij(mmax,nspmax,nspmax), bij(mmax,nspmax,nspmax)
   integer:: itype2(nspmax,nspmax)
 
@@ -54,7 +54,7 @@ contains
 !--parameter file format------------------------------------------------
 !   pairtype   Timonova
 !   atomic   cspi  ni  e0  e1  e2  pj(0:lmax)  qj(0:lmax)  ti(lmax)
-!   pair     cspi cspj itype2 rcij rsij rpij epij alpij c2ij c3ij wij
+!   pair     cspi cspj itype2 rcij rsij rpij epij alpij c2ij c3ij wij(0:lmax)
 !   triple   cspk cspi cspj  cmin cmax
 !-----------------------------------------------------------------------
 !   itype2 is the type of pair potential function:
@@ -68,7 +68,7 @@ contains
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w,rp,e0i,e1i,e2i,n, &
+    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(lmax),rp,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
          bmax,srmax
     character(len=128):: cline,fname,c1
@@ -87,7 +87,7 @@ contains
       rpij(:,:) = 0d0
       pj(:,:) = 0d0
       qj(:,:) = 0d0
-      wij(:,:) = 0d0
+      wij(:,:,:) = 0d0
       e0(:) = 0d0
       e1(:) = 0d0
       e2(:) = 0d0
@@ -162,7 +162,7 @@ contains
           endif
           if( it2.eq.1 ) then  ! Timonova-type pair potential
             backspace(ioprms)
-            read(ioprms,*) c1,cspi,cspj,itmp,rc,rs,rp,alp,ep,c2,c3,w
+            read(ioprms,*) c1,cspi,cspj,itmp,rc,rs,rp,alp,ep,c2,c3,w(0:lmax)
 !.....Set imask,jmask
             imask(:) = 1
             jmask(:) = 1
@@ -186,7 +186,7 @@ contains
                 c2ij(is,js) = c2
                 c3ij(is,js) = c3
                 rpij(is,js) = rp
-                wij(is,js) = w
+                wij(0:lmax,is,js) = w(0:lmax)
 !.....Symmetrize parameters
                 interact(js,is) = .true.
                 itype2(js,is) = 1
@@ -197,12 +197,13 @@ contains
                 c2ij(js,is) = c2
                 c3ij(js,is) = c3
                 rpij(js,is) = rp
-                wij(js,is) = w
+                wij(0:lmax,js,is) = w(0:lmax)
               enddo
             enddo
           else if( it2.eq.2 ) then
             backspace(ioprms)
-            read(ioprms,*) c1,cspi,cspj,itmp,(sr(m),m=1,mmax),(b(m),m=1,mmax),w
+            read(ioprms,*) c1,cspi,cspj,itmp,(sr(m),m=1,mmax), &
+                 (b(m),m=1,mmax),(w(l),l=0,lmax)
 !.....Set imask,jmask
             imask(:) = 1
             jmask(:) = 1
@@ -227,8 +228,8 @@ contains
                   srij(m,is,js) = sr(m)
                   srij(m,js,is) = sr(m)
                 enddo
-                wij(is,js) = w
-                wij(js,is) = w
+                wij(0:lmax,is,js) = w(0:lmax)
+                wij(0:lmax,js,is) = w(0:lmax)
 !.....rs and rc are necessary for embed part
                 rcij(is,js) = srij(mmax,is,js)
                 rcij(js,is) = srij(mmax,is,js)
@@ -354,15 +355,16 @@ contains
             if( cspj.eq.'x' ) cycle
             if( interact(is,js) ) then
               if( itype2(is,js).eq.1 )  then
-                write(6,'(a,2(1x,a3),i3,8f8.3)') '   pair   ', &
+                write(6,'(a,2(1x,a3),i3,13f8.3)') '   pair   ', &
                      trim(cspi),trim(cspj),itype2(is,js), &
                      rcij(is,js),rsij(is,js),rpij(is,js), &
-                     alpij(is,js),epij(is,js),c2ij(is,js),c3ij(is,js), wij(is,js)
+                     alpij(is,js),epij(is,js),c2ij(is,js),c3ij(is,js), &
+                     wij(0:lmax,is,js)
               else if( itype2(is,js).eq.2 ) then
-                write(6,'(a,2(1x,a3),i3,8f8.3)') '   pair   ', &
+                write(6,'(a,2(1x,a3),i3,13f8.3)') '   pair   ', &
                      trim(cspi),trim(cspj),itype2(is,js), &
                      (srij(m,is,js),m=1,mmax), (bij(m,is,js),m=1,mmax), &
-                     wij(is,js)
+                     wij(0:lmax,is,js)
               endif
             endif
           enddo
@@ -393,10 +395,10 @@ contains
     call mpi_bcast(epij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c2ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c3ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(wij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(pj,4*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(qj,4*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ti,3*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(wij,(lmax+1)*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(pj,(lmax+1)*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(qj,(lmax+1)*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ti,lmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(ni,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(e0,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(e1,nspmax,mpi_real8,0,mpi_md_world,ierr)
@@ -619,57 +621,57 @@ contains
             enddo  ! kk-loop
           endif  ! lstrs
         else if( itype2(is,js).eq.2 ) then
-          if( dij.gt.srij(mmax,is,js) ) goto 10
+          if( dij.le.srij(mmax,is,js) ) then
 !.....Type-2 2-body potential
-          call calc_phi2(is,js,dij,phi2,dphi2)
-          tmp = 0.5d0 *phi2*sij(jj)
-          epil(i) = epil(i) +0.5d0*tmp
-          epil(j) = epil(j) +0.5d0*tmp
-          epot2l = epot2l +tmp
+            call calc_phi2(is,js,dij,phi2,dphi2)
+            tmp = 0.5d0 *phi2*sij(jj)
+            epil(i) = epil(i) +0.5d0*tmp
+            epil(j) = epil(j) +0.5d0*tmp
+            epot2l = epot2l +tmp
 !.....Type-2 2-body forces
-          dtmp = 0.5d0 *dphi2 *sij(jj)
-          aal(1:3,j) = aal(1:3,j) -dtmp *drijj(1:3)
-          aal(1:3,i) = aal(1:3,i) -dtmp *driji(1:3)
-          do kk=1,nni
-            k = lspr(kk,i)
-            aal(1:3,k) = aal(1:3,k) -0.5d0*phi2*dsij(1:3,kk)
-            aal(1:3,i) = aal(1:3,i) +0.5d0*phi2*dsij(1:3,kk)
-          enddo
-!.....Atomic stress for pair part
-          if( lstrs ) then
-            do ixyz=1,3
-              do jxyz=1,3
-                strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-                strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-              enddo
-            enddo
+            dtmp = 0.5d0 *dphi2 *sij(jj)
+            aal(1:3,j) = aal(1:3,j) -dtmp *drijj(1:3)
+            aal(1:3,i) = aal(1:3,i) -dtmp *driji(1:3)
             do kk=1,nni
               k = lspr(kk,i)
+              aal(1:3,k) = aal(1:3,k) -0.5d0*phi2*dsij(1:3,kk)
+              aal(1:3,i) = aal(1:3,i) +0.5d0*phi2*dsij(1:3,kk)
+            enddo
+!.....Atomic stress for pair part
+            if( lstrs ) then
               do ixyz=1,3
                 do jxyz=1,3
                   strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                       -0.25d0*phi2*dsij(jxyz,kk)
-                  strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                       -0.25d0*phi2*dsij(jxyz,kk)
+                       -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                  strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                       -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
                 enddo
               enddo
-            enddo  ! kk-loop
-          endif  ! lstrs
+              do kk=1,nni
+                k = lspr(kk,i)
+                do ixyz=1,3
+                  do jxyz=1,3
+                    strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                         -0.25d0*phi2*dsij(jxyz,kk)
+                    strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
+                         -0.25d0*phi2*dsij(jxyz,kk)
+                  enddo
+                enddo
+              enddo  ! kk-loop
+            endif  ! lstrs
+          endif
         else  ! if itype2
           if( myid_md.eq.0 ) then
             print *,'Such itype2 is not available, ',itype2(is,js)
           endif
           stop
         endif
-10      continue
 !.....Compute Sij*fcij,flij and their derivatives for embedded part
         sfc(jj) = sij(jj)*fcij
         do l=0,lmax
           eqjr = exp(-qj(l,js)*dij)
-          fl(l,jj) = pj(l,js) *eqjr *wij(is,js)
-          dfl(1:3,l,jj)= pj(l,js)*(-qj(l,js))*eqjr *rij(1:3)/dij *wij(is,js)
+          fl(l,jj) = pj(l,js) *eqjr *wij(l,is,js)
+          dfl(1:3,l,jj)= pj(l,js)*(-qj(l,js))*eqjr *rij(1:3)/dij *wij(l,is,js)
         enddo
 !.....dsfc wrt non-j
         do kk=1,nni
@@ -799,6 +801,7 @@ contains
            +rhoi0 *dgdgam *dgam(1:3,1:nni)
       dgdy = yi /sgm**2 *exp(-yi*yi/2/sgm**2)
       dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2d0*e2(is)*yi)*gyi +dgdy*fyi
+
       do jj=1,nni
 !!$        if( sij(jj).lt.tiny ) cycle
         j = lspr(jj,i)
@@ -823,7 +826,7 @@ contains
       enddo ! jj-loop
 !!$      stop
     enddo  ! i-loop
-!$omp end do
+! !$omp end do
 !$omp end parallel
 
 !.....Send back epi on immigrants
