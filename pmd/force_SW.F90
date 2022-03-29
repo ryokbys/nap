@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:42:22 Ryo KOBAYASHI>
+!                     Last modified: <2022-03-29 18:16:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   include "./const.h"
@@ -112,7 +112,7 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-      swli= 1d0/swl
+      swli= 1d0/aswl
 !!$      a8d3r3= 8d0/(3d0*sqrt(3d0))
 !!$      avol= 5.427d0**3/8
 !-------finally set l1st
@@ -141,7 +141,7 @@ contains
         js= int(tag(j))
         if( .not. interact(is,js) ) cycle
         src= aswrc(is,js)
-        if( d2lspr(k,i).gt.src*src ) cycle
+        if( d2lspr(k,i)/aswl**2.gt.src*src ) cycle
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
@@ -207,7 +207,7 @@ contains
         if( j.eq.i ) cycle
         js= int(tag(j))
         srcij= aswrc(is,js)
-        if( d2lspr(n,i).ge.srcij*srcij ) cycle
+        if( d2lspr(n,i)/aswl**2.ge.srcij*srcij ) cycle
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
@@ -229,7 +229,7 @@ contains
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           srcik= aswrc(is,ks)
-          if( d2lspr(m,i).ge.srcik**2 ) cycle
+          if( d2lspr(m,i)/aswl**2.ge.srcik**2 ) cycle
           xk(1:3)= ra(1:3,k)
           x = xk(1) -xi(1)
           y = xk(2) -xi(2)

@@ -227,7 +227,8 @@ contains
 
 !.....Normal velocity Verlet update of positions
     do ia=1,natm
-      ra(1:3,ia) = ra(1:3,ia) +va(1:3,ia) *dt
+      ra(1:3,ia) = ra(1:3,ia) +(hi(1:3,1)*va(1,ia) &
+           +hi(1:3,2)*va(2,ia) +hi(1:3,3)*va(3,ia))*dt
     enddo
 
 !.....Constraints hereafter
@@ -242,8 +243,10 @@ contains
       j = idcs(2,ic)
       ris(1:3,ic) = ra(1:3,i)
       rjs(1:3,ic) = ra(1:3,j)
-      vis(1:3,ic) = abc2cart(h,va(:,i))
-      vjs(1:3,ic) = abc2cart(h,va(:,j))
+!!$      vis(1:3,ic) = abc2cart(h,va(:,i))
+!!$      vjs(1:3,ic) = abc2cart(h,va(:,j))
+      vis(1:3,ic) = va(1:3,i)
+      vjs(1:3,ic) = va(1:3,j)
       rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
       rij(1:3) = rij(1:3) -anint(rij(1:3))
       rij = abc2cart(h,rij)
@@ -290,8 +293,10 @@ contains
       j = idcs(2,ic)
       ra(1:3,i) = ris(:,ic)
       ra(1:3,j) = rjs(:,ic)
-      va(1:3,i) = cart2abc(hi,vis(:,ic))
-      va(1:3,j) = cart2abc(hi,vjs(:,ic))
+!!$      va(1:3,i) = cart2abc(hi,vis(:,ic))
+!!$      va(1:3,j) = cart2abc(hi,vjs(:,ic))
+      va(1:3,i) = vis(1:3,ic)
+      va(1:3,j) = vjs(1:3,ic)
     enddo
 
     return
@@ -313,8 +318,10 @@ contains
     do ic=1,nconst
       i = idcs(1,ic)
       j = idcs(2,ic)
-      vis(1:3,ic) = abc2cart(h,va(:,i))
-      vjs(1:3,ic) = abc2cart(h,va(:,j))
+!!$      vis(1:3,ic) = abc2cart(h,va(:,i))
+!!$      vjs(1:3,ic) = abc2cart(h,va(:,j))
+      vis(1:3,ic) = va(1:3,i)
+      vjs(1:3,ic) = va(1:3,j)
     enddo
 
     do iter=1,maxiter
@@ -349,8 +356,10 @@ contains
     do ic=1,nconst
       i = idcs(1,ic)
       j = idcs(2,ic)
-      va(1:3,i) = cart2abc(hi,vis(:,ic))
-      va(1:3,j) = cart2abc(hi,vjs(:,ic))
+!!$      va(1:3,i) = cart2abc(hi,vis(:,ic))
+!!$      va(1:3,j) = cart2abc(hi,vjs(:,ic))
+      va(1:3,i) = vis(1:3,ic)
+      va(1:3,j) = vjs(1:3,ic)
     enddo
 
     return

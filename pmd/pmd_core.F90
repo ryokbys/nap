@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-03-26 09:10:22 KOBAYASHI Ryo>
+!                     Last-modified: <2022-03-29 16:29:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -627,7 +627,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
     else
       do i=1,natm
-        ra(1:3,i)=ra(1:3,i) +va(1:3,i)*dt
+        ra(1:3,i)=ra(1:3,i) +(hi(1:3,1)*va(1,i) &
+             +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i) )*dt
       enddo
     endif
     ltot_updated = .false.
@@ -1655,14 +1656,14 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
 !.....ifmv= int(mod(tag(i)*10,10d0))
     ifmv = ifmvOf(tag(i))
     if( ifmv.eq.0 ) cycle
-    x= va(1,i)
-    y= va(2,i)
-    z= va(3,i)
-    v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
+!!$    x= va(1,i)
+!!$    y= va(2,i)
+!!$    z= va(3,i)
+!!$    v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
 !.....Tensor form eki
     do jxyz=1,3
       do ixyz=1,3
-        eki(ixyz,jxyz,i)= v(ixyz)*v(jxyz)
+        eki(ixyz,jxyz,i)= va(ixyz,i)*va(jxyz,i)
       enddo
     enddo
     v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
@@ -1705,11 +1706,12 @@ subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
 
   vmaxl = 0d0
   do i=1,natm
-    vx = va(1,i)
-    vy = va(2,i)
-    vz = va(3,i)
-    v(1:3) = h(1:3,1)*vx +h(1:3,2)*vy +h(1:3,3)*vz
-    v2 = v(1)*v(1) +v(2)*v(2) +v(3)*v(3)
+!!$    vx = va(1,i)
+!!$    vy = va(2,i)
+!!$    vz = va(3,i)
+!!$    v(1:3) = h(1:3,1)*vx +h(1:3,2)*vy +h(1:3,3)*vz
+!!$    v2 = v(1)*v(1) +v(2)*v(2) +v(3)*v(3)
+    v2 = va(1,i)**2 +va(2,i)**2 +va(3,i)**2
     vmaxl = max(vmaxl,v2)
   enddo
   tmp = mpi_wtime()
@@ -2522,13 +2524,10 @@ subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
 !     &       ,va(1:3,i)
   enddo
 
-  do i=1,natm
-    vt(1:3) = va(1:3,i)
-    va(1:3,i) = hi(1:3,1)*vt(1) +hi(1:3,2)*vt(2) +hi(1:3,3)*vt(3)
-!!$    va(1,i)= va(1,i) /h(1,1,0) !*dt
-!!$    va(2,i)= va(2,i) /h(2,2,0) !*dt
-!!$    va(3,i)= va(3,i) /h(3,3,0) !*dt
-  enddo
+!!$  do i=1,natm
+!!$    vt(1:3) = va(1:3,i)
+!!$    va(1:3,i) = hi(1:3,1)*vt(1) +hi(1:3,2)*vt(2) +hi(1:3,3)*vt(3)
+!!$  enddo
 
 end subroutine setv
 !=======================================================================
