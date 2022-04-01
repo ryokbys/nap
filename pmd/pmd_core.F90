@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-03-29 16:29:28 KOBAYASHI Ryo>
+!                     Last-modified: <2022-04-01 15:28:08 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -34,6 +34,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays, &
        update_d2lspr, check_lspr, check_lscl
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
+  use isostat,only: setup_langevin, vel_update_langevin, vel_update_berendsen, &
+       cell_update_berendsen,cell_force_berendsen, setup_cell_langevin, &
+       cell_update_langevin, cvel_update_langevin, setup_cell_berendsen, &
+       setup_cell_langevin
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -49,7 +53,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,maxnn
   integer:: ihour,imin,isec
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
-       htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow
+       htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
   logical:: l1st
   logical:: lconverged = .false.
 !.....FIRE variables
@@ -90,11 +94,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,dtmax,' fs'
     endif
     dt = dtmax
-  endif
-
-!.....multiply damping factor 1st to avoid doing every step
-  if( ifdmp.eq.1 ) then
-    fmv(1:3,0:9)= fmv(1:3,0:9) *dmp
   endif
 
 !.....Set 0d0 to z of fmv(9) in case of z-loading
@@ -191,6 +190,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
+!.....Convert velocities and forces from scaled unit to real unit
+  do ia=1,natm
+    va(1:3,ia) = h(1:3,1,0)*va(1,ia) +h(1:3,2,0)*va(2,ia) +h(1:3,3,0)*va(3,ia)
+    aa(1:3,ia) = h(1:3,1,0)*aa(1,ia) +h(1:3,2,0)*aa(2,ia) +h(1:3,3,0)*aa(3,ia)
+  enddo
+
 !.....Deformation setup
   if( trim(cdeform).ne.'none' ) then
     call init_deform(nstp,h,dhratio,myid_md,iprint)
@@ -249,6 +254,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( ifdmp.eq.2 ) then
     va(1:3,1:natm) = 0d0
+    h(1:3,1:3,1) = 0d0
   endif
 
 !-----calc kinetic energy
@@ -257,27 +263,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   vmaxold=vmax
 
   if( trim(ctctl).eq.'Langevin' ) then
-    tgmm= 1d0/trlx
-    do ifmv=1,9
-      if( ttgt(ifmv).lt.0d0 ) then
-        tfac(ifmv)= -1d0
-      else
-!.....TFAC should have [sqrt(ue/fs**2)] = [ue/Ang/sqrt(ump)] unit
-!            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
-!     &           *m2ang/s2fs
-!            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
-        tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
-      endif
-    enddo
-    if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
-      print *,''
-      print *,'Langevin thermostat parameters:'
-      print '(a,f10.2)','   Relaxation time = ',trlx
-      do ifmv=1,nfmv
-        print '(a,i3,f10.2,es15.4)','   ifmv,ttgt,tfac = ' &
-             ,ifmv,ttgt(ifmv),tfac(ifmv)
-      enddo
-    endif
+    call setup_langevin(myid_md,iprint)
   else if( trim(ctctl).eq.'ttm' ) then
     tmp = mpi_wtime()
     call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
@@ -325,10 +311,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
   
 !.....Calc forces
-  lstrs = lstrs0 .or. &
-       ( trim(cpctl).eq.'Berendsen' .or. &
-       trim(cpctl).eq.'vc-Berendsen' .or. &
-       trim(cpctl).eq.'vv-Berendsen')
+  lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
+!!$       ( trim(cpctl).eq.'Berendsen' .or. &
+!!$       trim(cpctl).eq.'vc-Berendsen' .or. &
+!!$       trim(cpctl).eq.'vv-Berendsen')
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
   tmp = mpi_wtime()
@@ -367,41 +353,46 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,nodes_md,myid_md,mpi_md_world,0,21)
 #endif
 
-  if( trim(cpctl).eq.'Berendsen' .or. &
-       trim(cpctl).eq.'vc-Berendsen' ) then
-    if(myid_md.eq.0 .and. iprint.ne.0 ) then
-      write(6,*) ''
-      write(6,'(a)') ' Barostat: variable-cell Berendsen'
-      write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
-           ,stgt(1,1),stgt(2,2),stgt(3,3) &
-           ,stgt(2,3),stgt(3,1),stgt(1,2)
-    endif
-    stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
-  else if( trim(cpctl).eq.'vv-Berendsen' ) then
-    if( abs(pini-pfin).gt. 0.1d0 ) then
-      if(myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') ' Barostat: variable-volume Berendsen'
-        write(6,'(a,f0.3,a,f0.3,a)') &
-             '   Target pressure from = ',pini,' GPa to ' &
-             ,pfin,' GPa'
-      endif
-      ptgt = pini *gpa2up
-    else
-      if(myid_md.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') ' Barostat: variable-volume Berendsen'
-        write(6,'(a,f0.3,a)') &
-             '   Target pressure = ',ptgt,' GPa'
-      endif
-      ptgt = ptgt *gpa2up
-    endif
-  endif
+!!$  if( trim(cpctl).eq.'vv-Berendsen' ) then
+!!$    if( abs(pini-pfin).gt. 0.1d0 ) then
+!!$      if(myid_md.eq.0 .and. iprint.ne.0 ) then
+!!$        write(6,*) ''
+!!$        write(6,'(a)') ' Barostat: variable-volume Berendsen'
+!!$        write(6,'(a,f0.3,a,f0.3,a)') &
+!!$             '   Target pressure from = ',pini,' GPa to ' &
+!!$             ,pfin,' GPa'
+!!$      endif
+!!$      ptgt = pini *gpa2up
+!!$    else
+!!$      if(myid_md.eq.0 .and. iprint.ne.0 ) then
+!!$        write(6,*) ''
+!!$        write(6,'(a)') ' Barostat: variable-volume Berendsen'
+!!$        write(6,'(a,f0.3,a)') &
+!!$             '   Target pressure = ',ptgt,' GPa'
+!!$      endif
+!!$      ptgt = ptgt *gpa2up
+!!$    endif
+!!$  else if( index(cpctl,'Beren').ne.0 ) then
+!!$    if(myid_md.eq.0 .and. iprint.ne.0 ) then
+!!$      write(6,*) ''
+!!$      write(6,'(a)') ' Barostat: variable-cell Berendsen'
+!!$      write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
+!!$           ,stgt(1,1),stgt(2,2),stgt(3,3) &
+!!$           ,stgt(2,3),stgt(3,1),stgt(1,2)
+!!$    endif
+!!$    stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
+!!$  endif
 
-  call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
-       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-  stnsr(:,:) = stnsr(:,:) *up2gpa
-  prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
+  call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+!!$  call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
+!!$       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+  if( index(cpctl,'Beren').ne.0 ) then
+    call setup_cell_berendsen(myid_md,iprint)
+    call cell_force_berendsen(stnsr,ah,mpi_md_world)
+  else if( index(cpctl,'Lange').ne.0 ) then
+    call setup_cell_langevin(myid_md,iprint)
+    call cvel_update_langevin(stnsr,h,mpi_md_world,2)
+  endif
 
   istp= 0
   simtime = 0d0
@@ -426,6 +417,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
+
+!.....Human-friendly stress unit GPa
+    sth(:,:) = stnsr(:,:) *up2gpa
+    prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
     if( prss.lt.0d0 ) then
       ctmp = '(tensile)'
     else
@@ -434,8 +429,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
          prss,' GPa '//trim(ctmp)
     write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   =', &
-         stnsr(1,1),stnsr(2,2),stnsr(3,3), &
-         stnsr(2,3),stnsr(3,1),stnsr(1,2)
+         sth(1,1),sth(2,2),sth(3,3), &
+         sth(2,3),sth(3,1),sth(1,2)
     write(6,*) ''
 
 !!$    print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
@@ -556,9 +551,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
 
 !.....In case of isobaric MD, lstrs has to be always TRUE.
-    if( trim(cpctl).eq.'Berendsen' .or. &
-         trim(cpctl).eq.'vc-Berendsen' .or. &
-         trim(cpctl).eq.'vv-Berendsen' .or. lstrs0 ) then
+!!$    if( trim(cpctl).eq.'Berendsen' .or. &
+!!$         trim(cpctl).eq.'vc-Berendsen' .or. &
+!!$         trim(cpctl).eq.'vv-Berendsen' .or. lstrs0 ) then
+    if( index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) then
       lstrs = .true.
     else
       lstrs = .false.
@@ -596,6 +592,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
     enddo
     if( chgopt_method(1:4).eq.'xlag' ) call update_vauxq(aux(iaux_vq,:))
+    if( index(cpctl,'Lange').ne.0 ) call cvel_update_langevin(stnsr,h,mpi_md_world,1)
 
     if( ifdmp.eq.2 ) then
       call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
@@ -604,9 +601,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Restrict dt (use vardt_len here)
       call get_vmax(namax,natm,va,h,vmax,mpi_md_world)
       dt = min( dt, vardt_len/vmax )
+    else if( ifdmp.eq.1 ) then
+      do i=1,natm
+        va(1:3,i) = va(1:3,i) *dmp
+      enddo
+      h(:,:,1) = h(:,:,1) *dmp
     endif
 
-!-------multiply fmv or damping
+!-------multiply fmv
     do i=1,natm
       l= int(mod(tag(i)*10,10d0))
       va(1:3,i)=va(1:3,i) *fmv(1:3,l)
@@ -645,20 +647,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,sorg,myid_md,mpi_md_world)
     endif
 
-    if( trim(cpctl).eq.'Berendsen' .or. &
-         trim(cpctl).eq.'vc-Berendsen' .or. &
-         trim(cpctl).eq.'vv-Berendsen' ) then
-      htmp(1:3,1:3) = matmul(ah,h(1:3,1:3,0))
-      do i=1,3
-        do j=1,3
-!.....NOTE: The definition of lcellfix from input and
-!.....that of h-matrix actually used are in relation of transpose.
-          if( .not. lcellfix(j,i) ) then
-            h(i,j,0) = htmp(i,j)
-          endif
-        enddo
-      enddo
-      lcell_updated = .true.
+    if( index(cpctl,'Beren').ne.0 ) then
+      call cell_update_berendsen(ah,h,lcellfix,lcell_updated)
+    else if( index(cpctl,'Lange').ne.0 ) then
+      call cell_update_langevin(h,lcellfix,lcell_updated)
     endif
 
     if( trim(cdeform).ne.'none' ) then
@@ -752,10 +744,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          ,h,nnmax,lspr)
 
 !.....Second kick of velocities
-    do i=1,natm
-      is = int(tag(i))
-      va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
-    enddo
+    if( trim(ctctl).eq.'Langevin' ) then
+      call vel_update_langevin(natm,tag,va,aa)
+    else 
+      do i=1,natm
+        is = int(tag(i))
+        va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
+      enddo
+    endif
     if( chgopt_method(1:4).eq.'xlag' ) call update_vauxq(aux(iaux_vq,:))
 
 !.....Constraints for velocities
@@ -768,76 +764,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
          ,vmax,mpi_md_world)
 
-    if( trim(ctctl).eq.'Langevin' ) then
-!.....Langevin thermostat with Mannella integrator
-      hscl(1:3)= 0d0
-      do l=1,3
-        hscl(l)= dsqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
-      enddo
-!.....If final temperature is assigned,
-!.....target temperatures are forced to be set intermediate temperatures
-      if( tfin.gt.0d0 ) then
-        ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
-        tfac(1:9) = dsqrt(2d0*tgmm*ttgt(1:9)/dt *k2ue)
-      endif
-      do i=1,natm
-        ifmv = ifmvOf(tag(i))
-        is = int(tag(i))
-        if( .not. (ifmv.eq.0 .or. tfac(ifmv).lt.0d0) ) then
-          ami= am(is)
-          aai(1:3)= 0d0
-!.....Here unit of TMP should be [eV/Ang],
-!     whereas TFAC is [eu/Ang/sqrt(ump)], so need to multiply ue2ev
-          tmp= tfac(ifmv)*dsqrt(ami)*ue2ev
-!.....Here the unit of va*tgmm*ami is [ump*(Ang)/fs**2 = ue/(Ang)],
-!.....where (Ang) is actually scaled to unitless,
-!.....but this should be [eV/Ang], so need to multiply ue2ev.
-          do l=1,3
-            aai(l)= -va(l,i)*tgmm*ami*ue2ev &
-                 +tmp*box_muller()/hscl(l)
-          enddo
-          if( iprint.ge.ipl_info ) then
-!.....accumulate energy difference
-            vi(1:3)= h(1:3,1,0)*va(1,i) &
-                 +h(1:3,2,0)*va(2,i) &
-                 +h(1:3,3,0)*va(3,i)
-            vl(1:3)= h(1:3,1,0)*aai(1)*fa2v(is)*dt *2d0 &
-                 +h(1:3,2,0)*aai(2)*fa2v(is)*dt *2d0 &
-                 +h(1:3,3,0)*aai(3)*fa2v(is)*dt *2d0
-            ediff(ifmv)= ediff(ifmv) +fekin(is) &
-                 *(2d0*dot(vi,vl)+dot(vl,vl))
-          endif
-!.....To compensate the factor 1/2 in fa2v, multiply 2 here.
-          va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(is)*dt *2d0
-        endif
-      enddo
-!-------temperature control by Berendsen thermostat
-    else if( trim(ctctl).eq.'Berendsen' ) then
-      tfac(1:9)= 0d0
-!.....if final temperature is assigned,
-!.....target temperatures are forced to be set intermediate temperatures
-      if( tfin.gt.0d0 ) then
-        ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
-      endif
-      do ifmv=1,9
-        if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-        temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
-        if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-          tfac(ifmv)= dsqrt(1d0 +dt/trlx*100d0 )
-        else
-          tfac(ifmv)= dsqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv)) &
-               /temp(ifmv))
-        endif
-      enddo
-      do i=1,natm
-!            ifmv= int(mod(tag(i)*10,10d0))
-        ifmv = ifmvOf(tag(i))
-        if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-        va(1:3,i)= va(1:3,i) *tfac(ifmv)
-!.....accumulate energy difference
-        is= int(tag(i))
-        ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fekin(is)
-      enddo
+!.....Some thermostats come after get_ekin, since they require ekl values
+    if( trim(ctctl).eq.'Berendsen' ) then
+      call vel_update_berendsen(natm,tag,va)
     else if( trim(ctctl).eq.'ttm' ) then
       tmp = mpi_wtime()
       call assign_atom2cell(namax,natm,ra,sorg,boundary)
@@ -853,15 +782,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
       call couple_3d1d(myid_md,mpi_md_world,iprint)
       call accum_time('ttm',mpi_wtime()-tmp)
-    endif  ! end of thermostat
-
+    endif
+    
     if( abs(pini-pfin).gt.0.1d0 ) then
       ptgt = ( pini +(pfin-pini)*istp/nstp ) *gpa2up
     endif
-    call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
-         ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-    stnsr(:,:) = stnsr(:,:) *up2gpa
-    prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
+    call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+    if( index(cpctl,'Beren').ne.0 ) then
+      call cell_force_berendsen(stnsr,ah,mpi_md_world)
+    else if( index(cpctl,'Lange').ne.0 ) then
+      call cvel_update_langevin(stnsr,h,mpi_md_world,2)
+    endif
+!!$    call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
+!!$         ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
+    sth(:,:) = stnsr(:,:) *up2gpa
+    prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
 
 !.....temperature distribution along x
     if( ltdst ) call calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra &
@@ -925,10 +860,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              //',es13.4,2es11.3)') &
              " istp,etime,temp,epot,vol,prss=" &
              ,istp,tcpu,tave,epot,vol,prss
-        if( trim(cpctl).eq.'Berendsen' .or. &
-             trim(cpctl).eq.'vc-Berendsen' .or. &
-             trim(cpctl).eq.'vv-Berendsen' .and. &
-             iprint.ne.0 ) then
+!!$        if( trim(cpctl).eq.'Berendsen' .or. &
+!!$             trim(cpctl).eq.'vc-Berendsen' .or. &
+!!$             trim(cpctl).eq.'vv-Berendsen' .and. &
+!!$             iprint.ne.0 ) then
+        if( (index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) &
+             .and. iprint.ne.0 ) then
           write(6,'(a)') ' Lattice vectors:' !,h(1:3,1:3,0)
           write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
           write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
@@ -1081,17 +1018,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
   endif
 
-!.....revert forces to the unit eV/A before going out pmd_core
+!.....Convert velocities and forces to scaled unit
   if( myid_md.eq.0 ) then
-    do i=1,ntot0
-      is= int(tagtot(i))
-      aai(1:3)= h(1:3,1,0)*atot(1,i) &
-           +h(1:3,2,0)*atot(2,i) &
-           +h(1:3,3,0)*atot(3,i)
-      atot(1:3,i) = aai(1:3)
+    do ia=1,ntot0
+      atot(1:3,ia)= hi(1:3,1)*atot(1,ia) &
+           +hi(1:3,2)*atot(2,ia) &
+           +hi(1:3,3)*atot(3,ia)
+      vtot(1:3,ia)= hi(1:3,1)*vtot(1,ia) &
+           +hi(1:3,2)*vtot(2,ia) &
+           +hi(1:3,3)*vtot(3,ia)
     enddo
   endif
   hmat(:,:,:) = h(:,:,:)  ! Return h-matrix as hmat
+
+!.....Return stnsr as human-friendly unit, GPa
+  stnsr(:,:) = stnsr(:,:) *up2gpa
 
 !.....Output metadynamics potential
   if( lmetaD ) then
@@ -1495,7 +1436,7 @@ subroutine setup(nspmax,am,fekin,fa2v)
   real(8),intent(in):: am(nspmax)
   real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
 
-  integer:: i
+  integer:: is
 
 !.....Factors for the following quantities
 !.....Force: eV/Ang
@@ -1503,9 +1444,9 @@ subroutine setup(nspmax,am,fekin,fa2v)
 !.....Velocity: Ang/fs
 !.....Position: Ang
 !.....Energy: eV = 1.0/1.602e-19 [J = kg*m**2/s**2]
-  do i=1,nspmax
-    fa2v(i) = 0.5d0 *ev2j *(kg2ump *m2ang**2/s2fs**2) /am(i)
-    fekin(i)= 0.5d0 *(am(i)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
+  do is=1,nspmax
+    fa2v(is) = 0.5d0 *ev2j *(kg2ump *m2ang**2/s2fs**2) /am(is)
+    fekin(is)= 0.5d0 *(am(is)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
   enddo
 
 end subroutine setup
@@ -1640,15 +1581,15 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
   real(8),intent(in):: va(3,namax),h(3,3),fekin(nspmax) &
        ,tag(namax)
-  real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
+  real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(nspmax)
 !-----locals
   integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
-  real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9),tmp
+  real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(nspmax),tmp
 !!$  integer,external:: ifmvOf
 
   ekinl=0d0
   eki(1:3,1:3,1:natm)= 0d0
-  ekll(1:9)= 0d0
+  ekll(:)= 0d0
   vmaxl= 0d0
 
   do i=1,natm
@@ -1682,8 +1623,8 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
   ekin= 0d0
   call mpi_allreduce(ekinl,ekin,1,mpi_real8 &
        ,mpi_sum,mpi_md_world,ierr)
-  ekl(1:9)= 0d0
-  call mpi_allreduce(ekll,ekl,9,mpi_real8 &
+  ekl(:)= 0d0
+  call mpi_allreduce(ekll,ekl,nspmax,mpi_real8 &
        ,mpi_sum,mpi_md_world,ierr)
   vmax= 0d0
   call mpi_allreduce(vmaxl,vmax,1,mpi_real8 &
@@ -2422,8 +2363,6 @@ subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
   integer:: i,ixyz,jxyz,ierr,l
   real(8):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
 
-  call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-
 !.....Berendsen for variable-cell
   if( trim(cpctl).eq.'Berendsen' .or. &
        trim(cpctl).eq.'vc-Berendsen' ) then
@@ -2832,35 +2771,29 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
   real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0),stot(3,3,ntot0)
   real(8),intent(out):: auxtot(naux,ntot0)
-!!$  integer,intent(in):: ntot0,natm,nxyz,myid_md,mpi_md_world
-!!$  real(8),intent(in):: va(3,natm),aa(3,natm),epi(natm),eki(3,3,natm) &
-!!$       ,strs(3,3,natm),tag(natm),sorg(3)
-!!$  integer,intent(in):: naux
-!!$  real(8),intent(in):: aux(naux,natm)
-!!$  real(8),intent(inout):: ra(3,natm)
-!!$  real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
-!!$       ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0),stot(3,3,ntot0)
-!!$  real(8),intent(out):: auxtot(naux,ntot0)
   integer,parameter:: nmpi = 10
   integer:: n0,ixyz,natmt,i,ierr,ntott
   integer:: istat(mpi_status_size),itag
   real(8):: t0
-  real(8),allocatable,save:: ratmp(:,:)
-!!$  integer,external:: itotOf
+  real(8),allocatable,save:: ratmp(:,:),vatmp(:,:),aatmp(:,:)
 
   if( .not. allocated(ratmp) ) then
-    allocate(ratmp(3,natm))
+    allocate(ratmp(3,natm),vatmp(3,natm),aatmp(3,natm))
   else if( size(ratmp).lt.3*natm ) then
-    deallocate(ratmp)
-    allocate(ratmp(3,natm))
+    deallocate(ratmp,vatmp,aatmp)
+    allocate(ratmp(3,natm),vatmp(3,natm),aatmp(3,natm))
   endif
 
   if( myid_md.eq.0 ) then
     n0 = natm
     tagtot(1:natm) = tag(1:natm)
     rtot(1:3,1:natm) = ra(1:3,1:natm)
-    vtot(1:3,1:natm) = va(1:3,1:natm)
-    atot(1:3,1:natm) = aa(1:3,1:natm)
+    do i=1,natm
+      vtot(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
+      atot(1:3,i) = hi(1:3,1)*aa(1,i) +hi(1:3,2)*aa(2,i) +hi(1:3,3)*aa(3,i)
+    enddo
+!!$    vtot(1:3,1:natm) = va(1:3,1:natm)
+!!$    atot(1:3,1:natm) = aa(1:3,1:natm)
     epitot(1:natm) = epi(1:natm)
     ekitot(1:3,1:3,1:natm) = eki(1:3,1:3,1:natm)
     stot(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm)
@@ -2907,9 +2840,11 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
          ,mpi_md_world,ierr)
     call mpi_send(tag,natm,mpi_real8,0,itag+1 &
          ,mpi_md_world,ierr)
-!.....positions should be shifted before passing data
+!.....Positions should be shifted, velocities and forces should be converted to scaled ones
     do i=1,natm
       ratmp(1:3,i) = ra(1:3,i) + sorg(1:3)
+      vatmp(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
+      aatmp(1:3,i) = hi(1:3,1)*aa(1,i) +hi(1:3,2)*aa(2,i) +hi(1:3,3)*aa(3,i)
     enddo
     call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2 &
          ,mpi_md_world,ierr)
