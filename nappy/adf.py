@@ -274,8 +274,9 @@ def main():
 
     if nskip > len(infiles):
         raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
-    infiles.sort(key=get_key,reverse=True)
-    if nskip > 0:
+    if len(infiles) > 1:
+        infiles.sort(key=get_key,reverse=True)
+    if nskip > 0 and len(infiles) > nskip:
         del infiles[:nskip]
 
     na= int(180.0/dang)
