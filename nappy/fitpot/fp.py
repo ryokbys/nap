@@ -462,6 +462,17 @@ def read_data(fname,):
     ```
     - 1st line:  num of data (NDAT),  weight of the data (WDAT)
     - 2nd line-: data values (number of data should be equal to NDAT)
+    ----------------------------------------
+    In case that "datatype: independent" is specified in the option,
+    the input file format is changed as the following,
+    ```
+      10     1.0
+      0.1234    0.1234
+     -0.2345    0.2345
+      0.3456    0.1
+      ...
+    ```
+    - Below the 1st line-:  (value, error eps) pair
     """
     if not os.path.exists(fname):
         raise RuntimeError('File not exsits: ',fname)
@@ -472,6 +483,7 @@ def read_data(fname,):
     ndat = 0
     wdat = 0.0
     data = None
+    epss = None
     idat = 0
     done = False
     options = {'datatype': 'continuous', 'eps':1.0e-3}
@@ -490,18 +502,31 @@ def read_data(fname,):
             ndat = int(ldat[0])
             wdat = float(ldat[1])
             data = np.zeros(ndat)
+            if 'indep' in options['datatype']:
+                epss = np.zeros(ndat)
         else:
             if data is None:
                 raise RuntimeError('data is None, which should not happen.')
-            for i,d in enumerate(ldat):
-                data[idat] = float(d)
+            if 'indep' in options['datatype']:
+                # In case of datatype==independent, each line has (value,eps) pair information
+                data[idat] = float(ldat[0])
+                epss[idat] = float(ldat[1])
                 idat += 1
                 if idat == ndat:
                     done = True
                     break
+            else:
+                for i,d in enumerate(ldat):
+                    data[idat] = float(d)
+                    idat += 1
+                    if idat == ndat:
+                        done = True
+                        break
         if done:
             break
     options['eps'] = float(options['eps'])
+    if 'indep' in options['datatype']:
+        options['epss'] = epss
     return {'ndat':ndat, 'wdat':wdat, 'data':data, **options}
 
 def parse_option(line):
@@ -560,7 +585,15 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         pmdd = pmd['data']
         z2 = 0.0
         sumdiff2 = 0.0
-        if dtype[:3] == 'sep':  # data treated separately
+        if dtype[:5] == 'indep':  # independent data
+            epss = ref['epss']
+            for n in range(num):
+                diff = pmdd[n] - refd[n]
+                sumdiff2 += diff*diff /epss[n]**2
+            if num > 0:
+                sumdiff2 /= num
+            losses[name] = min(sumdiff2, luplim)
+        elif dtype[:3] == 'sep':  # data treated separately
             for n in range(num):
                 # print('n=',n)
                 diff = pmdd[n] -refd[n]
@@ -725,14 +758,16 @@ def func_wrapper(variables, **kwargs):
         # subprocess.run(cmd.split(),check=True)
         # print('subdir,cmd=',subdir,cmd)
         subprocess.run(cmd,shell=True,check=True)
-        os.chdir(cwd)
         # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
-            pmddata = get_data2(subdir,prefix='pmd',**kwargs)
+            pmddata = get_data2('.',prefix='pmd',**kwargs)
             L = loss_func2(pmddata,**kwargs)
         else:
-            pmddata = get_data(subdir,prefix='pmd',**kwargs)
+            pmddata = get_data('.',prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
+        os.mkdir("iid_{0:d}".format(kwargs['iid']))
+        os.system("cp data.pmd.* iid_{0:d}/".format(kwargs['iid']))
+        os.chdir(cwd)
     except Exception as e:
         if print_level > 0:
             print('  Since pmd or post-process failed at {0:s}, '.format(subdir)

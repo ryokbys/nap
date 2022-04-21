@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-04-01 15:28:08 KOBAYASHI Ryo>
+!                     Last-modified: <2022-04-21 15:48:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -384,8 +384,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !!$  endif
 
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-!!$  call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
-!!$       ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
   if( index(cpctl,'Beren').ne.0 ) then
     call setup_cell_berendsen(myid_md,iprint)
     call cell_force_berendsen(stnsr,ah,mpi_md_world)
@@ -793,8 +791,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     else if( index(cpctl,'Lange').ne.0 ) then
       call cvel_update_langevin(stnsr,h,mpi_md_world,2)
     endif
-!!$    call force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
-!!$         ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
     sth(:,:) = stnsr(:,:) *up2gpa
     prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
 
@@ -2342,63 +2338,6 @@ function bmv(xv,yv,zv,ku,anxi,anyi,anzi)
   endif
   return
 end function bmv
-!=======================================================================
-subroutine force_isobaric(stgt,ptgt,ah,natm,eki,strs,sgm &
-     ,dt,srlx,stbeta,vol,stnsr,mpi_md_world,cpctl)
-!
-!  Calc. acceralation of h-matrix used in isobaric MD
-!  using given stress tensor stgt.
-!
-  implicit none
-  include "mpif.h"
-  integer,intent(in):: natm,mpi_md_world
-  real(8),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm),ptgt &
-       ,sgm(3,3),dt,vol,srlx,stbeta
-  real(8),intent(out):: ah(3,3),stnsr(3,3)
-  character(len=*):: cpctl
-
-!.....Max change rate (2%)
-  real(8),parameter:: RMAX = 0.02d0
-
-  integer:: i,ixyz,jxyz,ierr,l
-  real(8):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
-
-!.....Berendsen for variable-cell
-  if( trim(cpctl).eq.'Berendsen' .or. &
-       trim(cpctl).eq.'vc-Berendsen' ) then
-!.....now ah is scaling factor for h-mat
-    ah(1:3,1:3)= 0d0
-    ah(1,1)= 1d0
-    ah(2,2)= 1d0
-    ah(3,3)= 1d0
-!.....Limit change rate of h (ah) to RMAX
-    do jxyz=1,3
-      sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
-      do ixyz=1,3
-        tmp = 0d0
-        do l=1,3
-          tmp = tmp + ( stgt(ixyz,l)-stnsr(ixyz,l) ) *sgm(l,jxyz)
-        enddo
-        tmp = tmp *stbeta*dt/3/srlx /sgmnrm
-!!$        tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
-        tmp = min(max(tmp,-RMAX),RMAX)
-        ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
-      enddo
-    enddo
-!.....Berendsen for variable-volume not variable-cell
-  else if( trim(cpctl).eq.'vv-Berendsen' ) then
-    ah(1:3,1:3)= 0d0
-    ah(1,1)= 1d0
-    ah(2,2)= 1d0
-    ah(3,3)= 1d0
-    prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
-    fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
-!.....Limit change rate of h (ah) to RMAX
-    fac = min(max(fac,1d0-RMAX),1d0+RMAX)
-    ah(1:3,1:3) = ah(1:3,1:3)*fac
-  endif
-
-end subroutine force_isobaric
 !=======================================================================
 subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 !      
