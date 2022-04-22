@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-26 08:47:51 KOBAYASHI Ryo>
+!                     Last modified: <2022-04-22 12:31:52 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -111,7 +111,7 @@ contains
     aa3(1:3,1:namax)= 0d0
 !.....Loop over i
 !$omp parallel
-!$omp do reduction(+:epotl3,aa3,strsl) &
+!$omp do reduction(+:epotl3) &
 !$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k, &
 !$omp            ks,rc3,xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm, &
 !$omp            shft,csn,tcsn,tcsn2,vexp,tmp,dhrij,dhrik,dhcsn,drikk, &
@@ -175,18 +175,43 @@ contains
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
           tmpj(1:3)= dhcsn*dcsnj(1:3) +dhrij*drijj(1:3)
           tmpk(1:3)= dhcsn*dcsnk(1:3) +dhrik*drikk(1:3)
-          aa3(1:3,j)= aa3(1:3,j) -tmpj(1:3)
-          aa3(1:3,k)= aa3(1:3,k) -tmpk(1:3)
           aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))
+!...Use omp atomic instead of reduction(+:aa3) for better parallel performace.
+!$omp atomic
+          aa3(1,j)= aa3(1,j) -tmpj(1)
+!$omp atomic
+          aa3(2,j)= aa3(2,j) -tmpj(2)
+!$omp atomic
+          aa3(3,j)= aa3(3,j) -tmpj(3)
+!$omp atomic
+          aa3(1,k)= aa3(1,k) -tmpk(1)
+!$omp atomic
+          aa3(2,k)= aa3(2,k) -tmpk(2)
+!$omp atomic
+          aa3(3,k)= aa3(3,k) -tmpk(3)
 !.....Stress
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
                  -0.5d0*xij(jxyz)*tmpj(1:3) & !*volj &
                  -0.5d0*xik(jxyz)*tmpk(1:3) !*volk
-            strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*tmpj(1:3) !*volj
-            strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
-                 -0.5d0*xik(jxyz)*tmpk(1:3) !*volk
+!$omp atomic
+            strsl(1,jxyz,j)=strsl(1,jxyz,j) &
+                 -0.5d0*xij(jxyz)*tmpj(1) !*volj
+!$omp atomic
+            strsl(2,jxyz,j)=strsl(2,jxyz,j) &
+                 -0.5d0*xij(jxyz)*tmpj(2) !*volj
+!$omp atomic
+            strsl(3,jxyz,j)=strsl(3,jxyz,j) &
+                 -0.5d0*xij(jxyz)*tmpj(3) !*volj
+!$omp atomic
+            strsl(1,jxyz,k)=strsl(1,jxyz,k) &
+                 -0.5d0*xik(jxyz)*tmpk(1) !*volk
+!$omp atomic
+            strsl(2,jxyz,k)=strsl(2,jxyz,k) &
+                 -0.5d0*xik(jxyz)*tmpk(2) !*volk
+!$omp atomic
+            strsl(3,jxyz,k)=strsl(3,jxyz,k) &
+                 -0.5d0*xik(jxyz)*tmpk(3) !*volk
           enddo
 
         enddo
