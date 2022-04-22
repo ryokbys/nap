@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-26 13:58:27 KOBAYASHI Ryo>
+!                     Last modified: <2022-04-22 12:57:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -517,7 +517,7 @@ contains
     strsl(:,:,:) = 0d0
 
 !$omp parallel 
-!$omp do reduction(+:epot2l,epotml,epil,aal,strsl) &
+!$omp do reduction(+:epot2l,epotml,epil) &
 !$omp    private(i,xi,is,sij,dsij,dsfc,sfc,fl,dfl,rijs,nni,jj,j,js,xj, &
 !$omp            xij,rij,dij2,dij,fcij,dfcij,driji,drijj,ep,alpha, &
 !$omp            c2,c3,dp,eta,expeta,phi,tmp,dphi,dtmp,phifc,kk,k, &
@@ -590,36 +590,42 @@ contains
           dphi = alpha/dp *ep*expeta *(eta*(1d0 -2d0*c2) &
                +eta**2 *(c2 -3d0*c3) +c3*eta**3)
           dtmp = 0.5d0 *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
-          aal(1:3,j) = aal(1:3,j) -dtmp*drijj(1:3)
           aal(1:3,i) = aal(1:3,i) -dtmp*driji(1:3)
+          do ixyz=1,3
+!$omp atomic
+            aal(ixyz,j) = aal(ixyz,j) -dtmp*drijj(ixyz)
+          enddo
           phifc = 0.5d0 *phi *fcij
           do kk=1,nni
             k = lspr(kk,i)
-            aal(1:3,k) = aal(1:3,k) -phifc*dsij(1:3,kk)
             aal(1:3,i) = aal(1:3,i) +phifc*dsij(1:3,kk)
+            do ixyz=1,3
+!$omp atomic
+              aal(ixyz,k) = aal(ixyz,k) -phifc*dsij(ixyz,kk)
+            enddo
           enddo
 !.....Atomic stress for pair part
-          if( lstrs ) then
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+!$omp atomic
+              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+            enddo
+          enddo
+          do kk=1,nni
+            k = lspr(kk,i)
             do ixyz=1,3
               do jxyz=1,3
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-                strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                     -0.5d0*phifc*dsij(jxyz,kk)
+!$omp atomic
+                strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
+                     -0.5d0*phifc*dsij(jxyz,kk)
               enddo
             enddo
-            do kk=1,nni
-              k = lspr(kk,i)
-              do ixyz=1,3
-                do jxyz=1,3
-                  strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                       -0.5d0*phifc*dsij(jxyz,kk)
-                  strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                       -0.5d0*phifc*dsij(jxyz,kk)
-                enddo
-              enddo
-            enddo  ! kk-loop
-          endif  ! lstrs
+          enddo  ! kk-loop
         else if( itype2(is,js).eq.2 ) then
           if( dij.le.srij(mmax,is,js) ) then
 !.....Type-2 2-body potential
@@ -630,35 +636,41 @@ contains
             epot2l = epot2l +tmp
 !.....Type-2 2-body forces
             dtmp = 0.5d0 *dphi2 *sij(jj)
-            aal(1:3,j) = aal(1:3,j) -dtmp *drijj(1:3)
             aal(1:3,i) = aal(1:3,i) -dtmp *driji(1:3)
+            do ixyz=1,3
+!$omp atomic
+              aal(ixyz,j) = aal(ixyz,j) -dtmp *drijj(ixyz)
+            enddo
             do kk=1,nni
               k = lspr(kk,i)
-              aal(1:3,k) = aal(1:3,k) -0.5d0*phi2*dsij(1:3,kk)
               aal(1:3,i) = aal(1:3,i) +0.5d0*phi2*dsij(1:3,kk)
+              do ixyz=1,3
+!$omp atomic
+                aal(ixyz,k) = aal(ixyz,k) -0.5d0*phi2*dsij(ixyz,kk)
+              enddo
             enddo
 !.....Atomic stress for pair part
-            if( lstrs ) then
+            do ixyz=1,3
+              do jxyz=1,3
+                strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+!$omp atomic
+                strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+              enddo
+            enddo
+            do kk=1,nni
+              k = lspr(kk,i)
               do ixyz=1,3
                 do jxyz=1,3
                   strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                       -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
-                  strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                       -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                       -0.25d0*phi2*dsij(jxyz,kk)
+!$omp atomic
+                  strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
+                       -0.25d0*phi2*dsij(jxyz,kk)
                 enddo
               enddo
-              do kk=1,nni
-                k = lspr(kk,i)
-                do ixyz=1,3
-                  do jxyz=1,3
-                    strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                         -0.25d0*phi2*dsij(jxyz,kk)
-                    strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                         -0.25d0*phi2*dsij(jxyz,kk)
-                  enddo
-                enddo
-              enddo  ! kk-loop
-            endif  ! lstrs
+            enddo  ! kk-loop
           endif
         else  ! if itype2
           if( myid_md.eq.0 ) then
@@ -811,18 +823,20 @@ contains
         if( dij2.gt.trcij2(is,js) ) cycle
         rij(1:3) = rijs(1:3,jj)
         atmp(1:3) = dfdy /ni(is) *drho(1:3,jj)
-        aal(1:3,j) = aal(1:3,j) -atmp(1:3)
         aal(1:3,i) = aal(1:3,i) +atmp(1:3)
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*rij(ixyz)*atmp(jxyz)
-              strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*rij(ixyz)*atmp(jxyz)
-            enddo
+        do ixyz=1,3
+!$omp atomic
+          aal(ixyz,j) = aal(ixyz,j) -atmp(ixyz)
+        enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
+                 -0.5d0*rij(ixyz)*atmp(jxyz)
+!$omp atomic
+            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+                 -0.5d0*rij(ixyz)*atmp(jxyz)
           enddo
-        endif
+        enddo
       enddo ! jj-loop
 !!$      stop
     enddo  ! i-loop
@@ -839,12 +853,10 @@ contains
          ,nn,mpi_md_world,aal,3)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aal(1:3,1:natm)
 
-    if( lstrs ) then
 !.....Send back stresses on immigrants
-      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_md_world,strsl,9)
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !.....Gather epot
     epotl = epot2l +epotml
