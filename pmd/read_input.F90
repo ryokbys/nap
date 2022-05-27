@@ -43,6 +43,7 @@ subroutine set_variable(ionum,cname)
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
+  use deform,only: cdeform, trlx_deform, dhmat
 #ifdef __WALL__
   use wall
 #endif
@@ -214,8 +215,11 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'deformation' ) then
     call read_c1(ionum,cdeform)
     return
-  elseif( trim(cname).eq.'deform_ratio' ) then
-    call read_rs(ionum,3,3,dhratio(1:3,1:3))
+  elseif( trim(cname).eq.'deform_hmat' ) then
+    call read_rs(ionum,3,3,dhmat(1:3,1:3))
+    return
+  elseif( trim(cname).eq.'deform_relax_time' ) then
+    call read_r1(ionum,trlx_deform)
     return
   elseif( trim(cname).eq.'zload_type' ) then
     call read_c1(ionum,czload_type)

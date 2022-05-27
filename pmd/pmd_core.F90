@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-04-21 15:48:04 KOBAYASHI Ryo>
+!                     Last-modified: <2022-05-27 22:39:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -24,7 +24,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,update_const_pos
   use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
   use structure,only: cna,acna
-  use deform,only: init_deform, apply_deform
+  use deform,only: init_deform, apply_deform, cdeform
   use util,only: itotOf, ifmvOf
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
   use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg,clr_init
@@ -38,6 +38,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        cell_update_berendsen,cell_force_berendsen, setup_cell_langevin, &
        cell_update_langevin, cvel_update_langevin, setup_cell_berendsen, &
        setup_cell_langevin
+
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -198,7 +199,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Deformation setup
   if( trim(cdeform).ne.'none' ) then
-    call init_deform(nstp,h,dhratio,myid_md,iprint)
+    call init_deform(h,myid_md,iprint)
   endif
 
 !.....get_num_dof is called once in a MD run
@@ -652,7 +653,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
 
     if( trim(cdeform).ne.'none' ) then
-      call apply_deform(h)
+      call apply_deform(h,dt,simtime)
       lcell_updated = .true.
     endif
 

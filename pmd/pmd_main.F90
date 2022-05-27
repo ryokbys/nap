@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-04-01 15:03:39 KOBAYASHI Ryo>
+!                     Last-modified: <2022-05-28 00:04:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -448,11 +448,12 @@ subroutine write_initial_setting()
     write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
+
   endif
   write(6,*) ''
 !.....strain control
-  write(6,'(2x,a,5x,a)') 'zload_type',trim(czload_type)
   if( trim(czload_type).ne.'none' ) then
+    write(6,'(2x,a,5x,a)') 'zload_type',trim(czload_type)
     write(6,'(2x,a,5x,f0.3)') 'zload_skin_width',zskin_width
     write(6,'(2x,a,5x,f0.3)') 'zload_shear_angle',zshear_angle
     write(6,'(2x,a,5x,f0.3)') 'final_strain',strfin
@@ -540,6 +541,39 @@ subroutine write_inpmd(ionum,cfname)
 
 end subroutine write_inpmd
 !=======================================================================
+subroutine check_inpmd_consistency(myid)
+  use pmdvars
+  use deform,only: cdeform
+  implicit none 
+  include 'mpif.h'
+  integer,intent(in):: myid
+  integer:: istat,ierr
+
+  istat = 0
+
+  if( myid.eq.0 ) then
+    if( trim(czload_type).ne.'none' .and. trim(cdeform).ne.'none' ) then
+      istat = istat +1
+      print *,' Invalid in.pmd consistency:'
+      print *,'   You cannot set zload_type and deformation at the same time.'
+      print *,'   Either one of these two should be none.'
+    endif
+    if( trim(cdeform).ne.'none' .and. trim(cpctl).ne.'none' ) then
+      istat = istat +1
+      print *,' Invalid in.pmd consistency:'
+      print *,'   You cannot set stress_control and deformation at the same time.'
+      print *,'   Either one of these two should be none.'
+    endif
+  endif
+
+  call mpi_bcast(istat,1,mpi_integer,0,mpicomm,ierr)
+
+  if( istat.gt.0 ) then
+    stop 1
+  endif
+  
+end subroutine check_inpmd_consistency
+!=======================================================================
 subroutine bcast_params()
   use pmdvars
   use force
@@ -547,6 +581,7 @@ subroutine bcast_params()
   use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,npx,npy,npz,cspc_pdens,orig_pdens,hmat_pdens
+  use deform,only: cdeform,trlx_deform,dhmat
   implicit none
   include 'mpif.h'
 
@@ -604,7 +639,11 @@ subroutine bcast_params()
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
-
+!.....Deformation
+  call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
+  call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
+  
 !.....Charge related
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
@@ -667,9 +706,6 @@ subroutine bcast_params()
   call mpi_bcast(lrdcfrc,1,mpi_logical,0,mpicomm,ierr)
 !.....Linked-cell reordering
   call mpi_bcast(lreorder,1,mpi_logical,0,mpicomm,ierr)
-!.....Deformation
-  call mpi_bcast(cdeform,128,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(dhratio,9,mpi_real8,0,mpicomm,ierr)
 !.....Structure analysis
   call mpi_bcast(cstruct,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(istruct,1,mpi_integer,0,mpicomm,ierr)

@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2022-03-31 15:19:44 KOBAYASHI Ryo>
+!                    Last modified: <2022-05-27 22:36:23 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -255,10 +255,6 @@ module pmdvars
   real(8):: pka_theta = 0.d0  ! in degree
   real(8):: pka_phi = 0.d0    ! in degree
   
-!.....Deformation
-  character(len=128):: cdeform= 'none'
-  real(8):: dhratio(3,3)
-
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1
