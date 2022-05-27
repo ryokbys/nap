@@ -10,6 +10,8 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
+  --in INPUTFILE
+              Name of configuration file. [default: in.fitpot]
   --nproc NPROC
               Number of processes to be used. If it's less than 1, use as many processes as possible. [default: 0]
   --subdir-prefix PREFIX
@@ -251,6 +253,7 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
     rc3 = kwargs['rc3']
     options = kwargs['options']
     hardlim = kwargs['hardlim']
+    vopts = kwargs['vopts']
     nv = len(vs)
     with open(fname,'w') as f:
         if 'hard-limit' in options.keys() and options['hard-limit']:
@@ -260,9 +263,11 @@ def write_vars_fitpot(vs,vrs,fname='in.vars.fitpot',**kwargs):
         for i in range(len(vs)):
             f.write(' {0:15.7f}  {1:15.7f}  {2:15.7f}'.format(vs[i],*vrs[i]))
             if 'hard-limit' in options.keys() and options['hard-limit']:
-                f.write('  {0:10.4f}  {1:10.4f}\n'.format(*hardlim[i]))
-            else:
-                f.write('\n')
+                f.write('  {0:10.4f}  {1:10.4f}'.format(*hardlim[i]))
+            if len(vopts[i]) > 0:
+                for ivo,vo in enumerate(vopts[i]):
+                    f.write(f'  {vo}')
+            f.write('\n')
     return None
 
 def parse_option(line):
@@ -290,6 +295,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     vs = []
     vrs = []
     vrsh = []
+    vopts = []
     options = {}
     for line in lines:
         if line[0] in ('!','#'):
@@ -314,6 +320,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
                 vs.append(float(data[0]))
                 vrs.append([ float(data[1]), float(data[2])])
                 vrsh.append([float(data[3]), float(data[4])])
+                vopts.append(data[5:])
                 print(' iv,vrhmin,vrhmax= {0:3d} {1:11.3e} {2:11.3e}'.format(iv,
                                                                              float(data[3]),
                                                                              float(data[4])))
@@ -321,11 +328,12 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
                 vs.append(float(data[0]))
                 vrs.append([ float(data[1]), float(data[2])])
                 vrsh.append([-1e+30, 1e+30])
+                vopts.append(data[3:])
     vs = np.array(vs)
     vrs = np.array(vrs)
     vrsh = np.array(vrsh)
     print('')
-    return rc2,rc3,vs,vrs,vrsh,options
+    return rc2,rc3,vs,vrs,vrsh,options,vopts
     
 
 def read_rdf(fname,specorder,pairs=[]):
@@ -447,13 +455,24 @@ def read_data(fname,):
     -----------------
     ```
     #  Comment lines begins with '#' or '!'
-    # 
+    #  Options start with "option-name: "
     10    1.0
     0.1234  0.2345  0.3456  0.4567  0.5678  0.6789
     0.7890  0.8901  0.9012  0.0123
     ```
     - 1st line:  num of data (NDAT),  weight of the data (WDAT)
     - 2nd line-: data values (number of data should be equal to NDAT)
+    ----------------------------------------
+    In case that "datatype: independent" is specified in the option,
+    the input file format is changed as the following,
+    ```
+      10     1.0
+      0.1234    0.1234
+     -0.2345    0.2345
+      0.3456    0.1
+      ...
+    ```
+    - Below the 1st line-:  (value, error eps) pair
     """
     if not os.path.exists(fname):
         raise RuntimeError('File not exsits: ',fname)
@@ -464,28 +483,63 @@ def read_data(fname,):
     ndat = 0
     wdat = 0.0
     data = None
+    epss = None
     idat = 0
     done = False
+    options = {'datatype': 'continuous', 'eps':1.0e-3}
     for line in lines:
         if line[0] in ('#','!'):
+            try: 
+                k,v = parse_option(line)
+            except:
+                k = None
+                v = None
+            if k != None and v != None:
+                options[k] = v
             continue
         ldat = line.split()
         if ndat < 1:
             ndat = int(ldat[0])
             wdat = float(ldat[1])
             data = np.zeros(ndat)
+            if 'indep' in options['datatype']:
+                epss = np.zeros(ndat)
         else:
             if data is None:
                 raise RuntimeError('data is None, which should not happen.')
-            for i,d in enumerate(ldat):
-                data[idat] = float(d)
+            if 'indep' in options['datatype']:
+                # In case of datatype==independent, each line has (value,eps) pair information
+                data[idat] = float(ldat[0])
+                epss[idat] = float(ldat[1])
                 idat += 1
                 if idat == ndat:
                     done = True
                     break
+            else:
+                for i,d in enumerate(ldat):
+                    data[idat] = float(d)
+                    idat += 1
+                    if idat == ndat:
+                        done = True
+                        break
         if done:
             break
-    return {'ndat':ndat, 'wdat':wdat, 'data':data}
+    options['eps'] = float(options['eps'])
+    if 'indep' in options['datatype']:
+        options['epss'] = epss
+    return {'ndat':ndat, 'wdat':wdat, 'data':data, **options}
+
+def parse_option(line):
+    """
+    Parse option from a comment line.
+    """
+    words = line.split()
+    if len(words) < 2 or words[1][-1] != ':':
+        return None,None
+    optname = words[1]
+    k = words[1][:-1]
+    v = words[2]
+    return k,v
 
 def get_data2(basedir,prefix='ref',**kwargs):
     """
@@ -519,6 +573,8 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
     for name in refdata.keys():
         ref = refdata[name]
         wgt = ref['wdat']
+        dtype = ref['datatype']
+        eps = ref['eps']
         pmd = pmddata[name]
         if pmd == None:
             losses[name] = misval
@@ -529,12 +585,27 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         pmdd = pmd['data']
         z2 = 0.0
         sumdiff2 = 0.0
-        for n in range(num):
-            # print('n=',n)
-            diff = pmdd[n] -refd[n]
-            sumdiff2 += diff*diff
-            z2 += refd[n]*refd[n]
-        losses[name] = min(sumdiff2 /(z2+eps), luplim)
+        if dtype[:5] == 'indep':  # independent data
+            epss = ref['epss']
+            for n in range(num):
+                diff = pmdd[n] - refd[n]
+                sumdiff2 += diff*diff /epss[n]**2
+            if num > 0:
+                sumdiff2 /= num
+            losses[name] = min(sumdiff2, luplim)
+        elif dtype[:3] == 'sep':  # data treated separately
+            for n in range(num):
+                # print('n=',n)
+                diff = pmdd[n] -refd[n]
+                sumdiff2 += diff*diff /(refd[n]**2+eps**2)
+            losses[name] = min(sumdiff2, luplim)
+        else:  # data treated all together (default)
+            for n in range(num):
+                # print('n=',n)
+                diff = pmdd[n] -refd[n]
+                sumdiff2 += diff*diff
+                z2 += refd[n]*refd[n]
+            losses[name] = min(sumdiff2 /(z2+eps), luplim)
         L += losses[name] *wgt
         
     if kwargs['print_level'] > 0:
@@ -687,16 +758,18 @@ def func_wrapper(variables, **kwargs):
         # subprocess.run(cmd.split(),check=True)
         # print('subdir,cmd=',subdir,cmd)
         subprocess.run(cmd,shell=True,check=True)
-        os.chdir(cwd)
         # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
-            pmddata = get_data2(subdir,prefix='pmd',**kwargs)
+            pmddata = get_data2('.',prefix='pmd',**kwargs)
             L = loss_func2(pmddata,**kwargs)
         else:
-            pmddata = get_data(subdir,prefix='pmd',**kwargs)
+            pmddata = get_data('.',prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
+        os.mkdir("iid_{0:d}".format(kwargs['iid']))
+        os.system("cp data.pmd.* iid_{0:d}/".format(kwargs['iid']))
+        os.chdir(cwd)
     except Exception as e:
-        if print_level > 1:
+        if print_level > 0:
             print('  Since pmd or post-process failed at {0:s}, '.format(subdir)
                   +'the upper limit value is applied to its loss function.',
                   flush=True)
@@ -783,11 +856,11 @@ def main():
     start = time.time()
 
     nproc = int(args['--nproc'])
-
-    infp = read_in_fitpot('in.fitpot')
+    infname = args['--in']
+    infp = read_in_fitpot(infname)
     write_info(infp,args)
 
-    rc2,rc3,vs,vrs,vrsh,options = read_vars_fitpot(infp['param_file'])
+    rc2,rc3,vs,vrs,vrsh,options,vopts = read_vars_fitpot(infp['param_file'])
 
     kwargs = infp
     kwargs['options'] = options
@@ -798,6 +871,7 @@ def main():
     kwargs['subdir-prefix'] = args['--subdir-prefix']
     kwargs['subjob-script'] = args['--subjob-script']
     kwargs['start'] = start
+    kwargs['vopts'] = vopts
     
     smpldir = infp['sample_directory']
     if len(infp['match']) != 0:

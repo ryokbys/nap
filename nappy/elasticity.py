@@ -4,12 +4,14 @@ Calculate elastic constants C_ij by least square fitting
 using Green-Lagrange deformation tensors, which is the same
 scheme as materialsproject.org does.
 
-PREPARE mode creates directories and POSCAR files to be computed.
-ANALYZE mode reads the stress values obtained by some code.
+PREPARE mode creates directories and input files (as the same name as INFILE) to be computed.
+ANALYZE mode reads the stress values obtained by some code. 
+STRSFILE is the file name of resulting stress information, e.g., strs.pmd in the case of pmd.
+COMPUTE mode performs MD or MS calculations using pmd as a backend.
 
 Usage:
-    elasticity.py prepare [options] POSCAR
-    elasticity.py analyze [options] POSCAR STRSFILE
+    elasticity.py prepare [options] INFILE
+    elasticity.py analyze [options] INFILE STRSFILE
 
 Options:
   -h, --help  Shows this message and exit.
@@ -28,8 +30,8 @@ import spglib
 import yaml
 
 import ase.io
+import nappy
 from nappy.napsys import NAPSystem
-from nappy.io import read, from_ase
 import copy
 
 __author__  = 'Ryo KOBAYASHI'
@@ -75,7 +77,7 @@ def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
 
     #...original system
     #nsys0 = NAPSystem(fname=infname)
-    nsys0 = read(infname)
+    nsys0 = nappy.io.read(infname)
     #orig_atoms = read(infname,format='vasp')
     orig_atoms = nsys0.to_ase_atoms()
 
@@ -95,8 +97,11 @@ def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
         #print(i,emat,cell)
         # cell = np.dot(cell0,fmat.T)
         atoms.set_cell(cell,scale_atoms=True)
-        atoms.write(dname+'/POSCAR',format='vasp',vasp5=True,direct=True,
-                    sort=False)
+        if 'POSCAR' in infname:
+            atoms.write(dname+'/'+infname,format='vasp',vasp5=True,direct=True,
+                        sort=False)
+        else:
+            raise ValueError('Only POSCAR is available for INFILE.')
     
     print('prepare done')
     print('')
@@ -412,7 +417,7 @@ if __name__ == '__main__':
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
 
-    infname = args['POSCAR']
+    infname = args['INFILE']
     
     if args['prepare']:
         prepare(infname,dlt1max=dlt1max,dlt2max=dlt2max)

@@ -43,6 +43,7 @@ subroutine get_force(l1st,epot,stnsr)
   use dipole,only: force_dipole
   use fpc,only: force_fpc
   use angular,only: force_angular
+  use RFMEAM,only: force_RFMEAM
   use time, only: accum_time
   implicit none
   include "mpif.h"
@@ -93,7 +94,11 @@ subroutine get_force(l1st,epot,stnsr)
         aux(iaux_q,:) = aux(iaux_chg,:)
       else
         call bacopy_auxq_fixed(aux(iaux_q,:),aux(iaux_vq,:))
-        call chgopt_xlag(aux(iaux_chg,:),aux(iaux_q,:))
+        call chgopt_xlag(aux(iaux_chg,:),aux(iaux_q,:),ierr)
+        if( ierr.ne.0 ) then
+          call chgopt_damping(aux(iaux_chg,:),.false.)
+!!$          aux(iaux_q,:) = aux(iaux_chg,:)
+        endif
       endif
       call accum_time('chgopt_xlag',mpi_wtime() -tmp)
     else
@@ -247,6 +252,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_EAM',mpi_wtime() -tmp)
   endif
+  if( use_force('RFMEAM') ) then
+    tmp = mpi_wtime()
+    call force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+    call accum_time('force_RFMEAM',mpi_wtime() -tmp)
+  endif
   if( use_force('linreg') ) then
     tmp = mpi_wtime()
     call force_linreg(namax,natm,tag,ra,nnmax,aa &
@@ -390,11 +402,11 @@ subroutine get_force(l1st,epot,stnsr)
     call accum_time('force_Coulomb',mpi_wtime() -tmp)
   endif
 
-!.....convert forces from hmat-coordinates to Cartesian coordinates
-  do i=1,natm
-    at(1:3)= aa(1:3,i)
-    aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-  enddo
+!!$!.....convert forces from hmat-coordinates to Cartesian coordinates
+!!$  do i=1,natm
+!!$    at(1:3)= aa(1:3,i)
+!!$    aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!!$  enddo
   return
 end subroutine get_force
 !=======================================================================
@@ -424,6 +436,7 @@ subroutine init_force(linit)
   use BMH,only: read_params_BMH, lprmset_BMH
   use fpc,only: read_params_fpc, lprmset_fpc
   use angular,only: read_params_angular, lprmset_angular
+  use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   implicit none
   include "./const.h"
   
@@ -513,6 +526,12 @@ subroutine init_force(linit)
     call init_EAM()
     if( .not.lprmset_EAM ) then
       call read_params_EAM(myid_md,mpi_md_world,iprint,specorder)
+    endif
+  endif
+!.....RF-MEAM
+  if( use_force('RFMEAM') ) then
+    if( .not.lprmset_RFMEAM ) then
+      call read_params_RFMEAM(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
   
@@ -1141,12 +1160,11 @@ subroutine chgopt_damping(chg,l1st)
 
   if( l1st ) then
     if( allocated(vq) ) then
-      call accum_mem('force_common',-8*size(vq) -8*size(fq))
-      deallocate(vq,fq)
+      call accum_mem('force_common',-8*(size(vq)+size(fq)+size(dq)))
+      deallocate(vq,fq,dq)
     endif
-    allocate(vq(namax),fq(namax))
-    call accum_mem('force_common',8*size(vq) +8*size(fq))
-    allocate(dq(namax))
+    allocate(vq(namax),fq(namax),dq(namax))
+    call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
   endif
 
 !!$  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)
@@ -1245,7 +1263,7 @@ subroutine chgopt_damping(chg,l1st)
   return
 end subroutine chgopt_damping
 !=======================================================================
-subroutine chgopt_xlag(chg,auxq)
+subroutine chgopt_xlag(chg,auxq,iflag)
 !
 !  Charge optimization via extended Lagrangian proposed by Nomura[1].
 !  Charges are optimized only once (line minimization) along the forces
@@ -1262,10 +1280,11 @@ subroutine chgopt_xlag(chg,auxq)
   include "./const.h"
   real(8),intent(in):: auxq(namax)
   real(8),intent(inout):: chg(namax)
+  integer,intent(out):: iflag
 
   logical,save:: l1st = .true.
   real(8),save,allocatable:: fq(:)
-  integer:: i,iflag,imax,ierr
+  integer:: i,imax,ierr
   real(8):: alpha,epot,dqmax,dq
 
   if( l1st ) then
@@ -1295,11 +1314,15 @@ subroutine chgopt_xlag(chg,auxq)
   call get_fq_wrapper(chg,fq,epot,.false.)
 !!$  print *,'epot/ntot = ',epot/ntot
 
+  iflag = 0
   call linmin_chg(chg,fq,conv_eps_qeq,alpha,epot,iflag)
-  if( iflag.ne.0 .and. myid_md.eq.0 ) then
-    print *,'something wrong with linmin_chg? iflag = ',iflag
+  if( iflag.ne.0 ) then
+    if( myid_md.eq.0 ) then
+      print *,'something wrong with linmin_chg? iflag = ',iflag
+    endif
+  else
+    chg(1:natm) = chg(1:natm) +fq(1:natm)*alpha
   endif
-  chg(1:natm) = chg(1:natm) +fq(1:natm)*alpha
   return
 end subroutine chgopt_xlag
 !=======================================================================

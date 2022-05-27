@@ -7,5 +7,4 @@
   integer,parameter:: ipl_warn  = 3  ! warnings
   integer,parameter:: ipl_info  = 4  ! info, vars, check points
   integer,parameter:: ipl_debug = 5  ! debug info
-  
       

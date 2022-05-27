@@ -10,6 +10,8 @@ Options:
   -h, --help  Show this help message and exit.
   -w DEG      Width of the angular degree. [default: 1.0]
   -r RCUT     Cutoff radius of the bonding pair. [default: 3.0]
+  --nnmax NNMAX
+              Max num of neighbors when counting neighbors. [default: 100]
   --gsmear=SIGMA
               Width of Gaussian smearing, zero means no smearing. [default: 0]
   --specorder=SPECORDER
@@ -21,9 +23,8 @@ Options:
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --skip=NSKIP 
               Skip first NSKIP steps from the statistics. [default: 0]
-  --no-average
-              Not to take average over files.
   --plot      Plot figures. [default: False]
+  --fortran   Try using fortran routine for ADF calculation.
 """
 from __future__ import print_function
 
@@ -99,7 +100,7 @@ def adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk):
             nda[int(deg/dang)] += 1
     return nda
 
-def adf(nsys,dang,rcut,triplets):
+def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
 
     natm0= nsys.num_atoms()
 
@@ -109,14 +110,43 @@ def adf(nsys,dang,rcut,triplets):
         nsys.repeat(n1,n2,n3)
     nsys.assign_pbc()
 
-    nsys.make_pair_list(rcut=rcut)
+    na= int(180.0/dang)
+    poss = nsys.get_scaled_positions()
+    
+    if fortran:
+        try:
+            import nappy.pmd.mods as pmods
+            natm = len(nsys)
+            tags = nsys.get_tags()
+            hmat = nsys.get_hmat()
+            hmati = nsys.get_hmat_inv()
+            iprint = 0
+            l1st = True
+            lspr,d2lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
+                                                      rcut,hmat,hmati,
+                                                      iprint,l1st)
+            itriples = np.zeros((len(triplets),3),dtype=int)
+            specorder = nsys.specorder
+            for it,t in enumerate(triplets):
+                si,sj,sk = t
+                isp = specorder.index(si)+1
+                jsp = specorder.index(sj)+1
+                ksp = specorder.index(sk)+1
+                itriples[it,0] = isp
+                itriples[it,1] = jsp
+                itriples[it,2] = ksp
+            angd,adfs = pmods.distfunc.calc_adf(tags,hmat,poss.T,rcut,
+                                                lspr,d2lspr,itriples.T,
+                                                dang,na)
+            return angd, adfs.T
+        except:
+            print(' Failed to use the fortran routines...')
+            pass
 
-    na= int(180.0/dang)+1
-
+    nsys.make_pair_list(rcut=rcut,nnmax=nnmax)
     anda= np.zeros((len(triplets),na),dtype=float)
-    angd= np.array([ dang*ia for ia in range(na) ])
+    angd= np.array([ dang/2 +dang*ia for ia in range(na) ])
     symbols = nsys.get_symbols()
-    poss = np.array(nsys.atoms.pos)
     lspr = nsys.atoms.lspr
     for it,t in enumerate(triplets):
         si,sj,sk = t
@@ -126,11 +156,11 @@ def adf(nsys,dang,rcut,triplets):
             adfa= adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk)
             for iang in range(na):
                 anda[it,iang]= anda[it,iang] +adfa[iang]
-    return angd,anda,natm0
+    return angd,anda
 
-def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False,
-                specorder=None):
-    na= int(180.0/dang) +1
+def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
+                specorder=None,fortran=False,nnmax=100):
+    na= int(180.0/dang)
     aadf= np.zeros((len(triplets),na),dtype=float)
     nsum= 0
     for infname in infiles:
@@ -140,11 +170,11 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],no_average=False,
         #nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File = ',infname)
         nsys = read(fname=infname,specorder=specorder)
-        angd,df,n= adf(nsys,dang,rcut,triplets)
+        angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
+        #...NOTE that df is not averaged over the atoms in nsys
         aadf += df
-        nsum += n
-
-    if not no_average:
+        nsum += 1
+    if nsum != 0:
         aadf /= nsum
     return angd,aadf
 
@@ -165,7 +195,7 @@ def write_normal(fname,triplets,na,angd,agr):
     outfile.close()
     return None
 
-def write_out4fp(fname,triplets,na,angd,rcut,nperline=6):
+def write_out4fp(fname,triplets,na,angd,agr,rcut,nperline=6):
     """
     Write out ADF data in general fp.py format.
 
@@ -211,11 +241,10 @@ def plot_figures(angd,agr,triplets):
     plt.xlabel('Angle (degree)')
     plt.ylabel('ADF')
     plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
+    return None
 
-
-if __name__ == "__main__":
-
-    args= docopt(__doc__)
+def main():
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
     
     infiles= args['INFILE']
     triplets = args['--triplets']
@@ -231,8 +260,9 @@ if __name__ == "__main__":
     dang= float(args['-w'])
     drad= np.pi *dang/180.0
     rcut= float(args['-r'])
+    nnmax= int(args['--nnmax'])
     sigma= int(args['--gsmear'])
-    no_average = args['--no-average']
+    fortran = args['--fortran']
     ofname= args['-o']
     if ofname == 'None':
         ofname = None
@@ -244,14 +274,15 @@ if __name__ == "__main__":
 
     if nskip > len(infiles):
         raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
-    infiles.sort(key=get_key,reverse=True)
-    del infiles[:nskip]
+    if len(infiles) > 1:
+        infiles.sort(key=get_key,reverse=True)
+    if nskip > 0 and len(infiles) > nskip:
+        del infiles[:nskip]
 
-    na= int(180.0/dang) +1
+    na= int(180.0/dang)
     angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,triplets=triplets,
-                          no_average=no_average,
-                          specorder=specorder)
+                          specorder=specorder,fortran=fortran,nnmax=nnmax)
 
     if not sigma == 0:
         print(' Gaussian smearing...')
@@ -269,10 +300,15 @@ if __name__ == "__main__":
     #...Format of output (named by ofname) depends on out4fp
     if ofname is not None:
         if out4fp:
-            write_out4fp(ofname,triplets,na,angd,rcut)
+            write_out4fp(ofname,triplets,na,angd,agr,rcut)
         else:
             write_normal(ofname,triplets,na,angd,agr)
         
     print(' Wrote out.adf')
     if ofname is not None:
         print(' Wrote {0:s}'.format(ofname))
+    return None
+
+if __name__ == "__main__":
+
+    main()

@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-21 12:59:39 Ryo KOBAYASHI>
+!                     Last modified: <2022-04-22 15:38:55 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -111,10 +111,11 @@ contains
     aa3(1:3,1:namax)= 0d0
 !.....Loop over i
 !$omp parallel
-!$omp do reduction(+:epotl3,aa3,strsl) &
-!$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k,ks,rc3, &
-!$omp            xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm,shft,csn,tcsn,tcsn2, &
-!$omp            vexp,tmp,dhrij,dhrik,dhcsn,drikk,dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
+!$omp do reduction(+:epotl3) &
+!$omp    private(i,xi,is,n,j,js,xj,x,y,z,xij,rij2,rij,riji,drijj,m,k, &
+!$omp            ks,rc3,xk,xik,rik2,rik,riki,drijc,drikc,alp,bet,gmm, &
+!$omp            shft,csn,tcsn,tcsn2,vexp,tmp,dhrij,dhrik,dhcsn,drikk, &
+!$omp            dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
       is= int(tag(i))
@@ -174,19 +175,32 @@ contains
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
           tmpj(1:3)= dhcsn*dcsnj(1:3) +dhrij*drijj(1:3)
           tmpk(1:3)= dhcsn*dcsnk(1:3) +dhrik*drikk(1:3)
-          aa3(1:3,j)= aa3(1:3,j) -tmpj(1:3)
-          aa3(1:3,k)= aa3(1:3,k) -tmpk(1:3)
           aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))
+!...Use omp atomic instead of reduction(+:aa3) for better parallel performace.
+          do ixyz=1,3
+!$omp atomic
+            aa3(ixyz,j)= aa3(ixyz,j) -tmpj(ixyz)
+          enddo
+          do ixyz=1,3
+!$omp atomic
+            aa3(ixyz,k)= aa3(ixyz,k) -tmpk(ixyz)
+          enddo
 !.....Stress
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
                  -0.5d0*xij(jxyz)*tmpj(1:3) & !*volj &
                  -0.5d0*xik(jxyz)*tmpk(1:3) !*volk
-            strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*tmpj(1:3) !*volj
-            strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
-                 -0.5d0*xik(jxyz)*tmpk(1:3) !*volk
-          enddo
+            do ixyz=1,3
+!$omp atomic
+              strsl(ixyz,jxyz,j)=strsl(ixyz,jxyz,j) &
+                   -0.5d0*xij(jxyz)*tmpj(ixyz) !*volj
+            enddo
+            do ixyz=1,3
+!$omp atomic
+              strsl(ixyz,jxyz,k)=strsl(ixyz,jxyz,k) &
+                   -0.5d0*xik(jxyz)*tmpk(ixyz) !*volk
+            enddo
+          enddo ! jxyz
 
         enddo
       enddo
@@ -270,8 +284,8 @@ contains
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
           ksp = csp2isp(cspk)
-          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),4es11.3)', &
-               '  cspi,cspj,cspk,rc3,alp,bet,gmm=', &
+          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),4f7.3)', &
+               '   cspi,cspj,cspk,rc3,alp,bet,gmm=', &
                trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm
           if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then
             interact3(isp,jsp,ksp) = .true.
@@ -303,8 +317,8 @@ contains
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
           ksp = csp2isp(cspk)
-          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),5es11.3)', &
-               '  cspi,cspj,cspk,rc3,alp,bet,gmm,shft=', &
+          if( iprint.ge.ipl_basic ) print '(a,3(a3,1x),5f7.3)', &
+               '   cspi,cspj,cspk,rc3,alp,bet,gmm,shft=', &
                trim(cspi),trim(cspj),trim(cspk),rc3,alp,bet,gmm,shft
           if( isp.gt.0 .and. jsp.gt.0 .and. ksp.gt.0 ) then
             interact3(isp,jsp,ksp) = .true.

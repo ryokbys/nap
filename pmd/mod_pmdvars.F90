@@ -1,10 +1,10 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2021-12-23 14:59:25 Ryo KOBAYASHI>
+!                    Last modified: <2022-05-27 22:36:23 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
-! PARAMETERS
+! Parameters or constants
 !=======================================================================
 
 !.....output #
@@ -21,9 +21,9 @@ module pmdvars
 !.....max. num. of species
   integer,parameter:: nspmax= 9
 
-!=======================================================================
-! VARIABLES
-!=======================================================================
+!-----------------------------------------------------------------------
+! Global variables to be given by input file or wrapper function
+!-----------------------------------------------------------------------
 
 !!$!.....Data of total system
 !!$  real(8):: hunit,h(3,3,0:1)
@@ -68,7 +68,7 @@ module pmdvars
   real(8):: dmp  = 0.9d0
   real(8):: eps_conv = 1d-4
   integer:: n_conv = 1
-!.....temperature
+!.....Thermostat
   character(len=20):: ctctl='none'
   integer:: iftctl= 0
   real(8):: tinit= -1d0
@@ -106,18 +106,20 @@ module pmdvars
        1d0, 1d0, 1d0, & ! 8
        1d0, 1d0, 1d0  & ! 9
        /
-!.....whether compute stress or not
+!.....Whether compute stress or not
   logical:: lstrs0 = .true.
   logical:: lstrs = .false.
-!.....barostat
+!.....Barostat: (vv|vc)-Berendsen, (vv|vc)-Langevin
+!.....  vv --- variable volume
+!.....  vc --- variable cell
   character(len=20):: cpctl='none'
-  real(8):: ptgt   = 0d0
+  real(8):: ptgt   = 0d0   ! target pressure [GPa]
   real(8):: pini   = 0d0
   real(8):: pfin   = 0d0
-  real(8):: srlx   = 100d0
+  real(8):: srlx   = 100d0  ! relaxation time [fs]
   real(8):: stbeta = 1d0
   real(8):: strfin = 0.0d0
-  real(8):: stgt(1:3,1:3)= 0d0
+  real(8):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
   logical:: lcellfix(1:3,1:3)= .false.
 !.....charge optimize or variable charge
   logical:: lvc = .false.
@@ -153,15 +155,21 @@ module pmdvars
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
 
+
+!-----------------------------------------------------------------------
+!  Global variables used in pmd
+!-----------------------------------------------------------------------
+
   integer:: nstp_done
   integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax,ntot
   real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
-  real(8):: tgmm
+  real(8):: tgmm,cgmm,cmass
   real(8):: tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax), &
        ekl(nspmax)
   integer:: ndof(nspmax)
+  real(8):: ttgt_lang
 !!$  real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
 !!$  integer,allocatable:: ndof(:)
   integer:: nxmlt
@@ -247,10 +255,6 @@ module pmdvars
   real(8):: pka_theta = 0.d0  ! in degree
   real(8):: pka_phi = 0.d0    ! in degree
   
-!.....Deformation
-  character(len=128):: cdeform= 'none'
-  real(8):: dhratio(3,3)
-
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1

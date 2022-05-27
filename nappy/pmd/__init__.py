@@ -70,7 +70,7 @@ class PMD:
         self.result = {}
         self.result['rtot'] = res[0]
         self.result['vtot'] = res[1]
-        self.result['atot'] = res[2]
+        self.result['atot'] = res[2] # already converted to eV/Ang in pmd
         self.result['stot'] = res[3]
         self.result['ekitot'] = res[4]
         self.result['epitot'] = res[5]
@@ -145,6 +145,7 @@ class PMD:
         npmd = self.param2var('num_out_pmd',0)
         nerg = self.param2var('num_out_energy',100)
         nnmax = self.param2var('max_num_neighbors',200)
+        lrealloc = self.param2var('allow_reallocation',False)
 
         # if 'Coulomb' in self.params['force_type']:
         #     naux = max(naux,2)
@@ -163,7 +164,7 @@ class PMD:
         pw.set_pmdvars(nsp,cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,
                        ifdmp,dmpcoeff,conveps,convnum,
                        cpctrl,ptgt,stgt.T,srlx,
-                       ifpmd,npmd,nerg,nnmax)
+                       ifpmd,npmd,nerg,nnmax,lrealloc)
         return None
 
     def param2var(self,s,v0):
@@ -236,6 +237,11 @@ class PMD:
         if not hasattr(self,'result'):
             return None
         return self.result['stnsr']
+
+    def get_forces(self):
+        if not hasattr(self,'result'):
+            return None
+        return self.result['atot']
 
     def get_system(self):
         if not hasattr(self,'result'):

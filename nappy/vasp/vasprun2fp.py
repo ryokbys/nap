@@ -98,7 +98,9 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
         strs = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     with open(dirname+'/strs.ref','w') as f:
         for s in strs:
-            f.write(" {0:15.7f}".format(s*_kb2gpa)) # converting from kBar to GPa
+            # Convert from kBar to GPa
+            # The minus sign comes from the difference of definition betw pmd.
+            f.write(" {0:15.7f}".format(s*(-_kb2gpa))) 
         f.write('\n')
     return None
 

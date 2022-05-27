@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-10 20:43:38 Ryo KOBAYASHI>
+!                     Last modified: <2022-04-21 15:47:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -41,13 +41,15 @@ contains
 !
 !  Check if the given string is numeric or not.
 !
+    use,intrinsic:: ieee_arithmetic
     character(len=*),intent(in):: str
     logical:: is_numeric
     real(8):: x
     integer:: e
 
     read(str,*,iostat=e) x
-    is_numeric = ( e == 0 .and. .not.isnan(x) )
+!    is_numeric = ( e == 0 .and. .not.isnan(x) )
+    is_numeric = ( e == 0 .and. .not.ieee_is_nan(x) )
     return
   end function is_numeric
 !=======================================================================

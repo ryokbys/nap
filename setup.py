@@ -22,7 +22,7 @@ VERSION = '0.10.12'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'numpy', 'pandas', 'docopt', 'ase', 'scipy',
+    'numpy','pandas','docopt','ase','scipy','mpi4py','pyyaml',
 ]
 
 # What packages are optional?

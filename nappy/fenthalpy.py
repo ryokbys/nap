@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
 Compute formation enthalpy from given structures.
-The 1st file in the arguments is the product and the following files are the reactants.
-(Assuming that the product is only one chemical compound not plural.)
 If --erg-xxx option is not specified, pmd will be performed to get energies.
 
 Usage:
@@ -22,8 +20,9 @@ Options:
                If provided, not to perform MD relaxation. [default: None]
   --nstp NSTP  Number of steps for relaxation MD. [default: 1000]
   --dt DT      Time interval for relaxation MD. [default: -2.0]
+  --damp DAMP  Damping coefficient. [default: 0.9]
   --out4fp     Write out to a file in the fp.py data format. 
-  --outfname OUTFILE
+  -o,--outfname OUTFILE
                Output file name for out4fp. [default: data.pmd.fenth]
   --print-level IPRINT
                Print level in pmd. [default: 0]
@@ -123,7 +122,7 @@ def calc_formation_enthalpy(ergs_react,erg_prod,coeffs):
     dH = -dH
     return dH
 
-def get_pmd_done(nsys,nstp=1000,dt=-2.0,print_level=0):
+def get_pmd_done(nsys,nstp=1000,dt=-2.0,print_level=0,damp=0.9):
     """
     Perform pmd of relaxation and return the pmd object.
     """
@@ -133,7 +132,7 @@ def get_pmd_done(nsys,nstp=1000,dt=-2.0,print_level=0):
     pmd.set_params(stress_control='vc-Berendsen', pressure_target=0.0,
                    stress_target=[[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]],
                    stress_relax_time=50.0, print_level=print_level)
-    pmd.run(nstp=nstp,dt=dt,ifdmp=1,dmp=0.99)
+    pmd.run(nstp=nstp,dt=dt,ifdmp=1,dmp=damp)
     nsys_fin = pmd.get_system()
     nappy.io.write(nsys_fin,fname="pmdfin_{0:s}".format(nsys_fin.get_chemical_formula()))
     return pmd
@@ -170,6 +169,7 @@ def main(args):
     dry = args['--dry']
     nstp = int(args['--nstp'])
     dt = float(args['--dt'])
+    damp = float(args['--damp'])
     out4fp = args['--out4fp']
     erg_prod = args['--erg-prod']
     ergs_react = args['--ergs-react']
@@ -202,7 +202,8 @@ def main(args):
         return None
 
     if erg_prod == 'None':  # Compute relaxation and get potential energies of given structures.
-        pmd_prod = get_pmd_done(product,nstp=nstp,dt=dt,print_level=iprint)
+        pmd_prod = get_pmd_done(product,nstp=nstp,dt=dt,
+                                print_level=iprint,damp=damp)
         erg_prod = pmd_prod.result['epot']
         product = pmd_prod.get_system()
     else: # Energy per atom is given

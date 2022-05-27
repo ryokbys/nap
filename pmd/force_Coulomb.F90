@@ -1,12 +1,12 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-21 15:37:54 Ryo KOBAYASHI>
+!                     Last modified: <2022-05-16 23:32:44 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
 !  For screened Coulomb potential:
 !    - Ref. Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
-!    - No cutoff treatment
+!    - Cutoff treatment of energy and force shifts.
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
@@ -62,6 +62,8 @@ module Coulomb
 !  real(8),allocatable:: rho_scr(:,:)
 !!$  real(8):: fbvs = 0.74d0 +- 0.04
   real(8):: fbvs = 0.74d0
+!.....Scale factor
+  real(8):: sfctr = 1d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -74,6 +76,7 @@ module Coulomb
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
   real(8):: rho_screened_cut = 5.0d0
   real(8):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+  real(8):: rcut = -1d0
 
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
@@ -321,7 +324,7 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
-    character(len=128):: cmode,cline,ctmp,fname
+    character(len=128):: cmode,cline,ctmp,fname,c1st
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
@@ -347,188 +350,16 @@ contains
       if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Coulomb parameters:'
 !.....Start reading
       do while(.true.)
-        read(ioprms,*,end=10) cline
-        if( num_data(cline,' ').eq.0 ) cycle
-        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
-!.....Detect keyword
-        if( trim(cline).eq.'charges' ) then
-          cmode = 'charges'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cchgs
-          if(  trim(cchgs).ne.'fixed' .and. &
-               trim(cchgs).ne.'fixed_bvs' .and. &
-               trim(cchgs).ne.'variable' .and. &
-               trim(cchgs).ne.'qeq' ) then
-            print *,'ERROR: charges should have an argument of'//&
-                 ' either fixed, fixed_bvs, variable or qeq.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cchgs)
-          cycle
-        else if( trim(cline).eq.'charge_dist' ) then
-          cmode = 'charge_dist'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cdist
-          if(  trim(cdist).ne.'point' .and. &
-               trim(cdist).ne.'gaussian' ) then
-            print *,'ERROR: charge_dist should have an argument of'//&
-                 ' either point or gaussian.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cdist)
-          cycle
-        else if( trim(cline).eq.'terms' ) then
-          cmode = 'terms'
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cterms
-          if(  trim(cterms).ne.'full' .and. &
-               trim(cterms).ne.'short' .and. &
-               trim(cterms).ne.'long' .and. &
-               trim(cterms).ne.'direct' .and. &
-               trim(cterms).ne.'direct_cut' .and. &
-               trim(cterms).ne.'screened_cut' ) then
-            print *,'ERROR: terms should have an argument of '//&
-                 'either direct_cut, screened_cut, full, short, or long.'
-            stop
-          endif
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cterms)
-          cycle
-        else if( trim(cline).eq.'interactions' ) then
-          backspace(ioprms)
-          read(ioprms,'(a)') ctmp
-          nentry = num_data(ctmp,' ')
-          if( nentry.eq.1 ) then
-            cmode = 'interactions'
-            cinteract = 'given'
-            interact(1:nspmax,1:nspmax) = .false.
-          else if( nentry.eq.2 ) then
-            backspace(ioprms)
-            read(ioprms,*) ctmp, cinteract
-            cmode = 'none'
-          endif
-          cycle
-        else if( trim(cline).eq.'sigma' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, sgm_ew
-          cycle
-        else if( trim(cline).eq.'fbvs' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fbvs
-          cycle
-        else if( trim(cline).eq.'pacc' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, pacc
-          cycle
-        else if( trim(cline).eq.'rho_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, rho_screened_cut
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),rho_screened_cut
-          cycle
-        else if( trim(cline).eq.'rad_screened_cut' ) then
-!.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
-          rho_screened_cut = -1d0 *abs(rho_screened_cut)
-          backspace(ioprms)
-          read(ioprms,*) ctmp, csp, rad
-          if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
-          isp = csp2isp(trim(csp))
-          if( isp.gt.0 ) then
-            rad_bvs(isp) = rad
-          endif
-          cycle
-        else if( trim(cline).eq.'rhoii_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cspi, rhoii
-          isp = csp2isp(trim(cspi))
-          if( isp.le.0 ) cycle
-          rho_scr(isp,isp) = rhoii
-          if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
-          cycle
-        else if( trim(cline).eq.'rhoij_screened_cut' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, cspi, cspj, rhoij
-          isp = csp2isp(trim(cspi))
-          jsp = csp2isp(trim(cspj))
-          if( isp.le.0 .or. jsp.le.0 ) cycle
-          rho_scr(isp,jsp) = rhoij
-          rho_scr(jsp,isp) = rhoij
-          if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
-               ,trim(cspj),rhoij
-          cycle
-!.....QEq related parameters hereafter
-        else if( trim(cline).eq.'chgopt_method' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, chgopt_method
-          cycle
-        else if( trim(cline).eq.'codmp_method' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, codmp_method
-          cycle
-        else if( trim(cline).eq.'conv_eps_qeq' ) then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, conv_eps_qeq
-          cycle
-        else if( trim(cline).eq.'nstp_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, nstp_qeq
-          cycle
-        else if( trim(cline).eq.'minstp_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_qeq
-          cycle
-        else if( trim(cline).eq.'minstp_conv_qeq') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, minstp_conv_qeq
-          cycle
-        else if( trim(cline).eq.'dt_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dt_codmp
-          cycle
-        else if( trim(cline).eq.'qmass') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, qmass
-          cycle
-        else if( trim(cline).eq.'fdamp_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fdamp_codmp
-          cycle
-        else if( trim(cline).eq.'dfdamp_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dfdamp_codmp
-          cycle
-        else if( trim(cline).eq.'finc_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, finc_codmp
-          cycle
-        else if( trim(cline).eq.'fdec_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, fdec_codmp
-          cycle
-        else if( trim(cline).eq.'alpha0_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, alpha0_codmp
-          cycle
-        else if( trim(cline).eq.'falpha_codmp') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, falpha_codmp
-          cycle
-        else if( trim(cline).eq.'dqmax_cogrd') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dqmax_cogrd
-          cycle
-        else if( trim(cline).eq.'dqeps_cogrd') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, dqeps_cogrd
-          cycle
-        else if( trim(cline).eq.'bound_k4') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, bound_k4
-          cycle
-        else if( trim(cline).eq.'omg2dt2') then
-          backspace(ioprms)
-          read(ioprms,*) ctmp, omg2dt2
+        read(ioprms,'(a)',end=10) cline
+        nentry = num_data(cline,' ')
+        if( nentry.eq.0 ) then
+          cmode = 'none'
           cycle
         endif
-!.....Not a keyword, a certain mode should be already selected.
+        if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) cycle
+        read(cline,*) c1st
+!.....Detect keyword....................................................
+!.....But 1st, if a certain mode is already selected...
         if( trim(cmode).eq.'charges' ) then
           backspace(ioprms)
           if( trim(cchgs).eq.'fixed' ) then
@@ -548,39 +379,39 @@ contains
           else if( trim(cchgs).eq.'fixed_bvs' ) then
             read(ioprms,*) csp,vid,rad,npq
             isp = csp2isp(trim(csp))
-            if( isp.gt.0 ) then
-              ispflag(isp) = .true.
-              vid_bvs(isp) = vid
-              rad_bvs(isp) = rad
-              npq_bvs(isp) = npq
-              if( iprint.ge.ipl_basic ) then
-                write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
-                     ,trim(csp),vid,rad,npq
-              endif
-            else
+            if( isp.lt.1 .or. isp.gt.nspmax ) then
               if( iprint.ge.ipl_info ) then
                 print *,'  fixed_bvs charge read but not used: ',trim(csp)
               endif
+              cycle
+            endif
+            ispflag(isp) = .true.
+            vid_bvs(isp) = vid
+            rad_bvs(isp) = rad
+            npq_bvs(isp) = npq
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,a5,2f7.3,i4)') '   csp,vid,rad,npq =' &
+                   ,trim(csp),vid,rad,npq
             endif
           else if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') then
             read(ioprms,*) csp, dchi,djii,de0,qlow,qup
             isp = csp2isp(trim(csp))
-            if( isp.gt.0 ) then
-              ispflag(isp) = .true.
-              vc_chi(isp) = dchi
-              vc_jii(isp) = djii
-              vc_e0(isp) = de0
-              qbot(isp) = qlow
-              qtop(isp) = qup
-              if( iprint.ge.ipl_basic ) then
-                write(6,'(a,a3,4f10.4,2f5.1)') &
-                     '   csp,chi,Jii,e0,qbot,qtop = ', &
-                     trim(csp),dchi,djii,de0,qlow,qup
-              endif
-            else
+            if( isp.lt.1 .or. isp.gt.nspmax ) then
               if( iprint.ge.ipl_info ) then
                 print *,'  variable charge read but not used: ',trim(csp)
               endif
+              cycle
+            endif
+            ispflag(isp) = .true.
+            vc_chi(isp) = dchi
+            vc_jii(isp) = djii
+            vc_e0(isp) = de0
+            qbot(isp) = qlow
+            qtop(isp) = qup
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,a3,4f10.4,2f5.1)') &
+                   '   csp,chi,Jii,e0,qbot,qtop = ', &
+                   trim(csp),dchi,djii,de0,qlow,qup
             endif
           endif
 !!$        else if( trim(cmode).eq.'charge_dist' ) then
@@ -593,12 +424,201 @@ contains
           read(ioprms,*) cspi,cspj
           isp = csp2isp(trim(cspi))
           jsp = csp2isp(trim(cspj))
-          if( isp.gt.0 .and. jsp.gt.0 ) then
+          if( isp.gt.0 .and. isp.le.nspmax .and. jsp.gt.0 .and. jsp.le.nspmax ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
           else
             if( iprint.ge.ipl_info ) print *,'  interacion read but not used: ',isp,jsp
           endif
+
+!.....If no cmode is given, detect keyword.
+        else if( trim(c1st).eq.'charges' ) then
+          cmode = 'charges'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cchgs
+          if(  trim(cchgs).ne.'fixed' .and. &
+               trim(cchgs).ne.'fixed_bvs' .and. &
+               trim(cchgs).ne.'variable' .and. &
+               trim(cchgs).ne.'qeq' ) then
+            print *,'ERROR: charges should have an argument of'//&
+                 ' either fixed, fixed_bvs, variable or qeq.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cchgs)
+          cycle
+        else if( trim(c1st).eq.'charge_dist' ) then
+          cmode = 'charge_dist'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cdist
+          if(  trim(cdist).ne.'point' .and. &
+               trim(cdist).ne.'gaussian' ) then
+            print *,'ERROR: charge_dist should have an argument of'//&
+                 ' either point or gaussian.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cdist)
+          cycle
+        else if( trim(c1st).eq.'terms' ) then
+          cmode = 'terms'
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cterms
+          if(  trim(cterms).ne.'full' .and. &
+               trim(cterms).ne.'short' .and. &
+               trim(cterms).ne.'long' .and. &
+               trim(cterms).ne.'direct' .and. &
+               trim(cterms).ne.'direct_cut' .and. &
+               trim(cterms).ne.'screened_cut' ) then
+            print *,'ERROR: terms should have an argument of '//&
+                 'either direct_cut, screened_cut, full, short, or long.'
+            stop
+          endif
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),' '//trim(cterms)
+          cycle
+        else if( trim(c1st).eq.'interactions' ) then
+          backspace(ioprms)
+          read(ioprms,'(a)') ctmp
+          nentry = num_data(ctmp,' ')
+          if( nentry.eq.1 ) then
+            cmode = 'interactions'
+            cinteract = 'given'
+            interact(1:nspmax,1:nspmax) = .false.
+          else if( nentry.eq.2 ) then
+            backspace(ioprms)
+            read(ioprms,*) ctmp, cinteract
+            cmode = 'none'
+          endif
+          cycle
+        else if( trim(c1st).eq.'rcut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, rcut
+          cycle
+        else if( trim(c1st).eq.'scale_factor' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, sfctr
+          cycle
+        else if( trim(c1st).eq.'sigma' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, sgm_ew
+          cycle
+        else if( trim(c1st).eq.'fbvs' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fbvs
+          cycle
+        else if( trim(c1st).eq.'pacc' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, pacc
+          cycle
+        else if( trim(c1st).eq.'rho_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, rho_screened_cut
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),rho_screened_cut
+          cycle
+        else if( trim(c1st).eq.'rad_screened_cut' ) then
+!.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
+          rho_screened_cut = -1d0 *abs(rho_screened_cut)
+          backspace(ioprms)
+          read(ioprms,*) ctmp, csp, rad
+          if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
+          isp = csp2isp(trim(csp))
+          if( isp.gt.0 ) then
+            rad_bvs(isp) = rad
+          endif
+          cycle
+        else if( trim(c1st).eq.'rhoii_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, rhoii
+          isp = csp2isp(trim(cspi))
+          if( isp.le.0 ) cycle
+          rho_scr(isp,isp) = rhoii
+          if( iprint.ge.ipl_info ) print '(1x,a,3x,a,1x,f7.3)',trim(ctmp),trim(cspi),rhoii
+          cycle
+        else if( trim(c1st).eq.'rhoij_screened_cut' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, cspi, cspj, rhoij
+          isp = csp2isp(trim(cspi))
+          jsp = csp2isp(trim(cspj))
+          if( isp.le.0 .or. jsp.le.0 ) cycle
+          rho_scr(isp,jsp) = rhoij
+          rho_scr(jsp,isp) = rhoij
+          if( iprint.ge.ipl_info ) print *,trim(ctmp),trim(cspi) &
+               ,trim(cspj),rhoij
+          cycle
+!.....QEq related parameters hereafter
+        else if( trim(c1st).eq.'chgopt_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, chgopt_method
+          cycle
+        else if( trim(c1st).eq.'codmp_method' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, codmp_method
+          cycle
+        else if( trim(c1st).eq.'conv_eps_qeq' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, conv_eps_qeq
+          cycle
+        else if( trim(c1st).eq.'nstp_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, nstp_qeq
+          cycle
+        else if( trim(c1st).eq.'minstp_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_qeq
+          cycle
+        else if( trim(c1st).eq.'minstp_conv_qeq') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, minstp_conv_qeq
+          cycle
+        else if( trim(c1st).eq.'dt_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dt_codmp
+          cycle
+        else if( trim(c1st).eq.'qmass') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, qmass
+          cycle
+        else if( trim(c1st).eq.'fdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdamp_codmp
+          cycle
+        else if( trim(c1st).eq.'dfdamp_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dfdamp_codmp
+          cycle
+        else if( trim(c1st).eq.'finc_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, finc_codmp
+          cycle
+        else if( trim(c1st).eq.'fdec_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fdec_codmp
+          cycle
+        else if( trim(c1st).eq.'alpha0_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, alpha0_codmp
+          cycle
+        else if( trim(c1st).eq.'falpha_codmp') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, falpha_codmp
+          cycle
+        else if( trim(c1st).eq.'dqmax_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqmax_cogrd
+          cycle
+        else if( trim(c1st).eq.'dqeps_cogrd') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, dqeps_cogrd
+          cycle
+        else if( trim(c1st).eq.'bound_k4') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, bound_k4
+          cycle
+        else if( trim(c1st).eq.'omg2dt2') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, omg2dt2
+          cycle
+        else
+          print *,' No such entry: ',trim(c1st)
+          cycle
         endif
       enddo ! while(.true.)
 
@@ -624,6 +644,7 @@ contains
           if( iprint.ne.0 ) then
             print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
             print *,'           which is determined by acc*sqrt(2/pi)/Jii.'
+            print *,'    sgm_ew,sgmlim,vcgjiimin=',sgm_ew,sgmlim,vcgjiimin
           endif
           sgm_ew = sgmlim
         endif
@@ -691,6 +712,8 @@ contains
     call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(sfctr,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -702,7 +725,6 @@ contains
     call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
 
     call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
@@ -892,11 +914,11 @@ contains
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
-    if( lstrs ) then
+!!$    if( lstrs ) then
 !!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
 !!$           ,nn,mpi_md_world,strsl,9)
-      strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+!!$    endif
 
     if( l1st .and. myid.eq.0 .and. iprint.ge.ipl_basic ) then
       if( cterms(1:6).eq.'direct' ) then
@@ -910,6 +932,10 @@ contains
         print '(a,f12.4," eV")','   Long-range term   = ',elr
       endif
     endif
+
+!!$    print *,'strs Coulomb:'
+!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
+!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
 !!$    epotl = esrl +elrl +eselfl
 !!$!.....Gather epot
@@ -964,7 +990,7 @@ contains
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji
+        tmp = 0.5d0 *acc *qi*qj*diji *sfctr
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -974,20 +1000,18 @@ contains
           esrl = esrl +tmp
         endif
 !.....force
-        ftmp = -acc *qi*qj*diji*diji
+        ftmp = -acc *qi*qj*diji*diji *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
@@ -1045,6 +1069,7 @@ contains
         dvdrc = -acc*qi*qj /rc**2
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji -vrc -dvdrc*(dij-rc)
+        tmp = tmp *sfctr
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1055,19 +1080,18 @@ contains
         endif
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
+        ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
@@ -1121,8 +1145,8 @@ contains
     esrl= 0d0
 !.....Loop over resident atoms
 !$omp parallel
-!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi,dxdj,rhoij,terfc, &
-!$omp     vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
+!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp     dxdj,rhoij,terfc,vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
 !$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -1131,8 +1155,8 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j=lspr(jj,i)
-        if(j.eq.0) exit
-        if(j.le.i) cycle
+!!$        if(j.eq.0) exit
+!!$        if(j.le.i) cycle
         js= int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
@@ -1152,31 +1176,31 @@ contains
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
+        tmp = tmp *sfctr
 !.....potential
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
-!!$        epi(i)= epi(i) +tmp
-!!$        esrl = esrl +tmp
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl = esrl +tmp
 !.....force
+        dedr = dedr*sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+!!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 !$omp end do
@@ -1231,6 +1255,7 @@ contains
         terfc = erfc(dij*ss2i)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
+        tmp = tmp *sfctr
 !!$        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
@@ -1246,19 +1271,18 @@ contains
 !!$             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
         ftmp = -acc *qj*qi*diji *( diji *terfc &
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
+        ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
-        if( lstrs ) then
-          do ixyz=1,3
-            do jxyz=1,3
-              strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
-        endif
+        enddo
       enddo
     enddo
 
@@ -1282,7 +1306,7 @@ contains
 
     integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz,itot
     real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
-         tmp,cs,sn,texp,bb2,bk
+         tmp,ftmp,cs,sn,texp,bb2,bk
     real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
     real(8):: emat(3,3)
@@ -1391,29 +1415,31 @@ contains
 !!$                 *( cs*qcos(ik) +sn*qsin(ik) )
             tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
+            tmp = tmp *sfctr
             epi(i) = epi(i) +tmp
             elrl = elrl +tmp
 !.....Forces
 !!$            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
 !!$                 *0.5d0*( -sn*qcos(ik) +cs*qsin(ik) )
-            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
-                 *( -sn*qcos(ik) +cs*qsin(ik) )
+!!$            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
+!!$                 *( -sn*qcos(ik) +cs*qsin(ik) )
+            ftmp = -acc/vol *qi *pflr(ik,is) &
+                 *( -sn*qcos(ik) +cs*qsin(ik) ) *sfctr
+            aa(1:3,i) = aa(1:3,i) +bb(1:3)*ftmp
 !!$            if( itot.eq.19 .or. itot.eq.21 ) then
 !!$              print '(a,4i4,7es11.3)','myid,i,itot,ik,aa,qcos,qsin,cs,sn=' &
 !!$                   ,myid,i,itot,ik,aa(1:3,i) &
 !!$                   ,qcos(ik),qsin(ik),cs,sn
 !!$            endif
 !.....Stress
-            if( lstrs ) then
-              bk = norm(bb)
-              do ixyz=1,3
-                do jxyz=1,3
-                  strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
-                       *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2d0/bk) &
-                       -emat(ixyz,jxyz))
-                enddo
+            bk = norm(bb)
+            do ixyz=1,3
+              do jxyz=1,3
+                strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
+                     *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2d0/bk) &
+                     -emat(ixyz,jxyz))
               enddo
-            endif  ! lstress
+            enddo
 
 10          if( k3.ge.-kmax3+2 ) then
               cs3mm= cs3m
@@ -1459,8 +1485,8 @@ contains
         qi = chg(i)
         q2 = qi*qi
         tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-        eselfl = eselfl +tmp
-        epi(i) = epi(i) +tmp
+        eselfl = eselfl +tmp*sfctr
+        epi(i) = epi(i) +tmp*sfctr
       enddo
     else if( trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long') then ! fixed charge
@@ -1469,8 +1495,8 @@ contains
       do i=1,natm
         is = int(tag(i))
         q2 = chg(i)*chg(i)
-        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi)
-        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi)
+        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
+        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
       enddo
     endif
     return
@@ -1525,7 +1551,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = acc *diji *terfc *fcut1(dij,0d0,rc)
+        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) *sfctr
         if( j.le.natm ) then
           esr = esr +tmp*qi*qj
         else
@@ -1583,6 +1609,9 @@ contains
     sgmsq2 = sqrt(2d0)*sgm_ew
     ss2i = 1d0 /sgmsq2
     esr = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
+!$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1591,16 +1620,11 @@ contains
         dij2 = d2lspr(jj,i)
         if( dij2.ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
+!!$        if( j.eq.0 ) exit
+!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
-!!$        xj(1:3) = ra(1:3,j)
-!!$        xij(1:3)= xj(1:3)-xi(1:3)
-!!$        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-!!$        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        dij = sqrt(dij)
         dij = sqrt(dij2)
         diji = 1d0/dij
         rhoij = rho_scr(is,js)
@@ -1609,16 +1633,20 @@ contains
         dvdrc = dvdrcs(is,js)
 !.....potential
         tmp = acc*diji*terfc -vrc -dvdrc*(dij-rc)
-        if( j.le.natm ) then
-          esr = esr +tmp*qi*qj
-        else
-          esr = esr +0.5d0*tmp*qi*qj
-        endif
+        tmp = tmp *sfctr
+!!$        if( j.le.natm ) then
+!!$          esr = esr +tmp*qi*qj
+!!$        else
+!!$          esr = esr +0.5d0*tmp*qi*qj
+!!$        endif
+        esr = esr +0.5d0*tmp*qi*qj        
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
-        fq(j) = fq(j) -tmp*qi
+!!$        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     return
   end subroutine qforce_screened_cut
@@ -1672,10 +1700,11 @@ contains
 !.....Potential energy per atom
             tmp = prefac/bb2*qi*texp &
                  *(cs*qcos(ik) +sn*qsin(ik))
+            tmp = tmp *sfctr
             elr = elr +tmp
 !.....Force on charge
             fq(i)= fq(i) -2d0 *prefac/bb2 *texp &
-                 *(cs*qcos(ik) +sn*qsin(ik))
+                 *(cs*qcos(ik) +sn*qsin(ik)) *sfctr
 !!$            if( i.eq.1 .and. (ik.gt.5000.and.ik.le.6000) ) then
 !!$              print '(a,i6,3i4,10f10.4)','ik,qi,1/bb2,texp,cs,sn,qcos,qsin,fqikkk,fq(i)='&
 !!$                   ,ik,k1,k2,k3,qi,1.d0/bb2,texp,cs,sn &
@@ -1711,8 +1740,9 @@ contains
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm_ew
-      eself = eself +vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)
+      tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
+      eself = eself +tmp *sfctr
+      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)*sfctr
     enddo
 
   end subroutine qforce_self

@@ -51,7 +51,7 @@ __version__ = "200722"
 #...constants
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
 #                 'cube','CHGCAR','pdb')
-DEFAULT_LABELS = ('pos','vel','frc','sid')
+DEFAULT_LABELS = ('x','y','z','vx','vy','vz','fx','fy','fz','sid')
 # _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
 #                  'cube','CHGCAR')
 # _default_labels = ('pos','vel','frc','sid')
@@ -117,6 +117,10 @@ class NAPSystem(object):
         if 'distance' in aux_names:
             aux_names.remove('distance')
         return aux_names
+
+    def set_lattice_constant(self,alc):
+        self.alc = alc
+        return None
 
     def set_lattice(self, alc, a1, a2, a3):
         """
@@ -253,7 +257,7 @@ class NAPSystem(object):
         b3 = 2.0 *np.pi *np.cross(a1,a2)/v
         return b1,b2,b3
 
-    def add_atoms(self,symbols,poss,vels,frcs):
+    def add_atoms(self,symbols,poss,vels=[],frcs=[]):
         """
         Add atoms of given symbols, positions, velocities and forces.
         Positions, velocities and forces are assumed to be scaled in lattice vectors.
@@ -270,9 +274,21 @@ class NAPSystem(object):
             sids.append(sid)
         
         newatoms = pd.DataFrame(columns=self.atoms.columns)
-        newatoms.pos = [ np.array(pos) for pos in poss ]
-        newatoms.vel = [ np.array(vel) for vel in vels ]
-        newatoms.frc = [ np.array(frc) for frc in frcs ]
+        if type(poss) == list:
+            poss = np.array(poss)
+        newatoms[['x','y','z']] = poss
+        if len(vels) == len(poss):
+            if type(vels) == list:
+                vels = np.array(vels)
+        else:
+            vels = np.zeros(poss.shape)
+        newatoms[['vx','vy','vz']] = vels
+        if len(frcs) == len(poss):
+            if type(frcs) == list:
+                frcs = np.array(frcss)
+        else:
+            frcs = np.zeros(poss.shape)
+        newatoms[['fx','fy','fz']] = frcs
         newatoms.sid = [ sid for sid in sids ]
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)
@@ -327,11 +343,36 @@ class NAPSystem(object):
     def get_volume(self):
         return self.alc**3 *np.abs(np.dot(self.a1,np.cross(self.a2,self.a3)))
 
+    def get_positions(self,real=False):
+        """
+        Get positions of atoms. If real=True, the positions are multiplied with h-mat.
+        """
+        if real:
+            return self.get_real_positions()
+        return self.get_scaled_positions()
+    
+    def get_velocities(self,real=False):
+        """
+        Get velocities of atoms. If real=True, they are multiplied with h-mat.
+        """
+        if real:
+            return self.get_real_velocities()
+        return self.get_scaled_velocities()
+    
+    def get_forces(self,real=False):
+        """
+        Get forces of atoms. If real=True, they are multiplied with h-mat.
+        """
+        if real:
+            return self.get_real_forces()
+        return self.get_scaled_forces()
+    
     def get_real_positions(self):
         hmat = self.get_hmat()
+        spos = self.get_scaled_positions()
         rpos = np.zeros((len(self.atoms),3))
         for ia in range(len(self.atoms)):
-            pos = self.atoms.pos[ia]
+            pos = spos[ia]
             rpos[ia,:] = np.dot(hmat,pos)
         return rpos
 
@@ -342,23 +383,51 @@ class NAPSystem(object):
         for i in range(len(self.atoms)):
             rpi = rposs[i]
             spi = np.dot(hmati,rpi)
-            self.atoms.at[i,'pos'] = spi
+            self.atoms.at[i,['x','y','z']] = spi
         return None
 
     def get_scaled_positions(self):
-        return np.array(list(self.atoms.pos.values))
+        return self.atoms[['x','y','z']].to_numpy()
 
     def set_scaled_positions(self,sposs):
         if len(sposs) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
-        self.atoms.pos = [ np.array(p) for p in sposs ]
+        if type(sposs) == list:
+            sposs = np.array(sposs)
+        self.atoms[['x','y','z']] = sposs
         return None
+
+    def get_scaled_velocities(self):
+        return self.atoms[['vx','vy','vz']].to_numpy()
+
+    def get_real_velocities(self):
+        hmat = self.get_hmat()
+        vels = self.get_scaled_velocities()
+        rvels = np.zeros(vels.shape)
+        for ia in range(len(vels)):
+            v = vels[ia]
+            rvels[ia,:] = np.dot(hmat,v)
+        return rvels
 
     def set_scaled_velocities(self,svels):
         if len(svels) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
-        self.atoms.vel = [ np.array(v) for v in svels ]
+        if type(svels) == list:
+            svels = np.array(svels)
+        self.atoms[['vx','vy','vz']] = svels
         return None
+
+    def get_scaled_forces(self):
+        return self.atoms[['fx','fy','fz']].to_numpy()
+
+    def get_real_forces(self):
+        hmat = self.get_hmat()
+        frcs = self.get_scaled_forces()
+        rfrcs = np.zeros(frcs.shape)
+        for ia in range(len(frcs)):
+            f = frcs[ia]
+            rfrcs[ia,:] = np.dot(hmat,f)
+        return rfrcs
 
     def get_tags(self):
         """
@@ -508,6 +577,7 @@ class NAPSystem(object):
         """
         Visualize the system using 3Dmol.js and py3Dmol.
         """
+        from nappy.elements import elements
         try:
             import py3Dmol
         except Exception as e:
@@ -520,12 +590,15 @@ class NAPSystem(object):
         
         pdb = nappy.io.get_PDB_txt(self,**options)
         v = py3Dmol.view()
+        v.removeAllModels()
+        v.setViewStyle({'style':'outline','color':'black','width':0.03})
         v.addModel(pdb,'pdb')
-        v.setViewStyle({'style':'outline','color':'black','width':0.05})
+        colors = { s:elements[s]['CPKcolor'] for s in self.specorder }
         if 'modopts' in locals():
             v.setStyle(modopts)
         else:
-            v.setStyle({'stick':{'radius':.1},'sphere':{'radius':.5}})
+            v.setStyle({'stick':{'radius':.1,'colorscheme':{'prop':'elem','map':colors}},
+                        'sphere':{'radius':.5,'colorscheme':{'prop':'elem','map':colors}}})
         v.addUnitCell()
         if hasattr(self,'voldata'):
             cube = self.get_cube_txt()
@@ -548,8 +621,8 @@ class NAPSystem(object):
             raise ValueError('ia > natms, ia,natms = ',ia,natm)
         if ja > natm:
             raise ValueError('ja > natms, ja,natms = ',ja,natm)
-        xi = self.atoms.pos[ia]
-        xj = self.atoms.pos[ja]
+        xi = self.atoms.loc[ia,['x','y','z']].to_numpy()
+        xj = self.atoms.loc[ja,['x','y','z']].to_numpy()
         xij = xj-xi -np.round(xj-xi)
         hmat = self.get_hmat()
         rij = np.dot(hmat,xij)
@@ -567,9 +640,9 @@ class NAPSystem(object):
             raise ValueError('j > natms, j,natms = ',j,natm)
         if k > natm:
             raise ValueError('k > natms, k,natms = ',k,natm)
-        xi = self.atoms.pos[i]
-        xj = self.atoms.pos[j]
-        xk = self.atoms.pos[k]
+        xi = self.atoms.loc[i,['x','y','z']].to_numpy()
+        xj = self.atoms.loc[j,['x','y','z']].to_numpy()
+        xk = self.atoms.loc[k,['x','y','z']].to_numpy()
         xij = xj-xi -np.round(xj-xi)
         xik = xk-xi -np.round(xk-xi)
         hmat = self.get_hmat()
@@ -632,13 +705,9 @@ class NAPSystem(object):
         else:
             rcs2[:,:] = rcut**2
         rc2= rcut**2
+
         h= self.get_hmat()
-        # h[:,0]= self.a1 *self.alc
-        # h[:,1]= self.a2 *self.alc
-        # h[:,2]= self.a3 *self.alc
         hi= np.linalg.inv(h)
-        # print h
-        # print hi
         lcx= int(1.0/np.sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
         lcy= int(1.0/np.sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
         lcz= int(1.0/np.sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
@@ -657,18 +726,14 @@ class NAPSystem(object):
         lshd= np.zeros((lcxyz,),dtype=int)
         lscl[:]= -1
         lshd[:]= -1
-        # print 'lcx,lcy,lcz,lcxyz=',lcx,lcy,lcz,lcxyz
-        # print 'rcx,rcy,rcz=',rcx,rcy,rcz
         
         # Use numpy array instead of accessing pandas series when it will be heavily accessed.
-        poss = np.array(self.atoms.pos)
+        poss = self.get_scaled_positions()
 
         #...make a linked-cell list
         self.assign_pbc()
         for i in range(self.num_atoms()):
-            # pi = self.atoms.pos[i]
             pi = poss[i]
-            # print pi
             #...assign a vector cell index
             mx = int(pi[0]*rcxi)
             my = int(pi[1]*rcyi)
@@ -677,7 +742,6 @@ class NAPSystem(object):
             my = min(max(my,0),lcy-1)
             mz = min(max(mz,0),lcz-1)
             m= mx*lcyz +my*lcz +mz
-            # print i,pi,mx,my,mz,m
             lscl[i]= lshd[m]
             lshd[m]= i
 
@@ -702,9 +766,7 @@ class NAPSystem(object):
         sids = self.atoms.sid
 
         for ia in range(self.num_atoms()):
-            # pi = self.atoms.pos[i]
             pi = poss[ia]
-            # print pi
             #...assign a vector cell index
             mx = int(pi[0]*rcxi)
             my = int(pi[1]*rcyi)
@@ -713,7 +775,6 @@ class NAPSystem(object):
             my = min(max(my,0),lcy-1)
             mz = min(max(mz,0),lcz-1)
             isp = sids[ia] -1
-            # m= mx*lcyz +my*lcz +mz
             for kuz in (-1,0,1):
                 m1z = mz +kuz
                 if m1z < 0: m1z += lcz
@@ -787,14 +848,14 @@ class NAPSystem(object):
                 yield lspri[jj]
 
     def assign_pbc(self):
-        poss = self.atoms.pos
+        poss = self.get_scaled_positions()
         for i in range(len(self.atoms)):
             pi = poss[i]
             newpi = np.zeros(3)
             newpi[0] = pbc(pi[0])
             newpi[1] = pbc(pi[1])
             newpi[2] = pbc(pi[2])
-            self.atoms.at[i,'pos'] = newpi
+            self.atoms.at[i,['x','y','z']] = newpi
         return None
 
     def get_expansion_num(self,length):
@@ -822,9 +883,11 @@ class NAPSystem(object):
         """
         Shift all the atoms by (sx,sy,sz) in scaled unit.
         """
-        def _shift(arr):
-            return np.array([arr[0]+sx, arr[1]+sy, arr[2]+sz])
-        self.atoms.pos = self.atoms.pos.apply(_shift)
+        def _shift(x,d):
+            return x+d
+        self.atoms['x'] = self.atoms['x'].apply(_shift,d=sx)
+        self.atoms['y'] = self.atoms['y'].apply(_shift,d=sy)
+        self.atoms['z'] = self.atoms['z'].apply(_shift,d=sz)
         return None
 
     def cycle_coord(self,ncycle=0):
@@ -836,15 +899,19 @@ class NAPSystem(object):
             return None
         for icycle in range(ncycle):
             a1,a2,a3 = self.get_lattice_vectors()
-            spos = self.get_scaled_positions()
             a1 = [ a1[1], a1[2], a1[0] ]
             a2 = [ a2[1], a2[2], a2[0] ]
             a3 = [ a3[1], a3[2], a3[0] ]
             self.set_lattice(1.0, a2, a3, a1)
-        
-        self.atoms.pos = self.atoms.pos.apply(lambda x: [ x[(0+ncycle) % 3],
-                                                          x[(1+ncycle) % 3],
-                                                          x[(2+ncycle) % 3]])
+
+        from_col = ['x','y','z']
+        to_col = [ from_col[ (0+ncycle) %3],
+                   from_col[ (1+ncycle) %3],
+                   from_col[ (2+ncycle) %3],]
+        newdf = np.DataFrame(columns=['x','y','z'])
+        for i in range(3):
+            newdf[to_col[i]] = self.atoms[from_col[i]]
+        self.atoms[['x','y','z']] = newdf[['x','y','z']]
         return None
         
     def repeat(self,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
@@ -874,21 +941,29 @@ class NAPSystem(object):
         # atoms0= copy.copy(self.atoms)
         newnatm = len(self.atoms) *n1*n2*n3
         newsids = [ 0 for i in range(newnatm) ]
-        newposs = [ np.zeros(3) for i in range(newnatm) ]
-        newvels = [ np.zeros(3) for i in range(newnatm) ]
-        newfrcs = [ np.zeros(3) for i in range(newnatm) ]
+        newposs = np.zeros((newnatm,3))
+        newvels = np.zeros((newnatm,3))
+        newfrcs = np.zeros((newnatm,3))
         colnames = list(self.atoms.columns)
         #...Labels except (sid,pos,vel,frc) are all auxiliary data
         auxnames = colnames.copy()
         auxnames.remove('sid')
-        auxnames.remove('pos')
-        auxnames.remove('vel')
-        auxnames.remove('frc')
+        auxnames.remove('x')
+        auxnames.remove('y')
+        auxnames.remove('z')
+        auxnames.remove('vx')
+        auxnames.remove('vy')
+        auxnames.remove('vz')
+        auxnames.remove('fx')
+        auxnames.remove('fy')
+        auxnames.remove('fz')
         newauxs = {}
         for auxname in auxnames:
             newauxs[auxname] = []
         inc = 0
-        poss = self.atoms.pos
+        poss = self.get_scaled_positions()
+        vels = self.atoms[['vx','vy','vz']].to_numpy()
+        frcs = self.atoms[['fx','fy','fz']].to_numpy()
         for i1 in range(n1m,n1):
             for i2 in range(n2m,n2):
                 for i3 in range(n3m,n3):
@@ -898,17 +973,20 @@ class NAPSystem(object):
                         y= pi0[1]/m2 +1.0/m2*i2
                         z= pi0[2]/m3 +1.0/m3*i3
                         newsids[inc] = self.atoms.sid[i0]
-                        newposs[inc][:] = [x,y,z]
-                        newvels[inc][:] = self.atoms.vel[i0]
-                        newfrcs[inc][:] = self.atoms.frc[i0]
+                        newposs[inc,:] = [x,y,z]
+                        newvels[inc,:] = vels[i0,:]
+                        newfrcs[inc,:] = frcs[i0,:]
                         for auxname in auxnames:
                             newauxs[auxname].append(self.atoms.loc[i0,auxname])
                         inc += 1
         #...Use DataFrame self.atoms
         self.atoms = pd.DataFrame(columns=colnames)
-        self.atoms['pos'] = newposs
-        self.atoms['vel'] = newvels
-        self.atoms['frc'] = newfrcs
+        self.atoms[['x','y','z']] = newposs
+        self.atoms[['vx','vy','vz']] = newvels
+        self.atoms[['fx','fy','fz']] = newfrcs
+        # self.atoms['pos'] = newposs
+        # self.atoms['vel'] = newvels
+        # self.atoms['frc'] = newfrcs
         self.atoms['sid'] = newsids
         for auxname in auxnames:
             self.atoms[auxname] = newauxs[auxname]
@@ -924,8 +1002,9 @@ class NAPSystem(object):
 
         #...1st, count numbers to remove
         nrm = 0
+        spos = self.get_scaled_positions()
         for ia in range(len(self.atoms)):
-            pi = self.atoms.pos[ia]
+            pi = spos[ia]
             for l in range(3):
                 if pi[l] >= ds[l]:
                     nrm += 1
@@ -936,22 +1015,34 @@ class NAPSystem(object):
         self.a2 = self.a2 *ds[1]
         self.a3 = self.a3 *ds[2]
         newsids = [ 0 for i in range(newnatm) ] 
-        newposs = [ np.zeros(3) for i in range(newnatm) ] 
-        newvels = [ np.zeros(3) for i in range(newnatm) ] 
-        newfrcs = [ np.zeros(3) for i in range(newnatm) ] 
+        newposs = np.zeros((newnatm,3))
+        newvels = np.zeros((newnatm,3))
+        newfrcs = np.zeros((newnatm,3))
+        # newposs = [ np.zeros(3) for i in range(newnatm) ] 
+        # newvels = [ np.zeros(3) for i in range(newnatm) ] 
+        # newfrcs = [ np.zeros(3) for i in range(newnatm) ] 
         colnames = list(self.atoms.columns)
         #...Labels except (sid,pos,vel,frc) are all auxiliary data
         auxnames = colnames.copy()
         auxnames.remove('sid')
-        auxnames.remove('pos')
-        auxnames.remove('vel')
-        auxnames.remove('frc')
+        auxnames.remove('x')
+        auxnames.remove('y')
+        auxnames.remove('z')
+        auxnames.remove('vx')
+        auxnames.remove('vy')
+        auxnames.remove('vz')
+        auxnames.remove('fx')
+        auxnames.remove('fy')
+        auxnames.remove('fz')
         newauxs = {}
         for auxname in auxnames:
             newauxs[auxname] = []
         inc = 0
+        poss = self.get_scaled_positions()
+        vels = self.atoms[['vx','vy','vz']].to_numpy()
+        frcs = self.atoms[['fx','fy','fz']].to_numpy()
         for ia in range(len(self.atoms)):
-            pi = self.atoms.pos[ia]
+            pi = poss[ia]
             survive = True
             for l in range(3):
                 if pi[l] >= ds[l]:
@@ -963,17 +1054,17 @@ class NAPSystem(object):
                     if ds[l] < 0.9:
                         pinew[l] = pinew[l] /ds[l]
                 newsids[inc] = self.atoms.sid[ia]
-                newposs[inc][:] = pinew
-                newvels[inc][:] = self.atoms.vel[ia]
-                newfrcs[inc][:] = self.atoms.frc[ia]
+                newposs[inc,:] = pinew[:]
+                newvels[inc,:] = vels[ia,:]
+                newfrcs[inc,:] = frcs[ia,:]
                 for auxname in auxnames:
                     newauxs[auxname].append(self.atoms.loc[ia,auxname])
                 inc += 1
         #...Use DataFrame self.atoms
         self.atoms = pd.DataFrame(columns=colnames)
-        self.atoms['pos'] = newposs
-        self.atoms['vel'] = newvels
-        self.atoms['frc'] = newfrcs
+        self.atoms[['x','y','z']] = newposs
+        self.atoms[['vz','vy','vz']] = newvels
+        self.atoms[['fx','fy','fz']] = newfrcs
         self.atoms['sid'] = newsids
         for auxname in auxnames:
             self.atoms[auxname] = newauxs[auxname]
@@ -1020,7 +1111,7 @@ class NAPSystem(object):
         sshift = shift /lengths2[axis]
         for ia in range(len(self.atoms)):
             spos[ia,axis] += sshift
-        self.atoms.pos = spos.tolist()
+        self.atoms[['x','y','z']] = spos
         return None
         
     def to_ase_atoms(self):
@@ -1038,13 +1129,13 @@ class NAPSystem(object):
         a = np.linalg.norm(cell[0,:])
         b = np.linalg.norm(cell[1,:])
         c = np.linalg.norm(cell[2,:])
-        spos = list(self.atoms.pos)
-        vels = [ [vel[0]*a, vel[1]*b, vel[2]*c] for vel in self.atoms.vel ]
+        spos = list(self.get_scaled_positions())
         symbols = [ self.specorder[sid-1] for sid in self.atoms.sid ]
         atoms = Atoms(symbols=symbols,
                       cell=cell,
                       scaled_positions=spos,
                       pbc=True)
+        vels = [ [vel[0]*a, vel[1]*b, vel[2]*c] for vel in self.atoms[['vx','vy','vz']].values ]
         atoms.set_velocities(vels)
         return atoms
 
@@ -1063,11 +1154,12 @@ class NAPSystem(object):
         h[:,1] = self.a2 *self.alc
         h[:,2] = self.a3 *self.alc
         cr2 = criterion*criterion
+        spos = self.get_scaled_positions()
         for i in range(len(self.atoms)):
-            pi = self.atoms.pos[i]
+            pi = spos[i]
             for jj in range(len(self.atoms.lspr[i])):
                 j = self.atoms.lspr[i][jj]
-                pj = self.atoms.pos[j]
+                pj = spos[j]
                 xij = pj-pi
                 xij = xij -np.round(xij)
                 rij = np.dot(h,xij)
@@ -1127,7 +1219,8 @@ def analyze(nsys):
     return None
 
 def main():
-    args= docopt(__doc__)
+    import os,sys
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
 
     infmt= args['--in-format']
     outfmt= args['--out-format']
@@ -1179,5 +1272,4 @@ def main():
     return None
 
 if __name__ == "__main__":
-
     main()
