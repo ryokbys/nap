@@ -296,7 +296,7 @@ class CS:
             fgen.write('     0  {0:8d}  {1:12.4e}\n'.format(ind.iid, ind.val))
             find.write(' {0:8d}  {1:12.4e}'.format(ind.iid, ind.val))
             for j,vj in enumerate(ind.vector):
-                find.write(' {0:11.3e}'.format(vj))
+                find.write(' {0:11.4e}'.format(vj))
             find.write('\n')
 
         if self.print_level > 0:
@@ -390,7 +390,7 @@ class CS:
                     self.population[jv] = cj
                     find.write(' {0:8d}  {1:12.4e}'.format(cj.iid, cj.val))
                     for k,vk in enumerate(cj.vector):
-                        find.write(' {0:11.3e}'.format(vk))
+                        find.write(' {0:11.4e}'.format(vk))
                     find.write('\n')
                     find.flush()
                 else:

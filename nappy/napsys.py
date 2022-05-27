@@ -118,6 +118,10 @@ class NAPSystem(object):
             aux_names.remove('distance')
         return aux_names
 
+    def set_lattice_constant(self,alc):
+        self.alc = alc
+        return None
+
     def set_lattice(self, alc, a1, a2, a3):
         """
         Set lattice by specifying lattice constant and 3 vectors.

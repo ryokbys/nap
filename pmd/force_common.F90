@@ -94,7 +94,11 @@ subroutine get_force(l1st,epot,stnsr)
         aux(iaux_q,:) = aux(iaux_chg,:)
       else
         call bacopy_auxq_fixed(aux(iaux_q,:),aux(iaux_vq,:))
-        call chgopt_xlag(aux(iaux_chg,:),aux(iaux_q,:))
+        call chgopt_xlag(aux(iaux_chg,:),aux(iaux_q,:),ierr)
+        if( ierr.ne.0 ) then
+          call chgopt_damping(aux(iaux_chg,:),.false.)
+!!$          aux(iaux_q,:) = aux(iaux_chg,:)
+        endif
       endif
       call accum_time('chgopt_xlag',mpi_wtime() -tmp)
     else
@@ -1259,7 +1263,7 @@ subroutine chgopt_damping(chg,l1st)
   return
 end subroutine chgopt_damping
 !=======================================================================
-subroutine chgopt_xlag(chg,auxq)
+subroutine chgopt_xlag(chg,auxq,iflag)
 !
 !  Charge optimization via extended Lagrangian proposed by Nomura[1].
 !  Charges are optimized only once (line minimization) along the forces
@@ -1276,10 +1280,11 @@ subroutine chgopt_xlag(chg,auxq)
   include "./const.h"
   real(8),intent(in):: auxq(namax)
   real(8),intent(inout):: chg(namax)
+  integer,intent(out):: iflag
 
   logical,save:: l1st = .true.
   real(8),save,allocatable:: fq(:)
-  integer:: i,iflag,imax,ierr
+  integer:: i,imax,ierr
   real(8):: alpha,epot,dqmax,dq
 
   if( l1st ) then
@@ -1309,11 +1314,15 @@ subroutine chgopt_xlag(chg,auxq)
   call get_fq_wrapper(chg,fq,epot,.false.)
 !!$  print *,'epot/ntot = ',epot/ntot
 
+  iflag = 0
   call linmin_chg(chg,fq,conv_eps_qeq,alpha,epot,iflag)
-  if( iflag.ne.0 .and. myid_md.eq.0 ) then
-    print *,'something wrong with linmin_chg? iflag = ',iflag
+  if( iflag.ne.0 ) then
+    if( myid_md.eq.0 ) then
+      print *,'something wrong with linmin_chg? iflag = ',iflag
+    endif
+  else
+    chg(1:natm) = chg(1:natm) +fq(1:natm)*alpha
   endif
-  chg(1:natm) = chg(1:natm) +fq(1:natm)*alpha
   return
 end subroutine chgopt_xlag
 !=======================================================================

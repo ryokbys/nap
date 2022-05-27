@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-04-22 12:57:59 KOBAYASHI Ryo>
+!                     Last modified: <2022-05-10 13:05:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -731,6 +731,8 @@ contains
         enddo  ! kk-loop
       enddo  ! jj-loop
 
+!.....Since rhoi2==0 causes divided-by-zero problem, replace rhoi2 with a finite value.
+      rhoi2(0) = max(rhoi2(0),tiny)
 !.....F[rhoi]
       rhoi0 = sqrt(rhoi2(0))
       gam = 0d0

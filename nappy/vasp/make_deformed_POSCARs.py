@@ -23,7 +23,7 @@ Options:
   --uniform
               Use uniform interval deviation. [default: False]
   --specorder=SPECORDER
-              Order of species. [default: ]
+              Order of species. [default: None]
 """
 from __future__ import print_function
 
@@ -33,7 +33,8 @@ from docopt import docopt
 
 # sys.path.append(os.path.dirname(__file__))
 # sys.path.append(os.path.dirname(__file__)+'/../')
-from nappy.napsys import NAPSystem
+# from nappy.napsys import NAPSystem
+import nappy
 
 _length_digit = 3
 _angle_digit = 3
@@ -93,9 +94,10 @@ def isotropic(psys0,factors=[],offset=0):
     psyslist = []
     for fac in factors:
         psys = copy.deepcopy(psys0)
-        alc0 = psys0.alc
-        alc = alc0 *fac
-        psys.alc = alc
+        psys.set_lattice_constant(psys0.alc*fac)
+        # alc0 = psys0.alc
+        # alc = alc0 *fac
+        # psys.alc = alc
         psyslist.append(psys)
     return psyslist
 
@@ -226,9 +228,12 @@ if __name__ == "__main__":
     offset = int(args['--offset'])
     uniform = args['--uniform']
     specorder = args['--specorder'].split(',')
+    if specorder[0] == 'None':
+        specorder = None
     fname= args['POSCAR']
 
-    psys0 = NAPSystem(fname,specorder=specorder)
+    #psys0 = NAPSystem(fname,specorder=specorder)
+    psys0 = nappy.io.read(fname,specorder=specorder)
     factors = []
     if uniform:
         factors = get_uniform_factors(min_factor=fmin,max_factor=fmax,
@@ -251,6 +256,6 @@ if __name__ == "__main__":
     for p in psyslist:
         num += 1
         outfname = fname+'-{0:05d}'.format(num)
-        p.write_POSCAR(outfname)
+        nappy.io.write(p,fname=outfname)
 
 
