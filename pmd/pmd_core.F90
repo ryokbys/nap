@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-05-27 22:39:09 KOBAYASHI Ryo>
+!                     Last-modified: <2022-05-31 11:25:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -427,7 +427,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
     write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
          prss,' GPa '//trim(ctmp)
-    write(6,'(1x,a,6(1x,f0.3))') '  Stress tensor   =', &
+    write(6,'(1x,a,6f10.3)') '  Stress tensor   =', &
          sth(1,1),sth(2,2),sth(3,3), &
          sth(2,3),sth(3,1),sth(1,2)
     write(6,*) ''
@@ -869,8 +869,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
 
           write(6,'(a,6f10.3)') ' Stress (GPa):', &
-               stnsr(1,1),stnsr(2,2),stnsr(3,3), &
-               stnsr(2,3),stnsr(1,3),stnsr(1,2)
+               sth(1,1),sth(2,2),sth(3,3), &
+               sth(2,3),sth(1,3),sth(1,2)
+!!$               stnsr(1,1),stnsr(2,2),stnsr(3,3), &
+!!$               stnsr(2,3),stnsr(1,3),stnsr(1,2)
         endif
         call flush(6)
       endif
