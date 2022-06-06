@@ -285,7 +285,7 @@ class NAPSystem(object):
         newatoms[['vx','vy','vz']] = vels
         if len(frcs) == len(poss):
             if type(frcs) == list:
-                frcs = np.array(frcss)
+                frcs = np.array(frcs)
         else:
             frcs = np.zeros(poss.shape)
         newatoms[['fx','fy','fz']] = frcs

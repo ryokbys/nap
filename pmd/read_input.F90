@@ -189,6 +189,10 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'pressure_target' ) then
     call read_r1(ionum,ptgt)
+!.....As ptgt can be also used for vc-X isobaric methods, copy it to stgt(i,i)
+    stgt(1,1) = ptgt
+    stgt(2,2) = ptgt
+    stgt(3,3) = ptgt
     return
   elseif( trim(cname).eq.'initial_pressure_target' ) then
     call read_r1(ionum,pini)
@@ -198,6 +202,8 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'stress_target' ) then
     call read_rs(ionum,3,3,stgt(1:3,1:3))
+!.....It is not necesarry, but copy average stgt to ptgt as well...
+    ptgt = (stgt(1,1)+stgt(2,2)+stgt(3,3))/3
     return
   elseif( trim(cname).eq.'stress_relax_time' .or. &
        trim(cname).eq.'pressure_relax_time' ) then
