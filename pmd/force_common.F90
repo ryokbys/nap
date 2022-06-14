@@ -30,7 +30,7 @@ subroutine get_force(l1st,epot,stnsr)
 !!$  use NN,only:force_NN
 !!$  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use DNN,only: force_DNN
-  use Coulomb, only: force_Coulomb, &
+  use Coulomb, only: force_Coulomb, init_for_Ewald, &
        chgopt_method, bacopy_auxq_fixed
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
@@ -77,6 +77,11 @@ subroutine get_force(l1st,epot,stnsr)
 !.....Compute overlay coefficient first
   if( loverlay ) then
     call calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr,l1st,iprint)
+  endif
+
+!.....init_for_Ewald must be called before chgopt_damping
+  if( use_force('Coulomb') ) then
+    call init_for_Ewald(h,rc,myid_md,mpi_md_world,iprint)
   endif
 
 !.....If varaible charge, optimize charges before any charge-dependent potential
@@ -413,6 +418,8 @@ end subroutine get_force
 subroutine init_force(linit)
 !
 !  Initialization routine is separated from main get_force routine.
+!  And this routine is called from pmd_main not from pmd_core, so h and ra
+!  are not yet determined but hmat and rtot are.
 !
   use pmdvars,only: namax,nspmax,nsp,myid_md,mpi_md_world,iprint, &
        specorder,rc,lvc,am

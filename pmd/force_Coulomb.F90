@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-05-16 23:32:44 KOBAYASHI Ryo>
+!                     Last modified: <2022-06-14 17:31:07 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -142,7 +142,7 @@ contains
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    logical,intent(inout):: lvc 
+    logical,intent(inout):: lvc
 
     integer:: i,is,ierr,nspl
 
@@ -156,8 +156,26 @@ contains
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
       lvc = .true.
     endif
-
+    
   end subroutine init_coulomb
+!=======================================================================
+  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint)
+!
+! Initialization for Ewald method, which should be called in both cases of
+! variable charge and fixed charge.
+!
+    real(8),intent(in):: h(3,3),rc
+    integer,intent(in):: myid,mpi_world,iprint
+    
+    if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+        call init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+      else
+        call init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+      endif
+    endif
+    
+  end subroutine init_for_Ewald
 !=======================================================================
   subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
 !
@@ -231,7 +249,7 @@ contains
 
   end subroutine init_fc_Ewald
 !=======================================================================
-  subroutine init_vc_Ewald(myid,mpi_world,iprint,h,rc)
+  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -240,8 +258,8 @@ contains
 !  read from input file in.params.Coulomb.
 !
     implicit none
-    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),rc
+    integer,intent(in):: myid,mpi_world,iprint
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
@@ -826,17 +844,6 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Coulomb',8*size(strsl))
-
-      if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-        if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
-!.....Variable-charge Coulomb with Gaussian distribution charges
-!     which ends-up long-range-only Ewald summation
-          call init_vc_Ewald(myid,mpi_md_world,iprint,h,rc)
-        else
-          call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
-        endif
-      endif
-
 
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
@@ -1669,7 +1676,6 @@ contains
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
     prefac = 1d0 /(2d0*vol*eps0)
-!!$    print *,'prefac=',prefac
 !.....Compute structure factor
     call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
          ,myid,mpi_md_world,sorg)
