@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 21:38:55 Ryo KOBAYASHI>
+!                     Last-modified: <2022-07-05 13:24:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -758,19 +758,13 @@ contains
 
     t0 = mpi_wtime()
 
-!!$    call compute_nac(natm,myid,mpi_world,iprint)
 !.....First distinguish center of mass vectors of cells
     vacl(:,:) = 0d0
-!!$    nacl(:) = 0
     do i=1,natm
       ic = a2c(i)
       vacl(1:3,ic) = vacl(1:3,ic) +va(1:3,i)
-!!$      nacl(ic) = nacl(ic) + 1
     enddo
     vac(:,:) = 0d0
-!.....NACL and NAC are temporal here, used just for normalization
-!!$    nac(:) = 0
-!!$    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(vacl,vac,3*nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
     do ic=1,nxyz
       if( nac(ic).eq.0 ) cycle
@@ -783,8 +777,7 @@ contains
       ic = a2c(i)
       is = int(tag(i))
       vat(1:3) = va(1:3,i) -vac(1:3,ic)
-      vatr(1:3) = h(1:3,1)*vat(1) +h(1:3,2)*vat(2) +h(1:3,3)*vat(3)
-      ekti(i) = (vatr(1)**2 +vatr(2)**2 +vatr(3)**2) *fekin(is)
+      ekti(i) = (vat(1)**2 +vat(2)**2 +vat(3)**2) *fekin(is)
     enddo
     
     dofl(1:nxyz) = 0
@@ -822,7 +815,6 @@ contains
         tap(:) = 0d0
         do ic=1,nxyz
           if( dof(ic).eq.0 ) cycle
-!!$          call ic2ixyz(ic,ix,iy,iz)
 !.....Degree of freedom per atom (3 in case of 3D) is included in dof
           ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
           gp(ic) = dof(ic) *fkb *gmmp(ic) /vcell ! /3
@@ -1294,7 +1286,7 @@ contains
 !     and V0*GMMI*AMI is also [ue/Ang],
 !     so need to multiply ue2ev
         do l=1,3
-          aain(l) = sgmi*box_muller()/hscl(l) *ue2ev
+          aain(l) = sgmi*box_muller() *ue2ev
           aaout(l) = -vt(l)*gmmi*ami *ue2ev
           aai(l) = aaout(l) +aain(l)
         enddo
@@ -1312,18 +1304,16 @@ contains
           stop
         endif
 !.....accumulate energy difference
-        vi(1:3)= h(1:3,1)*vt(1) &
-             +h(1:3,2)*vt(2) &
-             +h(1:3,3)*vt(3)
-        vl(1:3)= h(1:3,1)*aai(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aai(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aai(3)*fa2v(isp)*dtmd *2d0
-        vin(1:3)= h(1:3,1)*aain(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aain(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aain(3)*fa2v(isp)*dtmd *2d0
-        vout(1:3)= h(1:3,1)*aaout(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
+        vi(1:3) = vt(1:3)
+        vl(1:3)= aai(1)*fa2v(isp)*dtmd *2d0 &
+             +aai(2)*fa2v(isp)*dtmd *2d0 &
+             +aai(3)*fa2v(isp)*dtmd *2d0
+        vin(1:3)= aain(1)*fa2v(isp)*dtmd *2d0 &
+             +aain(2)*fa2v(isp)*dtmd *2d0 &
+             +aain(3)*fa2v(isp)*dtmd *2d0
+        vout(1:3)= aaout(1)*fa2v(isp)*dtmd *2d0 &
+             +aaout(2)*fa2v(isp)*dtmd *2d0 &
+             +aaout(3)*fa2v(isp)*dtmd *2d0
         ediffl(isp)= ediffl(isp) +fekin(isp) &
              *(2d0*dot(vi,vl)+dot(vl,vl))
         deinl(isp)= deinl(isp) +fekin(isp) &
@@ -1376,7 +1366,6 @@ contains
     call mpi_allreduce(nabcl,nabc,1,mpi_integer,mpi_sum,mpi_world,ierr)
     areatom = area/nabc
 
-    hxi = 1d0/h(1,1)
     do i=1,natm
       xi = ra(1,i) +sorg(1)
       if( xi.lt.xrmd-xdnr ) cycle
@@ -1386,7 +1375,7 @@ contains
       zimp = ami *rho_latt *sspeed_latt
       ic = a2c(i)
       sgmi = dsqrt(2d0*zimp*areatom*ta(ic)/dtmd*k2ue)
-      axi = (-vx*zimp*areatom +sgmi*box_muller()*hxi)*ue2ev
+      axi = (-vx*zimp*areatom +sgmi*box_muller())*ue2ev
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
       va(1,i) = va(1,i) +axi*fa2v(isp)*dtmd *2d0
     enddo
@@ -1692,9 +1681,8 @@ contains
           tagabl(inc) = tag(ia)
           rt(1:3) = ra(1:3,ia) +sorg(1:3)
           r(1:3) = h(1:3,1)*rt(1) +h(1:3,2)*rt(2) +h(1:3,3)*rt(3)
-          v(1:3) = h(1:3,1)*va(1,ia) +h(1:3,2)*va(2,ia) +h(1:3,3)*va(3,ia)
           rabl(1:3,inc) = r(1:3)
-          vabl(1:3,inc) = v(1:3)
+          vabl(1:3,inc) = va(1:3,ia)
         endif
       enddo
 !.....Gather to-be-removed atoms for writing out

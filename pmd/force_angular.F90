@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-04-22 15:38:55 KOBAYASHI Ryo>
+!                     Last modified: <2022-07-01 14:01:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -215,7 +215,6 @@ contains
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-
 
 !.....Gather epot
     epott= 0d0

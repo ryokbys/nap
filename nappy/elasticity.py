@@ -100,8 +100,21 @@ def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
         if 'POSCAR' in infname:
             atoms.write(dname+'/'+infname,format='vasp',vasp5=True,direct=True,
                         sort=False)
+        elif 'pmdini' in infname:
+            nsys = nappy.io.from_ase(atoms)
+            nappy.io.write(nsys,fname=dname+'/'+infname)
         else:
-            raise ValueError('Only POSCAR is available for INFILE.')
+            raise ValueError('Available INFILEs: POSCAR and pmdini')
+        with open(dname+'/README','w') as f:
+            f.write('# Strain of the sample made by elasticity.py.\n\n')
+            f.write('strain tensor:\n' )
+            f.write('  {0:6.3f}  {1:6.3f}  {2:6.3f}\n'.format(*emat[0,0:3]))
+            f.write('  {0:6.3f}  {1:6.3f}  {2:6.3f}\n'.format(*emat[1,0:3]))
+            f.write('  {0:6.3f}  {1:6.3f}  {2:6.3f}\n'.format(*emat[2,0:3]))
+            f.write('\nResulting cell matrix:\n')
+            f.write('  {0:10.3f}  {1:10.3f}  {2:10.3f}\n'.format(*cell[0,0:3]))
+            f.write('  {0:10.3f}  {1:10.3f}  {2:10.3f}\n'.format(*cell[1,0:3]))
+            f.write('  {0:10.3f}  {1:10.3f}  {2:10.3f}\n'.format(*cell[2,0:3]))
     
     print('prepare done')
     print('')
@@ -111,6 +124,7 @@ def prepare(infname='POSCAR',dlt1max=0.01,dlt2max=0.06):
     print('or')
     print('  $ python elasticity.py analyze strs.pmd')
     print('')
+    return None
 
 def cdote(strns,*params):
     """
@@ -229,8 +243,9 @@ def params2ctnsr(params):
 def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
     #...original system
-    #atoms0 = read(infname,format='vasp')
-    atoms0 = ase.io.read(infname,format='vasp')
+    nsys0 = nappy.io.read(infname)
+    #atoms0 = ase.io.read(infname,format='vasp')
+    atoms0 = nsys0.to_ase_atoms()
 
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
@@ -339,7 +354,7 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
     cij = cij0
     symdata = spglib.get_symmetry_dataset(atoms0)
     #nsys = NAPSystem(ase_atoms=atoms0)
-    nsys = from_ase(atoms0)
+    nsys = nappy.io.from_ase(atoms0)
     sgnum = symdata['number']
     
     a,b,c = nsys.get_lattice_lengths()

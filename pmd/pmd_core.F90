@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-05-31 11:25:04 KOBAYASHI Ryo>
+!                     Last-modified: <2022-06-16 11:31:37 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1030,7 +1030,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
   hmat(:,:,:) = h(:,:,:)  ! Return h-matrix as hmat
 
-!.....Return stnsr as human-friendly unit, GPa
+!.....Return stnsr in human-friendly unit, GPa
   stnsr(:,:) = stnsr(:,:) *up2gpa
 
 !.....Output metadynamics potential
