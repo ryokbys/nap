@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-06-16 11:31:37 KOBAYASHI Ryo>
+!                     Last-modified: <2022-07-06 10:05:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2137,12 +2137,13 @@ subroutine bamove()
   use force
   use pmdmpi,only: nid2xyz
   use clrchg,only: lclrchg
+  use time,only: accum_time
   implicit none
   include 'mpif.h'
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
-  integer:: mvque(0:nbmax,6),newim
-  real(8):: xi(3)
+  integer:: mvque(0:nbmax,6),newim,maxa,itmp
+  real(8):: xi(3),tmp
   logical,external:: bmv
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
@@ -2223,6 +2224,32 @@ subroutine bamove()
       print *,'Buffer overflowed at bamove node',myid_md
       print *,'# in MVQUE=',mvque(0,kuh)
       stop
+    endif
+    
+!.....Error trap for reallocation like bacopy
+    itmp = natm + newim
+    do kdd= -1,0
+      ku = 2*kd +kdd
+      itmp = itmp +mvque(0,ku)
+    enddo
+    tmp = mpi_wtime()
+    call mpi_allreduce(itmp,maxa,1,mpi_integer,mpi_max, &
+         mpi_md_world,ierr)
+    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    if( maxa.gt.namax-nbmax ) then
+      if( lrealloc ) then
+        if( myid_md.eq.0 .and. iprint.ne.0 ) then
+          print *,'Update namax from ',namax,' to ',maxa*2+nbmax
+        endif
+        call realloc_namax_related(maxa*2,nbmax)
+      else
+        if( myid_md.eq.0 ) then
+          print *,'Exit pmd because maxa > nalmax.'
+          print *,'If you do not want to stop, set allow_reallocation T in in.pmd.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
     endif
 
     do kdd= -1,0

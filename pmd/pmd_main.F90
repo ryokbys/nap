@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-05-28 00:04:41 KOBAYASHI Ryo>
+!                     Last-modified: <2022-07-06 18:44:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -639,6 +639,7 @@ subroutine bcast_params()
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(lrealloc,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)

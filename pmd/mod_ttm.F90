@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-05 13:24:43 KOBAYASHI Ryo>
+!                     Last-modified: <2022-07-06 15:07:55 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -1853,7 +1853,7 @@ contains
 
     integer:: ix
     real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
-    real(8):: denom,xlsurf,vc1d,kl1d
+    real(8):: denom,xlsurf,vc1d,kl1d,I0_1D
 !!$    real(8),parameter:: kappa_latt = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
 !!$    real(8),parameter:: kappa_latt = 1.137d-4  ! kappa for Si lattice in eV/(fs.Ang.K)
     
@@ -1888,6 +1888,7 @@ contains
     if( itype_pulse.eq.1 ) then  ! stepwise pulse
       if( tnow.ge.t0_laser .and. &
            tnow.le.(t0_laser +tau_pulse) ) then
+        I0_1D = I_0 /darea *area
         xlsurf = (lsurf-1 +0.5d0)*dx
         vc1d = area*dx1d
         do ix=ibc1d+1,nd1d
@@ -1898,13 +1899,14 @@ contains
           tmp = 1d0 /(ce*rho_e *vc1d)
 !.....Do not shft 0.5 since the mesh points are at the edges of cells in case of 1D-TTM
           xi = (ix -1)*dx1d -xlsurf
-          de = I_0 *min(1d0, exp(-xi/lskin))*dx1d 
+          de = I0_1D *min(1d0, exp(-xi/lskin))*dx1d 
           dtep(ix) = dtep(ix) +de*tmp
         enddo
       endif
     else if( itype_pulse.eq.2 ) then  ! Gaussian pulse
       if( tnow.ge.t0_laser .and. &
            tnow.lt.(t0_laser +tau_pulse*2) ) then
+        I0_1D = I_0 /darea *area
         xlsurf = (lsurf-1 +0.5d0)*dx
         vc1d = area*dx1d
         pulsefactor = exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
@@ -1916,7 +1918,7 @@ contains
           tmp = 1d0 /(ce *rho_e *vc1d)
 !.....Do not shft 0.5 since the mesh points are at the edges of cells in case of 1D-TTM
           xi = (ix -1)*dx1d -xlsurf
-          de = I_0 *min(1d0, exp(-xi/lskin)) *dx1d *pulsefactor 
+          de = I0_1D *min(1d0, exp(-xi/lskin)) *dt_inner *dx1d *pulsefactor 
           dtep(ix) = dtep(ix) +de*tmp
         enddo
       endif
