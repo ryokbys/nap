@@ -199,13 +199,20 @@ def read_rdf(fname='out.rdf'):
     return rs,rdfs
     
 def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
-        nnmax=100,fortran=False):
+        nnmax=100,fortran=False,mask=None):
     """
     Compute RDF of the givin system.
     Number of bins is determined from DR, RMAX0, and RMIN as, int((RMAX0-RMIN)/DR)+1.
     Position of a bin is defined as the point of center of the bin, r_i = DR*(i+0.5).
     """
     natm0= nsys0.num_atoms()
+    #...NOTE: mask is not available now
+    # if mask:
+    #     if type(mask) != list:
+    #         raise TypeError('mask is not list.')
+    #     if len(mask) != natm0:
+    #         raise ValueError('len(mask) != len(nsys0)')
+        
     vol= nsys0.get_volume()
     natms = [ float(natm0) ]
     for ispcs in range(1,nspcs+1):
