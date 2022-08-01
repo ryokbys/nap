@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-06 10:05:22 KOBAYASHI Ryo>
+!                     Last-modified: <2022-07-12 16:49:13 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -313,9 +313,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   
 !.....Calc forces
   lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
-!!$       ( trim(cpctl).eq.'Berendsen' .or. &
-!!$       trim(cpctl).eq.'vc-Berendsen' .or. &
-!!$       trim(cpctl).eq.'vv-Berendsen')
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
   tmp = mpi_wtime()
@@ -745,7 +742,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Second kick of velocities
     if( trim(ctctl).eq.'Langevin' ) then
       call vel_update_langevin(natm,tag,va,aa)
-    else 
+    else
       do i=1,natm
         is = int(tag(i))
         va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
@@ -857,10 +854,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              //',es13.4,2es11.3)') &
              " istp,etime,temp,epot,vol,prss=" &
              ,istp,tcpu,tave,epot,vol,prss
-!!$        if( trim(cpctl).eq.'Berendsen' .or. &
-!!$             trim(cpctl).eq.'vc-Berendsen' .or. &
-!!$             trim(cpctl).eq.'vv-Berendsen' .and. &
-!!$             iprint.ne.0 ) then
         if( (index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) &
              .and. iprint.ne.0 ) then
           write(6,'(a)') ' Lattice vectors:' !,h(1:3,1:3,0)
@@ -871,8 +864,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           write(6,'(a,6f10.3)') ' Stress (GPa):', &
                sth(1,1),sth(2,2),sth(3,3), &
                sth(2,3),sth(1,3),sth(1,2)
-!!$               stnsr(1,1),stnsr(2,2),stnsr(3,3), &
-!!$               stnsr(2,3),stnsr(1,3),stnsr(1,2)
         endif
         call flush(6)
       endif
@@ -1945,9 +1936,9 @@ subroutine bacopy(l1st)
       if( lrealloc ) then
         if (myid_md.eq.0 .and. iprint.ne.0 ) then
           print *,'Updated namax and array since nbmax changed' &
-               //' from ',nbmax,' to ',int(maxb*1.5)
+               //' from ',nbmax,' to ',2*maxb
         endif
-        call realloc_namax_related(nalmax,int(maxb*1.5))
+        call realloc_namax_related(namax-nbmax,2*maxb)
       else
         if( myid_md.eq.0 ) then
           print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
@@ -2142,7 +2133,7 @@ subroutine bamove()
   include 'mpif.h'
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
-  integer:: mvque(0:nbmax,6),newim,maxa,itmp
+  integer:: mvque(0:nbmax,6),newim,maxa,itmp,mvql,mvqg
   real(8):: xi(3),tmp
   logical,external:: bmv
   real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
@@ -2216,14 +2207,36 @@ subroutine bamove()
     endif
 
 !-------Error trap
-    if (mvque(0,kul).gt.nbmax) then
-      print *,'Buffer overflowed at bamove node',myid_md
-      print *,'# in MVQUE=',mvque(0,kul)
-      stop
-    else if (mvque(0,kuh).gt.nbmax) then
-      print *,'Buffer overflowed at bamove node',myid_md
-      print *,'# in MVQUE=',mvque(0,kuh)
-      stop
+    mvql = max(mvque(0,kul),mvque(0,kuh))
+!!$    if (mvque(0,kul).gt.nbmax) then
+!!$      jerr = mvque(0,kul)
+!!$      print *,'Buffer overflowed at bamove node',myid_md
+!!$      print *,'# in MVQUE=',mvque(0,kul)
+!!$      stop
+!!$    else if (mvque(0,kuh).gt.nbmax) then
+!!$      jerr = mvque(0,kuh)
+!!$      print *,'Buffer overflowed at bamove node',myid_md
+!!$      print *,'# in MVQUE=',mvque(0,kuh)
+!!$      stop
+!!$    endif
+    tmp = mpi_wtime()
+    call mpi_allreduce(mvql,mvqg,1,mpi_integer,mpi_max, &
+         mpi_md_world,ierr)
+    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    if( mvqg.gt.nbmax ) then
+      if( lrealloc ) then
+        if( myid_md.eq.0 .and. iprint.ne.0 ) then
+          print *,'Update nbmax from ',nbmax,' to ',nbmax*2
+        endif
+        call realloc_namax_related(namax-nbmax,nbmax*2)
+      else
+        if( myid_md.eq.0 ) then
+          print *,'Exit pmd because mvqg > nbmax.'
+          print *,'If you do not want to stop, set allow_reallocation T in in.pmd.'
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
     endif
     
 !.....Error trap for reallocation like bacopy
@@ -3041,7 +3054,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
     stop
   endif
 
-  newnamax = int(newnalmax*1.2) + newnbmax
+  newnamax = newnalmax + newnbmax
 !.....No need of updating arrays
   if( newnamax .lt. namax ) return
 

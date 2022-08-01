@@ -817,7 +817,7 @@ def write_xsf(nsys,fname='xsf'):
     f.write("{0:>8d}  {1:2d}\n".format(len(nsys.atoms),nsys.num_species()))
     spos = nsys.get_scaled_positions()
     for i in range(len(nsys.atoms)):
-        pos = sos[i]
+        pos = spos[i]
         x,y,z = scaled_to_cartesian(h,*pos)
         sid = nsys.atoms.sid[i]
         symbol = nsys.specorder[sid-1]

@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-06 15:07:55 KOBAYASHI Ryo>
+!                     Last-modified: <2022-07-12 16:55:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -747,7 +747,7 @@ contains
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
 !!$    integer,external:: ifmvOf
 
-    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
+!!$    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
 
     if( .not. allocated(dofl) ) then
       allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
@@ -778,6 +778,7 @@ contains
       is = int(tag(i))
       vat(1:3) = va(1:3,i) -vac(1:3,ic)
       ekti(i) = (vat(1)**2 +vat(2)**2 +vat(3)**2) *fekin(is)
+!!$      if( i.eq.1 ) print '(a,2i5,4es12.4)','ic,i,va,ekti=',ic,i,vat(1:3),ekti(i)
     enddo
     
     dofl(1:nxyz) = 0
@@ -793,6 +794,7 @@ contains
       enddo
       dofl(ic) = dofl(ic) + idof
       eksuml(ic) = eksuml(ic) +ekti(i)
+!!$      if( i.eq.1 ) print '(a,3i5,es12.4)','i,ic,idof,ekti=',i,ic,idof,ekti(i)
       if( ek.gt.ekth ) then
         dofpl(ic) = dofpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ekti(i)
@@ -817,6 +819,7 @@ contains
           if( dof(ic).eq.0 ) cycle
 !.....Degree of freedom per atom (3 in case of 3D) is included in dof
           ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
+!!$          if( ic.eq.11 ) print '(a,2i5,2es12.4)','ic,dof,ek,ta=',ic,dof(ic),eksum(ic),ta(ic)
           gp(ic) = dof(ic) *fkb *gmmp(ic) /vcell ! /3
           if( dofp(ic).eq.0 ) cycle
           tap(ic) = ekpsum(ic) *2d0 /fkb /dofp(ic)
@@ -1077,6 +1080,7 @@ contains
       denom = ce*rho_e
       dtemp = ( kappa*d2te(iz,iy,ix) +pterm +sterm ) /denom ! *dt
       dtep(iz,iy,ix) = dtep(iz,iy,ix) +dtemp
+!!$      if( ic.eq.11 ) print '(a,2i5,4es12.3)','ic,ix,pterm,=',ic,ix,pterm,gp(ic),teic,ta(ic)
     enddo  ! ic=1,nxyz
 
 !.....Laser pulse
@@ -1230,13 +1234,14 @@ contains
     use util,only: itotOf, ifmvOf
     include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
-    real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
-         ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
+    real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax), &
+         fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,ifmv,ix,iy,iz,naccp,ierr,isp
-    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
-         ,aain(3),aaout(3),vin(3),vout(3),v0(3)
+    real(8):: sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3),&
+         aain(3),aaout(3),vin(3),vout(3),v0(3),etai,afi,bfi
+    real(8):: dv(3),dv0(3),dvin(3),dvout(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
     logical,save:: l1st = .true.
 
@@ -1260,10 +1265,6 @@ contains
     ediffl(1:nspmax) = 0d0
     deinl(1:nspmax) = 0d0
     deoutl(1:nspmax) = 0d0
-    hscl(1:3)= 0d0
-    do l=1,3
-      hscl(l)= dsqrt(h(1,l)**2 +h(2,l)**2 +h(3,l)**2)
-    enddo
     do i=1,natm
       ifmv = ifmvOf(tag(i))
       isp = int(tag(i))
@@ -1279,47 +1280,59 @@ contains
         ek = ekti(i)
         gmmi = gmmp(ic)
         if( ek.gt.ekth ) gmmi = gmmp(ic) + gmms(ic)
-        aai(1:3)= 0d0
-        aain(1:3)= 0d0
-        aaout(1:3)= 0d0
+!!$!.....G-JF algorithm parameters for Langevin
+!!$        etai = gmmi *dtmd /2
+!!$        bfi = 1d0 /(1d0 +etai)
+!!$        afi = 2d0*etai /(1d0 +etai)
 !.....SGMI should be [eV/Ang] whereas it is [ue/Ang]
 !     and V0*GMMI*AMI is also [ue/Ang],
 !     so need to multiply ue2ev
+        aai(1:3)= 0d0
+        aain(1:3)= 0d0
+        aaout(1:3)= 0d0
         do l=1,3
           aain(l) = sgmi*box_muller() *ue2ev
           aaout(l) = -vt(l)*gmmi*ami *ue2ev
           aai(l) = aaout(l) +aain(l)
         enddo
+!!$        dv0(1:3) = fa2v(isp)*dtmd*aa(1:3,i)
+!!$        dvout(1:3) = -afi*vt(1:3)
+!!$        do l=1,3
+!!$          dvin(l) = fa2v(isp)*dtmd *2d0*bfi*sgmi*box_muller()*ue2ev
+!!$        enddo
+!!$        dv(1:3) = dvin(1:3) +dvout(1:3)
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(isp)*dtmd *2d0
+!!$        va(1:3,i)= va(1:3,i) +dv0(1:3) +dv(1:3)
+!!$        if( i.eq.1 ) print '(a,2i5,3es12.4)','i,ic,va=',i,ic,va(1:3,i)
         if( va(1,i)*0d0.ne.0d0 .or. va(2,i)*0d0.ne.0d0 &
              .or. va(3,i)*0d0.ne.0d0 ) then
           if( myid.eq.0 ) then
             print *,'ERROR: va==NaN !!!'
             print *,'  ic,i,va(:)=',ic,i,va(1:3,i)
-            print *,'  aain,aaout=',aain(1:3),aaout(1:3)
+!!$            print *,'  aain,aaout=',aain(1:3),aaout(1:3)
+            print *,'  dvin,dvout=',dvin(1:3),dvout(1:3)
             print *,'  sgmi=',sgmi
             print *,'  gmmp(ic),te(iz,iy,ix)=',gmmp(ic),te(iz,iy,ix)
           endif
           stop
         endif
 !.....accumulate energy difference
-        vi(1:3) = vt(1:3)
-        vl(1:3)= aai(1)*fa2v(isp)*dtmd *2d0 &
-             +aai(2)*fa2v(isp)*dtmd *2d0 &
-             +aai(3)*fa2v(isp)*dtmd *2d0
-        vin(1:3)= aain(1)*fa2v(isp)*dtmd *2d0 &
-             +aain(2)*fa2v(isp)*dtmd *2d0 &
-             +aain(3)*fa2v(isp)*dtmd *2d0
-        vout(1:3)= aaout(1)*fa2v(isp)*dtmd *2d0 &
-             +aaout(2)*fa2v(isp)*dtmd *2d0 &
-             +aaout(3)*fa2v(isp)*dtmd *2d0
+        vl(1:3)= aai(1:3)*fa2v(isp)*dtmd *2d0
+        vin(1:3)= aain(1:3)*fa2v(isp)*dtmd *2d0
+        vout(1:3)= aaout(1:3)*fa2v(isp)*dtmd *2d0
         ediffl(isp)= ediffl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vl)+dot(vl,vl))
+             *(2d0*dot(vt,vl)+dot(vl,vl))
         deinl(isp)= deinl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vin)+dot(vin,vin))
+             *(2d0*dot(vt,vin)+dot(vin,vin))
         deoutl(isp)= deoutl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vout)+dot(vout,vout))
+             *(2d0*dot(vt,vout)+dot(vout,vout))
+!!$        ediffl(isp)= ediffl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dv)+dot(dv,dv))
+!!$        deinl(isp)= deinl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dvin)+dot(dvin,dvin))
+!!$        deoutl(isp)= deoutl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dvout)+dot(dvout,dvout))
       endif
     enddo
 
@@ -2181,5 +2194,5 @@ contains
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
