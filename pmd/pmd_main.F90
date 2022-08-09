@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-06 18:44:41 KOBAYASHI Ryo>
+!                     Last-modified: <2022-08-09 19:36:34 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -582,6 +582,7 @@ subroutine bcast_params()
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,npx,npy,npz,cspc_pdens,orig_pdens,hmat_pdens
   use deform,only: cdeform,trlx_deform,dhmat
+  use descriptor,only: lout_desc
   implicit none
   include 'mpif.h'
 
@@ -644,7 +645,8 @@ subroutine bcast_params()
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
-  
+!.....Descriptor
+  call mpi_bcast(lout_desc,1,mpi_logical,0,mpicomm,ierr)
 !.....Charge related
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields

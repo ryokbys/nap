@@ -44,6 +44,7 @@ subroutine set_variable(ionum,cname)
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use deform,only: cdeform, trlx_deform, dhmat
+  use descriptor,only: lout_desc
 #ifdef __WALL__
   use wall
 #endif
@@ -363,6 +364,10 @@ subroutine set_variable(ionum,cname)
 !.....Reallocation
   elseif( trim(cname).eq.'allow_reallocation') then
     call read_l1(ionum,lrealloc)
+    return
+!.....Descriptor
+  elseif( trim(cname).eq.'write_desc' ) then
+    call read_l1(ionum,lout_desc)
     return
     
 #ifdef __WALL__

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-08-02 11:01:14 KOBAYASHI Ryo>
+!                     Last-modified: <2022-08-09 23:08:56 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -38,6 +38,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        cell_update_berendsen,cell_force_berendsen, setup_cell_langevin, &
        cell_update_langevin, cvel_update_langevin, setup_cell_berendsen, &
        setup_cell_langevin
+  use descriptor,only: write_desc,lout_desc
 
   implicit none
   include "mpif.h"
@@ -309,6 +310,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( chgopt_method(1:4).eq.'xlag' ) then
     aux(iaux_vq,:) = 0d0
+  endif
+
+!.....Output descriptor and stop
+  if( lout_desc ) then
+    if( nodes_md.ne.1 ) stop 'ERROR: write_desc cannot be done in parallel.'
+    call write_desc(namax,natm,nnmax,lspr,h,tag,ra,rc, &
+         myid_md,mpi_md_world,iprint)
   endif
   
 !.....Calc forces
