@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-07-01 14:01:15 KOBAYASHI Ryo>
+!                     Last modified: <2022-08-05 09:21:06 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -353,6 +353,7 @@ contains
     call mpi_bcast(alps,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(bets,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gmms,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(shfts,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     return
   end subroutine read_params_angular

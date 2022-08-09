@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-12 16:49:13 KOBAYASHI Ryo>
+!                     Last-modified: <2022-08-02 11:01:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -529,8 +529,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   al(2)= h(2,2,0)
   al(3)= h(3,3,0)
 
-!!$  if( lflux ) call accum_lflux(namax,natm,h,ra,va,clr,istp,dt &
-!!$       ,myid_md,mpi_md_world,nxyz)
   if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iaux_clr,:),istp,dt &
        ,myid_md,mpi_md_world,nxyz)
   if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
@@ -547,13 +545,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
 
 !.....In case of isobaric MD, lstrs has to be always TRUE.
-!!$    if( trim(cpctl).eq.'Berendsen' .or. &
-!!$         trim(cpctl).eq.'vc-Berendsen' .or. &
-!!$         trim(cpctl).eq.'vv-Berendsen' .or. lstrs0 ) then
     if( index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) then
       lstrs = .true.
     else
-      lstrs = .false.
+      lstrs = lstrs0
     endif
 
 !.....Variable time-step
@@ -609,9 +604,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       l= int(mod(tag(i)*10,10d0))
       va(1:3,i)=va(1:3,i) *fmv(1:3,l)
     enddo
-!        call get_vmax(namax,natm,va,h,vmaxt,mpi_md_world)
-!        print '(a,i5,2es12.4)','myid,vmax,vmaxt='
-!     &       ,myid_md,vmax,vmaxt
 
     if( lclrchg ) then  ! special treatment for translational momentum
       call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
@@ -712,7 +704,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
     call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
-    lstrs = .false.
+    lstrs = lstrs0
 !.....Structure analysis
     if( trim(cstruct).eq.'CNA' &
          .and. mod(istp,istruct).eq.0 ) then

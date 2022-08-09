@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-12 16:55:58 KOBAYASHI Ryo>
+!                     Last-modified: <2022-08-08 19:31:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -11,6 +11,7 @@ module ttm
   use memory,only: accum_mem
   use vector,only: dot
   use random,only: box_muller
+  use util,only: itotOf
   implicit none
   save
   include 'mpif.h'
@@ -680,6 +681,11 @@ contains
     integer:: i,ix,iy,iz,ic,l
     real(8):: xi(3),udx,udy,udz,t0
 
+    if( size(a2c).ne.namax ) then
+      deallocate(a2c,aai,ekti)
+      allocate(a2c(namax),aai(3,namax),ekti(namax))
+    endif
+
     t0 = mpi_wtime()
 
     udx = 1d0/nx
@@ -691,11 +697,13 @@ contains
       do l=1,3
         if( boundary(l:l).eq.'p' ) then
           xi(l) = mod(xi(l),1d0)
+          if( xi(l).lt.0d0 ) xi(l) = xi(l) +1d0
         endif
       enddo
       ix = int(xi(1)/udx) +1
       iy = int(xi(2)/udy) +1
       iz = int(xi(3)/udz) +1
+!.....Assuming that only x can be free-boundary
       if( boundary(1:1).eq.'f' ) then
         ix = min(max(ix,1),nx)
       endif
@@ -778,7 +786,6 @@ contains
       is = int(tag(i))
       vat(1:3) = va(1:3,i) -vac(1:3,ic)
       ekti(i) = (vat(1)**2 +vat(2)**2 +vat(3)**2) *fekin(is)
-!!$      if( i.eq.1 ) print '(a,2i5,4es12.4)','ic,i,va,ekti=',ic,i,vat(1:3),ekti(i)
     enddo
     
     dofl(1:nxyz) = 0
@@ -794,8 +801,7 @@ contains
       enddo
       dofl(ic) = dofl(ic) + idof
       eksuml(ic) = eksuml(ic) +ekti(i)
-!!$      if( i.eq.1 ) print '(a,3i5,es12.4)','i,ic,idof,ekti=',i,ic,idof,ekti(i)
-      if( ek.gt.ekth ) then
+      if( ekti(i).gt.ekth ) then
         dofpl(ic) = dofpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ekti(i)
       endif
@@ -819,7 +825,8 @@ contains
           if( dof(ic).eq.0 ) cycle
 !.....Degree of freedom per atom (3 in case of 3D) is included in dof
           ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
-!!$          if( ic.eq.11 ) print '(a,2i5,2es12.4)','ic,dof,ek,ta=',ic,dof(ic),eksum(ic),ta(ic)
+!!$          if( ic.eq.13 ) print '(a,2i5,2es12.3,i5)','ic,dof,ta,eksum=', &
+!!$               ic,dof(ic),ta(ic),eksum(ic)
           gp(ic) = dof(ic) *fkb *gmmp(ic) /vcell ! /3
           if( dofp(ic).eq.0 ) cycle
           tap(ic) = ekpsum(ic) *2d0 /fkb /dofp(ic)
