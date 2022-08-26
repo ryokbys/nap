@@ -624,6 +624,11 @@ def main():
     nnmax = int(args['--nnmax'])
     ofname= args['-o']
 
+    if nnmax < int(rmax**3):
+        newnnmax = int(rmax**3)
+        print(' nnmax is updated from {0:d} to {1:d} according to rmax.'.format(nnmax,newnnmax))
+        nnmax = newnnmax
+
     if ofname == 'None':
         ofname = None
     specorder = [ x for x in args['--specorder'].split(',') ]
