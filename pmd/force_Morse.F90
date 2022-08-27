@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-26 08:45:30 KOBAYASHI Ryo>
+!                     Last modified: <2022-08-27 12:27:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -166,7 +166,7 @@ contains
       do k=1,lspr(0,i)
         if( d2lspr(k,i).ge.rc2 ) cycle
         j=lspr(k,i)
-!!$        if(j.eq.0) exit
+!!$        if( j.le.i ) cycle
         js= int(tag(j))
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
@@ -189,14 +189,30 @@ contains
         tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
         epi(i)= epi(i) +tmp2
         epotl= epotl +tmp2
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp2
+!!$          epotl= epotl +tmp2 +tmp2
+!!$!$omp atomic
+!!$          epi(j)= epi(j) +tmp2
+!!$        else
+!!$          epi(i)= epi(i) +tmp2
+!!$          epotl= epotl +tmp2
+!!$        endif
 !.....force
         dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+!!$        do ixyz=1,3
+!!$!$omp atomic
+!!$          aa(ixyz,i)= aa(ixyz,i) +dxdi(ixyz)*dedr
+!!$        enddo
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+!!$!$omp atomic
+!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo

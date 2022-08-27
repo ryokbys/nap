@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-08-27 10:59:19 KOBAYASHI Ryo>
+!                     Last modified: <2022-08-27 12:46:39 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -1258,16 +1258,16 @@ contains
         dij = sqrt(dij)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
+!!$        dxdj(1:3)=  rij(1:3)*diji
         terfc = erfc(dij*ss2i)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
         tmp = tmp *sfctr
-!!$        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
-!!$          epi(j)= epi(j) +tmp
 !!$          esrl = esrl +tmp +tmp
+!!$!$omp atomic
+!!$          epi(j)= epi(j) +tmp
 !!$        else
 !!$          epi(i)= epi(i) +tmp
 !!$          esrl = esrl +tmp
@@ -1275,19 +1275,20 @@ contains
         epi(i)= epi(i) +tmp
         esrl= esrl +tmp
 !.....force
-!!$        ftmp = -acc *qj*qi*diji *( diji *terfc &
-!!$             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
-!!$             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
         ftmp = -acc *qj*qi*diji *( diji *terfc &
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
         ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!!$        do ixyz=1,3
+!!$!$omp atomic
+!!$          aa(ixyz,j)= aa(ixyz,j) +dxdi(ixyz)*ftmp
+!!$        enddo
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+!!$!$omp atomic
 !!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
