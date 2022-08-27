@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-06-14 17:31:07 KOBAYASHI Ryo>
+!                     Last modified: <2022-08-27 10:59:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -1237,6 +1237,10 @@ contains
     ss2i = 1d0 /sgmsq2
     sqpi = 1d0 /sqrt(pi)
     esrl = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp            dxdj,terfc,tmp,ftmp,ixyz,jxyz) &
+!$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1244,18 +1248,14 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
+!!$        if( j.le.i ) cycle
         js = int(tag(j))
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-!!$        dij = dlspr(0,jj,i)
-!!$        rij(1:3) = dlspr(1:3,jj,i)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
@@ -1264,14 +1264,16 @@ contains
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
         tmp = tmp *sfctr
 !!$        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl= esrl +tmp
 !.....force
 !!$        ftmp = -acc *qj*qi*diji *( diji *terfc &
 !!$             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
@@ -1280,18 +1282,20 @@ contains
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
         ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine Ewald_short
 !=======================================================================
@@ -1330,6 +1334,12 @@ contains
     emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
     emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
     emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
+!$omp parallel
+!$omp do private(i,xi,is,itot,qi,ri,ik,bdk1,bdk2,bdk3,cs10,cs20,cs30, &
+!$omp            cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm, &
+!$omp            sn3m,sn3mm,k1,k2,k3,bk1,bk2,bk3,cs1,sn1,cs2,sn2,cs3,sn3, &
+!$omp            bb,cs,sn,tmp,ftmp,bk,ixyz,jxyz) &
+!$omp     reduction(+:elrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i) +sorg(1:3)
       is= int(tag(i))
@@ -1470,6 +1480,8 @@ contains
         endif
       enddo  ! k1
     enddo  ! i
+!$omp end do
+!$omp end parallel
 
   end subroutine Ewald_long
 !=======================================================================

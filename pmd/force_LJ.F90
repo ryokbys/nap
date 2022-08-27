@@ -114,6 +114,7 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
 !$omp end parallel
 
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
@@ -195,12 +196,15 @@ contains
     epotl = 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 
+!$omp parallel
+!$omp do private(i,xi,is,jj,j,js,xij,rij,dij2,rcij,dij,cij, &
+!$omp            diji,dxdi,vr,vrc,dvdrc,tmp,dvdr,ixyz,jxyz) &
+!$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3) = ra(1:3,i)
       is = int(tag(i))
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
@@ -232,6 +236,8 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     
@@ -334,5 +340,5 @@ contains
 end module LJ
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
