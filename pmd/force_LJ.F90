@@ -1,6 +1,9 @@
 module LJ
   use pmdvars, only: nspmax
   use util,only: csp2isp
+#ifdef __OPENACC__
+  use openacc
+#endif
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -21,10 +24,15 @@ module LJ
   integer,parameter:: msp = nspmax
   integer:: nsp
 
-  real(8),allocatable:: strsl(:,:,:)
+  real(8),allocatable:: strsl(:,:,:),aal(:,:)
+!$acc declare create(aal,strsl)
   logical:: interact(msp,msp)
   real(8):: rpl_c(msp,msp), rpl_rc(msp,msp)
   integer:: rpl_n(msp,msp)
+
+#ifdef __OPENACC__
+  type(c_devptr):: ptr_strs
+#endif
   
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -55,7 +63,8 @@ contains
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)
-      allocate(strsl(3,3,namax))
+      allocate(strsl(3,3,namax),aal(3,namax))
+
 !!$!.....assuming fixed atomic volume
 !!$      avol= alcar**3 /4
 !!$      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -70,22 +79,33 @@ contains
     endif
 
     if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
+      deallocate(strsl,aal)
+      allocate(strsl(3,3,namax),aal(3,namax))
     endif
 
     epotl= 0d0
-    strsl(:,:,:) = 0d0
-
 !-----loop over resident atoms
+!!$#ifdef __OPENACC__
+!!$    ptr_strs = acc_deviceptr(strs)
+!!$    call acc_unmap_data(strs)
+!!$    call acc_map_data(strsl,ptr_strs,size(strs)*8)
+!!$#endif
+    
 !$omp parallel
-!$omp do private(i,j,k,xi,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
+!$omp do private(i,xi,j,k,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
 !$omp    reduction(+:epotl)
+
+!$acc kernels present(ra,h,lspr,epi,aal,strsl) &
+!$acc         pcreate(xi,xij,dxdi) pcopy(epotl)
+!$acc loop independent reduction(+:epotl) private(xi,xij,dxdi) gang worker vector
     do i=1,natm
+      aal(1:3,i)= 0d0
+      strsl(1:3,1:3,i)= 0d0
       xi(1:3)= ra(1:3,i)
+!$acc loop seq
       do k=1,lspr(0,i)
         j=lspr(k,i)
-        if(j.eq.0) exit
+!!$        if(j.eq.0) exit
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -99,7 +119,7 @@ contains
              -(sgmlj*riji)**6*riji) &
              -dvdrc
 !---------force
-        aa(1:3,i)=aa(1:3,i) -dxdi(1:3)*dvdr
+        aal(1:3,i)=aal(1:3,i) -dxdi(1:3)*dvdr
 !---------potential
         tmp= 0.5d0*( 4d0*epslj*((sgmlj*riji)**12 &
              -(sgmlj*riji)**6) -vrc -dvdrc*(rij-rc) )
@@ -116,7 +136,16 @@ contains
     enddo
 !$omp end do
 !$omp end parallel
+    
+!$acc end kernels
+!$acc update host(aal,strsl,epi)
 
+!!$#ifdef __OPENACC__
+!!$    call acc_unmap_data(strsl)
+!!$    call acc_map_data(strs,ptr_strs,size(strs)*8)
+!!$#endif
+
+    aa(:,1:natm) = aa(:,1:natm) +aal(:,1:natm)
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
     
 !-----gather epot

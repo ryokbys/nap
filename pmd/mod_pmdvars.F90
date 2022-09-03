@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2022-05-27 22:36:23 KOBAYASHI Ryo>
+!                    Last modified: <2022-08-30 14:43:38 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -178,16 +178,20 @@ module pmdvars
   integer:: istpe
 !.....simulation box
   real(8):: h(3,3,0:1)
+!$acc declare create(h)
   real(8):: hi(3,3),vol,sgm(3,3),al(3),avol
   real(8):: ht(3,3,0:1),hti(3,3),dh
 !.....positions, velocities, and accelerations
   real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
+!$acc declare create(ra)
 !.....real*8 identifier which includes species, index of FMV, total id
   real(8),allocatable:: tag(:)
   integer,allocatable:: lspr(:,:)
   real(8),allocatable:: d2lspr(:,:)
+!$acc declare create(tag,lspr,d2lspr)
 !.....potential and kinetic energy per atoms
   real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
+!$acc declare create(epi)
 !.....mass, prefactors
   real(8),allocatable:: acon(:),fack(:)
 !.....Factors for ekin

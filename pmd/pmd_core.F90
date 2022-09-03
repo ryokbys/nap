@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-08-09 23:08:56 KOBAYASHI Ryo>
+!                     Last-modified: <2022-08-30 14:46:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -318,7 +318,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call write_desc(namax,natm,nnmax,lspr,h,tag,ra,rc, &
          myid_md,mpi_md_world,iprint)
   endif
-  
+
+!$acc update device(ra,h,lspr)
 !.....Calc forces
   lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
 !.....Cell is new at the first call of get_force
@@ -353,6 +354,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( lrdcfrc ) then
     call reduce_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
   endif
+!!$  print *,'updating host(aa,strs)...'
+!!$!$acc update host(aa,strs)
+!!$  print *,'updating host...'
 
 #ifdef __DISL__
   call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg &
@@ -701,6 +705,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call update_d2lspr(namax,natm,nnmax,lspr,h,ra,rc,rbuf,d2lspr)
     endif
 
+!$acc update device(ra,h,lspr)
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
       lstrs = lstrs0
     endif
@@ -738,6 +743,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Force_modify
     if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
          ,h,nnmax,lspr)
+!!$!$acc update host(aa,strs)
 
 !.....Second kick of velocities
     if( trim(ctctl).eq.'Langevin' ) then
@@ -3031,6 +3037,7 @@ subroutine alloc_namax_related()
   mem = 8*namax*(3 +3 +3 +3 +9 +1 +nnmax+1 +nnmax +1 +3 +naux)
   mem = 4*namax*(nnmax+1) +4*6*(nbmax+1) +4*6*nbmax
   call accum_mem('pmd',mem)
+  
   return
 end subroutine alloc_namax_related
 !=======================================================================
