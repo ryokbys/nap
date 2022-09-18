@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-07-29 10:37:00 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-05 12:38:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -31,12 +31,13 @@ module isostat
   save
 
 !.....Max strain rate (1%)
-  real(8),parameter:: sratemax = 0.01d0
+  real(8):: sratemax = 0.01d0
   
   public:: setup_langevin, setup_cell_langevin, setup_cell_berendsen, &
+       setup_cell_min, &
        vel_update_langevin, vel_update_berendsen, &
        cell_update_berendsen, cell_force_berendsen, &
-       cell_update_langevin, cvel_update_langevin
+       cell_update_langevin, cvel_update_langevin, sratemax
        
 contains
 !=======================================================================
@@ -164,6 +165,25 @@ contains
     endif
     return
   end subroutine setup_cell_berendsen
+!=======================================================================
+  subroutine setup_cell_min(myid,iprint)
+    implicit none
+    integer,intent(in):: myid,iprint
+
+    if(myid.eq.0 .and. iprint.ne.0 ) then
+      write(6,*) ''
+      if( index(cpctl,'vc').ne.0 ) then
+        write(6,'(a)') ' Variable-cell'
+      else if( index(cpctl,'vv').ne.0 ) then
+        write(6,'(a)') ' Variable-volume'
+      endif
+      write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
+           ,stgt(1,1),stgt(2,2),stgt(3,3) &
+           ,stgt(2,3),stgt(3,1),stgt(1,2)
+    endif
+    stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
+
+  end subroutine setup_cell_min
 !=======================================================================
   subroutine vel_update_langevin(natm,tag,va,aa)
 !

@@ -191,11 +191,12 @@ contains
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      rcmax2 = 0d0
       do is=1,msp
         do js=1,msp
           if( .not. interact(is,js) ) cycle
           rcij = rpl_rc(is,js)
-          rcmax2 = max(rcmax2,rcij*rcij)
+          rcmax2 = max(rcmax2,rcij**2)
         enddo
       enddo
       vrcs(:,:) = 0d0
@@ -285,7 +286,7 @@ contains
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    
+
     character(len=128):: cline,cfname
     character(len=3):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
@@ -321,22 +322,25 @@ contains
           read(ioprms,*) cspi,cspj, cij, nij, rcij
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
-          if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
-            write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
-                 //' skip reading the line.'
-            cycle
-          endif
-          if( iprint.ne.0 ) write(6,'(a,2a4,f8.4,i5,f7.3)') &
-               '   cspi,cspj,cij,nij,rcij = ',cspi,cspj,cij,nij,rcij
-          interact(isp,jsp) = .true.
-          rpl_c(isp,jsp) = cij
-          rpl_n(isp,jsp) = nij
-          rpl_rc(isp,jsp) = rcij
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            interact(isp,jsp) = .true.
+            rpl_c(isp,jsp) = cij
+            rpl_n(isp,jsp) = nij
+            rpl_rc(isp,jsp) = rcij
 !.....Symmetrize
-          interact(jsp,isp) = interact(isp,jsp)
-          rpl_c(jsp,isp) = cij
-          rpl_n(jsp,isp) = nij
-          rpl_rc(jsp,isp) = rcij
+            interact(jsp,isp) = interact(isp,jsp)
+            rpl_c(jsp,isp) = cij
+            rpl_n(jsp,isp) = nij
+            rpl_rc(jsp,isp) = rcij
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,2a4,f8.2,i5,f7.3)') &
+                   '   cspi,cspj,cij,nij,rcij = ',cspi,cspj,cij,nij,rcij
+            endif
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
+            endif
+          endif
         else
           if( iprint.ne.0 ) then
             write(6,*) 'WARNING@read_params_LJ_repul: number of entry wrong, ' &
@@ -346,7 +350,7 @@ contains
         endif
       enddo
 10    close(ioprms)
-      
+
     endif
 
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)

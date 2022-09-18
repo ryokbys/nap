@@ -109,7 +109,7 @@ setup(
 
     entry_points={
         'console_scripts': ['napsys=nappy.napsys:main',
-                            'napopt=nappy.fitpot.fp:main',],
+                            'fp=nappy.fitpot.fp:main',],
     },
     install_requires=REQUIRED,
     extras_require=EXTRAS,

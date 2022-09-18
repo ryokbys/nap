@@ -18,6 +18,7 @@ Options:
               The 1st species (X1 in X1-X2-X3) is the center of two bonds. [default: None]
 """
 from __future__ import print_function
+import os
 
 from docopt import docopt
 

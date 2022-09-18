@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-05-10 13:05:00 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-18 22:35:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -68,7 +68,7 @@ contains
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(lmax),rp,e0i,e1i,e2i,n, &
+    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rp,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
          bmax,srmax
     character(len=128):: cline,fname,c1
@@ -674,7 +674,8 @@ contains
           endif
         else  ! if itype2
           if( myid_md.eq.0 ) then
-            print *,'Such itype2 is not available, ',itype2(is,js)
+            print *,'ERROR: Such itype2 is not available !!! '
+            print '(a,3i4)','  is,js,itype2=', is,js,itype2(is,js)
           endif
           stop
         endif

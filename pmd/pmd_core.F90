@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-08-30 14:46:29 KOBAYASHI Ryo>
+!                     Last-modified: <2022-09-18 22:27:08 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1296,6 +1296,277 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   return
 end subroutine oneshot4fitpot
 !=======================================================================
+subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
+     ,ekitot,epitot,auxtot,epot,stnsr)
+!
+!  Minimization/relaxation routine.
+!  Since MD and minimization could be very different, use different
+!  subroutine for minimization.
+!
+!.....All the arguments are in pmdvars module
+  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
+  use util,only: iauxof, calc_nfmv, cell_info
+  use pmdvars
+  use force
+  use vector,only: dot
+  use random,only: box_muller
+  use pmdmpi,only: nid2xyz,xyz2nid
+  use util,only: itotOf, ifmvOf
+  use time, only: sec2hms, accum_time
+  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays, &
+       update_d2lspr, check_lspr, check_lscl
+  use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
+  use isostat,only: setup_cell_min
+
+  implicit none
+  include "mpif.h"
+  include "./params_unit.h"
+  include "./const.h"
+  integer,intent(inout):: ntot0
+  real(8),intent(in):: hunit
+  real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
+       hmat(3,3,0:1)
+  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
+       ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
+  real(8),intent(out):: epot,stnsr(3,3)
+
+  integer:: ifmv,ierr,i_conv,maxnn,i
+  real(8):: tmp,tave,prss,epotp,sth(3,3),ekin
+  logical:: l1st
+  logical:: lconverged = .false.
+  character:: cnum*128, ctmp*128
+!.....Formats for output
+  character(len=20):: cfistp  = 'i10' !or larger
+  character(len=20):: cfstime = 'es18.10'
+  character(len=20):: cfetime = 'f12.2' ! for elapsed time
+  character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
+  integer,external:: calc_maxnn
+
+  if( nodes_md.ne.1 ) then
+    write(6,'(a)') 'Error: CG minimization is not available in parallel.'
+    write(6,'(a)') '  Use damping MD instead for large systems.'
+    stop
+  endif
+
+  tcpu0= mpi_wtime()
+  h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
+  ntot = ntot0
+
+  call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
+  call calc_nfmv(ntot0,tagtot)
+
+!-----parallel configuration
+  nxyz= nx*ny*nz
+  anxi= 1d0/nx
+  anyi= 1d0/ny
+  anzi= 1d0/nz
+!-----error trap
+  if(nodes_md.ne.nxyz) then
+    write(6,'(a)') " error: nodes_md .ne. nxyz!!"
+    write(6,'(a,3i5)') ' myid_md,nodes_md,nxyz=' &
+         ,myid_md,nodes_md,nxyz
+    print *,'nx,ny,nz =',nx,ny,nz
+    call mpi_finalize(ierr)
+    stop
+  endif
+!-----vector node indices: range [0:nx-1]
+  call nid2xyz(myid_md,myx,myy,myz)
+!-----reduced node origin
+  sorg(1)= anxi*myx
+  sorg(2)= anyi*myy
+  sorg(3)= anzi*myz
+
+!.....perform space decomposition after reading atomic configuration
+  tmp = mpi_wtime()
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+  call accum_time('space_decomp',mpi_wtime()-tmp)
+!.....Some conversions
+  do i=1,natm
+    ra(1:3,i)= ra(1:3,i) -sorg(1:3)
+  enddo
+
+!-----setup
+  call setup(nspmax,am,fekin,fa2v)
+!-----set HI and SGM
+  call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+!-----ntset
+  call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
+
+!.....get_num_dof is called once in a MD run
+  call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+
+!.....Set initial velocity as zero
+  va(1:3,1:natm) = 0d0
+
+  tcpu1= mpi_wtime()
+
+!-----copy RA of boundary atoms
+  call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
+       ,nx,ny,nz,myid_md)
+  l1st = .true.
+
+  if( myid_md.eq.0 ) then
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
+!.....write out energies
+      open(ioerg,file="out.erg",status='replace')
+      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+           //'   3:etot[eV],  4:ekin,' &
+           //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
+      write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
+      call flush(ioerg)
+    endif
+  endif
+
+  i_conv = 0
+  lconverged = .false.
+
+!.....Minimization loop starts
+  do istp=1,nstp
+
+!.....In case of variable-cell/volume, lstrs has to be always TRUE.
+    if( index(cpctl,'vv').ne.0 .or. index(cpctl,'vc').ne.0 ) then
+      lstrs = .true.
+    else
+      lstrs = lstrs0
+    endif
+
+    tmp = mpi_wtime()
+    call bacopy(.true.)
+    call accum_time('ba_xxx',mpi_wtime()-tmp)
+!-----Make pair list
+    tmp = mpi_wtime()
+    call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+         ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+    call accum_time('lspr',mpi_wtime()-tmp)
+
+    maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
+    if( iprint.gt.0 .and. myid_md.eq.0 ) then
+      print '(/a,i5)', ' Max num of neighbors = ',maxnn
+    endif
+
+!$acc update device(ra,h,lspr)
+!.....Calc forces
+    lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
+!.....Cell is new at the first call of get_force
+    lcell_updated = .true.
+    tmp = mpi_wtime()
+    call get_force(.true.,epot0,stnsr)
+    call accum_time('get_force',mpi_wtime()-tmp)
+    lcell_updated = .false.
+    lstrs = .false.
+    epot= epot0
+    epotp = 0d0
+
+    call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
+    call setup_cell_min(myid_md,iprint)
+
+    simtime = 0d0
+
+    if(myid_md.eq.0 .and. iprint.ne.0 ) then
+
+!.....Human-friendly stress unit GPa
+      sth(:,:) = stnsr(:,:) *up2gpa
+      prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
+      if( prss.lt.0d0 ) then
+        ctmp = '(tensile)'
+      else
+        ctmp = '(compressive)'
+      endif
+      write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
+           prss,' GPa '//trim(ctmp)
+      write(6,'(1x,a,6f10.3)') '  Stress tensor   =', &
+           sth(1,1),sth(2,2),sth(3,3), &
+           sth(2,3),sth(3,1),sth(1,2)
+      write(6,*) ''
+
+      tcpu = mpi_wtime() -tcpu0
+      tave = 0d0
+      write(6,'(a,'//cfistp//','//cfetime//','//cftave &
+           //',es13.4,2es11.3)') &
+           " istp,etime,temp,epot,vol,prss=" &
+           ,istp,tcpu,tave,epot,vol,prss
+    endif
+
+!.....output initial configuration including epi, eki, and strs
+    write(cnum,'(i0)') istp
+    tmp = mpi_wtime()
+    call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
+         ekitot,epitot,auxtot)
+    call accum_time('space_comp',mpi_wtime()-tmp)
+    if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
+      if( ifsort.gt.0 ) then
+        tmp = mpi_wtime()
+        call sort_by_tag(ntot,tagtot,rtot,vtot &
+             ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
+        call accum_time('sort_by_tag',mpi_wtime()-tmp)
+      endif
+      tmp = mpi_wtime()
+      if( ifpmd.eq.1 ) then  ! pmd format
+        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
+             then
+          call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+               tagtot,rtot,vtot)
+        elseif( trim(ciofmt).eq.'ascii' ) then
+          call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+               tagtot,rtot,vtot)
+        endif
+      else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
+        call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+             rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
+      endif
+      call accum_time('write_xxx',mpi_wtime() -tmp)
+    endif
+
+    if( myid_md.eq.0 ) then
+      if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
+!.....write out energies
+        tave = 0d0
+        write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+             //','//cftave//',2es16.7e3)') istp &
+             ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
+        call flush(ioerg)
+      endif
+    endif
+
+!!! TODO: complete CG minimization code here...    
+
+  end do  ! istp
+
+  nstp_done = istp
+  tcpu2= mpi_wtime()
+
+  if(myid_md.eq.0) then
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) close(ioerg)
+  endif
+
+  tcpu= tcpu2 -tcpu1
+  if( myid_md.eq.0 .and. iprint.ne. 0 ) then
+    write(6,*) ''
+    write(6,'(1x,a)') "Final values:"
+    write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot &
+         ,' eV = ',epot/ntot0,' eV/atom'
+    if( prss.lt.0d0 ) then
+      ctmp = '(tensile)'
+    else
+      ctmp = '(compressive)'
+    endif
+    write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
+         prss,' GPa '//trim(ctmp)
+    if( index(cpctl,'vv').ne.0 .or. &
+         index(cpctl,'vc').ne.0  ) then
+      call cell_info(h)
+    endif
+    write(6,*) ''
+  endif
+  
+  hmat(:,:,:) = h(:,:,:)  ! Return h-matrix as hmat
+
+!.....Return stnsr in human-friendly unit, GPa
+  stnsr(:,:) = stnsr(:,:) *up2gpa
+  
+  return
+end subroutine min_core
+!=======================================================================
 subroutine set_fmv(fmv)
 !
 ! Set default fmv values which might be override
@@ -1376,7 +1647,9 @@ subroutine set_cauxarr()
   if( lclrchg ) then
     naux = naux +1
   endif
-  if( allocated(cauxarr) .and. size(cauxarr).ne.naux ) deallocate(cauxarr)
+  if( allocated(cauxarr) ) then
+    if( size(cauxarr).ne.naux ) deallocate(cauxarr)
+  endif
   if( .not.allocated(cauxarr) ) allocate(cauxarr(naux))
   inc = 0
   if( luse_charge ) then

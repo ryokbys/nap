@@ -45,6 +45,7 @@ subroutine set_variable(ionum,cname)
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use deform,only: cdeform, trlx_deform, dhmat
   use descriptor,only: lout_desc
+  use isostat,only: sratemax
 #ifdef __WALL__
   use wall
 #endif
@@ -215,6 +216,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'flag_compute_stress' ) then
     call read_l1(ionum,lstrs0)
+    return
+  elseif( trim(cname).eq.'max_strain_rate' ) then
+    call read_r1(ionum,sratemax)
     return
   elseif( trim(cname).eq.'cell_fix' ) then
     call read_ls(ionum,3,3,lcellfix)
