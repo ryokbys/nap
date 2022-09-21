@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-08-27 12:46:39 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-20 22:22:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -912,7 +912,7 @@ contains
     endif
     if( trim(cterms).eq.'direct_cut' ) then
       call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
@@ -1025,7 +1025,7 @@ contains
   end subroutine force_direct
 !=======================================================================
   subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Direct Coulomb interaction with cutoff radius.
 !  Coulomb potential is shifted by v(rc) and modified by the term (r-rc)*v'(rc).
@@ -1039,18 +1039,22 @@ contains
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc,d2lspr(nnmax,namax)
-    logical,intent(in):: lstrs
+    logical,intent(in):: lstrs,l1st
     real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+    real(8):: rc2,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,dvdrc,vrc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 
 !.....Compute direct sum
     rc2 = rc*rc
     esrl = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp     dxdj,vrc,dvdrc,tmp,ftmp,ixyz,jxyz) &
+!$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1058,9 +1062,8 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
         js = int(tag(j))
+        if( .not.interact(is,js) ) cycle
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -1071,36 +1074,39 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        terfc = erfc(dij*ss2i)
         vrc = acc*qi*qj/rc
         dvdrc = -acc*qi*qj /rc**2
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji -vrc -dvdrc*(dij-rc)
+        tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp *sfctr
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
         ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine force_direct_cut
 !=======================================================================
@@ -1152,7 +1158,7 @@ contains
     esrl= 0d0
 !.....Loop over resident atoms
 !$omp parallel
-!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
 !$omp     dxdj,rhoij,terfc,vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
 !$omp     reduction(+:esrl)
     do i=1,natm

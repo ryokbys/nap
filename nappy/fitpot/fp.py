@@ -214,7 +214,7 @@ def write_info(infp,args):
     Write out information on input parameters for fp.
     """
 
-    print(' Inputs')
+    print(' Input')
     print(' ----------')
     print('   num of processes (given by --nproc option)  ',int(args['--nproc']))
     try:

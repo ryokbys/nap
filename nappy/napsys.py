@@ -855,7 +855,8 @@ class NAPSystem(object):
             newpi[0] = pbc(pi[0])
             newpi[1] = pbc(pi[1])
             newpi[2] = pbc(pi[2])
-            self.atoms.at[i,['x','y','z']] = newpi
+            #self.atoms.at[i,['x','y','z']] = newpi
+            self.atoms.loc[i,['x','y','z']] = newpi
         return None
 
     def get_expansion_num(self,length):
