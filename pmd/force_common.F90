@@ -30,7 +30,7 @@ subroutine get_force(l1st,epot,stnsr)
 !!$  use NN,only:force_NN
 !!$  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use DNN,only: force_DNN
-  use Coulomb, only: force_Coulomb, &
+  use Coulomb, only: force_Coulomb, init_for_Ewald, &
        chgopt_method, bacopy_auxq_fixed
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
@@ -77,6 +77,11 @@ subroutine get_force(l1st,epot,stnsr)
 !.....Compute overlay coefficient first
   if( loverlay ) then
     call calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr,l1st,iprint)
+  endif
+
+!.....init_for_Ewald must be called before chgopt_damping
+  if( use_force('Coulomb') ) then
+    call init_for_Ewald(h,rc,myid_md,mpi_md_world,iprint)
   endif
 
 !.....If varaible charge, optimize charges before any charge-dependent potential
@@ -413,6 +418,8 @@ end subroutine get_force
 subroutine init_force(linit)
 !
 !  Initialization routine is separated from main get_force routine.
+!  And this routine is called from pmd_main not from pmd_core, so h and ra
+!  are not yet determined but hmat and rtot are.
 !
   use pmdvars,only: namax,nspmax,nsp,myid_md,mpi_md_world,iprint, &
        specorder,rc,lvc,am
@@ -1377,7 +1384,7 @@ subroutine get_bounding_fq(chg,fq,epot)
 !  Compute forces on qs that bound qs inside [qbot,qtop].
 !
   use pmdvars,only: namax,natm,iprint,tag,mpi_md_world
-  use Coulomb,only: bound_k4,qtop,qbot
+  use Coulomb,only: bound_k2,bound_k4,qtop,qbot
   implicit none
   include 'mpif.h'
   include './const.h'
@@ -1393,11 +1400,15 @@ subroutine get_bounding_fq(chg,fq,epot)
   do i=1,natm
     is = int(tag(i))
     if( chg(i).ge.qtop(is) ) then
-      epotl = epotl +bound_k4*(chg(i)-qtop(is))**4
-      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qtop(is))**3
+      epotl = epotl +bound_k2*(chg(i)-qtop(is))**2 &
+           +bound_k4*(chg(i)-qtop(is))**4
+      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qtop(is)) &
+           -4d0*bound_k4*(chg(i)-qtop(is))**3
     else if( chg(i).le.qbot(is) ) then
-      epotl = epotl +bound_k4*(chg(i)-qbot(is))**4
-      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qbot(is))**3
+      epotl = epotl +bound_k2*(chg(i)-qbot(is))**2 &
+           +bound_k4*(chg(i)-qbot(is))**4
+      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qbot(is)) &
+           -4d0*bound_k4*(chg(i)-qbot(is))**3
     endif
   enddo
   epot = 0d0

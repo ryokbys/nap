@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-05-10 13:05:00 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-21 17:00:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -25,7 +25,6 @@ module RFMEAM
   integer,parameter:: lmax = 3
   integer,parameter:: mmax = 3
   real(8),parameter:: tiny = 1d-14
-  real(8),parameter:: sgm = 1d-5
   integer,parameter:: allspcs = 1000
   
   logical:: lprmset_RFMEAM = .false.
@@ -39,7 +38,7 @@ module RFMEAM
        c3ij(nspmax,nspmax), rpij(nspmax,nspmax), pj(0:lmax,nspmax), &
        qj(0:lmax,nspmax), e0(nspmax), e1(nspmax), e2(nspmax), &
        ni(nspmax), ti(lmax,nspmax), rcfac2(nspmax,nspmax), &
-       wij(0:lmax,nspmax,nspmax)
+       wij(0:lmax,nspmax,nspmax), sgm(nspmax)
   real(8):: srij(mmax,nspmax,nspmax), bij(mmax,nspmax,nspmax)
   integer:: itype2(nspmax,nspmax)
 
@@ -68,9 +67,9 @@ contains
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(lmax),rp,e0i,e1i,e2i,n, &
+    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rp,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
-         bmax,srmax
+         bmax,srmax,sgmi
     character(len=128):: cline,fname,c1
     character(len=3):: cspi,cspj,cspk
     logical:: latomic(nspmax)
@@ -91,6 +90,7 @@ contains
       e0(:) = 0d0
       e1(:) = 0d0
       e2(:) = 0d0
+      sgm(:) = 0.1d0
       ni(:) = 0d0
       ti(:,:) = 0d0
       interact(:,:) = .false.
@@ -113,7 +113,7 @@ contains
         read(ioprms,*) c1
         if( trim(c1).eq.'atomic' .or. trim(c1).eq.'element' ) then
           backspace(ioprms)
-          read(ioprms,*) c1,cspi, n,e0i,e1i,e2i,pjl(0:lmax),qjl(0:lmax),til(1:lmax)
+          read(ioprms,*) c1,cspi, n,e0i,e1i,e2i,sgmi,pjl(0:lmax),qjl(0:lmax),til(1:lmax)
           is = csp2isp(trim(cspi))
           if( is.lt.1 .and. trim(cspi).eq.'*' ) then  ! '*' means all.
             is = allspcs
@@ -130,6 +130,7 @@ contains
             e0(:) = e0i
             e1(:) = e1i
             e2(:) = e2i
+            sgm(:) = sgmi
             do i=1,nspmax
               pj(:,i) = pjl(:)
               qj(:,i) = qjl(:)
@@ -141,6 +142,7 @@ contains
             e0(is) = e0i
             e1(is) = e1i
             e2(is) = e2i
+            sgm(is)= sgmi
             pj(:,is) = pjl(:)
             qj(:,is) = qjl(:)
             ti(:,is) = til(:)
@@ -403,6 +405,7 @@ contains
     call mpi_bcast(e0,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(e1,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(e2,nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(sgm,nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(cmax,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(cmin,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax**2,mpi_logical,0,mpi_md_world,ierr)
@@ -442,7 +445,7 @@ contains
          rhoi2(0:lmax),gam,egam,ggam,dgdgam,rhoi,yi,gyi,fyi,frhoi,rhoi0, &
          pcs,pcsi,dcsdij(3),dcsdik(3),strho2,dgdy,dfdy,atmp(3), &
          cmaxkij,cmaxmax,truerc,epott,epot2l,epotml,epot2,epotm, &
-         phi2,dphi2
+         phi2,dphi2,sgmi
     real(8),allocatable,save:: aal(:,:),strsl(:,:,:),epil(:)
     real(8),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
          dfl(:,:,:),dsfc(:,:,:),drhoi2(:,:,:),drhoi0(:,:),dstrho2(:,:), &
@@ -674,7 +677,8 @@ contains
           endif
         else  ! if itype2
           if( myid_md.eq.0 ) then
-            print *,'Such itype2 is not available, ',itype2(is,js)
+            print *,'ERROR: Such itype2 is not available !!! '
+            print '(a,3i4)','  is,js,itype2=', is,js,itype2(is,js)
           endif
           stop
         endif
@@ -744,7 +748,8 @@ contains
       ggam = 2d0 /(1d0 +egam)
       rhoi = rhoi0 *ggam
       yi = rhoi/ni(is)
-      gyi = 1d0 -exp(-yi*yi /2d0/sgm**2)
+      sgmi = sgm(is)
+      gyi = 1d0 -exp(-yi*yi /2d0/sgmi**2)
       fyi = e0(is)*yi*log(yi) +e1(is)*yi +e2(is)*yi*yi
       frhoi = fyi*gyi
       epil(i)= epil(i) +frhoi
@@ -786,7 +791,8 @@ contains
           dplcs(2)= 3d0*cs
           dplcs(3)= (15d0*cs2 -3d0)/2
           do l=1,lmax
-            drhoi2(1:3,1:nni,l) = drhoi2(1:3,1:nni,l) +fl(l,jj)*fl(l,kk)*plcs(l) &
+            drhoi2(1:3,1:nni,l) = drhoi2(1:3,1:nni,l) &
+                 +fl(l,jj)*fl(l,kk)*plcs(l) &
                  *(sfc(jj)*dsfc(1:3,1:nni,kk) +sfc(kk)*dsfc(1:3,1:nni,jj))
             drhoi2(1:3,jj,l) = drhoi2(1:3,jj,l) +sfcjk*fl(l,kk) &
                  *(plcs(l)*dfl(1:3,l,jj) +fl(l,jj)*dcsdij(1:3)*dplcs(l))
@@ -813,7 +819,7 @@ contains
       dgdgam = 2d0*egam/(1d0+egam)**2
       drho(1:3,1:nni) = drhoi0(1:3,1:nni)*ggam &
            +rhoi0 *dgdgam *dgam(1:3,1:nni)
-      dgdy = yi /sgm**2 *exp(-yi*yi/2/sgm**2)
+      dgdy = yi /sgmi**2 *exp(-yi*yi/2/sgmi**2)
       dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2d0*e2(is)*yi)*gyi +dgdy*fyi
 
       do jj=1,nni

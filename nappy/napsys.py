@@ -285,7 +285,7 @@ class NAPSystem(object):
         newatoms[['vx','vy','vz']] = vels
         if len(frcs) == len(poss):
             if type(frcs) == list:
-                frcs = np.array(frcss)
+                frcs = np.array(frcs)
         else:
             frcs = np.zeros(poss.shape)
         newatoms[['fx','fy','fz']] = frcs
@@ -855,7 +855,8 @@ class NAPSystem(object):
             newpi[0] = pbc(pi[0])
             newpi[1] = pbc(pi[1])
             newpi[2] = pbc(pi[2])
-            self.atoms.at[i,['x','y','z']] = newpi
+            #self.atoms.at[i,['x','y','z']] = newpi
+            self.atoms.loc[i,['x','y','z']] = newpi
         return None
 
     def get_expansion_num(self,length):

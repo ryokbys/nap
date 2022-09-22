@@ -18,7 +18,7 @@ Options:
   --celltype CELLTYPE
              Conventional or primitive. [default: conventional]
   --specorder SPECORDER
-             Species order. [default: None]
+             Species order. [default: Si]
 """
 from __future__ import print_function
 
@@ -28,8 +28,6 @@ from docopt import docopt
 
 from nappy.napsys import NAPSystem
 import nappy
-
-_default_specorder=['Si']
 
 
 def make_sc(latconst=1.0,specorder=None):
@@ -73,17 +71,19 @@ def make_bcc(latconst=1.0,specorder=None):
     s.add_atoms(symbols,poss,vels,frcs)
     return s
 
-def make_bcc110(latconst=1.0):
+def make_bcc110(latconst=1.0,specorder=None):
     """                                                  
     Make a cell of bcc structure with z along [110].
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder == None:
+        raise ValueError('Error: specorder is None.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.414, 0.0 ])
     a3= np.array([ 0.0, 0.0, 1.414 ])
     s.set_lattice(latconst,a1,a2,a3)
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol, symbol, symbol, symbol]
     poss = [[0.00, 0.00, 0.00],
             [0.00, 0.50, 0.50],
@@ -94,17 +94,19 @@ def make_bcc110(latconst=1.0):
     s.add_atoms(symbols, poss, vels, frcs)
     return s
 
-def make_bcc111(latconst=1.0):
+def make_bcc111(latconst=1.0,specorder=None):
     """
     Make a cell of bcc structure with z along [111].
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.414, 0.0, 0.0 ])
     a2= np.array([ 0.0, 2.449, 0.0 ])
     a3= np.array([ 0.0, 0.0, 1.732 ])
     s.set_lattice(latconst,a1,a2,a3)
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     poss=[[0.00, 0.00, 0.00],
           [0.00, 0.00, 0.50],
           [0.00, 0.333, 0.167],
@@ -128,7 +130,7 @@ def make_fcc(latconst=1.0,specorder=None):
     Make a cell of fcc structure.
     """
     if specorder is None:
-        specorder = ['Al']
+        raise ValueError('specorder must be given.')
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -152,7 +154,7 @@ def make_fcc110(latconst=1.0,specorder=None):
     Make a cell of fcc structure with z along [110].
     """
     if specorder is None:
-        specorder = ['Al']
+        raise ValueError('specorder must be given.')
     s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
@@ -174,11 +176,13 @@ def make_fcc110(latconst=1.0,specorder=None):
     s.add_atoms(symbols,poss,vels,frcs)
     return s
 
-def make_honeycomb(latconst=1.0):
+def make_honeycomb(latconst=1.0,specorder=None):
     """
     Make a cell of 2D honeycomb structure.
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.5, 0.0 ])
@@ -188,7 +192,7 @@ def make_honeycomb(latconst=1.0):
             [0.50, 0.50, 1./6],
             [0.50, 0.50, 0.50],
             [0.00, 0.50, 0.5 +1.0/6] ]
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol for i in range(len(poss)) ]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
@@ -196,11 +200,13 @@ def make_honeycomb(latconst=1.0):
     return s
 
 
-def make_diamond(latconst=1.0):
+def make_diamond(latconst=1.0,specorder=None):
     """
     Make a cell of diamond structure.
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([ 0.0, 1.0, 0.0 ])
@@ -214,7 +220,7 @@ def make_diamond(latconst=1.0):
             [0.75, 0.75, 0.25],
             [0.75, 0.25, 0.75],
             [0.25, 0.75, 0.75]]
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol for i in range(len(poss)) ]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
@@ -222,11 +228,13 @@ def make_diamond(latconst=1.0):
     return s
 
 
-def make_hcp(latconst=1.0):
+def make_hcp(latconst=1.0,specorder=None):
     """
     Make a cell of hcp structure.
     """
-    s= NAPSystem(specorder=_default_specorder)
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    s= NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0, 0.0, 0.0 ])
     a2= np.array([-0.5, np.sqrt(3.0)/2, 0.0 ])
@@ -234,7 +242,7 @@ def make_hcp(latconst=1.0):
     s.set_lattice(latconst,a1,a2,a3)
     poss = [[0.00, 0.00, 0.00],
             [1.0/3, 2.0/3, 0.50] ]
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol for i in range(len(poss)) ]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
@@ -251,12 +259,14 @@ def make_graphene(latconst=2.467,size=(1,1,1)):
     
     return napsys
 
-def make_2D_triangle(latconst=3.8,size=(1,1,1)):
+def make_2D_triangle(latconst=3.8,size=(1,1,1),specorder=None):
     """
     Make 2D triangle lattice on x-z plane. 
     Note that it is not x-y plane.
     """
-    specorder = ['Ar']
+    if specorder is None:
+        raise ValueError('specorder must be given.')
+    #specorder = ['Ar']
     s = NAPSystem(specorder=specorder)
     #...lattice
     a1= np.array([ 1.0,  0.0, 0.0 ])
@@ -265,7 +275,7 @@ def make_2D_triangle(latconst=3.8,size=(1,1,1)):
     s.set_lattice(latconst,a1,a2,a3)
     poss = [[0.00, 0.50, 0.00],
             [0.50, 0.50, 0.50]]
-    symbol = _default_specorder[0]
+    symbol = specorder[0]
     symbols = [ symbol for i in range(len(poss)) ]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
@@ -277,10 +287,9 @@ def make_2D_triangle(latconst=3.8,size=(1,1,1)):
 
 def make_nacl(latconst=1.0,specorder=None):
     if specorder is None:
-        specorder = ['Na','Cl']
+        raise ValueError('specorder must be given.')
     if len(specorder) < 2:
-        specorder = ['Na','Cl']
-        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+        raise ValueError('Num of specorders must be greater than 1.')
     
     s = NAPSystem(specorder=specorder)
     #...lattice
@@ -296,7 +305,9 @@ def make_nacl(latconst=1.0,specorder=None):
             [0.50, 0.00, 0.50],
             [0.00, 0.50, 0.50],
             [0.50, 0.50, 0.50],]
-    symbols = ['Na','Cl','Cl','Cl','Na','Na','Na','Cl']
+    s1 = specorder[0]
+    s2 = specorder[1]
+    symbols = [s1,s2,s2,s2,s1,s1,s1,s2]
     vels = [ [0., 0., 0.] for i in range(len(poss)) ]
     frcs = [ [0., 0., 0.] for i in range(len(poss)) ]
     s.add_atoms(symbols,poss,vels,frcs)
@@ -307,10 +318,9 @@ def make_zincblend(latconst=1.0,specorder=None):
     Make a cell of diamond structure.
     """
     if specorder is None:
-        specorder = ['Ga','N']
+        raise ValueError('specorder must be given.')
     if len(specorder) < 2:
-        specorder = ['Ga','N']
-        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+        raise ValueError('Num of specorders must be greater than 1.')
     
     s= NAPSystem(specorder=specorder)
     #...lattice
@@ -340,10 +350,9 @@ def make_wurtzite(latconst=1.0,specorder=None,celltype='conventional'):
     - celltype: conventional or primitive
     """
     if specorder is None:
-        specorder = ['Ga','N']
+        raise ValueError('specorder must be given.')
     if len(specorder) < 2:
-        specorder = ['Ga','N']
-        print('Since len(specorder) < 2, specorder is reset to ',specorder)
+        raise ValueError('Num of specorders must be greater than 1.')
     
     s = NAPSystem(specorder=specorder)
     if celltype[0] == 'c':
@@ -382,7 +391,7 @@ def make_wurtzite(latconst=1.0,specorder=None,celltype='conventional'):
 if __name__ == "__main__":
 
     args= docopt(__doc__)
-    print(args)
+    # print(args)
     # nx= int(args['--nx'])
     # ny= int(args['--ny'])
     # nz= int(args['--nz'])
@@ -392,35 +401,33 @@ if __name__ == "__main__":
     orient = [ int(x) for x in args['--orientation'].split(',')]
     celltype = args['--celltype']
     specorder = [ x for x in args['--specorder'].split(',')]
-    if specorder[0] == 'None':
-        specorder = None
 
     struct= None
-    print('specorder = ',specorder)
+    # print('specorder = ',specorder)
     if args['sc']:
         struct= make_sc(latconst,specorder)
     elif args['bcc']:
         if orient == [0,0,1]:
             struct= make_bcc(latconst,specorder)
         elif orient == [1,1,0]:
-            struct= make_bcc110(latconst)
+            struct= make_bcc110(latconst,specorder)
         elif orient == [1,1,1]:
-            struct= make_bcc111(latconst)
+            struct= make_bcc111(latconst,specorder)
         else:
             raise ValueError('The orientation is not available: ',orient)
     elif args['fcc']:
         if orient == [0,0,1]:
-            struct= make_fcc(latconst)
+            struct= make_fcc(latconst,specorder)
         elif orient == [1,1,0]:
-            struct= make_fcc110(latconst)
+            struct= make_fcc110(latconst,specorder)
         else:
             raise ValueError('The orientation is not available: ',orient)
     elif args['hcp']:
-        struct= make_hcp(latconst)
+        struct= make_hcp(latconst,specorder)
     elif args['dia']:
-        struct= make_diamond(latconst)
+        struct= make_diamond(latconst,specorder=specorder)
     elif args['nacl']:
-        struct = make_nacl(latconst)
+        struct = make_nacl(latconst,specorder)
     elif args['zb']:
         struct = make_zincblend(latconst,specorder=specorder)
     elif args['wz']:

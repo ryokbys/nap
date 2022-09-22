@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-05-28 00:04:41 KOBAYASHI Ryo>
+!                     Last-modified: <2022-09-20 18:15:02 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -131,10 +131,6 @@ program pmd
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
 
-!.....Initialize random seeds in the function urnd
-    if( rseed.ge.0d0 ) call set_seed(rseed+myid_md)
-    tmp = urnd()
-    
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
       print *,'NOTICE: Since using the two-temperature model (TTM) MD:'
@@ -199,6 +195,13 @@ program pmd
   endif  ! end of myid.eq.0
 
   call bcast_params()
+!.....Initialize random seeds in the function urnd
+  if( rseed.lt.0d0 ) then
+    call set_seed(rseed)
+  else
+    call set_seed(rseed+myid_md)
+  endif
+  tmp = urnd()
   call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
   call mpi_bcast(hmat,9*2,mpi_real8,0,mpi_md_world,ierr)
 !.....Broadcast species data read from pmdini  
@@ -361,6 +364,7 @@ subroutine write_initial_setting()
   use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
+  use isostat,only: sratemax
   implicit none 
   integer:: i
 
@@ -432,6 +436,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a,5x,a)') 'stress_control',trim(cpctl)
   if( trim(cpctl).eq.'Berendsen' .or. &
        trim(cpctl).eq.'vc-Berendsen' ) then
+    write(6,'(2x,a,2x,f0.1)') 'stress_relax_time',srlx
     write(6,'(2x,a)') 'stress_target'
     write(6,'(5x,3es11.3)') stgt(1,1:3)
     write(6,'(5x,3es11.3)') stgt(2,1:3)
@@ -440,14 +445,16 @@ subroutine write_initial_setting()
     write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
-    write(6,'(2x,a)') ''
+    write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
     
   else if( trim(cpctl).eq.'vv-Berendsen' ) then
     write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
+    write(6,'(2x,a,2x,f0.1)') 'pressure_relax_time',srlx
     write(6,'(2x,a)') 'cell_fix'
     write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
     write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
+    write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
 
   endif
   write(6,*) ''
@@ -582,6 +589,8 @@ subroutine bcast_params()
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,npx,npy,npz,cspc_pdens,orig_pdens,hmat_pdens
   use deform,only: cdeform,trlx_deform,dhmat
+  use descriptor,only: lout_desc
+  use isostat,only: sratemax
   implicit none
   include 'mpif.h'
 
@@ -626,6 +635,7 @@ subroutine bcast_params()
   call mpi_bcast(pfin,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(srlx,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(stgt,9,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(sratemax,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(lcellfix,9,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(czload_type,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(zskin_width,1,mpi_real8,0,mpicomm,ierr)
@@ -639,11 +649,13 @@ subroutine bcast_params()
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
+  call mpi_bcast(lrealloc,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
-  
+!.....Descriptor
+  call mpi_bcast(lout_desc,1,mpi_logical,0,mpicomm,ierr)
 !.....Charge related
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields

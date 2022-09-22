@@ -1,6 +1,9 @@
 module LJ
   use pmdvars, only: nspmax
   use util,only: csp2isp
+#ifdef __OPENACC__
+  use openacc
+#endif
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -21,10 +24,15 @@ module LJ
   integer,parameter:: msp = nspmax
   integer:: nsp
 
-  real(8),allocatable:: strsl(:,:,:)
+  real(8),allocatable:: strsl(:,:,:),aal(:,:)
+!$acc declare create(aal,strsl)
   logical:: interact(msp,msp)
   real(8):: rpl_c(msp,msp), rpl_rc(msp,msp)
   integer:: rpl_n(msp,msp)
+
+#ifdef __OPENACC__
+  type(c_devptr):: ptr_strs
+#endif
   
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -55,7 +63,8 @@ contains
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)
-      allocate(strsl(3,3,namax))
+      allocate(strsl(3,3,namax),aal(3,namax))
+
 !!$!.....assuming fixed atomic volume
 !!$      avol= alcar**3 /4
 !!$      if(myid.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -70,22 +79,33 @@ contains
     endif
 
     if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
+      deallocate(strsl,aal)
+      allocate(strsl(3,3,namax),aal(3,namax))
     endif
 
     epotl= 0d0
-    strsl(:,:,:) = 0d0
-
 !-----loop over resident atoms
+!!$#ifdef __OPENACC__
+!!$    ptr_strs = acc_deviceptr(strs)
+!!$    call acc_unmap_data(strs)
+!!$    call acc_map_data(strsl,ptr_strs,size(strs)*8)
+!!$#endif
+    
 !$omp parallel
-!$omp do private(i,j,k,xi,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
+!$omp do private(i,xi,j,k,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
 !$omp    reduction(+:epotl)
+
+!$acc kernels present(ra,h,lspr,epi,aal,strsl) &
+!$acc         pcreate(xi,xij,dxdi) pcopy(epotl)
+!$acc loop independent reduction(+:epotl) private(xi,xij,dxdi) gang worker vector
     do i=1,natm
+      aal(1:3,i)= 0d0
+      strsl(1:3,1:3,i)= 0d0
       xi(1:3)= ra(1:3,i)
+!$acc loop seq
       do k=1,lspr(0,i)
         j=lspr(k,i)
-        if(j.eq.0) exit
+!!$        if(j.eq.0) exit
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -99,7 +119,7 @@ contains
              -(sgmlj*riji)**6*riji) &
              -dvdrc
 !---------force
-        aa(1:3,i)=aa(1:3,i) -dxdi(1:3)*dvdr
+        aal(1:3,i)=aal(1:3,i) -dxdi(1:3)*dvdr
 !---------potential
         tmp= 0.5d0*( 4d0*epslj*((sgmlj*riji)**12 &
              -(sgmlj*riji)**6) -vrc -dvdrc*(rij-rc) )
@@ -114,8 +134,18 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
 !$omp end parallel
+    
+!$acc end kernels
+!$acc update host(aal,strsl,epi)
 
+!!$#ifdef __OPENACC__
+!!$    call acc_unmap_data(strsl)
+!!$    call acc_map_data(strs,ptr_strs,size(strs)*8)
+!!$#endif
+
+    aa(:,1:natm) = aa(:,1:natm) +aal(:,1:natm)
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
     
 !-----gather epot
@@ -161,11 +191,12 @@ contains
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
+      rcmax2 = 0d0
       do is=1,msp
         do js=1,msp
           if( .not. interact(is,js) ) cycle
           rcij = rpl_rc(is,js)
-          rcmax2 = max(rcmax2,rcij*rcij)
+          rcmax2 = max(rcmax2,rcij**2)
         enddo
       enddo
       vrcs(:,:) = 0d0
@@ -195,12 +226,15 @@ contains
     epotl = 0d0
     strsl(1:3,1:3,1:namax) = 0d0
 
+!$omp parallel
+!$omp do private(i,xi,is,jj,j,js,xij,rij,dij2,rcij,dij,cij, &
+!$omp            diji,dxdi,vr,vrc,dvdrc,tmp,dvdr,ixyz,jxyz) &
+!$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3) = ra(1:3,i)
       is = int(tag(i))
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
         js = int(tag(j))
         if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
@@ -232,6 +266,8 @@ contains
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     
@@ -250,7 +286,7 @@ contains
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    
+
     character(len=128):: cline,cfname
     character(len=3):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
@@ -286,22 +322,25 @@ contains
           read(ioprms,*) cspi,cspj, cij, nij, rcij
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
-          if( isp.gt.nspmax .or. jsp.gt.nspmax ) then
-            write(6,*) ' Warning @read_params: since isp/jsp is greater than nspmax,'&
-                 //' skip reading the line.'
-            cycle
-          endif
-          if( iprint.ne.0 ) write(6,'(a,2a4,f8.4,i5,f7.3)') &
-               '   cspi,cspj,cij,nij,rcij = ',cspi,cspj,cij,nij,rcij
-          interact(isp,jsp) = .true.
-          rpl_c(isp,jsp) = cij
-          rpl_n(isp,jsp) = nij
-          rpl_rc(isp,jsp) = rcij
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            interact(isp,jsp) = .true.
+            rpl_c(isp,jsp) = cij
+            rpl_n(isp,jsp) = nij
+            rpl_rc(isp,jsp) = rcij
 !.....Symmetrize
-          interact(jsp,isp) = interact(isp,jsp)
-          rpl_c(jsp,isp) = cij
-          rpl_n(jsp,isp) = nij
-          rpl_rc(jsp,isp) = rcij
+            interact(jsp,isp) = interact(isp,jsp)
+            rpl_c(jsp,isp) = cij
+            rpl_n(jsp,isp) = nij
+            rpl_rc(jsp,isp) = rcij
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,2a4,f8.2,i5,f7.3)') &
+                   '   cspi,cspj,cij,nij,rcij = ',cspi,cspj,cij,nij,rcij
+            endif
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
+            endif
+          endif
         else
           if( iprint.ne.0 ) then
             write(6,*) 'WARNING@read_params_LJ_repul: number of entry wrong, ' &
@@ -311,7 +350,7 @@ contains
         endif
       enddo
 10    close(ioprms)
-      
+
     endif
 
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
@@ -334,5 +373,5 @@ contains
 end module LJ
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-05-16 23:32:44 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-21 16:40:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -123,8 +123,10 @@ module Coulomb
 !.....Gradient descent parameters
   real(8):: dqmax_cogrd = 1d-1
   real(8):: dqeps_cogrd = 1d-4
+!.....2nd order potential coeff for bounding q inside [qbot,qtop]
+  real(8):: bound_k2 = 1.0d+2
 !.....4-th order potential coeff for bounding q inside [qbot,qtop]
-  real(8):: bound_k4 = 1.0d+2
+  real(8):: bound_k4 = 0d0
 !.....Extended lagrangian
   real(8),allocatable:: aauxq(:)
   real(8):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
@@ -142,7 +144,7 @@ contains
     include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    logical,intent(inout):: lvc 
+    logical,intent(inout):: lvc
 
     integer:: i,is,ierr,nspl
 
@@ -156,8 +158,26 @@ contains
     if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
       lvc = .true.
     endif
-
+    
   end subroutine init_coulomb
+!=======================================================================
+  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint)
+!
+! Initialization for Ewald method, which should be called in both cases of
+! variable charge and fixed charge.
+!
+    real(8),intent(in):: h(3,3),rc
+    integer,intent(in):: myid,mpi_world,iprint
+    
+    if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
+      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+        call init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+      else
+        call init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+      endif
+    endif
+    
+  end subroutine init_for_Ewald
 !=======================================================================
   subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
 !
@@ -231,7 +251,7 @@ contains
 
   end subroutine init_fc_Ewald
 !=======================================================================
-  subroutine init_vc_Ewald(myid,mpi_world,iprint,h,rc)
+  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -240,8 +260,8 @@ contains
 !  read from input file in.params.Coulomb.
 !
     implicit none
-    integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),rc
+    integer,intent(in):: myid,mpi_world,iprint
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
@@ -612,6 +632,10 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, bound_k4
           cycle
+        else if( trim(c1st).eq.'bound_k2') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, bound_k2
+          cycle
         else if( trim(c1st).eq.'omg2dt2') then
           backspace(ioprms)
           read(ioprms,*) ctmp, omg2dt2
@@ -746,6 +770,7 @@ contains
     call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqmax_cogrd,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(bound_k2,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(bound_k4,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(omg2dt2,1,mpi_real8,0,mpi_world,ierr)
 
@@ -827,17 +852,6 @@ contains
       allocate(strsl(3,3,namax))
       call accum_mem('force_Coulomb',8*size(strsl))
 
-      if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-        if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
-!.....Variable-charge Coulomb with Gaussian distribution charges
-!     which ends-up long-range-only Ewald summation
-          call init_vc_Ewald(myid,mpi_md_world,iprint,h,rc)
-        else
-          call init_fc_Ewald(h,rc,myid,mpi_md_world,iprint)
-        endif
-      endif
-
-
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
       endif
@@ -905,7 +919,7 @@ contains
     endif
     if( trim(cterms).eq.'direct_cut' ) then
       call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
@@ -1018,7 +1032,7 @@ contains
   end subroutine force_direct
 !=======================================================================
   subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Direct Coulomb interaction with cutoff radius.
 !  Coulomb potential is shifted by v(rc) and modified by the term (r-rc)*v'(rc).
@@ -1032,18 +1046,22 @@ contains
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc,d2lspr(nnmax,namax)
-    logical,intent(in):: lstrs
+    logical,intent(in):: lstrs,l1st
     real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+    real(8):: rc2,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,dvdrc,vrc
     real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 
 !.....Compute direct sum
     rc2 = rc*rc
     esrl = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp     dxdj,vrc,dvdrc,tmp,ftmp,ixyz,jxyz) &
+!$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1051,9 +1069,8 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
         js = int(tag(j))
+        if( .not.interact(is,js) ) cycle
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -1064,36 +1081,39 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        terfc = erfc(dij*ss2i)
         vrc = acc*qi*qj/rc
         dvdrc = -acc*qi*qj /rc**2
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji -vrc -dvdrc*(dij-rc)
+        tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp *sfctr
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          epi(j)= epi(j) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
         ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine force_direct_cut
 !=======================================================================
@@ -1145,7 +1165,7 @@ contains
     esrl= 0d0
 !.....Loop over resident atoms
 !$omp parallel
-!$omp do private(i,xi,is,qi,k,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
 !$omp     dxdj,rhoij,terfc,vrc,dvdrc,texp,dedr,tmp,ixyz,jxyz) &
 !$omp     reduction(+:esrl)
     do i=1,natm
@@ -1230,6 +1250,10 @@ contains
     ss2i = 1d0 /sgmsq2
     sqpi = 1d0 /sqrt(pi)
     esrl = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
+!$omp            dxdj,terfc,tmp,ftmp,ixyz,jxyz) &
+!$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1237,54 +1261,55 @@ contains
       do jj=1,lspr(0,i)
         if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
-        if( j.eq.0 ) exit
-        if( j.le.i ) cycle
+!!$        if( j.le.i ) cycle
         js = int(tag(j))
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-!!$        dij = dlspr(0,jj,i)
-!!$        rij(1:3) = dlspr(1:3,jj,i)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
-        dxdj(1:3)=  rij(1:3)*diji
+!!$        dxdj(1:3)=  rij(1:3)*diji
         terfc = erfc(dij*ss2i)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
         tmp = tmp *sfctr
-!!$        tmp = 0.5d0 *acc *qi*qj*diji *terfc *fcut1(dij,0d0,rc)
-        if( j.le.natm ) then
-          epi(i)= epi(i) +tmp
-          epi(j)= epi(j) +tmp
-          esrl = esrl +tmp +tmp
-        else
-          epi(i)= epi(i) +tmp
-          esrl = esrl +tmp
-        endif
+!!$        if( j.le.natm ) then
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp +tmp
+!!$!$omp atomic
+!!$          epi(j)= epi(j) +tmp
+!!$        else
+!!$          epi(i)= epi(i) +tmp
+!!$          esrl = esrl +tmp
+!!$        endif
+        epi(i)= epi(i) +tmp
+        esrl= esrl +tmp
 !.....force
-!!$        ftmp = -acc *qj*qi*diji *( diji *terfc &
-!!$             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) ) *fcut1(dij,0d0,rc) &
-!!$             +acc *qi*qj*diji *terfc *dfcut1(dij,0d0,rc)
         ftmp = -acc *qj*qi*diji *( diji *terfc &
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
         ftmp = ftmp *sfctr
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
+!!$        do ixyz=1,3
+!!$!$omp atomic
+!!$          aa(ixyz,j)= aa(ixyz,j) +dxdi(ixyz)*ftmp
+!!$        enddo
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+!!$!$omp atomic
+!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine Ewald_short
 !=======================================================================
@@ -1323,6 +1348,12 @@ contains
     emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
     emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
     emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
+!$omp parallel
+!$omp do private(i,xi,is,itot,qi,ri,ik,bdk1,bdk2,bdk3,cs10,cs20,cs30, &
+!$omp            cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm, &
+!$omp            sn3m,sn3mm,k1,k2,k3,bk1,bk2,bk3,cs1,sn1,cs2,sn2,cs3,sn3, &
+!$omp            bb,cs,sn,tmp,ftmp,bk,ixyz,jxyz) &
+!$omp     reduction(+:elrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i) +sorg(1:3)
       is= int(tag(i))
@@ -1463,6 +1494,8 @@ contains
         endif
       enddo  ! k1
     enddo  ! i
+!$omp end do
+!$omp end parallel
 
   end subroutine Ewald_long
 !=======================================================================
@@ -1669,7 +1702,6 @@ contains
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
     prefac = 1d0 /(2d0*vol*eps0)
-!!$    print *,'prefac=',prefac
 !.....Compute structure factor
     call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
          ,myid,mpi_md_world,sorg)

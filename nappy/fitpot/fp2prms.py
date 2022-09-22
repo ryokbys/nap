@@ -18,6 +18,7 @@ Options:
               The 1st species (X1 in X1-X2-X3) is the center of two bonds. [default: None]
 """
 from __future__ import print_function
+import os
 
 from docopt import docopt
 
@@ -394,6 +395,7 @@ def fp2params(vs,**kwargs):
             fcontents = kwargs[fname]
             new_contents = fcontents.format(p=vs)
         except:
+            print('ERROR: Failed to replace the parameters in param_files !!!')
             print(fcontents)
             raise
         with open(fname,'w') as f:

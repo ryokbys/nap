@@ -22,7 +22,7 @@ from nappy.util import get_tag, decode_tag, pbc, \
 __author__ = "RYO KOBAYASHI"
 __version__ = ""
 
-FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
+FILE_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
                 'cube','CHGCAR','pdb')
 
 def write(nsys,fname="pmdini",format=None,**kwargs):
@@ -59,7 +59,7 @@ def read(fname="pmdini",format=None,specorder=None):
     
     if format == 'pmd':
         nsys = read_pmd(fname,specorder=specorder)
-    elif format == 'POSCAR':
+    elif format in ('POSCAR','CONTCAR','vasp','VASP'):
         nsys = read_POSCAR(fname,specorder=specorder)
     elif format == 'CHGCAR':
         nsys = read_CHGCAR(fname,specorder=specorder)
@@ -817,7 +817,7 @@ def write_xsf(nsys,fname='xsf'):
     f.write("{0:>8d}  {1:2d}\n".format(len(nsys.atoms),nsys.num_species()))
     spos = nsys.get_scaled_positions()
     for i in range(len(nsys.atoms)):
-        pos = sos[i]
+        pos = spos[i]
         x,y,z = scaled_to_cartesian(h,*pos)
         sid = nsys.atoms.sid[i]
         symbol = nsys.specorder[sid-1]

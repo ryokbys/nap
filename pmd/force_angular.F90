@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-04-22 15:38:55 KOBAYASHI Ryo>
+!                     Last modified: <2022-08-05 09:21:06 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -216,7 +216,6 @@ contains
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
-
 !.....Gather epot
     epott= 0d0
     epotl= epotl3
@@ -354,6 +353,7 @@ contains
     call mpi_bcast(alps,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(bets,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(gmms,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(shfts,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 
     return
   end subroutine read_params_angular

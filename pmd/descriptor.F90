@@ -20,6 +20,7 @@ module descriptor
   public:: ngl,glval,iglid
   public:: rcmax,rcmax2
   public:: set_paramsdir_desc, lfitpot, desc
+  public:: write_desc, lout_desc
   
 !!$ putting mpif.h inclusion here could cause some conflicts
 !!$  include "mpif.h"
@@ -86,6 +87,9 @@ module descriptor
 
 !.....Whether or not called from fitpot [default: .false.]
   logical:: lfitpot = .false.
+
+!.....Write out descriptor
+  logical:: lout_desc = .false.
 
 contains
   subroutine init_desc()
@@ -211,7 +215,8 @@ contains
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
       if( .not. allocated(gsfi) ) then
         allocate(gsfi(nsf),dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax),gscli(nsf))
-        call accum_mem('descriptor',8*(size(gsfi)+size(dgsfi)+size(gscli))+2*size(igsfi))
+        call accum_mem('descriptor',8*(size(gsfi)+size(dgsfi)+size(gscli)) &
+             +2*size(igsfi))
 !!$        mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi) +8*size(gscli)
         gscli(:) = 1d0
       endif
@@ -242,7 +247,8 @@ contains
       lrealloc=.true.
     endif
 
-    if( lrealloc ) then
+!.....gsf and dgsf are used only in fitpot, not in pmd
+    if( lrealloc .and. lfitpot ) then
       if( allocated(gsf) ) then
 !!$        mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
         call accum_mem('descriptor',-8*(size(gsf)+size(dgsf))+2*size(igsf))
@@ -256,7 +262,7 @@ contains
     endif
 
     time = time +(mpi_wtime() -time0)
-    
+
     return
   end subroutine make_gsf_arrays
 !=======================================================================
@@ -1639,9 +1645,9 @@ contains
     return
   end subroutine set_params_desc
 !=======================================================================
-  subroutine write_descs(ionum,natm,namax,nnmax,lspr,tag)
+  subroutine write_desc_unformatted(ionum,natm,namax,nnmax,lspr,tag)
 !
-!   Write out descriptor data (gsf,dgsf,igsf).
+!   Write out descriptor data (gsf,dgsf,igsf) unformatted.
 !   Buffer atom indices are replaced to resident atom ones.
 !
     use util,only: itotOf
@@ -1699,7 +1705,37 @@ contains
     close(ionum+2)
 
     deallocate(dgsfo,igsfo)
-  end subroutine write_descs
+  end subroutine write_desc_unformatted
+!=======================================================================
+  subroutine write_desc(namax,natm,nnmax,lspr,h,tag,ra,rcin, &
+       myid,mpi_world,iprint)
+!
+!  Calculate and write out descriptors.
+!  This code assumes running pmd on 1 node, not parallel.
+!
+    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
+         myid,mpi_world,iprint
+    real(8),intent(in):: tag(namax),ra(3,namax),rcin,h(3,3)
+
+    integer:: ia,is,isf
+    character(len=12),save:: cnum
+
+    call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
+    call make_gsf_arrays(.true.,namax,natm,tag,nnmax,lspr, &
+         myid,mpi_world,iprint)
+
+    open(ionum,file='out.desc.gsf',status='replace')
+    write(ionum,'(a,i8)') '# natm: ',natm
+    write(ionum,'(a,i8)') '# nsf:  ',nsf
+    write(cnum,'(i0)') nsf
+
+    do ia=1,natm
+      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
+      write(ionum,'('//trim(cnum)//'es13.4e3)') (gsfi(isf),isf=1,nsf)
+    enddo
+    close(ionum)
+    if( iprint.ge.ipl_basic ) print '(/a)',' Wrote descriptors in out.desc.gsf'
+  end subroutine write_desc
 !=======================================================================
   subroutine get_ints(nsfo,nalo,nnlo)
 !
@@ -1870,8 +1906,9 @@ contains
       enddo
     enddo
   end subroutine debug_descs
+!=======================================================================
 end module descriptor
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

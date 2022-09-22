@@ -44,6 +44,8 @@ subroutine set_variable(ionum,cname)
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use deform,only: cdeform, trlx_deform, dhmat
+  use descriptor,only: lout_desc
+  use isostat,only: sratemax
 #ifdef __WALL__
   use wall
 #endif
@@ -189,6 +191,10 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'pressure_target' ) then
     call read_r1(ionum,ptgt)
+!.....As ptgt can be also used for vc-X isobaric methods, copy it to stgt(i,i)
+    stgt(1,1) = ptgt
+    stgt(2,2) = ptgt
+    stgt(3,3) = ptgt
     return
   elseif( trim(cname).eq.'initial_pressure_target' ) then
     call read_r1(ionum,pini)
@@ -198,6 +204,8 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'stress_target' ) then
     call read_rs(ionum,3,3,stgt(1:3,1:3))
+!.....It is not necesarry, but copy average stgt to ptgt as well...
+    ptgt = (stgt(1,1)+stgt(2,2)+stgt(3,3))/3
     return
   elseif( trim(cname).eq.'stress_relax_time' .or. &
        trim(cname).eq.'pressure_relax_time' ) then
@@ -208,6 +216,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'flag_compute_stress' ) then
     call read_l1(ionum,lstrs0)
+    return
+  elseif( trim(cname).eq.'max_strain_rate' ) then
+    call read_r1(ionum,sratemax)
     return
   elseif( trim(cname).eq.'cell_fix' ) then
     call read_ls(ionum,3,3,lcellfix)
@@ -357,6 +368,10 @@ subroutine set_variable(ionum,cname)
 !.....Reallocation
   elseif( trim(cname).eq.'allow_reallocation') then
     call read_l1(ionum,lrealloc)
+    return
+!.....Descriptor
+  elseif( trim(cname).eq.'write_desc' ) then
+    call read_l1(ionum,lout_desc)
     return
     
 #ifdef __WALL__

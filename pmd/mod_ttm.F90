@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-11-24 21:38:55 Ryo KOBAYASHI>
+!                     Last-modified: <2022-08-08 19:31:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -11,6 +11,7 @@ module ttm
   use memory,only: accum_mem
   use vector,only: dot
   use random,only: box_muller
+  use util,only: itotOf
   implicit none
   save
   include 'mpif.h'
@@ -680,6 +681,11 @@ contains
     integer:: i,ix,iy,iz,ic,l
     real(8):: xi(3),udx,udy,udz,t0
 
+    if( size(a2c).ne.namax ) then
+      deallocate(a2c,aai,ekti)
+      allocate(a2c(namax),aai(3,namax),ekti(namax))
+    endif
+
     t0 = mpi_wtime()
 
     udx = 1d0/nx
@@ -691,11 +697,13 @@ contains
       do l=1,3
         if( boundary(l:l).eq.'p' ) then
           xi(l) = mod(xi(l),1d0)
+          if( xi(l).lt.0d0 ) xi(l) = xi(l) +1d0
         endif
       enddo
       ix = int(xi(1)/udx) +1
       iy = int(xi(2)/udy) +1
       iz = int(xi(3)/udz) +1
+!.....Assuming that only x can be free-boundary
       if( boundary(1:1).eq.'f' ) then
         ix = min(max(ix,1),nx)
       endif
@@ -747,7 +755,7 @@ contains
     real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
 !!$    integer,external:: ifmvOf
 
-    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
+!!$    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
 
     if( .not. allocated(dofl) ) then
       allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
@@ -758,19 +766,13 @@ contains
 
     t0 = mpi_wtime()
 
-!!$    call compute_nac(natm,myid,mpi_world,iprint)
 !.....First distinguish center of mass vectors of cells
     vacl(:,:) = 0d0
-!!$    nacl(:) = 0
     do i=1,natm
       ic = a2c(i)
       vacl(1:3,ic) = vacl(1:3,ic) +va(1:3,i)
-!!$      nacl(ic) = nacl(ic) + 1
     enddo
     vac(:,:) = 0d0
-!.....NACL and NAC are temporal here, used just for normalization
-!!$    nac(:) = 0
-!!$    call mpi_reduce(nacl,nac,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(vacl,vac,3*nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
     do ic=1,nxyz
       if( nac(ic).eq.0 ) cycle
@@ -783,8 +785,7 @@ contains
       ic = a2c(i)
       is = int(tag(i))
       vat(1:3) = va(1:3,i) -vac(1:3,ic)
-      vatr(1:3) = h(1:3,1)*vat(1) +h(1:3,2)*vat(2) +h(1:3,3)*vat(3)
-      ekti(i) = (vatr(1)**2 +vatr(2)**2 +vatr(3)**2) *fekin(is)
+      ekti(i) = (vat(1)**2 +vat(2)**2 +vat(3)**2) *fekin(is)
     enddo
     
     dofl(1:nxyz) = 0
@@ -800,7 +801,7 @@ contains
       enddo
       dofl(ic) = dofl(ic) + idof
       eksuml(ic) = eksuml(ic) +ekti(i)
-      if( ek.gt.ekth ) then
+      if( ekti(i).gt.ekth ) then
         dofpl(ic) = dofpl(ic) +idof
         ekpsuml(ic) = ekpsuml(ic) +ekti(i)
       endif
@@ -822,9 +823,10 @@ contains
         tap(:) = 0d0
         do ic=1,nxyz
           if( dof(ic).eq.0 ) cycle
-!!$          call ic2ixyz(ic,ix,iy,iz)
 !.....Degree of freedom per atom (3 in case of 3D) is included in dof
           ta(ic) = eksum(ic) *2d0 /fkb /dof(ic)
+!!$          if( ic.eq.13 ) print '(a,2i5,2es12.3,i5)','ic,dof,ta,eksum=', &
+!!$               ic,dof(ic),ta(ic),eksum(ic)
           gp(ic) = dof(ic) *fkb *gmmp(ic) /vcell ! /3
           if( dofp(ic).eq.0 ) cycle
           tap(ic) = ekpsum(ic) *2d0 /fkb /dofp(ic)
@@ -1085,6 +1087,7 @@ contains
       denom = ce*rho_e
       dtemp = ( kappa*d2te(iz,iy,ix) +pterm +sterm ) /denom ! *dt
       dtep(iz,iy,ix) = dtep(iz,iy,ix) +dtemp
+!!$      if( ic.eq.11 ) print '(a,2i5,4es12.3)','ic,ix,pterm,=',ic,ix,pterm,gp(ic),teic,ta(ic)
     enddo  ! ic=1,nxyz
 
 !.....Laser pulse
@@ -1238,13 +1241,14 @@ contains
     use util,only: itotOf, ifmvOf
     include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
-    real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax) &
-         ,fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
+    real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax), &
+         fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
     real(8),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,ifmv,ix,iy,iz,naccp,ierr,isp
-    real(8):: hscl(3),sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3)&
-         ,aain(3),aaout(3),vin(3),vout(3),v0(3)
+    real(8):: sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3),&
+         aain(3),aaout(3),vin(3),vout(3),v0(3),etai,afi,bfi
+    real(8):: dv(3),dv0(3),dvin(3),dvout(3)
     real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
     logical,save:: l1st = .true.
 
@@ -1268,10 +1272,6 @@ contains
     ediffl(1:nspmax) = 0d0
     deinl(1:nspmax) = 0d0
     deoutl(1:nspmax) = 0d0
-    hscl(1:3)= 0d0
-    do l=1,3
-      hscl(l)= dsqrt(h(1,l)**2 +h(2,l)**2 +h(3,l)**2)
-    enddo
     do i=1,natm
       ifmv = ifmvOf(tag(i))
       isp = int(tag(i))
@@ -1287,49 +1287,59 @@ contains
         ek = ekti(i)
         gmmi = gmmp(ic)
         if( ek.gt.ekth ) gmmi = gmmp(ic) + gmms(ic)
-        aai(1:3)= 0d0
-        aain(1:3)= 0d0
-        aaout(1:3)= 0d0
+!!$!.....G-JF algorithm parameters for Langevin
+!!$        etai = gmmi *dtmd /2
+!!$        bfi = 1d0 /(1d0 +etai)
+!!$        afi = 2d0*etai /(1d0 +etai)
 !.....SGMI should be [eV/Ang] whereas it is [ue/Ang]
 !     and V0*GMMI*AMI is also [ue/Ang],
 !     so need to multiply ue2ev
+        aai(1:3)= 0d0
+        aain(1:3)= 0d0
+        aaout(1:3)= 0d0
         do l=1,3
-          aain(l) = sgmi*box_muller()/hscl(l) *ue2ev
+          aain(l) = sgmi*box_muller() *ue2ev
           aaout(l) = -vt(l)*gmmi*ami *ue2ev
           aai(l) = aaout(l) +aain(l)
         enddo
+!!$        dv0(1:3) = fa2v(isp)*dtmd*aa(1:3,i)
+!!$        dvout(1:3) = -afi*vt(1:3)
+!!$        do l=1,3
+!!$          dvin(l) = fa2v(isp)*dtmd *2d0*bfi*sgmi*box_muller()*ue2ev
+!!$        enddo
+!!$        dv(1:3) = dvin(1:3) +dvout(1:3)
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
         va(1:3,i)= va(1:3,i) +aai(1:3)*fa2v(isp)*dtmd *2d0
+!!$        va(1:3,i)= va(1:3,i) +dv0(1:3) +dv(1:3)
+!!$        if( i.eq.1 ) print '(a,2i5,3es12.4)','i,ic,va=',i,ic,va(1:3,i)
         if( va(1,i)*0d0.ne.0d0 .or. va(2,i)*0d0.ne.0d0 &
              .or. va(3,i)*0d0.ne.0d0 ) then
           if( myid.eq.0 ) then
             print *,'ERROR: va==NaN !!!'
             print *,'  ic,i,va(:)=',ic,i,va(1:3,i)
-            print *,'  aain,aaout=',aain(1:3),aaout(1:3)
+!!$            print *,'  aain,aaout=',aain(1:3),aaout(1:3)
+            print *,'  dvin,dvout=',dvin(1:3),dvout(1:3)
             print *,'  sgmi=',sgmi
             print *,'  gmmp(ic),te(iz,iy,ix)=',gmmp(ic),te(iz,iy,ix)
           endif
           stop
         endif
 !.....accumulate energy difference
-        vi(1:3)= h(1:3,1)*vt(1) &
-             +h(1:3,2)*vt(2) &
-             +h(1:3,3)*vt(3)
-        vl(1:3)= h(1:3,1)*aai(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aai(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aai(3)*fa2v(isp)*dtmd *2d0
-        vin(1:3)= h(1:3,1)*aain(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aain(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aain(3)*fa2v(isp)*dtmd *2d0
-        vout(1:3)= h(1:3,1)*aaout(1)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,2)*aaout(2)*fa2v(isp)*dtmd *2d0 &
-             +h(1:3,3)*aaout(3)*fa2v(isp)*dtmd *2d0
+        vl(1:3)= aai(1:3)*fa2v(isp)*dtmd *2d0
+        vin(1:3)= aain(1:3)*fa2v(isp)*dtmd *2d0
+        vout(1:3)= aaout(1:3)*fa2v(isp)*dtmd *2d0
         ediffl(isp)= ediffl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vl)+dot(vl,vl))
+             *(2d0*dot(vt,vl)+dot(vl,vl))
         deinl(isp)= deinl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vin)+dot(vin,vin))
+             *(2d0*dot(vt,vin)+dot(vin,vin))
         deoutl(isp)= deoutl(isp) +fekin(isp) &
-             *(2d0*dot(vi,vout)+dot(vout,vout))
+             *(2d0*dot(vt,vout)+dot(vout,vout))
+!!$        ediffl(isp)= ediffl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dv)+dot(dv,dv))
+!!$        deinl(isp)= deinl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dvin)+dot(dvin,dvin))
+!!$        deoutl(isp)= deoutl(isp) +fekin(isp) &
+!!$             *(2d0*dot(vt,dvout)+dot(dvout,dvout))
       endif
     enddo
 
@@ -1376,7 +1386,6 @@ contains
     call mpi_allreduce(nabcl,nabc,1,mpi_integer,mpi_sum,mpi_world,ierr)
     areatom = area/nabc
 
-    hxi = 1d0/h(1,1)
     do i=1,natm
       xi = ra(1,i) +sorg(1)
       if( xi.lt.xrmd-xdnr ) cycle
@@ -1386,7 +1395,7 @@ contains
       zimp = ami *rho_latt *sspeed_latt
       ic = a2c(i)
       sgmi = dsqrt(2d0*zimp*areatom*ta(ic)/dtmd*k2ue)
-      axi = (-vx*zimp*areatom +sgmi*box_muller()*hxi)*ue2ev
+      axi = (-vx*zimp*areatom +sgmi*box_muller())*ue2ev
 !.....To compensate the factor 1/2 in fa2v, multiply 2 here.
       va(1,i) = va(1,i) +axi*fa2v(isp)*dtmd *2d0
     enddo
@@ -1692,9 +1701,8 @@ contains
           tagabl(inc) = tag(ia)
           rt(1:3) = ra(1:3,ia) +sorg(1:3)
           r(1:3) = h(1:3,1)*rt(1) +h(1:3,2)*rt(2) +h(1:3,3)*rt(3)
-          v(1:3) = h(1:3,1)*va(1,ia) +h(1:3,2)*va(2,ia) +h(1:3,3)*va(3,ia)
           rabl(1:3,inc) = r(1:3)
-          vabl(1:3,inc) = v(1:3)
+          vabl(1:3,inc) = va(1:3,ia)
         endif
       enddo
 !.....Gather to-be-removed atoms for writing out
@@ -1865,7 +1873,7 @@ contains
 
     integer:: ix
     real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
-    real(8):: denom,xlsurf,vc1d,kl1d
+    real(8):: denom,xlsurf,vc1d,kl1d,I0_1D
 !!$    real(8),parameter:: kappa_latt = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
 !!$    real(8),parameter:: kappa_latt = 1.137d-4  ! kappa for Si lattice in eV/(fs.Ang.K)
     
@@ -1900,6 +1908,7 @@ contains
     if( itype_pulse.eq.1 ) then  ! stepwise pulse
       if( tnow.ge.t0_laser .and. &
            tnow.le.(t0_laser +tau_pulse) ) then
+        I0_1D = I_0 /darea *area
         xlsurf = (lsurf-1 +0.5d0)*dx
         vc1d = area*dx1d
         do ix=ibc1d+1,nd1d
@@ -1910,13 +1919,14 @@ contains
           tmp = 1d0 /(ce*rho_e *vc1d)
 !.....Do not shft 0.5 since the mesh points are at the edges of cells in case of 1D-TTM
           xi = (ix -1)*dx1d -xlsurf
-          de = I_0 *min(1d0, exp(-xi/lskin))*dx1d 
+          de = I0_1D *min(1d0, exp(-xi/lskin))*dx1d 
           dtep(ix) = dtep(ix) +de*tmp
         enddo
       endif
     else if( itype_pulse.eq.2 ) then  ! Gaussian pulse
       if( tnow.ge.t0_laser .and. &
            tnow.lt.(t0_laser +tau_pulse*2) ) then
+        I0_1D = I_0 /darea *area
         xlsurf = (lsurf-1 +0.5d0)*dx
         vc1d = area*dx1d
         pulsefactor = exp(-(tnow -(t0_laser+tau_pulse))**2 /(2d0*sgm_pulse**2))
@@ -1928,7 +1938,7 @@ contains
           tmp = 1d0 /(ce *rho_e *vc1d)
 !.....Do not shft 0.5 since the mesh points are at the edges of cells in case of 1D-TTM
           xi = (ix -1)*dx1d -xlsurf
-          de = I_0 *min(1d0, exp(-xi/lskin)) *dx1d *pulsefactor 
+          de = I0_1D *min(1d0, exp(-xi/lskin)) *dt_inner *dx1d *pulsefactor 
           dtep(ix) = dtep(ix) +de*tmp
         enddo
       endif
@@ -2191,5 +2201,5 @@ contains
 end module ttm
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-05-28 00:03:26 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-05 12:38:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -20,7 +20,8 @@ module isostat
 !   2. PhD thesis by David Quigley (2005)
 !-----------------------------------------------------------------------
   use pmdvars,only: tinit,tfin,trlx,nstp,istp,tgmm,ttgt,dt,am,fa2v,tfac, &
-       ndof,ekl,temp,nfmv
+       ndof,ekl,temp,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
+       pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm
   use util,only: ifmvOf
   use random,only: box_muller
   implicit none
@@ -30,16 +31,18 @@ module isostat
   save
 
 !.....Max strain rate (1%)
-  real(8),parameter:: sratemax = 0.01d0
+  real(8):: sratemax = 0.01d0
   
   public:: setup_langevin, setup_cell_langevin, setup_cell_berendsen, &
+       setup_cell_min, &
        vel_update_langevin, vel_update_berendsen, &
        cell_update_berendsen, cell_force_berendsen, &
-       cell_update_langevin, cvel_update_langevin
+       cell_update_langevin, cvel_update_langevin, sratemax
        
 contains
 !=======================================================================
   subroutine setup_langevin(myid,iprint)
+    implicit none 
     integer,intent(in):: myid,iprint
 
     integer:: ifmv
@@ -72,8 +75,9 @@ contains
 !
 !  Set the parameters for Langevin barostat.
 !
-    use pmdvars,only: cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
-         pini,pfin,cpctl,ifdmp
+!!$    use pmdvars,only: cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
+!!$         pini,pfin,cpctl,ifdmp
+    implicit none
     integer,intent(in):: myid,iprint
     real(8),parameter:: temp_min = 10d0
     integer:: is,ndoftot
@@ -126,7 +130,8 @@ contains
   end subroutine setup_cell_langevin
 !=======================================================================
   subroutine setup_cell_berendsen(myid,iprint)
-    use pmdvars,only: cpctl,ptgt,stgt,pini,pfin
+!!$    use pmdvars,only: cpctl,ptgt,stgt,pini,pfin
+    implicit none 
     integer,intent(in):: myid,iprint
 
     if( index(cpctl,'vv-').ne.0 ) then
@@ -161,10 +166,30 @@ contains
     return
   end subroutine setup_cell_berendsen
 !=======================================================================
+  subroutine setup_cell_min(myid,iprint)
+    implicit none
+    integer,intent(in):: myid,iprint
+
+    if(myid.eq.0 .and. iprint.ne.0 ) then
+      write(6,*) ''
+      if( index(cpctl,'vc').ne.0 ) then
+        write(6,'(a)') ' Variable-cell'
+      else if( index(cpctl,'vv').ne.0 ) then
+        write(6,'(a)') ' Variable-volume'
+      endif
+      write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
+           ,stgt(1,1),stgt(2,2),stgt(3,3) &
+           ,stgt(2,3),stgt(3,1),stgt(1,2)
+    endif
+    stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
+
+  end subroutine setup_cell_min
+!=======================================================================
   subroutine vel_update_langevin(natm,tag,va,aa)
 !
 !  Update of velocities in Langevin thermostat using G-JF algorithm.
 !
+    implicit none
     integer,intent(in):: natm
     real(8),intent(in):: tag(natm),aa(3,natm)
     real(8),intent(inout):: va(3,natm)
@@ -213,6 +238,7 @@ contains
 !
 !  2nd update of velocities in Berendsen thermostat.
 !
+    implicit none 
     integer,intent(in):: natm
     real(8),intent(in):: tag(natm)
     real(8),intent(inout):: va(3,natm)
@@ -247,8 +273,8 @@ contains
 !  Calc. deviation of h-matrix used in isobaric MD
 !  using given stress tensor stgt.
 !
-    use pmdvars,only: cpctl,strs,eki,sgm,dt,srlx,stbeta,vol, &
-         stgt,ptgt,natm
+!!$    use pmdvars,only: cpctl,strs,eki,sgm,dt,srlx,stbeta,vol, &
+!!$         stgt,ptgt,natm
     implicit none
     include "mpif.h"
     integer,intent(in):: mpi_md_world
@@ -296,6 +322,7 @@ contains
 !
 !  Update cell vector, h, by Berendsen barostat
 !
+    implicit none 
     real(8),intent(in):: ah(3,3)
     logical,intent(in):: lcellfix(3,3)
     real(8),intent(inout):: h(3,3,0:1)
@@ -324,8 +351,8 @@ contains
 !  Parameters:
 !    - ikick: 1) 1st-kick, 2) 2nd-kick
 !
-    use pmdvars,only: cpctl,sgm,dt,srlx,vol,stgt,ptgt,cgmm,cmass,&
-         ttgt_lang
+!!$    use pmdvars,only: cpctl,sgm,dt,srlx,vol,stgt,ptgt,cgmm,cmass,&
+!!$         ttgt_lang
     implicit none
     include "mpif.h"
     integer,intent(in):: mpi_md_world,ikick
@@ -373,7 +400,8 @@ contains
 !
 !  Update cell vectors, h, by Langevin barostat
 !
-    use pmdvars,only: dt,cgmm,cmass
+!!$    use pmdvars,only: dt,cgmm,cmass
+    implicit none
     logical,intent(in):: lcellfix(3,3)
     real(8),intent(inout):: h(3,3,0:1)
     logical,intent(inout):: lcell_updated
@@ -417,6 +445,6 @@ contains
 end module isostat
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
 

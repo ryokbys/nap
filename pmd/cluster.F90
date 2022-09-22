@@ -1,6 +1,6 @@
 program cluster_analysis
 !-----------------------------------------------------------------------
-!                     Last-modified: <2021-03-09 10:41:42 Ryo KOBAYASHI>
+!                     Last-modified: <2022-07-08 16:40:42 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Cluster analysis program.
 ! The cluster analysis is usually performed for large scale systems.
@@ -18,12 +18,15 @@ program cluster_analysis
 !   - STDOUT
 !-----------------------------------------------------------------------
   use pmdvars
-  use pmdio,only: read_pmdtot_ascii
+  use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
   integer,parameter:: maxpair = 5
   character(len=20),parameter:: cfinput='in.cluster'
+
+  real(8):: hunit,hmat(3,3,0:1)
+  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
 
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nacmax
   integer,allocatable:: ictot(:),nacs(:),icouts(:),nhist(:)
@@ -34,7 +37,10 @@ program cluster_analysis
   t0 = mpi_wtime()
 
 !.....Read atom configuration
-  call read_pmdtot_ascii(10,trim(cpmdini))
+!!$  call read_pmdtot_ascii(10,trim(cpmdini))
+  ntot = get_ntot_ascii(20,trim(cpmdini))
+  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot))
+  call read_pmdtot_ascii(20,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
   call get_hi(h,hi)
 
 !.....Read input
@@ -151,6 +157,8 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 !  out_threshold   10
 !  recursive  T
 !-----------------------------------------------------------------------
+  use pmdvars,only: nspmax
+  use pmdio,only: split_pair
   use util, only: num_data,csp2isp
   implicit none 
   integer,intent(in):: ionum,maxpair
