@@ -51,12 +51,11 @@ def wrap(vs,vrs):
         vsnew[i] = min(max(v,vmin),vmax)
     return vsnew
 
-def update_vrange(vrs,vrsh,all_indivisuals):
+def update_vrange(vrs,vrsh,all_indivisuals,ntops=100):
     """
     Update variable ranges adaptively using all the individuals information.
     """
     #...Extract top NTOPS individuals from all
-    ntops = 100
     tops = []
     # print('len(all_indivisuals)=',len(all_indivisuals))
     for i,ind in enumerate(all_indivisuals):
@@ -300,8 +299,10 @@ class CS:
             find.write('\n')
 
         if self.print_level > 0:
-            print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(0, time()-start,
-                                                                           self.bestind.val),end="")
+            print(' step,time,best_iid,best_loss,vars='
+                  +' {0:6d} {1:8.1f} {2:5d} {3:8.4f}'.format(0,time()-start,
+                                                             self.bestind.iid,
+                                                             self.bestind.val),end="")
             for i in range(min(16,self.ndim)):
                 print(' {0:6.3f}'.format(self.bestind.vector[i]),end="")
             print('', flush=True)
@@ -430,8 +431,12 @@ class CS:
                     self.population[iv].vranges = self.vrs
             
             if self.print_level > 0:
-                print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(it+1, time()-start,
-                                                                               self.bestind.val),end="")
+                print(' step,time,best_iid,best_loss,vars='
+                      +' {0:6d} {1:8.1f} {2:5d} {3:8.4f}'.format(it+1,time()-start,
+                                                                 self.bestind.iid,
+                                                                 self.bestind.val),end="")
+                # print(' step,time,best,vars= {0:6d} {1:8.1f}  {2:8.4f}'.format(it+1, time()-start,
+                #                                                                self.bestind.val),end="")
                 for i in range(min(16,self.ndim)):
                     print(' {0:6.3f}'.format(self.bestind.vector[i]),end="")
                 print('', flush=True)

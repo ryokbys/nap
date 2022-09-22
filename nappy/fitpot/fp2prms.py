@@ -395,6 +395,7 @@ def fp2params(vs,**kwargs):
             fcontents = kwargs[fname]
             new_contents = fcontents.format(p=vs)
         except:
+            print('ERROR: Failed to replace the parameters in param_files !!!')
             print(fcontents)
             raise
         with open(fname,'w') as f:

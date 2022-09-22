@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-20 22:22:22 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-21 16:40:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -123,8 +123,10 @@ module Coulomb
 !.....Gradient descent parameters
   real(8):: dqmax_cogrd = 1d-1
   real(8):: dqeps_cogrd = 1d-4
+!.....2nd order potential coeff for bounding q inside [qbot,qtop]
+  real(8):: bound_k2 = 1.0d+2
 !.....4-th order potential coeff for bounding q inside [qbot,qtop]
-  real(8):: bound_k4 = 1.0d+2
+  real(8):: bound_k4 = 0d0
 !.....Extended lagrangian
   real(8),allocatable:: aauxq(:)
   real(8):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
@@ -630,6 +632,10 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, bound_k4
           cycle
+        else if( trim(c1st).eq.'bound_k2') then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, bound_k2
+          cycle
         else if( trim(c1st).eq.'omg2dt2') then
           backspace(ioprms)
           read(ioprms,*) ctmp, omg2dt2
@@ -764,6 +770,7 @@ contains
     call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqmax_cogrd,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(bound_k2,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(bound_k4,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(omg2dt2,1,mpi_real8,0,mpi_world,ierr)
 

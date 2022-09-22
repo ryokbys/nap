@@ -1384,7 +1384,7 @@ subroutine get_bounding_fq(chg,fq,epot)
 !  Compute forces on qs that bound qs inside [qbot,qtop].
 !
   use pmdvars,only: namax,natm,iprint,tag,mpi_md_world
-  use Coulomb,only: bound_k4,qtop,qbot
+  use Coulomb,only: bound_k2,bound_k4,qtop,qbot
   implicit none
   include 'mpif.h'
   include './const.h'
@@ -1400,11 +1400,15 @@ subroutine get_bounding_fq(chg,fq,epot)
   do i=1,natm
     is = int(tag(i))
     if( chg(i).ge.qtop(is) ) then
-      epotl = epotl +bound_k4*(chg(i)-qtop(is))**4
-      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qtop(is))**3
+      epotl = epotl +bound_k2*(chg(i)-qtop(is))**2 &
+           +bound_k4*(chg(i)-qtop(is))**4
+      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qtop(is)) &
+           -4d0*bound_k4*(chg(i)-qtop(is))**3
     else if( chg(i).le.qbot(is) ) then
-      epotl = epotl +bound_k4*(chg(i)-qbot(is))**4
-      fq(i) = fq(i) -4d0*bound_k4*(chg(i)-qbot(is))**3
+      epotl = epotl +bound_k2*(chg(i)-qbot(is))**2 &
+           +bound_k4*(chg(i)-qbot(is))**4
+      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qbot(is)) &
+           -4d0*bound_k4*(chg(i)-qbot(is))**3
     endif
   enddo
   epot = 0d0

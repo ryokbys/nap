@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-21 14:10:19 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-21 17:00:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -791,7 +791,8 @@ contains
           dplcs(2)= 3d0*cs
           dplcs(3)= (15d0*cs2 -3d0)/2
           do l=1,lmax
-            drhoi2(1:3,1:nni,l) = drhoi2(1:3,1:nni,l) +fl(l,jj)*fl(l,kk)*plcs(l) &
+            drhoi2(1:3,1:nni,l) = drhoi2(1:3,1:nni,l) &
+                 +fl(l,jj)*fl(l,kk)*plcs(l) &
                  *(sfc(jj)*dsfc(1:3,1:nni,kk) +sfc(kk)*dsfc(1:3,1:nni,jj))
             drhoi2(1:3,jj,l) = drhoi2(1:3,jj,l) +sfcjk*fl(l,kk) &
                  *(plcs(l)*dfl(1:3,l,jj) +fl(l,jj)*dcsdij(1:3)*dplcs(l))
