@@ -8,16 +8,20 @@ module pairlist
   save
   private
 
-  public:: mk_lspr_para,mk_lscl_para,reorder_arrays, update_d2lspr, &
+  public:: mk_lspr_para,mk_lscl_para,sort_arrays, update_d2lspr, &
        check_lspr, check_lscl
   public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, &
-       swap, qsort_list
+       swap, qsort_list, sort_lspr
   
   integer,allocatable:: lscl(:),lshd(:)
   real(8):: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
   integer:: lcx,lcy,lcz,lcxyz,lcyz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
   real(8),allocatable:: tmparr(:)
   integer:: ndmax
+
+!.....Cutoff list and
+  real(8),allocatable:: rclst(:)
+  integer,allocatable:: idxlst_rc(:,:)
 
 !.....Arrays for Gonnet's algorithm
   real(8),allocatable:: dlist(:)
@@ -100,9 +104,11 @@ contains
     return
   end subroutine mk_lscl_para
 !=======================================================================
-  subroutine reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
+  subroutine sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
 !
-!  Reorder arrays (tag,ra,va, and some more) using the cell list
+!  Sort arrays (tag,ra,va, and some more) using the cell list
+!  NOTE: This is not going to work well for now...,
+!    and thus it should not be used...
 !
     integer,intent(in):: namax,natm,nb,naux
     real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
@@ -125,7 +131,7 @@ contains
 !!$    endif
     
     return
-  end subroutine reorder_arrays
+  end subroutine sort_arrays
 !=======================================================================
   subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
        ,rc,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
@@ -165,15 +171,15 @@ contains
       my= min(max(my,0),lcy+1)
       mz= min(max(mz,0),lcz+1)
       m= mx*lcyz2 +my*lcz2 +mz +1
-      do kuz= -1,1
-        m1z= mz +kuz
-        if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
+      do kux= -1,1
+        m1x= mx +kux
+        if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
         do kuy= -1,1
           m1y= my +kuy
           if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
-          do kux= -1,1
-            m1x= mx +kux
-            if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
+          do kuz= -1,1
+            m1z= mz +kuz
+            if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
             m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
             if(lshd(m1).eq.0) cycle
             j=lshd(m1)
@@ -196,7 +202,7 @@ contains
 
               j=lscl(j)
             enddo ! while (j.gt.0)
-          enddo  ! kux
+          enddo  ! kuz
         enddo  ! kuy
       enddo  ! kux
     enddo  ! i=1,natm
@@ -489,6 +495,34 @@ contains
     endif
 
   end subroutine mk_lspr_gonnet
+!=======================================================================
+  recursive subroutine qsort_list(ndim,il,ir,dlist,ilist)
+!
+!  Sort dlist and ilist used in Gonnet's algorithm by Quicksort.
+!
+    integer,intent(in):: ndim,il,ir
+    real(8),intent(inout):: dlist(ndim)
+    integer,intent(inout):: ilist(ndim)
+
+    integer:: ip,i,j
+    real(8):: dip
+
+    if( ir-il.lt.1 ) return
+    ip = int((il+ir)/2)
+    dip = dlist(ip)
+    call swap(ndim,ip,ir,dlist,ilist)
+    i = il
+    do j=il,ir-1
+      if( dlist(j).lt.dip ) then
+        call swap(ndim,i,j,dlist,ilist)
+        i = i + 1
+      endif
+    enddo
+    call swap(ndim,i,ir,dlist,ilist)
+    call qsort_list(ndim,il,i,dlist,ilist)
+    call qsort_list(ndim,i+1,ir,dlist,ilist)
+
+  end subroutine qsort_list
 !=======================================================================
   subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,h,hi &
        ,lspr,d2lspr,iprint,l1st)
@@ -927,33 +961,47 @@ contains
     return
   end subroutine swap
 !=======================================================================
-  recursive subroutine qsort_list(ndim,il,ir,dlist,ilist)
+  subroutine sort_lspr(namax,natm,ra,nnmax,h,lspr)
 !
-!  Sort dlist and ilist used in Gonnet's algorithm by Quicksort.
+!  Sort indices in lspr in ascending order of distance.
 !
-    integer,intent(in):: ndim,il,ir
-    real(8),intent(inout):: dlist(ndim)
-    integer,intent(inout):: ilist(ndim)
+    integer,intent(in):: namax,natm,nnmax
+    real(8),intent(in):: ra(3,namax),h(3,3)
+    integer,intent(inout):: lspr(0:nnmax,namax)
 
-    integer:: ip,i,j
-    real(8):: dip
+    integer:: i,j,jj,nn
+    real(8):: xi(3),xij(3),rij(3),dij2
+    real(8),allocatable,save:: dists(:)
+    integer,allocatable,save:: idxarr(:),itmparr(:)
 
-    if( ir-il.lt.1 ) return
-    ip = int((il+ir)/2)
-    dip = dlist(ip)
-    call swap(ndim,ip,ir,dlist,ilist)
-    i = il
-    do j=il,ir-1
-      if( dlist(j).lt.dip ) then
-        call swap(ndim,i,j,dlist,ilist)
-        i = i + 1
-      endif
+    if( .not. allocated(dists) ) then
+      allocate(dists(nnmax),idxarr(nnmax),itmparr(nnmax))
+    else if( size(dists).ne.nnmax ) then
+      deallocate(dists,idxarr,itmparr)
+      allocate(dists(nnmax),idxarr(nnmax),itmparr(nnmax))
+    endif
+    
+    do i=1,natm
+      xi(1:3) = ra(1:3,i)
+!.....Create a temporary list of neighbor distances
+      dists(:) = 0d0
+      nn = lspr(0,i)
+      do jj=1,nn
+        j = lspr(jj,i)
+        xij(1:3) = ra(1:3,j) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        dists(jj) = dsqrt(dij2)
+      enddo
+!.....Sort lspr according to dists
+      call arg_heapsort_arr(nn,nnmax,dists,idxarr)
+      itmparr(1:nn) = lspr(1:nn,i)
+      do jj=1,nn
+        lspr(jj,i) = itmparr(idxarr(jj))
+      enddo
     enddo
-    call swap(ndim,i,ir,dlist,ilist)
-    call qsort_list(ndim,il,i,dlist,ilist)
-    call qsort_list(ndim,i+1,ir,dlist,ilist)
-
-  end subroutine qsort_list
+    return
+  end subroutine sort_lspr
 !=======================================================================
 end module pairlist
 !-----------------------------------------------------------------------

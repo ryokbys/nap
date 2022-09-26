@@ -117,9 +117,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'cutoff_buffer' ) then
     call read_r1(ionum,rbuf)
     return
-  elseif( trim(cname).eq.'reorder_arrays' ) then
-    call read_l1(ionum,lreorder)
-    return
+!!$  elseif( trim(cname).eq.'sort_arrays' ) then
+!!$    call read_l1(ionum,lsrt_arrs)
+!!$    return
   elseif( trim(cname).eq.'flag_damping' ) then
     call read_i1(ionum,ifdmp)
     return
