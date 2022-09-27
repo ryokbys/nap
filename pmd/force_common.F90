@@ -45,6 +45,7 @@ subroutine get_force(l1st,epot,stnsr)
   use angular,only: force_angular
   use RFMEAM,only: force_RFMEAM
   use Pellenq,only: force_Pellenq
+  use repel,only: force_repel
   use time, only: accum_time
   implicit none
   include "mpif.h"
@@ -272,6 +273,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Pellenq',mpi_wtime() -tmp)
   endif
+  if( use_force('repel') ) then
+    tmp = mpi_wtime()
+    call force_repel(namax,natm,tag,ra,nnmax,aa,strs,h &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+    call accum_time('force_repel',mpi_wtime() -tmp)
+  endif
   if( use_force('linreg') ) then
     tmp = mpi_wtime()
     call force_linreg(namax,natm,tag,ra,nnmax,aa &
@@ -453,6 +461,7 @@ subroutine init_force(linit)
   use angular,only: read_params_angular, lprmset_angular
   use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   use Pellenq,only: read_params_Pellenq, lprmset_Pellenq
+  use repel,only: read_params_repel, lprmset_repel
   implicit none
   include "./const.h"
   
@@ -554,6 +563,12 @@ subroutine init_force(linit)
   if( use_force('Pellenq') ) then
     if( .not.lprmset_Pellenq ) then
       call read_params_Pellenq(myid_md,mpi_md_world,iprint,specorder)
+    endif
+  endif
+!.....Pellenq
+  if( use_force('repel') ) then
+    if( .not.lprmset_repel ) then
+      call read_params_repel(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
   

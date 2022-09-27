@@ -1,6 +1,6 @@
 module Pellenq
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-27 11:08:47 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-27 13:42:11 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the  pontential by Pellenq and Nicholson.
 !    - Pellenq & Nicholson, J. Phys. Chem. 98, 13339–13349 (1994)
@@ -13,7 +13,6 @@ module Pellenq
   include "./const.h"
   save
 
-  
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Pellenq'
 
@@ -24,6 +23,7 @@ module Pellenq
   integer:: nsp
   logical:: interact(nspmax,nspmax)
 
+  character(len=10):: cprmtype = 'element'
   real(8):: Aij(nspmax,nspmax),rhoij(nspmax,nspmax)
   real(8):: c6ij(nspmax,nspmax),c8ij(nspmax,nspmax),c10ij(nspmax,nspmax)
   real(8):: rcij(nspmax,nspmax)
@@ -58,66 +58,119 @@ contains
       c8ij(:,:)= 0d0
       c10ij(:,:)= 0d0
       rcij(:,:)= 0d0
+      cprmtype = 'element'
       if( iprint.ne.0 ) write(6,'(/,a)') ' Pellenq parameters:'
       do while(.true.)
-        read(ioprms,*,end=10) cline
-        if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
+        read(ioprms,'(a)',end=10) cline
+        if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) then
+          call parse_option(cline)
+          cycle
+        endif
         backspace(ioprms)
-        read(ioprms,*) cspi,Ai,rhoi,c6i,c8i,c10i,rci
-        isp = csp2isp(cspi)
-        if( isp.gt.0 ) then
-          Aij(isp,isp) = Ai
-          rhoij(isp,isp) = rhoi
-          c6ij(isp,isp) = c6i
-          c8ij(isp,isp) = c8i
-          c10ij(isp,isp) = c10i
-          rcij(isp,isp) = rci
-          interact(isp,isp) = .true.
-          if( iprint.ge.ipl_basic ) then
-            write(6,'(a,a4,6f10.3)') '   cspi,Ai,rhoi,c6i,c8i,c10i,rci = ', &
-                 trim(cspi),Ai,rhoi,c6i,c8i,c10i,rci
+        if( trim(cprmtype) == 'pair' ) then
+          read(ioprms,*,end=10) cspi,cspj,Ai,rhoi,c6i,c8i,c10i,rci
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            Aij(isp,jsp) = Ai
+            rhoij(isp,jsp) = rhoi
+            c6ij(isp,jsp) = c6i
+            c8ij(isp,jsp) = c8i
+            c10ij(isp,jsp) = c10i
+            rcij(isp,jsp) = rci
+            interact(isp,jsp) = .true.
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,2a4,6f10.3)') '   cspi,cspj,Aij,rhoij,c6ij,c8ij,c10ij,rcij = ', &
+                   trim(cspi),trim(cspj),Ai,rhoi,c6i,c8i,c10i,rci
+            endif
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Pellenq parameter read but not used: cspi,cspj=', &
+                   trim(cspi),trim(cspj)
+            endif
           endif
-        else
-          if( iprint.ge.ipl_info ) then
-            print *,' Pellenq parameter read but not used: cspi=',cspi
+        else  ! cprmtype not 'pair', then it must be 'element' (default)
+          read(ioprms,*,end=10) cspi,Ai,rhoi,c6i,c8i,c10i,rci
+          isp = csp2isp(cspi)
+          if( isp.gt.0 ) then
+            Aij(isp,isp) = Ai
+            rhoij(isp,isp) = rhoi
+            c6ij(isp,isp) = c6i
+            c8ij(isp,isp) = c8i
+            c10ij(isp,isp) = c10i
+            rcij(isp,isp) = rci
+            interact(isp,isp) = .true.
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,a4,6f10.3)') '   cspi,Ai,rhoi,c6i,c8i,c10i,rci = ', &
+                   trim(cspi),Ai,rhoi,c6i,c8i,c10i,rci
+            endif
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Pellenq parameter read but not used: cspi=',cspi
+            endif
           endif
         endif
       enddo
 10    close(ioprms)
 
 !.....Mixing parameters from elemental ones
-      do isp=1,nspmax-1
-        if( .not.interact(isp,isp) ) cycle
-        do jsp=isp+1,nspmax
-          if( .not.interact(jsp,jsp) ) cycle
-          interact(isp,jsp) = .true.
-          Aij(isp,jsp) = sqrt(Aij(isp,isp) *Aij(jsp,jsp))
+      if( trim(cprmtype).eq.'element' ) then
+        do isp=1,nspmax-1
+          if( .not.interact(isp,isp) ) cycle
+          do jsp=isp+1,nspmax
+            if( .not.interact(jsp,jsp) ) cycle
+            interact(isp,jsp) = .true.
+            Aij(isp,jsp) = sqrt(Aij(isp,isp) *Aij(jsp,jsp))
 !.....Mixing lengths by averaging
-          rhoij(isp,jsp)= (rhoij(isp,isp) +rhoij(jsp,jsp))/2
-          rcij(isp,jsp) = (rcij(isp,isp) +rcij(jsp,jsp))/2
+            rhoij(isp,jsp)= (rhoij(isp,isp) +rhoij(jsp,jsp))/2
+            rcij(isp,jsp) = (rcij(isp,isp) +rcij(jsp,jsp))/2
 !.....Mixiing c6,c8,c10 by just sqrt, which may not be appropriate...
-          c6ij(isp,jsp) = sqrt(c6ij(isp,isp) *c6ij(jsp,jsp))
-          c8ij(isp,jsp) = sqrt(c8ij(isp,isp) *c8ij(jsp,jsp))
-          c10ij(isp,jsp)= sqrt(c10ij(isp,isp) *c10ij(jsp,jsp))
-          if( iprint.ge.ipl_basic ) then
-            cspi = specorder(isp)
-            cspj = specorder(jsp)
-            write(6,'(a,2a4,6f10.3)') &
-                 '   cspi,cspj,Ai,rhoi,c6i,c8i,c10i,rci = ', &
-                 trim(cspi),trim(cspj),Aij(isp,jsp),rhoij(isp,jsp),&
-                 c6ij(isp,jsp),c8ij(isp,jsp),c10ij(isp,jsp), &
-                 rcij(isp,jsp)
-          endif
+            c6ij(isp,jsp) = sqrt(c6ij(isp,isp) *c6ij(jsp,jsp))
+            c8ij(isp,jsp) = sqrt(c8ij(isp,isp) *c8ij(jsp,jsp))
+            c10ij(isp,jsp)= sqrt(c10ij(isp,isp) *c10ij(jsp,jsp))
+            if( iprint.ge.ipl_basic ) then
+              cspi = specorder(isp)
+              cspj = specorder(jsp)
+              write(6,'(a,2a4,6f10.3)') &
+                   '   cspi,cspj,Ai,rhoi,c6i,c8i,c10i,rci = ', &
+                   trim(cspi),trim(cspj),Aij(isp,jsp),rhoij(isp,jsp),&
+                   c6ij(isp,jsp),c8ij(isp,jsp),c10ij(isp,jsp), &
+                   rcij(isp,jsp)
+            endif
 !.....Symmetrize
-          interact(jsp,isp) = .true.
-          Aij(jsp,isp) = Aij(isp,jsp)
-          rhoij(jsp,isp)= rhoij(isp,jsp)
-          rcij(jsp,isp)= rcij(isp,jsp)
-          c6ij(jsp,isp) = c6ij(isp,jsp)
-          c8ij(jsp,isp) = c8ij(isp,jsp)
-          c10ij(jsp,isp)= c10ij(isp,jsp)
+            interact(jsp,isp) = .true.
+            Aij(jsp,isp) = Aij(isp,jsp)
+            rhoij(jsp,isp)= rhoij(isp,jsp)
+            rcij(jsp,isp)= rcij(isp,jsp)
+            c6ij(jsp,isp) = c6ij(isp,jsp)
+            c8ij(jsp,isp) = c8ij(isp,jsp)
+            c10ij(jsp,isp)= c10ij(isp,jsp)
+          enddo
         enddo
-      enddo
+      else  ! if cprmtype == 'pair', only symmetrize
+        do isp=1,nspmax-1
+          do jsp=isp+1,nspmax
+            if( .not. (interact(isp,jsp).or.interact(jsp,isp)) ) cycle
+            if( interact(isp,jsp) ) then
+              interact(jsp,isp) = .true.
+              Aij(jsp,isp) = Aij(isp,jsp)
+              rhoij(jsp,isp)= rhoij(isp,jsp)
+              rcij(jsp,isp)= rcij(isp,jsp)
+              c6ij(jsp,isp) = c6ij(isp,jsp)
+              c8ij(jsp,isp) = c8ij(isp,jsp)
+              c10ij(jsp,isp)= c10ij(isp,jsp)
+            else
+              interact(isp,jsp) = .true.
+              Aij(isp,jsp) = Aij(jsp,isp)
+              rhoij(isp,jsp)= rhoij(jsp,isp)
+              rcij(isp,jsp)= rcij(jsp,isp)
+              c6ij(isp,jsp) = c6ij(jsp,isp)
+              c8ij(isp,jsp) = c8ij(jsp,isp)
+              c10ij(isp,jsp)= c10ij(jsp,isp)
+            endif
+          enddo
+        enddo
+      endif
     endif  ! myid_md.eq.0
 
     call mpi_bcast(Aij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
@@ -133,6 +186,35 @@ contains
       write(6,*) ''
     endif
   end subroutine read_params_Pellenq
+!=======================================================================
+  subroutine parse_option(cline)
+!
+!  Parse options from a comment line.
+!  Lines starting from ! or # are treated as comment lines,
+!  and options can be given at the comment lines.
+!  The option words should be put after these comment characters with
+!  one or more spaces between them for example,
+!
+!  param_type: element
+!
+!  Currently available options are:
+!    - "param_type:", Parameter type, "element" (default) or "pair"
+!
+    use util, only: num_data
+    include "./const.h"
+    character(len=*),intent(in):: cline
+
+    integer:: num
+    character(len=10):: c1,copt
+
+    if( index(cline,'param_type:').ne.0 ) then
+      num = num_data(trim(cline),' ')
+      if( num.lt.3 ) stop 'ERROR: num of entry wrong...'
+      read(cline,*) c1, copt, cprmtype
+      print *,'  param_type: ',trim(cprmtype)
+    endif
+    
+  end subroutine parse_option
 !=======================================================================
   subroutine force_Pellenq(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc_global,lspr,d2lspr &
@@ -171,9 +253,8 @@ contains
       vrcs(:,:) = 0d0
       dvdrcs(:,:) = 0d0
       do is=1,nspmax
-        if( .not.interact(is,is) ) cycle
         do js=is,nspmax
-          if( .not.interact(is,js) ) cycle
+          if( .not.(interact(is,js).or.interact(js,is)) ) cycle
           rc = rcij(is,js)
           rc2 = max(rc2,rc**2)
           call compute_f2n(rc,is,js,f6,f8,f10,df6,df8,df10)
@@ -349,6 +430,7 @@ contains
     df10= dftmp
     return
   end subroutine compute_f2n
+  
 end module Pellenq
 !-----------------------------------------------------------------------
 !     Local Variables:

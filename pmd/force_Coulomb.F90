@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-21 16:40:09 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-27 11:47:57 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -32,7 +32,7 @@ module Coulomb
 !.....Keywords for terms: full, short, long, direct, direct_cut, screened_cut
 
   integer,parameter:: ioprms = 20
-!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
+!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0) in eV *Ang /e^2
   real(8),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
@@ -62,8 +62,8 @@ module Coulomb
 !  real(8),allocatable:: rho_scr(:,:)
 !!$  real(8):: fbvs = 0.74d0 +- 0.04
   real(8):: fbvs = 0.74d0
-!.....Scale factor
-  real(8):: sfctr = 1d0
+!.....Dielectric constant
+  real(8):: dielec = 1d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -512,9 +512,9 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, rcut
           cycle
-        else if( trim(c1st).eq.'scale_factor' ) then
+        else if( trim(c1st).eq.'dielectric' ) then
           backspace(ioprms)
-          read(ioprms,*) ctmp, sfctr
+          read(ioprms,*) ctmp, dielec
           cycle
         else if( trim(c1st).eq.'sigma' ) then
           backspace(ioprms)
@@ -737,7 +737,7 @@ contains
     call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sfctr,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dielec,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -1004,7 +1004,7 @@ contains
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *sfctr
+        tmp = 0.5d0 *acc *qi*qj*diji /dielec
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1014,7 +1014,7 @@ contains
           esrl = esrl +tmp
         endif
 !.....force
-        ftmp = -acc *qi*qj*diji*diji *sfctr
+        ftmp = -acc *qi*qj*diji*diji /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1085,7 +1085,7 @@ contains
         dvdrc = -acc*qi*qj /rc**2
 !.....potential
         tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
 !!$          epi(j)= epi(j) +tmp
@@ -1098,7 +1098,7 @@ contains
         esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
-        ftmp = ftmp *sfctr
+        ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
 !!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1196,7 +1196,7 @@ contains
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !.....potential
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
@@ -1209,7 +1209,7 @@ contains
         epi(i)= epi(i) +tmp
         esrl = esrl +tmp
 !.....force
-        dedr = dedr*sfctr
+        dedr = dedr /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -1275,7 +1275,7 @@ contains
         terfc = erfc(dij*ss2i)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
 !!$          esrl = esrl +tmp +tmp
@@ -1290,7 +1290,7 @@ contains
 !.....force
         ftmp = -acc *qj*qi*diji *( diji *terfc &
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
-        ftmp = ftmp *sfctr
+        ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
 !!$        do ixyz=1,3
 !!$!$omp atomic
@@ -1446,7 +1446,7 @@ contains
 !!$                 *( cs*qcos(ik) +sn*qsin(ik) )
             tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
-            tmp = tmp *sfctr
+            tmp = tmp /dielec
             epi(i) = epi(i) +tmp
             elrl = elrl +tmp
 !.....Forces
@@ -1455,7 +1455,7 @@ contains
 !!$            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
 !!$                 *( -sn*qcos(ik) +cs*qsin(ik) )
             ftmp = -acc/vol *qi *pflr(ik,is) &
-                 *( -sn*qcos(ik) +cs*qsin(ik) ) *sfctr
+                 *( -sn*qcos(ik) +cs*qsin(ik) ) /dielec
             aa(1:3,i) = aa(1:3,i) +bb(1:3)*ftmp
 !!$            if( itot.eq.19 .or. itot.eq.21 ) then
 !!$              print '(a,4i4,7es11.3)','myid,i,itot,ik,aa,qcos,qsin,cs,sn=' &
@@ -1518,8 +1518,8 @@ contains
         qi = chg(i)
         q2 = qi*qi
         tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-        eselfl = eselfl +tmp*sfctr
-        epi(i) = epi(i) +tmp*sfctr
+        eselfl = eselfl +tmp/dielec
+        epi(i) = epi(i) +tmp/dielec
       enddo
     else if( trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long') then ! fixed charge
@@ -1528,8 +1528,8 @@ contains
       do i=1,natm
         is = int(tag(i))
         q2 = chg(i)*chg(i)
-        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
-        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
+        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
+        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
       enddo
     endif
     return
@@ -1584,7 +1584,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) *sfctr
+        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) /dielec
         if( j.le.natm ) then
           esr = esr +tmp*qi*qj
         else
@@ -1666,7 +1666,7 @@ contains
         dvdrc = dvdrcs(is,js)
 !.....potential
         tmp = acc*diji*terfc -vrc -dvdrc*(dij-rc)
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          esr = esr +tmp*qi*qj
 !!$        else
@@ -1732,11 +1732,11 @@ contains
 !.....Potential energy per atom
             tmp = prefac/bb2*qi*texp &
                  *(cs*qcos(ik) +sn*qsin(ik))
-            tmp = tmp *sfctr
+            tmp = tmp /dielec
             elr = elr +tmp
 !.....Force on charge
             fq(i)= fq(i) -2d0 *prefac/bb2 *texp &
-                 *(cs*qcos(ik) +sn*qsin(ik)) *sfctr
+                 *(cs*qcos(ik) +sn*qsin(ik)) /dielec
 !!$            if( i.eq.1 .and. (ik.gt.5000.and.ik.le.6000) ) then
 !!$              print '(a,i6,3i4,10f10.4)','ik,qi,1/bb2,texp,cs,sn,qcos,qsin,fqikkk,fq(i)='&
 !!$                   ,ik,k1,k2,k3,qi,1.d0/bb2,texp,cs,sn &
@@ -1773,8 +1773,8 @@ contains
       q2 = qi*qi
       sgmi = sgm_ew
       tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-      eself = eself +tmp *sfctr
-      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)*sfctr
+      eself = eself +tmp /dielec
+      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)/dielec
     enddo
 
   end subroutine qforce_self
