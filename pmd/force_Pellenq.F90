@@ -1,6 +1,6 @@
 module Pellenq
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-26 22:29:57 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-27 11:08:47 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the  pontential by Pellenq and Nicholson.
 !    - Pellenq & Nicholson, J. Phys. Chem. 98, 13339–13349 (1994)
@@ -26,6 +26,7 @@ module Pellenq
 
   real(8):: Aij(nspmax,nspmax),rhoij(nspmax,nspmax)
   real(8):: c6ij(nspmax,nspmax),c8ij(nspmax,nspmax),c10ij(nspmax,nspmax)
+  real(8):: rcij(nspmax,nspmax)
 
 !.....Smooth cutoff
   real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
@@ -45,7 +46,7 @@ contains
     integer:: i,j,isp,jsp,id,ierr
     character(len=128):: cline,fname
     character(len=3):: cspi,cspj
-    real(8):: Ai,rhoi,c6i,c8i,c10i
+    real(8):: Ai,rhoi,c6i,c8i,c10i,rci
 
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -56,12 +57,13 @@ contains
       c6ij(:,:)= 0d0
       c8ij(:,:)= 0d0
       c10ij(:,:)= 0d0
+      rcij(:,:)= 0d0
       if( iprint.ne.0 ) write(6,'(/,a)') ' Pellenq parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
         backspace(ioprms)
-        read(ioprms,*) cspi,Ai,rhoi,c6i,c8i,c10i
+        read(ioprms,*) cspi,Ai,rhoi,c6i,c8i,c10i,rci
         isp = csp2isp(cspi)
         if( isp.gt.0 ) then
           Aij(isp,isp) = Ai
@@ -69,10 +71,11 @@ contains
           c6ij(isp,isp) = c6i
           c8ij(isp,isp) = c8i
           c10ij(isp,isp) = c10i
+          rcij(isp,isp) = rci
           interact(isp,isp) = .true.
           if( iprint.ge.ipl_basic ) then
-            write(6,'(a,a4,5f10.3)') '   cspi,Ai,rhoi,c6i,c8i,c10i = ', &
-                 trim(cspi),Ai,rhoi,c6i,c8i,c10i
+            write(6,'(a,a4,6f10.3)') '   cspi,Ai,rhoi,c6i,c8i,c10i,rci = ', &
+                 trim(cspi),Ai,rhoi,c6i,c8i,c10i,rci
           endif
         else
           if( iprint.ge.ipl_info ) then
@@ -88,16 +91,28 @@ contains
         do jsp=isp+1,nspmax
           if( .not.interact(jsp,jsp) ) cycle
           interact(isp,jsp) = .true.
-          Aij(isp,jsp) = sqrt(Aij(isp,isp)*Aij(jsp,jsp))
-          rhoij(isp,jsp)= (rhoij(isp,isp)+rhoij(jsp,jsp))/2
+          Aij(isp,jsp) = sqrt(Aij(isp,isp) *Aij(jsp,jsp))
+!.....Mixing lengths by averaging
+          rhoij(isp,jsp)= (rhoij(isp,isp) +rhoij(jsp,jsp))/2
+          rcij(isp,jsp) = (rcij(isp,isp) +rcij(jsp,jsp))/2
 !.....Mixiing c6,c8,c10 by just sqrt, which may not be appropriate...
-          c6ij(isp,jsp) = sqrt(c6ij(isp,isp)*c6ij(jsp,jsp))
-          c8ij(isp,jsp) = sqrt(c8ij(isp,isp)*c8ij(jsp,jsp))
-          c10ij(isp,jsp)= sqrt(c10ij(isp,isp)*c10ij(jsp,jsp))
+          c6ij(isp,jsp) = sqrt(c6ij(isp,isp) *c6ij(jsp,jsp))
+          c8ij(isp,jsp) = sqrt(c8ij(isp,isp) *c8ij(jsp,jsp))
+          c10ij(isp,jsp)= sqrt(c10ij(isp,isp) *c10ij(jsp,jsp))
+          if( iprint.ge.ipl_basic ) then
+            cspi = specorder(isp)
+            cspj = specorder(jsp)
+            write(6,'(a,2a4,6f10.3)') &
+                 '   cspi,cspj,Ai,rhoi,c6i,c8i,c10i,rci = ', &
+                 trim(cspi),trim(cspj),Aij(isp,jsp),rhoij(isp,jsp),&
+                 c6ij(isp,jsp),c8ij(isp,jsp),c10ij(isp,jsp), &
+                 rcij(isp,jsp)
+          endif
 !.....Symmetrize
           interact(jsp,isp) = .true.
           Aij(jsp,isp) = Aij(isp,jsp)
           rhoij(jsp,isp)= rhoij(isp,jsp)
+          rcij(jsp,isp)= rcij(isp,jsp)
           c6ij(jsp,isp) = c6ij(isp,jsp)
           c8ij(jsp,isp) = c8ij(isp,jsp)
           c10ij(jsp,isp)= c10ij(isp,jsp)
@@ -107,6 +122,7 @@ contains
 
     call mpi_bcast(Aij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(rhoij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rcij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c6ij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c8ij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(c10ij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
@@ -119,7 +135,7 @@ contains
   end subroutine read_params_Pellenq
 !=======================================================================
   subroutine force_Pellenq(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc_global,lspr,d2lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -129,7 +145,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc_global &
          ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -139,7 +155,7 @@ contains
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott, &
          dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2, &
          dij2,vrc,dvdrc,expbrc,expbr,A,rho,c6,c8,c10, &
-         r2,r10,r10i,r8i,r6i,f6,f8,f10,df6,df8,df10
+         r2,r10,r10i,r8i,r6i,f6,f8,f10,df6,df8,df10,rc
     real(8),save:: rc2
     real(8),external:: fcut1,dfcut1
 
@@ -150,7 +166,7 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Pellenq',8*size(strsl))
-      rc2 = rc*rc
+      rc2 = -1d0
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0d0
       dvdrcs(:,:) = 0d0
@@ -158,20 +174,31 @@ contains
         if( .not.interact(is,is) ) cycle
         do js=is,nspmax
           if( .not.interact(is,js) ) cycle
+          rc = rcij(is,js)
+          rc2 = max(rc2,rc**2)
           call compute_f2n(rc,is,js,f6,f8,f10,df6,df8,df10)
           expbrc = exp(-rc/rhoij(is,js))
-          vrc = Aij(is,js)*expbrc -f6*c6ij(is,js)/rc**6 &
-               -f8*c8ij(is,js)/rc**8 -f10*c10ij(is,js)/rc**10
+          vrc = Aij(is,js)*expbrc &
+               -f6*c6ij(is,js)/rc**6 &
+               -f8*c8ij(is,js)/rc**8 &
+               -f10*c10ij(is,js)/rc**10
+!!$          vrc = Aij(is,js)*expbrc
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrc= -Aij(is,js)*expbrc/rhoij(is,js) &
                -c6ij(is,js)/rc**6 *(df6 -6d0*f6/rc) &
                -c8ij(is,js)/rc**8 *(df8 -8d0*f8/rc) &
                -c10ij(is,js)/rc**10 *(df10 -10d0*f10/rc)
+!!$          dvdrc= -Aij(is,js)*expbrc/rhoij(is,js)
           dvdrcs(is,js) = dvdrc
           dvdrcs(js,is) = dvdrc
         enddo
       enddo
+      if( rc2.gt.rc_global**2 ) then
+        if( myid.eq.0 ) print *, &
+             'ERROR: rcmax of Pellenq pot is greater than global rc'
+        stop 1
+      endif
     endif
 
     if( .not.allocated(strsl) ) then
@@ -209,6 +236,8 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
 !!$        if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
+        rc = rcij(is,js)
+        if( dij.ge.rc ) cycle
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         A = Aij(is,js)
@@ -240,9 +269,11 @@ contains
 !!$          epotl= epotl +tmp2
 !!$        endif
 !.....force
-!!$        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
-        dedr= -A*expbr/rho -c6*r6i*(df6 -6d0*f6/dij) &
-             -c8*r8i*(df8 -8d0*f8/dij) -c10*r10i*(df10 -10d0*f10/dij)
+        dedr= -A*expbr/rho &
+             -c6*r6i*(df6 -6d0*f6/dij) &
+             -c8*r8i*(df8 -8d0*f8/dij) &
+             -c10*r10i*(df10 -10d0*f10/dij) &
+             -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$        do ixyz=1,3
 !!$!$omp atomic
@@ -293,8 +324,8 @@ contains
       fack = fack*k
       brk = brk*br
       tmp = brk/fack *expbr
-      ftmp = ftmp - tmp
-      dftmp = dftmp -tmp *(real(k)/r -rhoi)
+      ftmp = ftmp -tmp
+      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
     enddo
     f6 = ftmp
     df6 = dftmp
@@ -303,7 +334,7 @@ contains
       brk = brk*br
       tmp = brk/fack *expbr
       ftmp = ftmp -tmp
-      dftmp = dftmp -tmp *(real(k)/r -rhoi)
+      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
     enddo
     f8 = ftmp
     df8= dftmp
@@ -312,7 +343,7 @@ contains
       brk = brk*br
       tmp = brk/fack *expbr
       ftmp = ftmp -tmp
-      dftmp = dftmp -tmp *(real(k)/r -rhoi)
+      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
     enddo
     f10 = ftmp
     df10= dftmp
