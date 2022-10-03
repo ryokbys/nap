@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-27 11:47:57 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-29 16:44:06 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -658,7 +658,9 @@ contains
 10    close(ioprms)
 
 !.....In case of variable charge, sigma has a lower bound w.r.t. min(Jii)
-      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+      if( (trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') &
+           .and. .not. trim(cterms).ne.'screened_cut' &
+           .and. .not. trim(cterms).ne.'direct_cut' ) then
         vcgjiimin = 1d+30
         do isp=1,nsp
           vcgjiimin = min(vcgjiimin,vc_jii(isp))
@@ -666,9 +668,10 @@ contains
         sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
         if( sgm_ew.lt.sgmlim ) then
           if( iprint.ne.0 ) then
-            print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
+            print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by sgmlim'
             print *,'           which is determined by acc*sqrt(2/pi)/Jii.'
-            print *,'    sgm_ew,sgmlim,vcgjiimin=',sgm_ew,sgmlim,vcgjiimin
+            print *,'     original sgm_ew = ', sgm_ew
+            print *,'     replaced sgm_ew = ', sgmlim
           endif
           sgm_ew = sgmlim
         endif
@@ -1599,6 +1602,70 @@ contains
     return
   end subroutine qforce_short
 !=======================================================================
+  subroutine qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h &
+       ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
+!
+!  Compute q-force of direct_cut Coulomb potential.
+!
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),rc,d2lspr(nnmax,namax)
+    real(8),intent(inout):: fq(namax),esr
+    logical,intent(in):: l1st 
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp, &
+         vrc,dvdrc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+!!$    real(8),external:: fcut1
+
+    real(8),save:: rc2,sqpi
+
+!.....Compute direct sum
+    rc2 = rc*rc
+    esr = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
+!$omp    reduction(+:esr)
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        dij2 = d2lspr(jj,i)
+        if( dij2.ge.rc2 ) cycle
+        j = lspr(jj,i)
+!!$        if( j.eq.0 ) exit
+!!$        if( j.le.i ) cycle
+        js = int(tag(j))
+        if( .not.interact(is,js) ) cycle
+        qj = chg(j)
+        dij = sqrt(dij2)
+        diji = 1d0/dij
+        vrc = acc/rc
+        dvdrc = -acc/rc2
+!.....potential
+        tmp = acc*diji -vrc -dvdrc*(dij-rc)
+        tmp = tmp /dielec
+!!$        if( j.le.natm ) then
+!!$          esr = esr +tmp*qi*qj
+!!$        else
+!!$          esr = esr +0.5d0*tmp*qi*qj
+!!$        endif
+        esr = esr +0.5d0*tmp*qi*qj
+!.....Force on charge
+        fq(i) = fq(i) -tmp*qj
+!!$        fq(j) = fq(j) -tmp*qi
+      enddo
+    enddo
+!$omp end do
+!$omp end parallel
+
+    return
+  end subroutine qforce_direct_cut
+!=======================================================================
   subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
        ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
 !
@@ -1809,6 +1876,10 @@ contains
            myid_md,iprint,fq,eclongl)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    else if( trim(cterms).eq.'direct_cut'  ) then
+      call qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h, &
+           lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)

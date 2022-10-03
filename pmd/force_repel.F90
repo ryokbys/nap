@@ -1,11 +1,11 @@
 module repel
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-27 23:28:55 KOBAYASHI Ryo>
+!                     Last modified: <2022-09-28 14:15:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of repulsion pontential
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
-  use util,only: csp2isp
+  use util,only: csp2isp, is_numeric
   use memory,only: accum_mem
   implicit none
   include "./const.h"
@@ -21,8 +21,8 @@ module repel
   logical:: interact(nspmax,nspmax)
 
   character(len=10):: ctype = 'exp'
-  real(8):: Aij(nspmax,nspmax),rhoij(nspmax,nspmax)
-  real(8):: rcij(nspmax,nspmax)
+  real(8):: Aij(nspmax,nspmax), rhoij(nspmax,nspmax), &
+       sgmij(nspmax,nspmax), rcij(nspmax,nspmax)
 
 !.....Smooth cutoff
   real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
@@ -42,7 +42,7 @@ contains
     integer:: i,j,isp,jsp,id,ierr
     character(len=128):: cline,fname
     character(len=3):: cspi,cspj
-    real(8):: Ai,rhoi,c6i,c8i,c10i,rci
+    real(8):: Ai,rhoi,c6i,c8i,c10i,rci,sgmi
 
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -50,6 +50,7 @@ contains
       interact(1:nspmax,1:nspmax) = .false.
       Aij(:,:)= 0d0
       rhoij(:,:)= 0d0
+      sgmij(:,:)= 0d0
       rcij(:,:)= 0d0
       ctype = 'exp'
       if( iprint.ne.0 ) write(6,'(/,a)') ' repel parameters:'
@@ -61,17 +62,18 @@ contains
         endif
         backspace(ioprms)
         if( trim(ctype) == 'exp' ) then
-          read(ioprms,*,end=10) cspi,cspj,Ai,rhoi,rci
+          read(ioprms,*,end=10) cspi,cspj,Ai,rhoi,sgmi,rci
           isp = csp2isp(cspi)
           jsp = csp2isp(cspj)
           if( isp.gt.0 .and. jsp.gt.0 ) then
             Aij(isp,jsp) = Ai
             rhoij(isp,jsp) = rhoi
+            sgmij(isp,jsp) = sgmi
             rcij(isp,jsp) = rci
             interact(isp,jsp) = .true.
             if( iprint.ge.ipl_basic ) then
-              write(6,'(a,2a4,6f10.3)') '   cspi,cspj,Aij,rhoij,rcij = ', &
-                   trim(cspi),trim(cspj),Ai,rhoi,rci
+              write(6,'(a,2a4,6f10.3)') '   cspi,cspj,Aij,rhoij,sgmij,rcij = ', &
+                   trim(cspi),trim(cspj),Ai,rhoi,sgmi,rci
             endif
           else
             if( iprint.ge.ipl_info ) then
@@ -92,11 +94,13 @@ contains
             interact(jsp,isp) = .true.
             Aij(jsp,isp) = Aij(isp,jsp)
             rhoij(jsp,isp)= rhoij(isp,jsp)
+            sgmij(jsp,isp)= sgmij(isp,jsp)
             rcij(jsp,isp)= rcij(isp,jsp)
           else
             interact(isp,jsp) = .true.
             Aij(isp,jsp) = Aij(jsp,isp)
             rhoij(isp,jsp)= rhoij(jsp,isp)
+            sgmij(isp,jsp)= sgmij(jsp,isp)
             rcij(isp,jsp)= rcij(jsp,isp)
           endif
         enddo
@@ -105,6 +109,7 @@ contains
 
     call mpi_bcast(Aij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(rhoij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(sgmij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(rcij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
@@ -163,7 +168,7 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott, &
          dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2, &
-         dij2,vrc,dvdrc,expbrc,expbr,A,rho,rc
+         dij2,vrc,dvdrc,expbrc,expbr,A,rho,rc,sgm
     real(8),save:: rc2
     real(8),external:: fcut1,dfcut1
 
@@ -183,7 +188,7 @@ contains
           if( .not.(interact(is,js).or.interact(js,is)) ) cycle
           rc = rcij(is,js)
           rc2 = max(rc2,rc**2)
-          expbrc = exp(-rc/rhoij(is,js))
+          expbrc = exp(-(rc-sgmij(is,js))/rhoij(is,js))
           vrc = Aij(is,js)*expbrc
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
@@ -239,9 +244,10 @@ contains
         dxdi(1:3)= -rij(1:3)*diji
         A = Aij(is,js)
         rho= rhoij(is,js)
+        sgm= sgmij(is,js)
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
-        expbr = exp(-dij/rho)
+        expbr = exp(-(dij-sgm)/rho)
 !.....potential
         tmp= A*expbr
         tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))

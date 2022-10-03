@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-21 17:00:58 KOBAYASHI Ryo>
+!                     Last modified: <2022-10-03 14:42:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:

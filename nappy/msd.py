@@ -88,8 +88,8 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     if ids0 is not None:
         ids = [ i-1 for i in ids0 ]
         sids = nsys.atoms.sid
-        naps = [ 0 for i in len(specorder) ]
-        for i in ids0:
+        naps = [ 0 for i in range(len(specorder)) ]
+        for i in ids:
             sid = sids[i]
             naps[sid-1] += 1
     else:
@@ -159,6 +159,9 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     for ifile in range(len(files)):
         for nm in range(nmeasure):
             if nm*nshift < ifile <= (nm+1)*nshift:
+                #...NOTE: The code below could cause true_divide error,
+                #...  since when atoms are specified via --ids,
+                #...  any of naps elements could be zero...
                 msd[ifile-nm*nshift,nm,:,0] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,1] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,2] /= naps[:]

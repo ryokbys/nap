@@ -8,9 +8,12 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
-  -o, --offset OFFSET
-              Offset of given data. [default: 0]
+  --offset OFFSET
+              Offset of the given data. [default: 0]
   --plot      Plot a fitted graph. [default: False]
+  --out4fp    Output data file for fp.py in any-target mode.
+  --out4fp-name OUTNAME
+              File name for --out4fp. [default: data.pmd.D] 
 """
 from __future__ import print_function
 
@@ -32,7 +35,9 @@ def read_out_msd(fname='out.msd',offset=0,specorder=[],spc=None):
         lines = f.readlines()
     try:
         dname = os.path.dirname(fname)
-        dt = dt_from_inpmd(fname=dname+'/in.pmd')
+        if len(dname) == 0:
+            dname = '.'
+        dt = dt_from_inpmd(fname='/'.join([dname,'in.pmd']))
     except Exception as e:
         raise RuntimeError('Failed to read in.pmd.')
     ts = []
@@ -92,6 +97,8 @@ if __name__ == "__main__":
     fname = args['MSD_FILE']
     offset = int(args['--offset'])
     plot = args['--plot']
+    out4fp = args['--out4fp']
+    out4fpname = args['--out4fp-name']
 
     ts,msds = read_out_msd(fname,offset)
     #...Assuming input MSD unit in A^2/fs and output in cm^2/s
@@ -100,6 +107,16 @@ if __name__ == "__main__":
     a,b,std = msd2D(ts,msds,fac)
     print(' Diffusion coefficient = {0:12.4e}'.format(a)+
           ' +/- {0:12.4e} [cm^2/s]'.format(std))
+
+    if out4fp:
+        from datetime import datetime
+        with open(out4fpname,'w') as f:
+            cmd = ' '.join(s for s in sys.argv)
+            f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            f.write('#  {0:s}\n'.format(cmd))
+            f.write('#\n')
+            f.write('    1    1.0\n')
+            f.write('   {0:12.4}\n'.format(a))
 
     if plot:
         import matplotlib.pyplot as plt
