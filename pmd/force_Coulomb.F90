@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-29 16:44:06 KOBAYASHI Ryo>
+!                     Last modified: <2022-10-04 22:42:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -1084,8 +1084,8 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        vrc = acc*qi*qj/rc
-        dvdrc = -acc*qi*qj /rc**2
+        vrc = acc*qi*qj/rc /dielec
+        dvdrc = -acc*qi*qj /rc**2 /dielec
 !.....potential
         tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp /dielec
@@ -1155,8 +1155,9 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc *terfcc
-          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrc = acc /rc /dielec *terfcc
+          dvdrc = -acc /rc /dielec &
+               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc
@@ -1644,8 +1645,8 @@ contains
         qj = chg(j)
         dij = sqrt(dij2)
         diji = 1d0/dij
-        vrc = acc/rc
-        dvdrc = -acc/rc2
+        vrc = acc/rc /dielec
+        dvdrc = -acc/rc2 /dielec
 !.....potential
         tmp = acc*diji -vrc -dvdrc*(dij-rc)
         tmp = tmp /dielec
@@ -1695,8 +1696,9 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc *terfcc
-          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrc = acc /rc *terfcc /dielec
+          dvdrc = -acc /rc /dielec &
+               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc

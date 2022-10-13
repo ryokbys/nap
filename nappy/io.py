@@ -56,7 +56,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
 def read(fname="pmdini",format=None,specorder=None):
     if format in (None, 'None'):
         format= parse_filename(fname)
-    
+
     if format == 'pmd':
         nsys = read_pmd(fname,specorder=specorder)
     elif format in ('POSCAR','CONTCAR','vasp','VASP'):

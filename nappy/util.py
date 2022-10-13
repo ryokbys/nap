@@ -11,6 +11,7 @@ Options:
 from __future__ import print_function
 
 import os,sys
+from datetime import datetime
 from docopt import docopt
 import numpy as np
 
@@ -98,6 +99,38 @@ def pbc(x):
     else:
         return x
     
+def parse_option(line):
+    """
+    Parse an optional variable from a comment line.
+    The comment line should start with '#'
+    and the option name should follow it with follwoing ':' like,
+    # optname:  optvalue
+    """
+    data = line.split()
+    if data[0] != '#':
+        return None
+    if data[1][-1] != ':':
+        return None
+    optname = data[1].strip(':')
+    optval = data[2]
+    #...Return optname and optval as a dictionary.
+    return {optname:optval}
+
+def gen_header(argv):
+    """
+    Generate header that contains command line itself and datetime string.
+    ARGV is usually 'sys.argv'.
+    """
+    tnow = datetime.now()
+    dstr = tnow.strftime('%Y-%m-%d %H:%M:%S')
+    header = '# Generated at {0:s} \n'.format(dstr)
+    if len(argv) > 10:
+        argv = argv[:10]
+        argv.append('...')
+    cmd = ' '.join(argv)
+    header += '#           by {0:s}\n'.format(cmd)
+    return header
+
 if __name__ == "__main__":
 
     args = docopt(__doc__)

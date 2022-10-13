@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-09-23 22:19:20 KOBAYASHI Ryo>
+!                     Last-modified: <2022-10-13 11:44:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -78,6 +78,15 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
+!.....Scale velocity from scaled unit to real unit (Ang.)
+  if( myid_md.eq.0 ) then
+    do ia=1,ntot0
+      vtot(1:3,ia)= h(1:3,1,0)*vtot(1,ia) &
+           +h(1:3,2,0)*vtot(2,ia) &
+           +h(1:3,3,0)*vtot(3,ia)
+    enddo
+  endif
+
   call calc_nfmv(ntot0,tagtot)
 
   if( nstp.le.0 ) then
