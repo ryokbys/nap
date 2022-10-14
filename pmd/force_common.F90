@@ -83,7 +83,7 @@ subroutine get_force(l1st,epot,stnsr)
 
 !.....init_for_Ewald must be called before chgopt_damping
   if( use_force('Coulomb') ) then
-    call init_for_Ewald(h,rc,myid_md,mpi_md_world,iprint)
+    call init_for_Ewald(h,rc,myid_md,mpi_md_world,iprint,l1st)
   endif
 
 !.....If varaible charge, optimize charges before any charge-dependent potential

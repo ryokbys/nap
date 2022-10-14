@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-10-04 22:42:12 KOBAYASHI Ryo>
+!                     Last modified: <2022-10-14 16:18:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -161,31 +161,33 @@ contains
     
   end subroutine init_coulomb
 !=======================================================================
-  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 ! Initialization for Ewald method, which should be called in both cases of
 ! variable charge and fixed charge.
 !
     real(8),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
+    logical,intent(in):: l1st
     
     if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
-        call init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+        call init_vc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
       else
-        call init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+        call init_fc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
       endif
     endif
     
   end subroutine init_for_Ewald
 !=======================================================================
-  subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 !  Ewald sum with fixed charge.
 !
     implicit none 
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),rc
+    logical,intent(in):: l1st 
 
     integer:: i,ik,k1,k2,k3,isp
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2
@@ -193,7 +195,7 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:nspmax) = sgm_ew
     bkmax  = 2d0*pacc /rc
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -203,7 +205,7 @@ contains
 
     if( .not. (trim(cterms).eq.'full' .or. trim(cterms).eq.'long') ) return
     call get_recip_vectors(h)
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
@@ -212,7 +214,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i0)') '   kmax1 = ',kmax1
       write(6,'(a,i0)') '   kmax2 = ',kmax2
@@ -251,7 +253,7 @@ contains
 
   end subroutine init_fc_Ewald
 !=======================================================================
-  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -262,6 +264,7 @@ contains
     implicit none
     real(8),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
+    logical,intent(in):: l1st
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
@@ -278,7 +281,7 @@ contains
 !.....Detect minimum sigma to determine k-max
     sgm_min = sgm_ew
     bkmax  = sqrt(2d0*pacc) /sgm_min
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -289,7 +292,7 @@ contains
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
     call get_recip_vectors(h)
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) then
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
@@ -297,7 +300,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
