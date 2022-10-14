@@ -1,12 +1,11 @@
-========================================================================
- PMD: A Parallel Molecular Dynamics program 
  
- Revision: rev200428
- Contributors: 
-   - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
-========================================================================
+ pmd --- Parallel Molecular Dynamics ---
  
- Job started at 10:58:22 on 2021-01-09
+   Revision: rev220922
+   Contributors: 
+     - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
+ 
+ Job started at 16:11:11 on 2022-10-14
  
  Read pmdini in ascii mode.
  Species order read from pmdini option: 
@@ -30,7 +29,8 @@
    La :  24
    Zr :  16
  
- Number of processes in MPI = 1
+ Num of MPI processes = 1
+ Num of OpenMP processes = 1
  
 ------------------------------------------------------------------------
            Initial setting   
@@ -56,7 +56,7 @@
   
   flag_damping     0
   damping_coeff     .9900
-  converge_eps     .0001
+  converge_eps       1.0E-04
   converge_num     1
   min_iteration     0
   
@@ -66,7 +66,6 @@
   
   stress_control     none
  
-  zload_type     none
   
   factor_direction
        0   0.000   0.000   0.000
@@ -91,6 +90,31 @@
 ------------------------------------------------------------------------
 
  Broadcast data to be shared with all the nodes.
+ 
+ Number of total atoms = 192
+ Number of species     = 4
+ 
+ Use the following force-fields:  Coulomb  Morse 
+
+ Coulomb parameters:
+   csp,vid,rad,npq =    O -2.000  0.660   2
+   csp,vid,rad,npq =   Li  1.000  1.280   2
+   csp,vid,rad,npq =   La  3.000  2.070   6
+   csp,vid,rad,npq =   Zr  4.000  1.750   5
+ rhoij are set from given rads of fixed_bvs entries.
+   cspi,cspj,rho_scr=     O    O    1.3200
+   cspi,cspj,rho_scr=    Li   Li    2.5600
+   cspi,cspj,rho_scr=    Li   La    3.3500
+   cspi,cspj,rho_scr=    Li   Zr    3.0300
+   cspi,cspj,rho_scr=    La   La    4.1400
+   cspi,cspj,rho_scr=    La   Zr    3.8200
+   cspi,cspj,rho_scr=    Zr   Zr    3.5000
+
+ Morse parameters:
+   cspi,cspj,D,alpha,rmin =    O  Li  0.988  1.938  1.940
+   cspi,cspj,D,alpha,rmin =    O  La  1.186  2.217  2.470
+   cspi,cspj,D,alpha,rmin =    O  Zr  2.191  2.041  1.996
+
  Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
  
  Ensemble = NVE
@@ -101,38 +125,10 @@
  Max number of local atoms =        192
    nbmax =      10000
    namax = nalmax*1.2 + nbmax  =      10230
-   nnmax =        100
- Memory for main routine   =          8 MByte
- 
- Number of total atoms = 192
- Number of species     = 4
+   nnmax =        200
  Degrees of freedom for each ifmv =  576  0  0  0  0  0  0  0  0
- 
- Use the following force-fields:  Coulomb  Morse 
 
- Coulomb parameters:
-   csp,vid,rad,npq =    O -2.000  0.660   2
-   csp,vid,rad,npq =   Li  1.000  1.280   2
-   csp,vid,rad,npq =   La  3.000  2.070   6
-   csp,vid,rad,npq =   Zr  4.000  1.750   5
-   cspi,cspj,rho_bvs=     O    O    1.3200
-   cspi,cspj,rho_bvs=    Li   Li    2.5600
-   cspi,cspj,rho_bvs=    Li   La    3.3500
-   cspi,cspj,rho_bvs=    Li   Zr    3.0300
-   cspi,cspj,rho_bvs=    La   La    4.1400
-   cspi,cspj,rho_bvs=    La   Zr    3.8200
-   cspi,cspj,rho_bvs=    Zr   Zr    3.5000
- Finished reading ./in.params.Coulomb
-
- Morse parameters:
-   cspi,cspj,D,alpha,rmin =    O  Li  0.988  1.938  1.940
-   cspi,cspj,D,alpha,rmin =    O  La  1.186  2.217  2.470
-   cspi,cspj,D,alpha,rmin =    O  Zr  2.191  2.041  1.996
- ================= WORNING =======================
-   nnmax is less than 5*(num of atoms in a cell)
-   You should set max_num_meighbors greater than 100
- =================================================
- Max num of neighbors at 1st call = 98
+ Max num of neighbors =    98
  
  Charges fixed from ideal valences and composition:
    csp, V_ideal, V_actual =    O -2.000 -1.199
@@ -140,30 +136,31 @@
    csp, V_ideal, V_actual =   La  3.000  1.444
    csp, V_ideal, V_actual =   Zr  4.000  2.110
  
- Ewald energy term by term:
+ Ewald energy by terms:
    Self term         =       0.0000 eV
-   Short-range term  =     533.0033 eV
+   Short-range term  =     535.2205 eV
    Long-range term   =       0.0000 eV
  
  Initial values:
-   Kinetic energy  =          7.58973 eV =      0.040 eV/atom
-   Potential energy=       -161.24366 eV =     -0.840 eV/atom
-   Temperature 1   =        307.41779 K
-   Temperature     =        307.41779 K
-   Pressure        =         24.84780 GPa (compressive)
-   Stress tensor   = 25.589 25.670 23.285 -.025 -.029 .006
+   Kinetic energy  =         11.99187 eV =      0.062 eV/atom
+   Potential energy=       -158.31108 eV =     -0.825 eV/atom
+   Temperature 1   =        485.72367 K
+   Temperature     =        485.72367 K
+   Pressure        =         26.82084 GPa (compressive)
+   Stress tensor   =    29.032    27.124    24.307     0.266    -0.503    -0.124
  
- istp,etime,temp,epot,vol,prss= 0        0.01      307.42  -1.6124E+02  2.237E+03  2.485E+01
- istp,etime,temp,epot,vol,prss= 1        0.01      311.04  -1.6133E+02  2.237E+03  2.485E+01
- istp,etime,temp,epot,vol,prss= 2        0.01      318.59  -1.6152E+02  2.237E+03  2.483E+01
+ istp,etime,temp,epot,vol,prss= 0        0.00      485.72  -1.5831E+02  2.237E+03  2.682E+01
+ istp,etime,temp,epot,vol,prss= 1        0.01      481.62  -1.5821E+02  2.237E+03  2.685E+01
+ istp,etime,temp,epot,vol,prss= 2        0.01      479.33  -1.5815E+02  2.237E+03  2.685E+01
  
  Final values:
-   Kinetic energy  =          7.86560 eV =      0.041 eV/atom
-   Potential energy=       -161.51956 eV =     -0.841 eV/atom
-   Temperature 1   =        318.59178 K
-   Temperature     =        318.59178 K
-   Pressure        =         24.83214 GPa (compressive)
+   Kinetic energy  =         11.83403 eV =      0.062 eV/atom
+   Potential energy=       -158.15301 eV =     -0.824 eV/atom
+   Temperature 1   =        479.33076 K
+   Temperature     =        479.33076 K
+   Pressure        =         26.85377 GPa (compressive)
  
- Time                  =       0.01 sec  =   0h00m00s
+ Time   total =      0.012 sec =   0h00m00s
+ Memory per MPI-proc =     10.305 MB  
  
- Job finished at 10:58:22 on 2021-01-09
+ Job finished at 16:11:11 on 2022-10-14

@@ -4,7 +4,7 @@ Calculate elastic constants C_ij by least square fitting
 using Green-Lagrange deformation tensors, which is the same
 scheme as materialsproject.org does.
 
-PREPARE mode creates directories and input files (as the same name as INFILE) to be computed.
+PREPARE mode creates directories and input files (as the same name as INFILE) to be computed. INFILE can be POSCAR or pmdini.
 ANALYZE mode reads the stress values obtained by some code. 
 STRSFILE is the file name of resulting stress information, e.g., strs.pmd in the case of pmd.
 COMPUTE mode performs MD or MS calculations using pmd as a backend.
@@ -22,7 +22,7 @@ Options:
 """
 from __future__ import print_function
 
-import os
+import os,sys
 import numpy as np
 from docopt import docopt
 from scipy.optimize import curve_fit
@@ -335,7 +335,7 @@ def some_moduli(cij):
    s231 = s12 +s13 +s23  = {4:10.3f}
    s456 = s44 +s55 +s66  = {5:10.3f}
    Kv   = (c123 +2*c231)/9  = {6:10.3f}
-   Kr   = 1.0 /(c123 +2*s231)  = {7:10.3f}
+   Kr   = 1.0 /(s123 +2*s231)  = {7:10.3f}
    Gv   = (c123 -c231 +3*c456)/15  = {8:10.3f}
    Gr   = 15.0 /(4.0*s123 -4.0*s231 +3.0*s456)  = {9:10.3f}
    K    = (Kv +Kr)/2
@@ -425,8 +425,7 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
 
     return cij
 
-
-if __name__ == '__main__':
+def main():
 
     args= docopt(__doc__,version=__version__)
     dlt1max = float(args['--delta1'])
@@ -451,3 +450,9 @@ if __name__ == '__main__':
         dlt2max = conf['delta2']
         strsfname = args['STRSFILE']
         analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)
+
+    return None
+
+if __name__ == '__main__':
+
+    main()
