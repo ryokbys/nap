@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-21 16:40:09 KOBAYASHI Ryo>
+!                     Last modified: <2022-10-14 16:18:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -32,7 +32,7 @@ module Coulomb
 !.....Keywords for terms: full, short, long, direct, direct_cut, screened_cut
 
   integer,parameter:: ioprms = 20
-!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
+!.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0) in eV *Ang /e^2
   real(8),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
   real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
@@ -62,8 +62,8 @@ module Coulomb
 !  real(8),allocatable:: rho_scr(:,:)
 !!$  real(8):: fbvs = 0.74d0 +- 0.04
   real(8):: fbvs = 0.74d0
-!.....Scale factor
-  real(8):: sfctr = 1d0
+!.....Dielectric constant
+  real(8):: dielec = 1d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -161,31 +161,33 @@ contains
     
   end subroutine init_coulomb
 !=======================================================================
-  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_for_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 ! Initialization for Ewald method, which should be called in both cases of
 ! variable charge and fixed charge.
 !
     real(8),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
+    logical,intent(in):: l1st
     
     if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
-        call init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+        call init_vc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
       else
-        call init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+        call init_fc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
       endif
     endif
     
   end subroutine init_for_Ewald
 !=======================================================================
-  subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_fc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 !  Ewald sum with fixed charge.
 !
     implicit none 
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),rc
+    logical,intent(in):: l1st 
 
     integer:: i,ik,k1,k2,k3,isp
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2
@@ -193,7 +195,7 @@ contains
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:nspmax) = sgm_ew
     bkmax  = 2d0*pacc /rc
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -203,7 +205,7 @@ contains
 
     if( .not. (trim(cterms).eq.'full' .or. trim(cterms).eq.'long') ) return
     call get_recip_vectors(h)
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
@@ -212,7 +214,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
+    if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i0)') '   kmax1 = ',kmax1
       write(6,'(a,i0)') '   kmax2 = ',kmax2
@@ -251,7 +253,7 @@ contains
 
   end subroutine init_fc_Ewald
 !=======================================================================
-  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint)
+  subroutine init_vc_Ewald(h,rc,myid,mpi_world,iprint,l1st)
 !
 !  Since variable-charge potential with Gaussian distribution charges
 !  is mostly identical to the long-range part of Ewald summation,
@@ -262,6 +264,7 @@ contains
     implicit none
     real(8),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
+    logical,intent(in):: l1st
 
     integer:: i,isp,ik,k1,k2,k3,is
     real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
@@ -278,7 +281,7 @@ contains
 !.....Detect minimum sigma to determine k-max
     sgm_min = sgm_ew
     bkmax  = sqrt(2d0*pacc) /sgm_min
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
@@ -289,7 +292,7 @@ contains
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
     endif
     call get_recip_vectors(h)
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) then
       write(6,'(a)') ' Reciprocal vectors:'
       write(6,'(a,3es12.3)') '   b1 = ',b1(1:3)
       write(6,'(a,3es12.3)') '   b2 = ',b2(1:3)
@@ -297,7 +300,7 @@ contains
     endif
 !.....kmax# is constant during MD run even if h-matrix can change...
     call setup_kspace()
-    if( myid.eq.0 .and. iprint.ne.0 ) then
+    if( myid.eq.0 .and. iprint.ne.0 .and. l1st ) then
       write(6,'(a)') ' Number of k-points for Ewald sum:'
       write(6,'(a,i8)') '   kmax1 = ',kmax1
       write(6,'(a,i8)') '   kmax2 = ',kmax2
@@ -512,9 +515,9 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, rcut
           cycle
-        else if( trim(c1st).eq.'scale_factor' ) then
+        else if( trim(c1st).eq.'dielectric' ) then
           backspace(ioprms)
-          read(ioprms,*) ctmp, sfctr
+          read(ioprms,*) ctmp, dielec
           cycle
         else if( trim(c1st).eq.'sigma' ) then
           backspace(ioprms)
@@ -658,7 +661,9 @@ contains
 10    close(ioprms)
 
 !.....In case of variable charge, sigma has a lower bound w.r.t. min(Jii)
-      if( trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq' ) then
+      if( (trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') &
+           .and. .not. trim(cterms).ne.'screened_cut' &
+           .and. .not. trim(cterms).ne.'direct_cut' ) then
         vcgjiimin = 1d+30
         do isp=1,nsp
           vcgjiimin = min(vcgjiimin,vc_jii(isp))
@@ -666,9 +671,10 @@ contains
         sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
         if( sgm_ew.lt.sgmlim ) then
           if( iprint.ne.0 ) then
-            print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by ',sgmlim
+            print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by sgmlim'
             print *,'           which is determined by acc*sqrt(2/pi)/Jii.'
-            print *,'    sgm_ew,sgmlim,vcgjiimin=',sgm_ew,sgmlim,vcgjiimin
+            print *,'     original sgm_ew = ', sgm_ew
+            print *,'     replaced sgm_ew = ', sgmlim
           endif
           sgm_ew = sgmlim
         endif
@@ -737,7 +743,7 @@ contains
     call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sfctr,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dielec,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -1004,7 +1010,7 @@ contains
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *sfctr
+        tmp = 0.5d0 *acc *qi*qj*diji /dielec
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1014,7 +1020,7 @@ contains
           esrl = esrl +tmp
         endif
 !.....force
-        ftmp = -acc *qi*qj*diji*diji *sfctr
+        ftmp = -acc *qi*qj*diji*diji /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1081,11 +1087,11 @@ contains
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        vrc = acc*qi*qj/rc
-        dvdrc = -acc*qi*qj /rc**2
+        vrc = acc*qi*qj/rc /dielec
+        dvdrc = -acc*qi*qj /rc**2 /dielec
 !.....potential
         tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
 !!$          epi(j)= epi(j) +tmp
@@ -1098,7 +1104,7 @@ contains
         esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
-        ftmp = ftmp *sfctr
+        ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
 !!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
@@ -1152,8 +1158,9 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc *terfcc
-          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrc = acc /rc /dielec *terfcc
+          dvdrc = -acc /rc /dielec &
+               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc
@@ -1196,7 +1203,7 @@ contains
         texp = exp(-(dij/rhoij)**2)
         dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
         tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !.....potential
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
@@ -1209,7 +1216,7 @@ contains
         epi(i)= epi(i) +tmp
         esrl = esrl +tmp
 !.....force
-        dedr = dedr*sfctr
+        dedr = dedr /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -1275,7 +1282,7 @@ contains
         terfc = erfc(dij*ss2i)
 !.....potential
         tmp = 0.5d0 *acc *qi*qj*diji *terfc
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
 !!$          esrl = esrl +tmp +tmp
@@ -1290,7 +1297,7 @@ contains
 !.....force
         ftmp = -acc *qj*qi*diji *( diji *terfc &
              +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
-        ftmp = ftmp *sfctr
+        ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
 !!$        do ixyz=1,3
 !!$!$omp atomic
@@ -1446,7 +1453,7 @@ contains
 !!$                 *( cs*qcos(ik) +sn*qsin(ik) )
             tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
-            tmp = tmp *sfctr
+            tmp = tmp /dielec
             epi(i) = epi(i) +tmp
             elrl = elrl +tmp
 !.....Forces
@@ -1455,7 +1462,7 @@ contains
 !!$            aa(1:3,i)= aa(1:3,i) -acc/vol *qi*bb(1:3) *pflr(ik,is) &
 !!$                 *( -sn*qcos(ik) +cs*qsin(ik) )
             ftmp = -acc/vol *qi *pflr(ik,is) &
-                 *( -sn*qcos(ik) +cs*qsin(ik) ) *sfctr
+                 *( -sn*qcos(ik) +cs*qsin(ik) ) /dielec
             aa(1:3,i) = aa(1:3,i) +bb(1:3)*ftmp
 !!$            if( itot.eq.19 .or. itot.eq.21 ) then
 !!$              print '(a,4i4,7es11.3)','myid,i,itot,ik,aa,qcos,qsin,cs,sn=' &
@@ -1518,8 +1525,8 @@ contains
         qi = chg(i)
         q2 = qi*qi
         tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-        eselfl = eselfl +tmp*sfctr
-        epi(i) = epi(i) +tmp*sfctr
+        eselfl = eselfl +tmp/dielec
+        epi(i) = epi(i) +tmp/dielec
       enddo
     else if( trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long') then ! fixed charge
@@ -1528,8 +1535,8 @@ contains
       do i=1,natm
         is = int(tag(i))
         q2 = chg(i)*chg(i)
-        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
-        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) *sfctr
+        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
+        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
       enddo
     endif
     return
@@ -1584,7 +1591,7 @@ contains
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) *sfctr
+        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) /dielec
         if( j.le.natm ) then
           esr = esr +tmp*qi*qj
         else
@@ -1598,6 +1605,70 @@ contains
 
     return
   end subroutine qforce_short
+!=======================================================================
+  subroutine qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h &
+       ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
+!
+!  Compute q-force of direct_cut Coulomb potential.
+!
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint, &
+         lspr(0:nnmax,namax)
+    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+         h(3,3),rc,d2lspr(nnmax,namax)
+    real(8),intent(inout):: fq(namax),esr
+    logical,intent(in):: l1st 
+
+    integer:: i,j,jj,is,js,ixyz,jxyz
+    real(8):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp, &
+         vrc,dvdrc
+    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+!!$    real(8),external:: fcut1
+
+    real(8),save:: rc2,sqpi
+
+!.....Compute direct sum
+    rc2 = rc*rc
+    esr = 0d0
+!$omp parallel
+!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
+!$omp    reduction(+:esr)
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is= int(tag(i))
+      qi = chg(i)
+      do jj=1,lspr(0,i)
+        dij2 = d2lspr(jj,i)
+        if( dij2.ge.rc2 ) cycle
+        j = lspr(jj,i)
+!!$        if( j.eq.0 ) exit
+!!$        if( j.le.i ) cycle
+        js = int(tag(j))
+        if( .not.interact(is,js) ) cycle
+        qj = chg(j)
+        dij = sqrt(dij2)
+        diji = 1d0/dij
+        vrc = acc/rc /dielec
+        dvdrc = -acc/rc2 /dielec
+!.....potential
+        tmp = acc*diji -vrc -dvdrc*(dij-rc)
+        tmp = tmp /dielec
+!!$        if( j.le.natm ) then
+!!$          esr = esr +tmp*qi*qj
+!!$        else
+!!$          esr = esr +0.5d0*tmp*qi*qj
+!!$        endif
+        esr = esr +0.5d0*tmp*qi*qj
+!.....Force on charge
+        fq(i) = fq(i) -tmp*qj
+!!$        fq(j) = fq(j) -tmp*qi
+      enddo
+    enddo
+!$omp end do
+!$omp end parallel
+
+    return
+  end subroutine qforce_direct_cut
 !=======================================================================
   subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
        ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
@@ -1628,8 +1699,9 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc *terfcc
-          dvdrc = -acc /rc *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+          vrc = acc /rc *terfcc /dielec
+          dvdrc = -acc /rc /dielec &
+               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc
@@ -1666,7 +1738,7 @@ contains
         dvdrc = dvdrcs(is,js)
 !.....potential
         tmp = acc*diji*terfc -vrc -dvdrc*(dij-rc)
-        tmp = tmp *sfctr
+        tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          esr = esr +tmp*qi*qj
 !!$        else
@@ -1732,11 +1804,11 @@ contains
 !.....Potential energy per atom
             tmp = prefac/bb2*qi*texp &
                  *(cs*qcos(ik) +sn*qsin(ik))
-            tmp = tmp *sfctr
+            tmp = tmp /dielec
             elr = elr +tmp
 !.....Force on charge
             fq(i)= fq(i) -2d0 *prefac/bb2 *texp &
-                 *(cs*qcos(ik) +sn*qsin(ik)) *sfctr
+                 *(cs*qcos(ik) +sn*qsin(ik)) /dielec
 !!$            if( i.eq.1 .and. (ik.gt.5000.and.ik.le.6000) ) then
 !!$              print '(a,i6,3i4,10f10.4)','ik,qi,1/bb2,texp,cs,sn,qcos,qsin,fqikkk,fq(i)='&
 !!$                   ,ik,k1,k2,k3,qi,1.d0/bb2,texp,cs,sn &
@@ -1773,8 +1845,8 @@ contains
       q2 = qi*qi
       sgmi = sgm_ew
       tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-      eself = eself +tmp *sfctr
-      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)*sfctr
+      eself = eself +tmp /dielec
+      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)/dielec
     enddo
 
   end subroutine qforce_self
@@ -1809,6 +1881,10 @@ contains
            myid_md,iprint,fq,eclongl)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    else if( trim(cterms).eq.'direct_cut'  ) then
+      call qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h, &
+           lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)

@@ -8,10 +8,11 @@ veryclean: clean
 
 test:
 	@mpirun -np 1 ../../pmd/pmd 2>&1 > out.pmd
-	@grep Potential out.pmd.REF | head -n1 > /tmp/out.REF
-	@grep Potential out.pmd | head -n1 > /tmp/out
-	@diff -q /tmp/out /tmp/out.REF > /dev/null || (echo " FAIL: examples/pmd_ttm_Si" && exit 1)
+	@grep Potential out.pmd.REF | head -n1 > out.REF
+	@grep Potential out.pmd | head -n1 > out
+	@diff -q out out.REF > /dev/null || (echo " FAIL: examples/pmd_ttm_Si" && exit 1)
 	@echo " PASS: examples/pmd_ttm_Si"
+	@rm -f out out.REF
 
 resdir := result_$(shell date "+%y%m%d_%H%M")
 keep:

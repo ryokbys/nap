@@ -29,7 +29,7 @@ from ase.io import read,write
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "190522"
+__version__ = "221010"
 
 _kb2gpa = 160.2176487
 
@@ -159,7 +159,11 @@ def main():
             continue
         try:
             #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
-            os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+            sysname, nodename, release, version, machine = os.uname()
+            if 'Darwin' in sysname:
+                os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+            else:
+                os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
             atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         except Exception as e:
             print(' Failed to read vasprun.xml, so skip it.')
@@ -180,6 +184,11 @@ def main():
                 n += 1
         elif sequence or type(index) is slice:  # Whole MD sequence
             print(' Extracting sequence of ',len(atoms),' steps')
+            indices = []
+            # if sequence:  # Whole MD sequence
+            #     indices = [ i for i in range(len(atoms)) ]
+            # else:  # Sliced indices
+            #     indices = [ i for i in range(index.start, index.stop, index.step) ]
             for j,a in enumerate(atoms):
                 dirname = '{0:05d}/'.format(j)
                 print('  {0:s}'.format(dirname))

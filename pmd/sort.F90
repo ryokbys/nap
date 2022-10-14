@@ -129,20 +129,19 @@ subroutine heapsort_itag(n,nmax,itag,ndim,arr)
 
 end subroutine heapsort_itag
 !=======================================================================
-subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
+subroutine arg_heapsort_iarr(n,nmax,iarr,idxarr)
 !-----------------------------------------------------------------------
 !  Heap sort
 !    - See Numerical Recipes in Fortran, Chap.8
-!    - sort array TAG and ARR according to total id in TAG
+!    - sort indices according to integer array IARR
 !      by ascending order
-!    - assuming tag includes only total id information
 !-----------------------------------------------------------------------
   implicit none
   integer,intent(in):: n,nmax
-  integer,intent(inout):: itag(nmax)
+  integer,intent(inout):: iarr(nmax)
   integer,intent(out):: idxarr(nmax)
 
-  integer:: i,ir,j,l,irra,jtag,jdx
+  integer:: i,ir,j,l,irra,jarr,jdx
 !!$  real(8):: rarr(ndim)
 
 !-----check size
@@ -161,18 +160,18 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
 10 continue
   if( l.gt.1) then          ! still in hiring phase
     l=l-1
-    jtag= itag(l)
+    jarr= iarr(l)
     jdx = idxarr(l)
   else                      ! retirement and promotion phase
-    jtag= itag(ir)
+    jarr= iarr(ir)
     jdx = idxarr(ir)
 !
-    itag(ir)= itag(1)
+    iarr(ir)= iarr(1)
     idxarr(ir)= idxarr(1)
 !
     ir=ir-1
     if(ir.eq.1)then
-      itag(1)= jtag
+      iarr(1)= jarr
       idxarr(1)= jdx
       return
     endif
@@ -181,10 +180,10 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
   j=l+l
 20 if( j.le.ir ) then
     if( j.lt.ir ) then
-      if( itag(j).lt.itag(j+1) ) j=j+1
+      if( iarr(j).lt.iarr(j+1) ) j=j+1
     endif
-    if( jtag.lt.itag(j) ) then
-      itag(i)=itag(j)
+    if( jarr.lt.iarr(j) ) then
+      iarr(i)=iarr(j)
       idxarr(i)= idxarr(j)
       i=j
       j=j+j
@@ -193,11 +192,81 @@ subroutine arg_heapsort_itag(n,nmax,itag,idxarr)
     endif
     goto 20
   endif
-  itag(i)= jtag
+  iarr(i)= jarr
   idxarr(i)= jdx
   goto 10
 
-end subroutine arg_heapsort_itag
+end subroutine arg_heapsort_iarr
+!=======================================================================
+subroutine arg_heapsort_arr(n,nmax,arr,idxarr)
+!-----------------------------------------------------------------------
+!  Heap sort
+!    - See Numerical Recipes in Fortran, Chap.8
+!    - sort indices according to REAL8 array ARR
+!      by ascending order
+!-----------------------------------------------------------------------
+  implicit none
+  integer,intent(in):: n,nmax
+  real(8),intent(inout):: arr(nmax)
+  integer,intent(out):: idxarr(nmax)
+
+  integer:: i,ir,j,l,irra,jdx
+  real(8):: tmp
+!!$  real(8):: rarr(ndim)
+
+!-----check size
+  if( n.lt.2 ) return
+
+  do i=1,nmax
+    idxarr(i) = i
+  enddo
+
+!  The index l will be decremented to 1 during the "hiring" phase.
+!  Once it reaches 1, the index ir will be decremented to 1 during
+!    the "retirement-and-promotion" phase.
+
+  l= n/2+1
+  ir=n
+10 continue
+  if( l.gt.1) then          ! still in hiring phase
+    l=l-1
+    tmp= arr(l)
+    jdx = idxarr(l)
+  else                      ! retirement and promotion phase
+    tmp= arr(ir)
+    jdx = idxarr(ir)
+!
+    arr(ir)= arr(1)
+    idxarr(ir)= idxarr(1)
+!
+    ir=ir-1
+    if(ir.eq.1)then
+      arr(1)= tmp
+      idxarr(1)= jdx
+      return
+    endif
+  endif
+  i=l
+  j=l+l
+20 if( j.le.ir ) then
+    if( j.lt.ir ) then
+      if( arr(j).lt.arr(j+1) ) j=j+1
+    endif
+    if( tmp.lt.arr(j) ) then
+      arr(i)=arr(j)
+      idxarr(i)= idxarr(j)
+      i=j
+      j=j+j
+    else
+      j=ir+1
+    endif
+    goto 20
+  endif
+  arr(i)= tmp
+  idxarr(i)= jdx
+  goto 10
+
+end subroutine arg_heapsort_arr
 !=======================================================================
 subroutine heapsort_i(n,nmax,tag,iarr)
 !-----------------------------------------------------------------------
@@ -270,41 +339,41 @@ subroutine heapsort_i(n,nmax,tag,iarr)
 
 end subroutine heapsort_i
 !=======================================================================
-recursive subroutine qsort_itag(nmax,il,ir,itag,ndim,arr)
+recursive subroutine qsort_iarr(nmax,il,ir,iarr,ndim,arr)
 !
-!  Sort arr using itag by quick sort algorithm.
+!  Sort arr using iarr by quick sort algorithm.
 !
   implicit none
   integer,intent(in):: nmax,ndim,il,ir
-  integer,intent(inout):: itag(nmax)
+  integer,intent(inout):: iarr(nmax)
   real(8),intent(inout):: arr(ndim,nmax)
 
   integer:: ip,ipiv,i,j
 
   if( ir-il.lt.1 ) return
   ip = int((il+ir)/2)
-  ipiv = itag(ip)
-  call swap_itag(nmax,ip,ir,itag,ndim,arr)
+  ipiv = iarr(ip)
+  call swap_iarr(nmax,ip,ir,iarr,ndim,arr)
   i = il
   do j=il,ir-1
-    if( itag(j).lt.ipiv ) then
-      call swap_itag(nmax,i,j,itag,ndim,arr)
+    if( iarr(j).lt.ipiv ) then
+      call swap_iarr(nmax,i,j,iarr,ndim,arr)
       i = i + 1
     endif
   enddo
-  call swap_itag(nmax,i,ir,itag,ndim,arr)
-  call qsort_itag(nmax,il,i,itag,ndim,arr)
-  call qsort_itag(nmax,i+1,ir,itag,ndim,arr)
+  call swap_iarr(nmax,i,ir,iarr,ndim,arr)
+  call qsort_iarr(nmax,il,i,iarr,ndim,arr)
+  call qsort_iarr(nmax,i+1,ir,iarr,ndim,arr)
 
-end subroutine qsort_itag
+end subroutine qsort_iarr
 !=======================================================================
-recursive subroutine arg_qsort_itag(nmax,il,ir,itag,idxarr)
+recursive subroutine arg_qsort_iarr(nmax,il,ir,iarr,idxarr)
 !
-!  Sort itag array by quick sort algorithm and return sorted index array.
+!  Sort iarr array by quick sort algorithm and return sorted index array.
 !
   implicit none
   integer,intent(in):: nmax,il,ir
-  integer,intent(inout):: itag(nmax)
+  integer,intent(inout):: iarr(nmax)
   integer,intent(out):: idxarr(nmax)
 
   integer:: ip,ipiv,i,j
@@ -314,54 +383,106 @@ recursive subroutine arg_qsort_itag(nmax,il,ir,itag,idxarr)
   enddo
   if( ir-il.lt.1 ) return
   ip = int((il+ir)/2)
-  ipiv = itag(ip)
-  call swap_itagidx(nmax,ip,ir,itag,idxarr)
+  ipiv = iarr(ip)
+  call swap_iarridx(nmax,ip,ir,iarr,idxarr)
   i = il
   do j=il,ir-1
-    if( itag(j).lt.ipiv ) then
-      call swap_itagidx(nmax,i,j,itag,idxarr)
+    if( iarr(j).lt.ipiv ) then
+      call swap_iarridx(nmax,i,j,iarr,idxarr)
       i = i + 1
     endif
   enddo
-  call swap_itagidx(nmax,i,ir,itag,idxarr)
-  call arg_qsort_itag(nmax,il,i,itag,idxarr)
-  call arg_qsort_itag(nmax,i+1,ir,itag,idxarr)
+  call swap_iarridx(nmax,i,ir,iarr,idxarr)
+  call arg_qsort_iarr(nmax,il,i,iarr,idxarr)
+  call arg_qsort_iarr(nmax,i+1,ir,iarr,idxarr)
 
-end subroutine arg_qsort_itag
+end subroutine arg_qsort_iarr
 !=======================================================================
-subroutine swap_itag(nmax,i,j,itag,ndim,arr)
+recursive subroutine arg_qsort_arr(nmax,il,ir,arr,idxarr)
+!
+!  Sort arr array by quick sort algorithm and return sorted index array.
+!
+  implicit none
+  integer,intent(in):: nmax,il,ir
+  real(8),intent(inout):: arr(nmax)
+  integer,intent(out):: idxarr(nmax)
+
+  integer:: ip,i,j
+  real(8):: aip
+
+  do i=1,nmax
+    idxarr(i) = i
+  enddo
+  if( ir-il.lt.1 ) return
+  ip = int((il+ir)/2)
+  aip = arr(ip)
+  call swap_arridx(nmax,ip,ir,arr,idxarr)
+  i = il
+  do j=il,ir-1
+    if( arr(j).lt.aip ) then
+      call swap_arridx(nmax,i,j,arr,idxarr)
+      i = i + 1
+    endif
+  enddo
+  call swap_arridx(nmax,i,ir,arr,idxarr)
+  call arg_qsort_arr(nmax,il,i,arr,idxarr)
+  call arg_qsort_arr(nmax,i+1,ir,arr,idxarr)
+
+end subroutine arg_qsort_arr
+!=======================================================================
+subroutine swap_iarr(nmax,i,j,iarr,ndim,arr)
   implicit none 
   integer,intent(in):: nmax,i,j,ndim
-  integer,intent(inout):: itag(nmax)
+  integer,intent(inout):: iarr(nmax)
   real(8),intent(inout):: arr(ndim,nmax)
 
   integer:: itmp
   real(8):: tmp(ndim)
 
-  itmp = itag(i)
-  itag(i) = itag(j)
-  itag(j) = itmp
+  itmp = iarr(i)
+  iarr(i) = iarr(j)
+  iarr(j) = itmp
   
   tmp(1:ndim) = arr(1:ndim,i)
   arr(1:ndim,i) = arr(1:ndim,j)
   arr(1:ndim,j) = tmp(1:ndim)
   return
-end subroutine swap_itag
+end subroutine swap_iarr
 !=======================================================================
-subroutine swap_itagidx(nmax,i,j,itag,idx)
+subroutine swap_iarridx(nmax,i,j,iarr,idx)
   implicit none 
   integer,intent(in):: nmax,i,j
-  integer,intent(inout):: itag(nmax),idx(nmax)
+  integer,intent(inout):: iarr(nmax),idx(nmax)
 
   integer:: itmp
 
-  itmp = itag(i)
-  itag(i) = itag(j)
-  itag(j) = itmp
+  itmp = iarr(i)
+  iarr(i) = iarr(j)
+  iarr(j) = itmp
 
   itmp = idx(i)
   idx(i) = idx(j)
   idx(j) = itmp
 
   return
-end subroutine swap_itagidx
+end subroutine swap_iarridx
+!=======================================================================
+subroutine swap_arridx(nmax,i,j,arr,idx)
+  implicit none 
+  integer,intent(in):: nmax,i,j
+  real(8),intent(inout):: arr(nmax)
+  integer,intent(inout):: idx(nmax)
+
+  integer:: itmp
+  real(8):: tmp
+
+  tmp = arr(i)
+  arr(i) = arr(j)
+  arr(j) = tmp
+
+  itmp = idx(i)
+  idx(i) = idx(j)
+  idx(j) = itmp
+
+  return
+end subroutine swap_arridx

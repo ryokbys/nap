@@ -18,6 +18,7 @@ Options:
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
                 Shift of each staggered lane. [default: 20]
+  --dt DT       Time interval (fs) between sequential files. [default: -1.0]
   -o FILENAME   Output filename. [default: out.msd]
   --xyz         Decompose MSD to x,y,z-direction. [default: False]
   --specorder SPECORDER
@@ -34,6 +35,7 @@ from datetime import datetime
 from nappy.napsys import NAPSystem
 from nappy.common import get_key
 from nappy.io import read
+from nappy.util import gen_header
 
 def anint(x):
     if x >= 0.5:
@@ -88,8 +90,8 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     if ids0 is not None:
         ids = [ i-1 for i in ids0 ]
         sids = nsys.atoms.sid
-        naps = [ 0 for i in len(specorder) ]
-        for i in ids0:
+        naps = [ 0 for i in range(len(specorder)) ]
+        for i in ids:
             sid = sids[i]
             naps[sid-1] += 1
     else:
@@ -159,6 +161,9 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     for ifile in range(len(files)):
         for nm in range(nmeasure):
             if nm*nshift < ifile <= (nm+1)*nshift:
+                #...NOTE: The code below could cause true_divide error,
+                #...  since when atoms are specified via --ids,
+                #...  any of naps elements could be zero...
                 msd[ifile-nm*nshift,nm,:,0] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,1] /= naps[:]
                 msd[ifile-nm*nshift,nm,:,2] /= naps[:]
@@ -179,6 +184,7 @@ if __name__ == "__main__":
             break
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
+    dt = float(args['--dt'])
     outfname= args['-o']
     specorder = args['--specorder']
     if specorder == 'None' or specorder is None:
@@ -206,6 +212,9 @@ if __name__ == "__main__":
 
     #...make output data files
     with open(outfname,'w') as f:
+        f.write(gen_header(sys.argv))
+        if dt > 0.0:
+            f.write('# dt: {0:0.1f}    ! Time interval in fs\n'.format(dt))
         if xyz:
             f.write('#   data_ID,')
             for spc in specorder:

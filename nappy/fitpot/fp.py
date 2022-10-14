@@ -550,6 +550,9 @@ def get_data2(basedir,prefix='ref',**kwargs):
     matches = kwargs['match']
     # print('matches=',matches)
 
+    if prefix == 'ref':
+        print(' Reference data and weights:')
+
     data = {}
     for m in matches:
         fname = basedir+'/data.{0:s}.{1:s}'.format(prefix,m)
@@ -559,6 +562,8 @@ def get_data2(basedir,prefix='ref',**kwargs):
         except:
             data[m] = None
             pass
+        if prefix == 'ref':
+            print('   {0:s}  {1:.3f}'.format(m,data[m]['wdat']))
     return data
 
 def loss_func2(pmddata,eps=1.0e-8,**kwargs):
@@ -916,7 +921,7 @@ def main():
         kwargs['npqs'] = npqs
         kwargs['charges'] = charges
 
-    print(' # iid,losses=      iid',end='')
+    print('\n # iid,losses=      iid',end='')
     if len(kwargs['match']) > 0:
         for m in kwargs['match']:
             print('  {0:>9s}'.format(m),end='')

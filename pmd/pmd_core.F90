@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-09-18 22:27:08 KOBAYASHI Ryo>
+!                     Last-modified: <2022-10-13 11:44:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -31,7 +31,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays, &
+  use pairlist, only: mk_lspr_para,mk_lscl_para, &
        update_d2lspr, check_lspr, check_lscl
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_langevin, vel_update_langevin, vel_update_berendsen, &
@@ -78,6 +78,15 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
+!.....Scale velocity from scaled unit to real unit (Ang.)
+  if( myid_md.eq.0 ) then
+    do ia=1,ntot0
+      vtot(1:3,ia)= h(1:3,1,0)*vtot(1,ia) &
+           +h(1:3,2,0)*vtot(2,ia) &
+           +h(1:3,3,0)*vtot(3,ia)
+    enddo
+  endif
+
   call calc_nfmv(ntot0,tagtot)
 
   if( nstp.le.0 ) then
@@ -286,12 +295,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
   l1st = .true.
-  if( lreorder ) then
-    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-         ,h,hi,l1st)
-    call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
-    l1st = .false.
-  endif
+!!$  if( lsrt_arrs ) then
+!!$    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
+!!$         ,h,hi,l1st)
+!!$    call sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
+!!$    l1st = .false.
+!!$  endif
   tmp = mpi_wtime()
   call bacopy(.true.)
   call accum_time('ba_xxx',mpi_wtime()-tmp)
@@ -682,11 +691,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bamove()
       l1st = .false.
-      if( lreorder ) then
-        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-             ,h,hi,l1st)
-        call reorder_arrays(namax,natm,nb,tag,ra,va,aux,naux)
-      endif
+!!$      if( lsrt_arrs ) then
+!!$        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
+!!$             ,h,hi,l1st)
+!!$        call sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
+!!$      endif
 !.....Copy RA of boundary atoms
       call bacopy(.false.)
       call accum_time('ba_xxx',mpi_wtime()-tmp)
@@ -1313,7 +1322,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use pmdmpi,only: nid2xyz,xyz2nid
   use util,only: itotOf, ifmvOf
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para,reorder_arrays, &
+  use pairlist, only: mk_lspr_para,mk_lscl_para, &
        update_d2lspr, check_lspr, check_lscl
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_cell_min
@@ -2277,7 +2286,7 @@ subroutine bacopy(l1st)
         nbnew=nbnew+nrc
 
 200     continue
-      enddo
+      enddo ! kdd= -1,0
     endif
 
 !-------Error trap
@@ -2296,7 +2305,7 @@ subroutine bacopy(l1st)
     endif
 
 100 continue
-  enddo
+  enddo ! kd=1,3
 
 !-----num. of received boundary atoms
   nb=nbnew
@@ -3170,9 +3179,9 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 
 !!$  tmp = mpi_wtime()
   if( ifsort.eq.1 ) then
-    call arg_heapsort_itag(natm,natm,itag,idxarr)
+    call arg_heapsort_iarr(natm,natm,itag,idxarr)
   else  ! default 2
-    call arg_qsort_itag(natm,1,natm,itag,idxarr)
+    call arg_qsort_iarr(natm,1,natm,itag,idxarr)
   endif
 !!$  call accum_time('sorting',mpi_wtime()-tmp)
 

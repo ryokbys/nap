@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2022-08-30 14:43:38 KOBAYASHI Ryo>
+!                    Last modified: <2022-09-23 20:54:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -243,8 +243,8 @@ module pmdvars
   logical:: lconst = .false. 
 !.....Reduced force
   logical:: lrdcfrc = .false. 
-!.....Linked cell reordering; this has bugs for cases using charges
-  logical:: lreorder = .false. 
+!.....Sort arrays according to linked cell; BUGS with charges
+  logical:: lsrt_arrs = .false. 
 
 !.....zload type: zload or shear
   character(len=128):: czload_type= 'none'
