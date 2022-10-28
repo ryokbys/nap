@@ -89,7 +89,7 @@ def peval(x,p):
     b,bp,v0,ev0= p
     return b*x/(bp*(bp-1.0)) *(bp*(1.0-v0/x) +(v0/x)**bp -1.0) +ev0
 
-def erg_vs_size(fname,al_min,al_max,niter):
+def erg_vs_size(fname,al_min,al_max,niter,mdexec):
     tmpfname = fname+'.tmp'
     os.system('cp '+fname+' '+tmpfname)
     al_orig,hmat,natm= read_pmd(fname)
@@ -127,14 +127,17 @@ def erg_vs_size(fname,al_min,al_max,niter):
         prss[i] = prs
         text = ' {0:10.4f} {1:10.4f} {2:15.7f} {3:12.4f}'.format(al,vol,erg,prs)
         print(text)
+        outfname = 'out.pmd.{0:03d}'.format(i)
+        os.system('rm -f {0:s} && mv out.pmd {0:s}'.format(outfname))
+        dumpfname = 'dump_0.{0:03d}'.format(i)
+        os.system('rm -f {0:s} && mv dump_0 {0:s}'.format(dumpfname))
     #...revert pmdini
     os.system('rm -f '+fname)
     os.system('cp '+tmpfname+' '+fname)
     os.system('rm -f '+tmpfname)
     return als,vols,ergs,prss,al_orig,hmat,natm
 
-if __name__ == '__main__':
-
+def main():
     args = docopt(__doc__)
 
     niter = int(args['-n'])
@@ -142,7 +145,7 @@ if __name__ == '__main__':
     al_min = float(args['MIN'])
     al_max = float(args['MAX'])
 
-    als,vols,ergs,prss,al_orig,hmat,natm = erg_vs_size(_infname,al_min,al_max,niter)
+    als,vols,ergs,prss,al_orig,hmat,natm = erg_vs_size(_infname,al_min,al_max,niter,mdexec)
 
     logfile= open('log.energy_vs_size','w')
     outfile1= open('out.energy_vs_size','w')
@@ -199,3 +202,8 @@ if __name__ == '__main__':
     print(' * out.energy_vs_size')
     print(' * log.energy_vs_size')
     #print ' * graph.Ecoh-vs-size.eps'
+    return None
+    
+
+if __name__ == '__main__':
+    main()

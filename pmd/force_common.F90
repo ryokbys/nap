@@ -5,7 +5,7 @@ subroutine get_force(l1st,epot,stnsr)
 !  new force routine should also be implemented in this subroutine.
 !-----------------------------------------------------------------------
   use force
-  use pmdvars,only: namax,natm,tag,ra,nnmax,aa,strs,aux,naux,nspmax, &
+  use pmdvars,only: namax,natm,nb,tag,ra,nnmax,aa,strs,aux,naux,nspmax, &
        h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr, &
        sorg,mpi_md_world,myid_md,epi,specorder,lstrs, &
        iprint,lvc,lcell_updated,boundary, &
@@ -31,7 +31,7 @@ subroutine get_force(l1st,epot,stnsr)
 !!$  use NN2,only: force_NN2,force_NN2_overlay_pot, force_NN2_overlay_frc
   use DNN,only: force_DNN
   use Coulomb, only: force_Coulomb, init_for_Ewald, &
-       chgopt_method, bacopy_auxq_fixed
+       chgopt_method, bacopy_auxq_fixed, qtop, qbot
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
@@ -67,7 +67,7 @@ subroutine get_force(l1st,epot,stnsr)
   logical,intent(in):: l1st
   real(8),intent(out):: epot,stnsr(3,3)
 
-  integer:: ierr,is,i,ichg
+  integer:: ierr,is,i,ichg,ia
   real(8):: at(3),tmp
 
   epot = 0d0
@@ -91,6 +91,17 @@ subroutine get_force(l1st,epot,stnsr)
     tmp = mpi_wtime()
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(/a)') ' Charges are to be equilibrated.'
+    endif
+!.....Set initial atomic charges
+    if( l1st ) then
+      do ia=1,natm+nb
+        is = int(tag(ia))
+        if( abs(qtop(is)).gt.abs(qbot(is)) ) then
+          aux(iaux_chg,ia) = qtop(is)
+        else
+          aux(iaux_chg,ia) = qbot(is)
+        endif
+      enddo
     endif
     if( chgopt_method(1:4).eq.'damp' .or. chgopt_method(1:4).eq.'FIRE' ) then
       call chgopt_damping(aux(iaux_chg,:),l1st)
@@ -1272,8 +1283,8 @@ subroutine chgopt_damping(chg,l1st)
 !!$    print '(a,200es11.3)',' chg=',chg(1:natm)
     call get_fq_wrapper(chg,fq,epot,.false.)
     if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) then
-      write(6,'(a,i5,2es16.8,2es11.3)') ' istp,epot/ntot,de/ntot,dqmax= ',istp &
-           ,epot/ntot,abs(epot-epotp)/ntot,dqmax
+      write(6,'(a,i5,2es16.8,4es11.3)') ' istp,epot/ntot,de/ntot,dqmax= ',istp &
+           ,epot/ntot,abs(epot-epotp)/ntot,dqmax,chg(1),chg(5)
     endif
 
 !.....check convergence
