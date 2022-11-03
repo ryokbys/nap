@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-11 09:41:41 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-03 14:32:27 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -84,7 +84,7 @@ contains
   end subroutine init_tersoff
 !=======================================================================
   subroutine force_tersoff(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint &
        ,tei)
     use vector,only: dot
@@ -95,7 +95,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,tag(namax),rc,d2lspr(nnmax,namax)
+         ,tag(namax),rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
     character(len=3),intent(in):: specorder(nspmax)
@@ -167,12 +167,12 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-        if( d2lspr(jj,ia).ge.ts_rc2(is,js) ) cycle
         if( .not.interact(is,js) ) cycle
         if( ja.le.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.ge.ts_rc2(is,js) ) cycle
         dij = dsqrt(dij2)
 !.....Potential
         fc = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
@@ -223,13 +223,12 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-        if( d2lspr(jj,ia).ge.ts_rc2(is,js) ) cycle
         if( .not.interact(is,js) ) cycle
         if( ja.eq.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-!!$        if( dij2.gt.ts_rc2 ) cycle
+        if( dij2.gt.ts_rc2(is,js) ) cycle
         dij = dsqrt(dij2)
         diji = 1d0/dij
         dirij(1:3)= -rij(1:3)*diji
@@ -244,12 +243,11 @@ contains
           ks = int(tag(ka))
 !.....Currently Tersoff potential is only available fro js==ks
           if( ks.ne.js ) cycle
-          if( d2lspr(kk,ia).ge.ts_rc2(is,ks) ) cycle
           if( ka.eq.ja ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-!!$          if( dik2.gt.ts_rc2 ) cycle
+          if( dik2.gt.ts_rc2(is,ks) ) cycle
           dik = dsqrt(dik2)
           fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           texp3 = exp(ts_alpha(is,ks)*(dij-dik)**ts_beta(is,ks))
@@ -293,11 +291,10 @@ contains
           ks = int(tag(ka))
 !.....Currently Tersoff potential is only available fro js==ks
           if( ks.ne.js ) cycle
-          if( d2lspr(kk,ia).ge.ts_rc2(is,ks) ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-!!$          if( dik2.gt.ts_rc2 ) cycle
+          if( dik2.ge.ts_rc2(is,ks) ) cycle
           dik = dsqrt(dik2)
           diki= 1d0/dik
           dirik(1:3)= -rik(1:3)*diki

@@ -8,7 +8,7 @@ module pairlist
   save
   private
 
-  public:: mk_lspr_para,mk_lscl_para,sort_arrays, update_d2lspr, &
+  public:: mk_lspr_para,mk_lscl_para,sort_arrays, &
        check_lspr, check_lscl
   public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, &
        swap, qsort_list, sort_lspr
@@ -134,7 +134,7 @@ contains
   end subroutine sort_arrays
 !=======================================================================
   subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
-       ,rc,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+       ,rc,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
 !
 !  Make a pairlist using cell list created in mk_lscl_para.
 !
@@ -143,7 +143,6 @@ contains
     integer,intent(out):: lspr(0:nnmax,namax)
     real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
     real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
-    real(8),intent(out):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,inc,nni,nnj
@@ -155,7 +154,6 @@ contains
 
 !-----reset pair list, LSPR
     lspr(:,:)= 0
-    d2lspr(:,:) = 0d0
 
 !-----make a pair list, LSPR
 !.....Scan atoms (not scanning cells)
@@ -197,7 +195,6 @@ contains
               if( rij2.lt.rc2 ) then
                 lspr(0,i) = lspr(0,i) +1
                 lspr(lspr(0,i),i) = j
-                d2lspr(lspr(0,i),i) = rij2
               endif
 
               j=lscl(j)
@@ -255,8 +252,6 @@ contains
 !!$                      lspr(0,j)= lspr(0,j) +1
 !!$                      lspr(lspr(0,i),i)=j
 !!$                      lspr(lspr(0,j),j)=i
-!!$                      d2lspr(lspr(0,i),i) = rij2
-!!$                      d2lspr(lspr(0,j),j) = rij2
 !!$                    endif
 !!$
 !!$                    j=lscl(j)
@@ -275,7 +270,7 @@ contains
   end subroutine mk_lspr_para
 !=======================================================================
   subroutine mk_lspr_gonnet(namax,natm,nbmax,nb,nnmax,tag,ra,va &
-       ,rc,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+       ,rc,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
 !
 !  Make a pairlist by Gonnet's algorithm using cell list created before.
 !  Ref.
@@ -286,7 +281,6 @@ contains
     integer,intent(out):: lspr(0:nnmax,namax)
     real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
     real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
-    real(8),intent(out):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ii,jj,inc,nleft
@@ -355,7 +349,6 @@ contains
 
 !-----reset pair list, LSPR
     lspr(0,:)= 0
-    d2lspr(:,:) = 0d0
 
 !=====Make a pair list, LSPR, using Gonnet's algorithm=====
 !.....Scan resident cells
@@ -395,8 +388,6 @@ contains
             endif
             lspr(lspr(0,i),i)=j
             lspr(lspr(0,j),j)=i
-            d2lspr(lspr(0,i),i) = rij2
-            d2lspr(lspr(0,j),j) = rij2
           endif
 
 !.....Continue until j= 0
@@ -472,8 +463,6 @@ contains
                         lspr(0,j)= lspr(0,j) +1
                         lspr(lspr(0,i),i)=j
                         lspr(lspr(0,j),j)=i
-                        d2lspr(lspr(0,i),i) = rij2
-                        d2lspr(lspr(0,j),j) = rij2
                       endif
                     enddo
                   endif
@@ -525,7 +514,7 @@ contains
   end subroutine qsort_list
 !=======================================================================
   subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,h,hi &
-       ,lspr,d2lspr,iprint,l1st)
+       ,lspr,iprint,l1st)
 !
 ! Make lspr in serial implimentation taking the periodic boundary
 ! condition into account.
@@ -534,7 +523,6 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax)
     real(8),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3),tag(namax)
-    real(8),intent(out):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n
@@ -575,7 +563,6 @@ contains
 
 !-----reset pair list, LSPR
     lspr(0,1:natm)= 0
-    d2lspr(:,:) = 0d0
 
 !-----reset headers
     lshd(1:lcxyz)= 0
@@ -650,7 +637,6 @@ contains
                     stop
                   endif
                   lspr(lspr(0,i),i)=j
-                  d2lspr(lspr(0,i),i) = rij2
 !.....Store i in j's neighbor list
                   lspr(0,j)= lspr(0,j)+1
                   if( lspr(0,j).gt.nnmax ) then
@@ -660,7 +646,6 @@ contains
                     stop
                   endif
                   lspr(lspr(0,j),j)=i
-                  d2lspr(lspr(0,j),j) = rij2
                 endif
 
 !---------Continue until j= 0
@@ -683,7 +668,7 @@ contains
   end subroutine mk_lspr_sngl
 !=======================================================================
   subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
-       ,h,hi,sgm,lspr,d2lspr,iprint,l1st)
+       ,h,hi,sgm,lspr,iprint,l1st)
 !
 !  Make pair list, lspr, by brute force approach, because the system
 !  is supposed to be small. Expand the system to take all the atoms 
@@ -693,7 +678,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nbmax,iprint
     integer,intent(out):: lspr(0:nnmax,natm),nb
     real(8),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
-    real(8),intent(out):: ra(3,namax),tag(namax),d2lspr(nnmax,namax)
+    real(8),intent(out):: ra(3,namax),tag(namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
@@ -759,7 +744,6 @@ contains
 
 !.....Search neighbor atoms and make the list
     lspr(0:nnmax,1:natm)= 0
-    d2lspr(:,:) = 0d0
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
       do ja=1,naex
@@ -777,7 +761,6 @@ contains
             stop
           endif
           lspr(lspr(0,ia),ia)= ja
-          d2lspr(lspr(0,ia),ia) = rij2
 !.....Store i in j's neighbor list
           lspr(0,ja)= lspr(0,ja)+1
           if( lspr(0,ja).gt.nnmax ) then
@@ -787,7 +770,6 @@ contains
             stop
           endif
           lspr(lspr(0,ja),ja)=ia
-          d2lspr(lspr(0,ja),ja) = rij2
         endif
       enddo
     enddo
@@ -853,40 +835,6 @@ contains
       stop
     endif
   end subroutine check_lspr
-!=======================================================================
-  subroutine update_d2lspr(namax,natm,nnmax,lspr,h,ra,rcut,rbuf,d2lspr)
-!
-!  Since d2lspr should be updated even if lspr is not changed,
-!  update only d2lspr taking the rbuf into account.
-!
-    integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,natm)
-    real(8),intent(in):: rcut,rbuf,ra(3,namax),h(3,3)
-    real(8),intent(inout):: d2lspr(nnmax,natm)
-
-    integer:: i,j,jj
-    real(8):: rmin2,xi(3),xij(3),rij(3),dij2
-
-    rmin2 = (rcut-rbuf)**2
-!$omp parallel
-!$omp do private(i,xi,jj,j,xij,rij,dij2)
-    do i=1,natm
-      xi(1:3) = ra(1:3,i)
-      do jj=1,lspr(0,i)
-!!$!.....Probably, do not need to consider neighbors close enough compared to rcut
-!!$        if( d2lspr(jj,i).lt.rmin2 ) cycle
-!!$!.....Only neighbors within a shell around rcut need to be updated 
-!!$!.....for the purpose of determining whether or not the neighbors are within cutoff
-        j = lspr(jj,i)
-        xij(1:3) = ra(1:3,j) -xi(1:3)
-        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
-        d2lspr(jj,i) = dij2
-      enddo
-    enddo
-!$omp end do
-!$omp end parallel
-    return
-  end subroutine update_d2lspr
 !=======================================================================
   subroutine sort_by_lscl(namax,natm,nb,ndim,arr)
 !

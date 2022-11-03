@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-02-21 16:36:15 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-03 14:28:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -223,7 +223,7 @@ contains
   end subroutine read_params_EAM
 !=======================================================================
   subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of SM paper.
@@ -241,7 +241,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax),d2lspr(nnmax,namax)
+         ,rc,tag(namax)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -297,13 +297,14 @@ contains
         if( .not. ea_interact(js) ) cycle
         rcout= ea_rcout(is,js)
         rc2 = rcout*rcout
-        if( d2lspr(k,i).gt.rc2 ) cycle
         rcin = ea_rcin(is,js)
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+        rij=xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
+        if( rij.ge.rc2 ) cycle
+        rij= dsqrt(rij)
         rho(i) = rho(i) +rhoij(is,js,rij,rcin,rcout,type_rho(is,js))
       enddo
     enddo
@@ -329,13 +330,14 @@ contains
         if( .not.pair_interact(is,js) ) cycle
         rcout = ea_rcout(is,js)
         rc2 = rcout*rcout
-        if( d2lspr(k,i).ge.rc2 ) cycle
         rcin = ea_rcin(is,js)
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=sqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
+        rij= xij(1)**2+ xij(2)**2 +xij(3)**2
+        if( rij.ge.rc2 ) cycle
+        rij= dsqrt(rij)
         drdxi(1:3)= -xij(1:3)/rij
         drdxj(1:3)= -drdxi(1:3)
         tmp = 0.5d0 *phi(is,js,rij,rcin,rcout,type_phi(is,js))

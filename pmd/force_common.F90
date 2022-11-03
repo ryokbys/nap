@@ -6,7 +6,7 @@ subroutine get_force(l1st,epot,stnsr)
 !-----------------------------------------------------------------------
   use force
   use pmdvars,only: namax,natm,nb,tag,ra,nnmax,aa,strs,aux,naux,nspmax, &
-       h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr, &
+       h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr, &
        sorg,mpi_md_world,myid_md,epi,specorder,lstrs, &
        iprint,lvc,lcell_updated,boundary, &
        iaux_chg, iaux_tei, iaux_q, iaux_vq
@@ -54,7 +54,6 @@ subroutine get_force(l1st,epot,stnsr)
 !!$  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
 !!$       ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
 !!$  integer,intent(in):: lspr(0:nnmax,namax) !,numff
-!!$  real(8),intent(in):: d2lspr(nnmax,namax)
 !!$  real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
 !!$       ,tag(namax),sorg(3)
 !!$  real(8),intent(inout):: rc
@@ -179,7 +178,7 @@ subroutine get_force(l1st,epot,stnsr)
   if( use_force('SW') ) then
     tmp = mpi_wtime()
     call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint)
     call accum_time('force_SW',mpi_wtime() -tmp)
   endif
@@ -193,7 +192,7 @@ subroutine get_force(l1st,epot,stnsr)
   if( use_force('Tersoff') ) then
     tmp = mpi_wtime()
     call force_tersoff(namax,natm,tag,ra,nnmax,aa &
-       ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint &
        ,aux(iaux_tei,:))
     call accum_time('force_Tersoff',mpi_wtime() -tmp)
@@ -266,28 +265,28 @@ subroutine get_force(l1st,epot,stnsr)
   if( use_force('EAM') ) then
     tmp = mpi_wtime()
     call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_EAM',mpi_wtime() -tmp)
   endif
   if( use_force('RFMEAM') ) then
     tmp = mpi_wtime()
     call force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_RFMEAM',mpi_wtime() -tmp)
   endif
   if( use_force('Pellenq') ) then
     tmp = mpi_wtime()
     call force_Pellenq(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Pellenq',mpi_wtime() -tmp)
   endif
   if( use_force('repel') ) then
     tmp = mpi_wtime()
     call force_repel(namax,natm,tag,ra,nnmax,aa,strs,h &
-       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_repel',mpi_wtime() -tmp)
   endif
@@ -328,7 +327,7 @@ subroutine get_force(l1st,epot,stnsr)
   if( use_force('Morse') ) then
     tmp = mpi_wtime()
     call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Morse',mpi_wtime() -tmp)
   endif
@@ -349,7 +348,7 @@ subroutine get_force(l1st,epot,stnsr)
   if( use_force('Buckingham') ) then
     tmp = mpi_wtime()
     call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
-       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Buckingham',mpi_wtime() -tmp)
   endif
@@ -421,13 +420,13 @@ subroutine get_force(l1st,epot,stnsr)
     if( lvc .and. chgopt_method(1:4).eq.'xlag' .and. .not.l1st ) then
       call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
            ,aux(iaux_q,:),h,hi,nb,nbmax &
-           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
+           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
            ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
            ,l1st,lcell_updated,lvc,specorder)
     else
       call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
            ,aux(iaux_chg,:),h,hi,nb,nbmax &
-           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr,sorg &
+           ,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,sorg &
            ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
            ,l1st,lcell_updated,lvc,specorder)
     endif
@@ -1179,7 +1178,7 @@ subroutine chgopt_damping(chg,l1st)
 !    - damping --- simple, stable, but not very efficient.
 !    - FIRE --- it is said that robust and fast, but sometimes unstable, do not know why.
 !
-  use pmdvars,only: namax,natm,tag,h,ra,nnmax,lspr,d2lspr,rc, &
+  use pmdvars,only: namax,natm,tag,h,ra,nnmax,lspr,rc, &
        lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,sorg,myid_md, &
        mpi_md_world,iprint,boundary,ntot
   use force
@@ -1586,7 +1585,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
 !  Search for coeff, alpha, that are multiplied to fq to get the charge
 !  distribution of minimum energy.
 !
-  use pmdvars, only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr,rc, &
+  use pmdvars, only: namax,natm,nnmax,tag,ra,h,lspr,rc, &
        lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,boundary,sorg, &
        myid_md,mpi_md_world,iprint,ntot
   use Coulomb, only: get_qforce,qbot,qtop
@@ -1692,7 +1691,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
 !
 !  Get a range of factor of line minimization in QEq.
 !
-  use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr,rc,sorg, &
+  use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,rc,sorg, &
        myid_md,mpi_md_world,iprint,ntot
   use Coulomb,only: get_qforce
   include './const.h'

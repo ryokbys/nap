@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-10-03 14:42:33 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-03 14:36:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -422,7 +422,7 @@ contains
   end subroutine read_params_RFMEAM
 !=======================================================================
   subroutine force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcg,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcg,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
     include "mpif.h"
@@ -432,7 +432,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,rcg,tag(namax),d2lspr(nnmax,namax)
+         ,rcg,tag(namax)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -541,7 +541,6 @@ contains
       rijs(:,:) = 0d0
       nni = lspr(0,i)
       do jj=1,nni
-!!$        if( d2lspr(jj,i).ge.rc2max ) cycle
         j = lspr(jj,i)
         xj(1:3) = ra(1:3,j)
         xij(1:3) = xj(1:3) -xi(1:3)
