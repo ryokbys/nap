@@ -19,6 +19,9 @@ Options:
               Maximum strain value of diagonal elements. Available only with prepare. [default: 0.002]
   --delta2 DELTA2
               Maximum strain value of off-diagonal elements. Available only with prepare. [default: 0.01]
+  --out4fp    Whether or not output Cij data for fp.py.
+  --out4fp-name FNAME
+              Filename of the output of Cij for fp.py. [default: data.pmd.Cij]
 """
 from __future__ import print_function
 
@@ -35,7 +38,7 @@ from nappy.napsys import NAPSystem
 import copy
 
 __author__  = 'Ryo KOBAYASHI'
-__version__ = '200521'
+__version__ = '221031'
 __licence__ = 'MIT'
 
 _confname = 'conf.elast.yaml'
@@ -425,11 +428,38 @@ def reduce_cij(atoms0,cij0,eps=1.e-4):
 
     return cij
 
+def out4fp_Cij(cij,fname='data.pmd.Cij'):
+    """
+    Output Cij data for fp.py.
+
+    The order of the data is as following,
+      11, 22, 33, 23, 13, 12, 44, 55, 66
+    """
+    from datetime import datetime
+    with open(fname,'w') as f:
+        nowstr = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f.write('# Cij data computed by elasticity.py at {0:s}.\n'.format(nowstr))
+        f.write('# The order of Cij is (11,22,33,23,13,12,44,55,66)\n')
+        f.write('# datatype: independent\n')
+        f.write('   9  1.0\n')
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[0,0]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[1,1]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[2,2]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[1,2]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[0,2]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[0,1]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[3,3]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[4,4]))
+        f.write('   {0:12.4e}   {0:.1f}\n'.format(cij[5,5]))
+    return None
+
 def main():
 
     args= docopt(__doc__,version=__version__)
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
+    out4fp = args['--out4fp']
+    out4fp_name = args['--out4fp-name']
 
     infname = args['INFILE']
     
@@ -449,7 +479,10 @@ def main():
         dlt1max = conf['delta1']
         dlt2max = conf['delta2']
         strsfname = args['STRSFILE']
-        analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)
+        cij = analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)
+        #...Output Cij for fp.py
+        if out4fp:
+            out4fp_Cij(cij,fname=out4fp_name)
 
     return None
 
