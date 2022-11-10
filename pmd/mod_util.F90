@@ -1,12 +1,14 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-19 18:25:55 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-10 21:35:34 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
   implicit none
   save
 
+  character(*),private,parameter:: LOWER_CASE = 'abcdefghijklmnopqrstuvwxyz'
+  character(*),private,parameter:: UPPER_CASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 contains
 !=======================================================================
   function num_data(str,delim) result(num)
@@ -300,10 +302,42 @@ contains
     
   end subroutine calc_nfmv
 !=======================================================================
-  
+  function lowcase(instr) result(outstr)
+!-----------------------------------------------------------------------
+!   Ref. pg 80, "Upgrading to Fortran 90", by Cooper Redwine,
+!   1995 Springer-Verlag, New York.
+!-----------------------------------------------------------------------
+    character(len=*),intent(in):: instr
+    character(len=len(instr)):: outstr
+    integer:: i,n
+
+    outstr = instr
+    do i=1,len(instr)
+!.....Find location of letter in upper case constant string
+      n = index(UPPER_CASE,outstr(i:i))
+!.....If current substring is a upper case letter, make it lower case
+      if( n.ne.0 ) outstr(i:i) = LOWER_CASE(n:n)
+    enddo
+    return
+  end function lowcase
+!=======================================================================
+  function upcase(instr) result(outstr)
+    character(len=*),intent(in):: instr
+    character(len=len(instr)):: outstr
+    integer:: i,n
+
+    outstr = instr
+    do i=1,len(instr)
+!.....Find location of letter in lower case constant string
+      n = index(LOWER_CASE,outstr(i:i))
+!.....If current substring is a lower case letter, make it upper case
+      if( n.ne.0 ) outstr(i:i) = UPPER_CASE(n:n)
+    enddo
+    return
+  end function upcase
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
 

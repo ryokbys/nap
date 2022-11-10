@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-09-23 21:10:16 KOBAYASHI Ryo>
+!                     Last-modified: <2022-11-10 21:31:31 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -413,8 +413,8 @@ subroutine write_initial_setting()
 !.....temperature control
   write(6,'(2x,a,5x,a)') 'temperature_control',trim(ctctl)
   write(6,'(2x,a,5x,f8.2)') 'initial_temperature',tinit
-  if( trim(ctctl).eq.'Berendsen' .or. &
-       trim(ctctl).eq.'Langevin' )  then
+  if( index(ctctl,'beren').ne.0 .or. &
+       index(ctctl,'lange').ne.0 )  then
     if( tfin.ge.0d0 ) then
       write(6,'(2x,a,5x,f8.2)') 'final_temperature  ',tfin
     else
@@ -434,8 +434,8 @@ subroutine write_initial_setting()
   write(6,'(2x,a)') ''
 !.....pressure control
   write(6,'(2x,a,5x,a)') 'stress_control',trim(cpctl)
-  if( trim(cpctl).eq.'Berendsen' .or. &
-       trim(cpctl).eq.'vc-Berendsen' ) then
+  if( trim(cpctl).eq.'berendsen' .or. &
+       trim(cpctl).eq.'vc-berendsen' ) then
     write(6,'(2x,a,2x,f0.1)') 'stress_relax_time',srlx
     write(6,'(2x,a)') 'stress_target'
     write(6,'(5x,3es11.3)') stgt(1,1:3)
@@ -447,7 +447,7 @@ subroutine write_initial_setting()
     write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
     write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
     
-  else if( trim(cpctl).eq.'vv-Berendsen' ) then
+  else if( trim(cpctl).eq.'vv-berendsen' ) then
     write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
     write(6,'(2x,a,2x,f0.1)') 'pressure_relax_time',srlx
     write(6,'(2x,a)') 'cell_fix'
@@ -798,18 +798,18 @@ subroutine check_ensemble()
 
   l_temp = .false.
 
-  if(  trim(ctctl).eq.'Langevin' .or. &
-       trim(ctctl).eq.'Berendsen' .or. &
+  if(  trim(ctctl).eq.'langevin' .or. &
+       trim(ctctl).eq.'berendsen' .or. &
        trim(ctctl).eq.'ttm' ) then
     l_temp = .true.
     c_3 = 'T'
   endif
 
-  if(  trim(cpctl).eq.'Berendsen' .or. &
-       trim(cpctl).eq.'vc-Berendsen' ) then
+  if(  trim(cpctl).eq.'berendsen' .or. &
+       trim(cpctl).eq.'vc-berendsen' ) then
     c_2 = 'p'
     if( .not. l_temp ) c_3 = 'H'
-  else if( trim(cpctl).eq.'vv-Berendsen' ) then
+  else if( trim(cpctl).eq.'vv-berendsen' ) then
     c_2 = 'P'
     if( .not. l_temp ) c_3 = 'H'
   endif
