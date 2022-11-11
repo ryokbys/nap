@@ -34,7 +34,7 @@ contains
 !
 !  Initialize lflux.
 !
-    use util,only: csp2isp
+    use util,only: csp2isp, get_vol
     use vector,only: matinv3,matxvec3
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: hmat(3,3)
@@ -61,6 +61,11 @@ contains
     dpyi= 1d0 /dpy
     dpzi= 1d0 /dpz
 
+!.....Reset orig_pdens and hmat_pdens if hmat_pdens is not given
+    if( get_vol(hmat_pdens).lt.1d-8 ) then
+      orig_pdens(:) = 0d0
+      hmat_pdens(:,:) = hmat(:,:)
+    endif
 !.....Sub lattice representation in original hmat
     hmati = matinv3(hmat)
     sosub = matxvec3(hmati,orig_pdens)
