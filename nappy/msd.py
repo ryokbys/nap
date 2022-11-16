@@ -185,6 +185,9 @@ if __name__ == "__main__":
     nmeasure = int(args['--measure'])
     nshift = int(args['--shift'])
     dt = float(args['--dt'])
+    if dt < 0.0:
+        raise ValueError('Current version of msd.py requires --dt option to be set by the user.\n'
+                         +'See the help with -h option.')
     outfname= args['-o']
     specorder = args['--specorder']
     if specorder == 'None' or specorder is None:
