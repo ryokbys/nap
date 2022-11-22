@@ -29,9 +29,10 @@ __author__ = 'Ryo KOBAYASHI'
 __version__ = '221117'
 
 def convert_by_multiply(nsys,ax1,ax2,ax3):
-    """
-    Convert the input nsys by using ax1,ax2,ax3.
-    See the definition in __doc__.
+    """Convert the input nsys by using ax1,ax2,ax3, each of them is written as (x1,x2,x3) that are
+multiplying factors to a1, a2, and a3, respectively.
+For example, if ax1 = (x1,x2,x3), the new a1 vector is given as:
+  a1_new = x1*a1 +x2*a2 +x3*a3
     """
     nsys.assign_pbc()
     #...Reset alc to 1.0
@@ -61,6 +62,9 @@ def convert_by_multiply(nsys,ax1,ax2,ax3):
     a1new = ax1[0]*nsys.a1 +ax1[1]*nsys.a2 +ax1[2]*nsys.a3
     a2new = ax2[0]*nsys.a1 +ax2[1]*nsys.a2 +ax2[2]*nsys.a3
     a3new = ax3[0]*nsys.a1 +ax3[1]*nsys.a2 +ax3[2]*nsys.a3
+    #...Check if a1.(a2xa3) > 0
+    if np.dot(a1new,np.cross(a2new,a3new)) < 0.0:
+        raise ValueError('a1.(a2xa3) < 0 of new axes, which is now allowed in VASP.')
     sa1new = np.dot(hmati,a1new)
     sa2new = np.dot(hmati,a2new)
     sa3new = np.dot(hmati,a3new)
@@ -138,10 +142,10 @@ def convert_by_multiply(nsys,ax1,ax2,ax3):
            0.0 <= sposi[1] < 1.0 and \
            0.0 <= sposi[2] < 1.0:
             symbol = exsymbols[ia]
-            print(' {0:5d} {1:s}'.format(ia,symbol)
-                  +' {0:12.5f} {1:12.5f} {2:12.5f}'.format(sposi[0],
-                                                           sposi[1],
-                                                           sposi[2]))
+            # print(' {0:5d} {1:s}'.format(ia,symbol)
+            #       +' {0:12.5f} {1:12.5f} {2:12.5f}'.format(sposi[0],
+            #                                                sposi[1],
+            #                                                sposi[2]))
             
             # atom.set_symbol(symbol)
             # atom.set_pos(sposi[0],sposi[1],sposi[2])
@@ -162,6 +166,31 @@ def convert_by_multiply(nsys,ax1,ax2,ax3):
     # print('Check '+infile+'.new')
 
     psnew.assign_pbc()
+
+    #...Remove atoms that are too close each other
+    psnew.make_pair_list(rcut=1.0)
+    poss = psnew.get_scaled_positions()
+    hmat = psnew.get_hmat()
+    to_remove = []
+    for i in range(len(psnew)):
+        pi = poss[i]
+        pinorm = np.dot(pi,pi)
+        for j in psnew.neighbors_of(i):
+            if i in to_remove or j in to_remove:
+                continue
+            pj = poss[j]
+            rij = pj-pi -np.round(pj-pi)
+            dij2 = np.dot(rij,rij)
+            #...dij2 < 0.1 Ang is too close, either one of them must be removed
+            if dij2 < 0.1:
+                pjnorm = np.dot(pj,pj)
+                if pjnorm < pinorm:
+                    to_remove.append(j)
+                else:
+                    to_remove.append(i)
+
+    psnew.remove_atoms(*to_remove)
+                
     return psnew
 
 
