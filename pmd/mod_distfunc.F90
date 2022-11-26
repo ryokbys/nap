@@ -13,14 +13,14 @@ module distfunc
   
 contains
 !=======================================================================
-  subroutine calc_rdf(natm,nnmax,tag,h,rmax,rmin,lspr, &
+  subroutine calc_rdf(natm,nnmax,tag,h,ra,rmax,rmin,lspr, &
        iprint,l1st,lpairwise,msp,nbins,dists,rdfs)
 !
 !  Calculate RDF.
 !
     implicit none
     integer,intent(in):: natm,nnmax,iprint,msp,nbins
-    real(8),intent(in):: rmax,rmin,tag(natm),h(3,3)
+    real(8),intent(in):: rmax,rmin,tag(natm),h(3,3),ra(3,natm)
     integer,intent(in):: lspr(0:nnmax,natm)
     logical,intent(in):: l1st,lpairwise
     real(8),intent(out):: dists(nbins)
@@ -28,7 +28,7 @@ contains
 
     integer:: ia,is,ja,js,jj,ib,ni,nj
     integer:: natms(msp)
-    real(8):: dr,rc2,dij2,dij,rrdr,vol,tmp,r
+    real(8):: dr,rc2,dij2,dij,rrdr,vol,tmp,r,xij(3),rij(3),xi(3)
 
     dr = (rmax-rmin)/nbins
     do ib=1,nbins

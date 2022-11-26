@@ -3,24 +3,17 @@
 This script provides functions to use a nappy database with the file, nappydb.yaml.
 Currently, the DB will not function with nested dictionaries.
 
-```python
-from nappy.database import NappyDB
-
-ndb = NappyDB()      # <== Loading DB from nappydb.yaml in the working directory.
-ndb['Ef_vac'] = 0.5  # <== Register key-value pair
-ndb.dump()           # <== Overwrite nappydb.yaml
-```
-
 Usage:
-  database.py show [options]
-  database.py register [options] KEY VALUE
-  database.py get [options] KEY
-  database.py del [options] KEY
+  database.py store [options]
+  database.py get [options]
+  database.py del [options]
+  database.py show
 
 Options:
-  -h, --help  Show this message and exit.
+  -h, --help   Show this message and exit.
+  --key KEY    Key. [defualt: None]
+  --value VAL  Value. [default: None]
 """
-import os
 from docopt import docopt
 import yaml
 
@@ -102,7 +95,7 @@ class NappyDB(object):
         return None
 
 
-def register(key,val):
+def store(key,val):
     ndb = NappyDB()
     item = {key: val}
     ndb += item
@@ -117,23 +110,23 @@ def get(key):
 
 def main():
     args = docopt(__doc__)
+    key = args['--key']
+    if key == 'None':
+        key = None
     
-    if args['register']:
-        key = args['KEY']
-        val = float(args['VAL'])  # assuming all the values are float
-        register(key,val)
-    elif args['get']:
-        key = args['KEY']
+    if args['get']:
         val = get(key)
         if 0.1 < abs(val) < 1000.0:
             print(f' {key:s} = {val:8.3f}')
         else:
             print(f' {key:s} = {val:12.4e}')
+    elif args['store']:
+        val = float(args['--value'])  # assuming all the values are float
+        store(key,val)
     elif args['show']:
         ndb = NappyDB()
         print(ndb)
     elif args['del']:
-        key = args['KEY']
         ndb = NappyDB()
         if not ndb.has(key):
             raise ValueError('There is no such key stored in the NappyDB.')
@@ -145,5 +138,4 @@ def main():
     return None
 
 if __name__ == "__main__":
-
     main()
