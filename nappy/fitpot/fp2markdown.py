@@ -62,21 +62,29 @@ def main():
 
     #...Markdown table
     maxlen = 0
-    for t in targets:
+    wxls = []
+    for i,t in enumerate(targets):
         maxlen = max(maxlen,len(t))
+        l = losses[i]
+        if t != 'total':
+            w = weights[i]
+            wxls.append(w*l)
+        else:
+            wxls.append(l)
     txt = '\n'
     txt += f'Best iid = {bestiid:d}\n\n'
-    txt += f'|  Target  |  Weight |  Loss  |\n'
-    txt += '|----------|---------|--------|\n'
+    txt += f'|  Target  |  Weight |  Loss  | Weight x Loss |\n'
+    txt +=  '|----------|---------|--------|---------------|\n'
     for i in range(len(targets)):
         t = targets[i]
         if t != 'total':
             w = weights[i]
             l = losses[i]
-            txt += f'|  {t:s}  |  {w:5.3f}  |  {l:.4f}  |\n'
+            wxl = wxls[i]
+            txt += f'|  {t:s}  |  {w:5.3f}  |  {l:.4f}  |  {wxl:.4f}  |\n'
         else:
             l = losses[i]
-            txt += f'|  {t:s}  |  -----  |  {l:.4f}  |\n'
+            txt += f'|  {t:s}  |  -----  |  -----  |  {l:.4f}  |\n'
     print(txt)
     
     return None
