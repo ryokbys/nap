@@ -771,7 +771,7 @@ def func_wrapper(variables, **kwargs):
             pmddata = get_data('.',prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
         os.mkdir("iid_{0:d}".format(kwargs['iid']))
-        os.system("cp data.pmd.* iid_{0:d}/".format(kwargs['iid']))
+        os.system("cp data.pmd.* in.params.* out.* nappydb.yaml iid_{0:d}/".format(kwargs['iid']))
         os.chdir(cwd)
     except Exception as e:
         if print_level > 0:

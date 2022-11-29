@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:25:43 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-28 17:17:53 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -1095,28 +1095,17 @@ contains
 !.....potential
         tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp /dielec
-!!$        if( j.le.natm ) then
-!!$          epi(i)= epi(i) +tmp
-!!$          epi(j)= epi(j) +tmp
-!!$          esrl = esrl +tmp +tmp
-!!$        else
-!!$          epi(i)= epi(i) +tmp
-!!$          esrl = esrl +tmp
-!!$        endif
         epi(i)= epi(i) +tmp
         esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
         ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -1633,7 +1622,7 @@ contains
     rc2 = rc*rc
     esr = 0d0
 !$omp parallel
-!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
+!$omp do private(i,xi,xj,xij,rij,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -1641,8 +1630,6 @@ contains
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-!!$        if( j.eq.0 ) exit
-!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
@@ -1658,15 +1645,9 @@ contains
 !.....potential
         tmp = acc*diji -vrc -dvdrc*(dij-rc)
         tmp = tmp /dielec
-!!$        if( j.le.natm ) then
-!!$          esr = esr +tmp*qi*qj
-!!$        else
-!!$          esr = esr +0.5d0*tmp*qi*qj
-!!$        endif
         esr = esr +0.5d0*tmp*qi*qj
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
-!!$        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
 !$omp end do
@@ -1720,7 +1701,7 @@ contains
     ss2i = 1d0 /sgmsq2
     esr = 0d0
 !$omp parallel
-!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -1847,6 +1828,9 @@ contains
     real(8):: qi,q2,sgmi,tmp
 
     eself = 0d0
+!$omp parallel
+!$omp do private(i,is,qi,q2,sgmi,tmp) &
+!$omp    reduction(+:eself)
     do i=1,natm
       is = int(tag(i))
       qi = chg(i)
@@ -1856,6 +1840,8 @@ contains
       eself = eself +tmp
       fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine qforce_self
 !=======================================================================

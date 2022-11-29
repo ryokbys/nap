@@ -116,6 +116,18 @@ _str_keys = [
 def get_default():
     return _default_params
 
+def correct_fortran_double(arg):
+    """
+    Correct fortran-type double precision variable, 1.0d-3,
+    to python float, 1.0e-3.
+    """
+
+    if type(arg) != str:
+        raise ValueError('arg is not a string.')
+    if arg[0].isdigit() and 'd' in arg:
+        arg = arg.replace('d','e')
+    return arg
+
 def read_inpmd(fname='in.pmd'):
     """
     Read in.pmd and return parameters as a dictionary.
@@ -128,6 +140,7 @@ def read_inpmd(fname='in.pmd'):
         if line[0] in ('#','!'):
             continue
         data = line.split()
+        data = [ correct_fortran_double(d) for d in data ]
         if len(data) == 0:
             mode = None
             continue
