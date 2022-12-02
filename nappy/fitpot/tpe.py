@@ -42,7 +42,7 @@ def random_variables(vranges):
     rvs = np.empty(len(vranges))
     for i in range(len(vranges)):
         vmin, vmax = vranges[i]
-        rvs[i] = random.random()*(vmax -vmin) +vmin
+        rvs[i] = np.random.random()*(vmax -vmin) +vmin
         # print(' i,vmin,vmax,v=',i,vmin,vmax,v)
     return rvs
 
@@ -91,7 +91,7 @@ class TPE:
     """
 
     def __init__(self, nbatch, variables, vranges, vlimits, loss_func,
-                 write_func, **kwargs):
+                 write_func, seed=42, **kwargs):
         """
         Conctructor of TPE class.
 
@@ -111,6 +111,8 @@ class TPE:
         """
         if nbatch < 1:
             raise ValueError('nbatch must be > 0.')
+        np.random.seed(seed)
+        random.seed(seed)
         self.nbatch = nbatch
         self.ndim = len(variables)
         self.vars0 = variables
@@ -392,10 +394,10 @@ class TPE:
             aquisition = np.zeros(ntrial)
             xs = np.empty(ntrial)
             for itry in range(ntrial):
-                ipnt = int(random.random()*npnt)
+                ipnt = int(np.random.random()*npnt)
                 xi = xlowsrt[ipnt]
-                r = h *np.sqrt(-2.0*np.log(random.random()))
-                th = 2.0 *np.pi *random.random()
+                r = h *np.sqrt(-2.0*np.log(np.random.random()))
+                th = 2.0 *np.pi *np.random.random()
                 x = xi + r*np.cos(th)
                 #...Wrap by vranges
                 x = min(max(x,xhmin),xhmax)
@@ -456,8 +458,8 @@ class TPE:
             for ib in range(self.nbatch):
                 ipnt = random.choices([j for j in range(len(wgts))],weights=wgts)[0]
                 xi = xtmps[ipnt,idim]
-                r = h *np.sqrt(-2.0*np.log(random.random()))
-                th = 2.0 *np.pi *random.random()
+                r = h *np.sqrt(-2.0*np.log(np.random.random()))
+                th = 2.0 *np.pi *np.random.random()
                 x = xi + r*np.cos(th)
                 #...Wrap by vranges
                 x = min(max(x,xhmin),xhmax)

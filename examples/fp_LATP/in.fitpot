@@ -11,7 +11,8 @@ match     rdf adf vol
 # adf_match   true  1.0
 # vol_match   true  1.0
 # lat_match   false
-potential   BVSx
+# param_files   in.params.Coulomb in.params.Morse in.params.angular
+potential BVSx
 
 cs_num_individuals   4
 cs_fraction          0.25

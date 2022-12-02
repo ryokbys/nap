@@ -18,6 +18,8 @@ Options:
               Prefix for pmd directory. [default: subdir_]
   --subjob-script SCRIPT
               Name of script that performs MD and post-processing. [default: subjob.sh]
+  --random-seed SEED
+              Random seed for reproducibility, if negative current time in second is applied. [default: -1]
 """
 from __future__ import print_function
 
@@ -51,7 +53,7 @@ def read_in_fitpot(fname='in.fitpot'):
     infp['print_level'] = 1
     infp['weights'] = {'rdf':1.0, 'adf':1.0, 'vol':1.0, 'lat':1.0}
     infp['update_vrange'] = -1
-    infp['param_file'] = 'in.vars.fitpot'
+    infp['vars_file'] = 'in.vars.fitpot'
 
     mode = None
     specorder = None
@@ -126,9 +128,9 @@ def read_in_fitpot(fname='in.fitpot'):
             nint = int(data[1])
         elif data[0] == 'sample_error':
             mode = 'sample_error'
-        elif data[0] == 'match':
+        elif data[0] in ('match','target'):
             if len(data) < 2:
-                raise RuntimeError('match entry requires at least one keyword.')
+                raise RuntimeError('match/target entry requires at least one keyword.')
             for i in range(1,len(data)):
                 infp['match'].append(data[i])
             mode = None
@@ -214,7 +216,7 @@ def write_info(infp,args):
     Write out information on input parameters for fp.
     """
 
-    print(' Input')
+    print('\n Input')
     print(' ----------')
     print('   num of processes (given by --nproc option)  ',int(args['--nproc']))
     try:
@@ -771,7 +773,9 @@ def func_wrapper(variables, **kwargs):
             pmddata = get_data('.',prefix='pmd',**kwargs)
             L = min( loss_func(pmddata,**kwargs), L_up_lim )
         os.mkdir("iid_{0:d}".format(kwargs['iid']))
-        os.system("cp data.pmd.* in.params.* out.* nappydb.yaml iid_{0:d}/".format(kwargs['iid']))
+        os.system("cp data.pmd.* in.params.* out.* iid_{0:d}/".format(kwargs['iid']))
+        if os.path.exists('nappydb.yaml'):
+            os.system("cp nappydb.yaml iid_{0:d}/".format(kwargs['iid']))
         os.chdir(cwd)
     except Exception as e:
         if print_level > 0:
@@ -862,10 +866,17 @@ def main():
 
     nproc = int(args['--nproc'])
     infname = args['--in']
+    seed = int(args['--random-seed'])
+    if seed < 0:
+        seed = int(start)
+        print(f' Random seed was set from the current time: {seed:d}')
+    else:
+        print(f' Random seed was given: {seed:d}')
+    
     infp = read_in_fitpot(infname)
     write_info(infp,args)
 
-    rc2,rc3,vs,vrs,vrsh,options,vopts = read_vars_fitpot(infp['param_file'])
+    rc2,rc3,vs,vrs,vrsh,options,vopts = read_vars_fitpot(infp['vars_file'])
 
     kwargs = infp
     kwargs['options'] = options
@@ -877,6 +888,12 @@ def main():
     kwargs['subjob-script'] = args['--subjob-script']
     kwargs['start'] = start
     kwargs['vopts'] = vopts
+
+    if 'potential' in infp.keys() and 'BVS' in infp['potential']:
+        pairs = get_pairs(infp['interactions'])
+        triplets = get_triplets(infp['interactions'])
+        kwargs['pairs'] = pairs
+        kwargs['triplets'] = triplets
     
     smpldir = infp['sample_directory']
     if len(infp['match']) != 0:
@@ -939,15 +956,16 @@ def main():
         T = infp['de_temperature']
         CR = infp['de_crossover_rate']
         opt = DE(N,F,CR,T, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
-                 nproc=nproc, **kwargs)
+                 nproc=nproc, seed=seed, **kwargs)
     elif kwargs['fitting_method'] in ('cs','CS','cuckoo','Cuckoo'):
         N = infp['cs_num_individuals']
         F = infp['cs_fraction']
         opt = CS(N,F, vs,vrs,vrsh, func_wrapper, write_vars_fitpot,
-                 nproc=nproc, **kwargs)
+                 nproc=nproc, seed=seed, **kwargs)
     elif kwargs['fitting_method'] in ('tpe','TPE','wpe','WPE'):
         nbatch = nproc
-        opt = TPE(nbatch, vs, vrs, vrsh, func_wrapper, write_vars_fitpot,**kwargs)
+        opt = TPE(nbatch, vs, vrs, vrsh, func_wrapper, write_vars_fitpot,
+                  seed=seed, **kwargs)
     
     opt.run(maxiter)
 
