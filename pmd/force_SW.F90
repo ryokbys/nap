@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-03-29 18:16:33 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-03 14:31:21 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   include "./const.h"
@@ -50,7 +50,7 @@ module SW
 
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint)
 !-----------------------------------------------------------------------
 !  Parallel implementation of SW(Si) force calculation for pmd
@@ -66,7 +66,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax),d2lspr(nnmax,namax) &
+    real(8),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
@@ -141,13 +141,13 @@ contains
         js= int(tag(j))
         if( .not. interact(is,js) ) cycle
         src= aswrc(is,js)
-        if( d2lspr(k,i)/aswl**2.gt.src*src ) cycle
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
         z = xj(3) -xi(3)
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+        if( rij2.ge.src*src ) cycle
         rij = dsqrt(rij2)
         if( rij.ge.src ) cycle
 !!$        rij = dlspr(0,k,i) /aswl
@@ -207,13 +207,13 @@ contains
         if( j.eq.i ) cycle
         js= int(tag(j))
         srcij= aswrc(is,js)
-        if( d2lspr(n,i)/aswl**2.ge.srcij*srcij ) cycle
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
         z = xj(3) -xi(3)
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
+        if( rij2.ge.srcij*srcij ) cycle
         rij = dsqrt(rij2)
 !!$        if( rij.ge.srcij ) cycle
 !!$        rij= dsqrt(rij2)
@@ -229,13 +229,13 @@ contains
           ks= int(tag(k))
           if( .not. interact3(is,js,ks) ) cycle
           srcik= aswrc(is,ks)
-          if( d2lspr(m,i)/aswl**2.ge.srcik**2 ) cycle
           xk(1:3)= ra(1:3,k)
           x = xk(1) -xi(1)
           y = xk(2) -xi(2)
           z = xk(3) -xi(3)
           xik(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
           rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
+          if( rik2.ge.srcik**2 ) cycle
           rik = dsqrt(rik2)
 !!$          if( rik.ge.srcik ) cycle
 !!$          rik = dlspr(0,m,i) /aswl

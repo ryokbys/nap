@@ -13,23 +13,22 @@ module distfunc
   
 contains
 !=======================================================================
-  subroutine calc_rdf(natm,nnmax,tag,h,rmax,rmin,lspr,d2lspr, &
+  subroutine calc_rdf(natm,nnmax,tag,h,ra,rmax,rmin,lspr, &
        iprint,l1st,lpairwise,msp,nbins,dists,rdfs)
 !
 !  Calculate RDF.
 !
     implicit none
     integer,intent(in):: natm,nnmax,iprint,msp,nbins
-    real(8),intent(in):: rmax,rmin,tag(natm),h(3,3)
+    real(8),intent(in):: rmax,rmin,tag(natm),h(3,3),ra(3,natm)
     integer,intent(in):: lspr(0:nnmax,natm)
-    real(8),intent(in):: d2lspr(nnmax,natm)
     logical,intent(in):: l1st,lpairwise
     real(8),intent(out):: dists(nbins)
     real(8),intent(out):: rdfs(nbins,0:msp,0:msp)
 
     integer:: ia,is,ja,js,jj,ib,ni,nj
     integer:: natms(msp)
-    real(8):: dr,rc2,dij2,dij,rrdr,vol,tmp,r
+    real(8):: dr,rc2,dij2,dij,rrdr,vol,tmp,r,xij(3),rij(3),xi(3)
 
     dr = (rmax-rmin)/nbins
     do ib=1,nbins
@@ -40,11 +39,14 @@ contains
     rdfs(:,:,:) = 0d0
     do ia=1,natm
       is = int(tag(ia))
+      xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-        dij2 = d2lspr(jj,ia)
-        if( dij2.gt.rc2 ) cycle
+        xij(1:3)= ra(1:3,ja) -xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.ge.rc2 ) cycle
         dij = dsqrt(dij2)
         rrdr = (dij-rmin)/dr
         if( rrdr.lt.0 ) cycle
@@ -105,7 +107,7 @@ contains
 
   end subroutine calc_rdf
 !=======================================================================
-  subroutine calc_adf(natm,nnmax,tag,h,ra,rc,lspr,d2lspr,&
+  subroutine calc_adf(natm,nnmax,tag,h,ra,rc,lspr,&
        ntrpl,itriples,dang,nang,angs,adfs)
 !
 !  Calculate the angular distribution function (ADF).
@@ -114,7 +116,6 @@ contains
     integer,intent(in):: natm,nnmax,ntrpl,nang
     real(8),intent(in):: rc,tag(natm),h(3,3),ra(3,natm),dang
     integer,intent(in):: lspr(0:nnmax,natm),itriples(3,ntrpl)
-    real(8),intent(in):: d2lspr(nnmax,natm)
     real(8),intent(out):: angs(nang)
     real(8),intent(out):: adfs(nang,ntrpl)
 
@@ -142,17 +143,17 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-        dij2 = d2lspr(jj,ia)
-        if( dij2.gt.rc2 ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3) -anint(ra(1:3,ja) -xi(1:3))
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.ge.rc2 ) cycle
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
           ks = int(tag(ka))
-          dik2 = d2lspr(kk,ia)
-          if( dik2.gt.rc2 ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3) -anint(ra(1:3,ka) -xi(1:3))
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          dik2= rik(1)**2 +rik(2)**2 +rik(3)**2
+          if( dik2.ge.rc2 ) cycle
           ijkexist = .false.
           do itrpl=1,ntrpl
             if( is.eq.itriples(1,itrpl) .and. &

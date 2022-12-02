@@ -8,11 +8,11 @@ veryclean: clean
 	rm -rf out.fp out.cs.* subdir_*
 
 run:
-	python ../../nappy/fitpot/fp.py --nproc 4 2>&1 | tee out.fp
+	python ../../nappy/fitpot/fp.py --nproc 4 --random-seed 42 2>&1 | tee out.fp
 
 test:
 	@echo " Testing fp.py in examples/fp_LZP; this could take a few minutes..."
-	@python ../../nappy/fitpot/fp.py --nproc 4 2>&1 > out.fp
+	@python ../../nappy/fitpot/fp.py --nproc 4 --random-seed 42 2>&1 > out.fp
 	@python test.py 2>&1 > /dev/null || (echo " FAIL: examples/fp_LZP" && exit 1)
 	@echo " PASS: examples/fp_LZP"
 

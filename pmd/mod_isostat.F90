@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-09-05 12:38:24 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-10 21:26:10 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -291,8 +291,8 @@ contains
       ah(2,2)= 1d0
       ah(3,3)= 1d0
 !.....Berendsen for variable-cell
-    if( trim(cpctl).eq.'Berendsen' .or. &
-         trim(cpctl).eq.'vc-Berendsen' ) then
+    if( trim(cpctl).eq.'berendsen' .or. &
+         trim(cpctl).eq.'vc-berendsen' ) then
 !.....Limit change rate of h (ah) to sratemax
       do jxyz=1,3
         sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
@@ -308,7 +308,7 @@ contains
         enddo
       enddo
 !.....Berendsen for variable-volume not variable-cell
-    else if( trim(cpctl).eq.'vv-Berendsen' ) then
+    else if( trim(cpctl).eq.'vv-berendsen' ) then
       prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
       fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
 !.....Limit change rate of h (ah) to RMAX

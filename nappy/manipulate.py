@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """
-Manipulation functions.
+Functions for manipulating napsys objects.
+This script itself does nothing by calling from commandline.
+Import it and use some functions from other scripts or notebooks.
 
 Usage:
   manipulate.py [options]
@@ -306,29 +308,60 @@ def change_cell(nsys0,X0):
     return nsys
 
 def join(nsys1,nsys2,axis):
-    """
-    Join two systems into one along the given axis (0,1,or 2).
-    The size of the interface area is determined from the cell size of system 1
-    perpendicular to the axis.
+    """Join two systems into one along the given axis (0,1,or 2).
+The size of the interface area is determined from the cell size of system 1 perpendicular to the axis.
+It is assumed that the lattice vectors of both systems perpendicular to the given axis are very similar.
 
-    Input
-    -----
-    nsys1,nsys2 : NAPSystem
-        Systems to be joined.
-    axis : int (0, 1 or 2)
-        The axis of two systems which two systems are joined along.
+Input
+-----
+nsys1,nsys2 : NAPSystem
+    Systems to be joined.
+axis : int (0, 1 or 2)
+    The axis of two systems which two systems are joined along.
 
-    Output
-    ------
-    NAPSystem
-        The system that contains atoms of two systems.
+Output
+------
+newsys1,newsys2 : NAPSystem
+    The systems of nsys1 and nsys2 with vacuum region in given axis.
+newsys : NAPSystem
+    The system composed of nsys1 and nsys2 joined along the given axis.
     """
-    raise Error('join is not implemented yet.')
-    return None
+    if type(axis) is not int:
+        raise ValueError('AXIS must be an integer.')
+    if axis < 0 or axis > 2:
+        raise ValueError('AXIS must be either 0, 1, or 2.')
+    len1 = [0.0, 0.0, 0.0]
+    len2 = [0.0, 0.0, 0.0]
+    len1[0],len1[1],len1[2] = nsys1.get_lattice_lengths()
+    len2[0],len2[1],len2[2] = nsys2.get_lattice_lengths()
+    #...Add vacuum of length of the joining system.
+    newsys1 = copy.copy(nsys1)
+    newsys2 = copy.copy(nsys2)
+    newsys1.add_vacuum(axis,len2[axis])
+    newsys2.add_vacuum(axis,len1[axis])
+    #...specorder is an union of the two systems
+    specorder1 = newsys1.specorder
+    specorder2 = newsys2.specorder
+    specorder = copy.copy(specorder1)
+    for s in specorder2:
+        if s not in specorder:
+            specorder.append(s)
+    #...Shift positions of system2 on top of system1
+    newsys = copy.copy(newsys1)
+    spos1 = newsys1.get_scaled_positions()
+    slen1 = spos1[:,axis].max() -spos1[:,axis].min()
+    spos2 = newsys2.get_scaled_positions()
+    slen2 = spos2[:,axis].max() -spos2[:,axis].min()
+    syms2 = newsys2.get_symbols()
+    shift2 = slen1 +(1.0 -slen1 -slen2)/2
+    for i in range(len(spos2)):
+        spos2[i,axis] += shift2
+    #...Finaly, add them to the NEWSYS
+    newsys.add_atoms(syms2,spos2)
+    
+    return newsys1,newsys2,newsys
     
 
 if __name__ == "__main__":
 
-    args = docopt(__doc__)
-
-    print('manipulate.py does nothing...')
+    print(__doc__)

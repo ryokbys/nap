@@ -77,7 +77,7 @@ class Individual:
             vmin, vmax = self.vranges[i]
             # vmin = self.vranges[i,0]
             # vmax = self.vranges[i,1]
-            v = random.random()*(vmax -vmin) +vmin
+            v = np.random.random()*(vmax -vmin) +vmin
             self.vector[i] = v
             # print(' i,vmin,vmax,v=',i,vmin,vmax,v)
         self.wrap_range()
@@ -104,7 +104,7 @@ class DE:
     """
 
     def __init__(self, N, F, CR, T, variables, vranges, loss_func, write_func,
-                 nproc=0,**kwargs):
+                 nproc=0,seed=42,**kwargs):
         """
         Conctructor of DE class.
 
@@ -115,6 +115,8 @@ class DE:
         """
         if N < 4:
             raise ValueError('N must be greater than 3 in DE!')
+        np.random.seed(seed)
+        random.seed(seed)
         self.N = N   # Number of individuals in a generation
         self.F = F   # Fraction of mixing in DE
         self.CR = CR # Cross-over rate
@@ -225,11 +227,11 @@ class DE:
                 vi = pi.vector
                 #...pick other 3 individuals
                 indices= [ j for j in range(self.N) if j != i ]
-                irand = int(random.random()*len(indices))
+                irand = int(np.random.random()*len(indices))
                 i1 = indices.pop(irand)
-                irand = int(random.random()*len(indices))
+                irand = int(np.random.random()*len(indices))
                 i2 = indices.pop(irand)
-                irand = int(random.random()*len(indices))
+                irand = int(np.random.random()*len(indices))
                 i3 = indices.pop(irand)
                 # print('i,i1,i2,i3=',i,i1,i2,i3)
                 ind1 = self.population[i1]
@@ -242,7 +244,7 @@ class DE:
                 #...cross over
                 vnew = np.array(vd)
                 for k in range(len(vi)):
-                    r = random.random()
+                    r = np.random.random()
                     if r > self.CR:
                         vnew[k] = vi[k]
                 #...create new individual for trial
@@ -304,7 +306,7 @@ class DE:
                         prob = np.exp(-dval/self.T)
                     else:
                         prob = 0.0
-                r = random.random()
+                r = np.random.random()
                 if r < prob:  # replace with new individual
                     self.population[ic] = ci
                     find.write(' {0:8d}  {1:12.4e}'.format(ci.iid, ci.val))

@@ -1,4 +1,28 @@
- option:  hard-limit True
+
+ fp.py --- fit parameters to any target property ---
+
+   Executed as /Users/kobayashi/src/nap/nappy/fitpot/fp.py --nproc 4 --random-seed 42
+            on ts3-rk.ogt.nitech.ac.jp
+            at 2022-12-02 12:08:30
+
+   Please cite:
+     1) R. Kobayashi, J. Open Source Software, 6(57), 2768 (2021)
+     2) R. Kobayashi, Y. Miyaji, K. Nakano, M. Nakayama, APL Materials 8, 081111 (2020)
+
+ Random seed was given: 42
+
+ Input
+ ----------
+   num of processes (given by --nproc option)   4
+   potential       BVSx
+   fitting_method  cs
+   num_individuals    4
+   fraction           0.2500
+   num_iteration   1
+   missing_value   1.0
+ ----------
+
+ option:  hard-limit T
  iv,vrhmin,vrhmax=   1   1.000e+00   1.000e+00
  iv,vrhmin,vrhmax=   2   0.000e+00   3.000e+00
  iv,vrhmin,vrhmax=   3   0.000e+00   3.000e+00
@@ -26,15 +50,22 @@
  iv,vrhmin,vrhmax=  25   0.000e+00   1.000e+01
  iv,vrhmin,vrhmax=  26   1.000e+00   1.000e+00
  iv,vrhmin,vrhmax=  27  -5.000e-01   5.000e-01
-   iid,losses=        2     1.5290     0.0350     0.5099     2.07391
-   iid,losses=        4     1.1971     1.4629     0.0794     2.73941
-   iid,losses=        3     1.0842     5.2728     0.0174     6.37450
-   iid,losses=        1     1.1070     2.8897     0.0068     4.00350
- step,time,best,vars=      0     35.6    2.0739  1.000  0.763  0.851  1.013  1.004  0.883  0.812  1.548  1.560  1.910  1.655  2.051  1.899  1.893  2.089  3.266
-   iid,losses=        5     1.4834     0.0700     0.4391     1.99245
-   iid,losses=        8     1.1577     5.0793     0.0644     6.30141
-   iid,losses=        6     1.2050     2.4793     0.0311     3.71540
-   iid,losses=        7     1.1169     3.5711     0.0044     4.69243
-   iid,losses=        9     1.0000     1.0000 160774719450.4277 160774719452.42773
- step,time,best,vars=      1     82.7    1.9925  1.000  0.759  0.867  1.000  0.998  0.881  0.826  1.544  1.565  2.050  1.653  2.053  1.990  1.894  2.088  3.237
-elapsed time = 82.737024 sec.
+
+ Reference data and weights:
+   rdf  1.000
+   adf  1.000
+   vol  1.000
+
+ # iid,losses=      iid        rdf        adf        vol      total
+   iid,losses=        1     1.0722     4.3464     0.0053     5.42392
+   iid,losses=        4     0.7529     3.9660     0.0606     4.77953
+   iid,losses=        3     0.9394     4.1495     0.0412     5.13005
+   iid,losses=        2     0.8077     6.8559     0.0558     7.71932
+ step,time,best_iid,best_loss,vars=      0     34.1     4   4.7795  1.000  1.156  0.799  0.854  0.761  0.781  1.015  1.823  2.068  1.523  1.517  2.208  1.346  1.962  1.702  5.038
+   iid,losses=        5     0.8177     3.4517     0.0374     4.30683
+   iid,losses=        7     1.0320     4.4855     0.0032     5.52068
+   iid,losses=        6     0.9540     4.9692     0.0580     5.98121
+   iid,losses=        8     0.8334     6.8761     0.0642     7.77373
+   iid,losses=        9     0.8904     3.2130     0.0246     4.12806
+ step,time,best_iid,best_loss,vars=      1     97.1     9   4.1281  1.000  1.161  1.191  0.778  0.751  0.802  1.242  2.560  1.465  1.717  1.603  2.669  1.921  1.992  2.128  3.879
+elapsed time = 97.064136 sec.

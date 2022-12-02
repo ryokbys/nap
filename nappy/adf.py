@@ -122,9 +122,9 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
             hmati = nsys.get_hmat_inv()
             iprint = 0
             l1st = True
-            lspr,d2lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
-                                                      rcut,hmat,hmati,
-                                                      iprint,l1st)
+            lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
+                                               rcut,hmat,hmati,
+                                               iprint,l1st)
             itriples = np.zeros((len(triplets),3),dtype=int)
             specorder = nsys.specorder
             for it,t in enumerate(triplets):
@@ -136,11 +136,12 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
                 itriples[it,1] = jsp
                 itriples[it,2] = ksp
             angd,adfs = pmods.distfunc.calc_adf(tags,hmat,poss.T,rcut,
-                                                lspr,d2lspr,itriples.T,
+                                                lspr,itriples.T,
                                                 dang,na)
             return angd, adfs.T
-        except:
+        except Exception as e:
             print(' Failed to use the fortran routines...')
+            print(e)
             pass
 
     nsys.make_pair_list(rcut=rcut,nnmax=nnmax)

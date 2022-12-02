@@ -1,6 +1,6 @@
 program cluster_analysis
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-07-08 16:40:42 KOBAYASHI Ryo>
+!                     Last-modified: <2022-11-03 14:20:34 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Cluster analysis program.
 ! The cluster analysis is usually performed for large scale systems.
@@ -50,9 +50,9 @@ program cluster_analysis
   call read_in_cluster(11,trim(cfinput),maxpair,rcut,lpair,outthd,lrecur)
 
 !.....Make neighbor list
-  allocate(lspr(0:nnmax,ntot),d2lspr(nnmax,ntot))
+  allocate(lspr(0:nnmax,ntot))
   call mk_lspr_sngl(ntot,ntot,nnmax,tagtot,rtot,rcut,h,hi, &
-       lspr,d2lspr,iprint,.true.)
+       lspr,iprint,.true.)
   maxnn = 0
   msp = 0
   do ia=1,ntot

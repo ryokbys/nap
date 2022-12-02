@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-10-13 11:44:46 KOBAYASHI Ryo>
+!                     Last-modified: <2022-11-10 21:29:02 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -32,7 +32,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
   use pairlist, only: mk_lspr_para,mk_lscl_para, &
-       update_d2lspr, check_lspr, check_lscl
+       check_lspr, check_lscl
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_langevin, vel_update_langevin, vel_update_berendsen, &
        cell_update_berendsen,cell_force_berendsen, setup_cell_langevin, &
@@ -273,9 +273,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,vmax,mpi_md_world)
   vmaxold=vmax
 
-  if( trim(ctctl).eq.'Langevin' ) then
+  if( index(ctctl,'langevin').ne.0 ) then
     call setup_langevin(myid_md,iprint)
-  else if( trim(ctctl).eq.'ttm' ) then
+  else if( index(ctctl,'ttm').ne.0 ) then
     tmp = mpi_wtime()
     call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
          boundary,myid_md,mpi_md_world,iprint)
@@ -307,7 +307,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----Make pair list
   tmp = mpi_wtime()
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
   call check_lscl(myid_md,iprint)
   call check_lspr(namax,natm,nnmax,lspr,iprint,myid_md,mpi_md_world)
   call accum_time('lspr',mpi_wtime()-tmp)
@@ -330,7 +330,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !$acc update device(ra,h,lspr)
 !.....Calc forces
-  lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
+  lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
   tmp = mpi_wtime()
@@ -346,9 +346,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
-    call cna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
+    call cna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
   else if( trim(cstruct).eq.'a-CNA' ) then
-    call acna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
+    call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
   endif
 !.....Color charge NEMD
   if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iaux_clr,:),hi,specorder &
@@ -372,7 +372,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,nodes_md,myid_md,mpi_md_world,0,21)
 #endif
 
-!!$  if( trim(cpctl).eq.'vv-Berendsen' ) then
+!!$  if( trim(cpctl).eq.'vv-berendsen' ) then
 !!$    if( abs(pini-pfin).gt. 0.1d0 ) then
 !!$      if(myid_md.eq.0 .and. iprint.ne.0 ) then
 !!$        write(6,*) ''
@@ -403,10 +403,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !!$  endif
 
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-  if( index(cpctl,'Beren').ne.0 ) then
+  if( index(cpctl,'beren').ne.0 ) then
     call setup_cell_berendsen(myid_md,iprint)
     call cell_force_berendsen(stnsr,ah,mpi_md_world)
-  else if( index(cpctl,'Lange').ne.0 ) then
+  else if( index(cpctl,'lange').ne.0 ) then
     call setup_cell_langevin(myid_md,iprint)
     call cvel_update_langevin(stnsr,h,mpi_md_world,2)
   endif
@@ -566,7 +566,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
 
 !.....In case of isobaric MD, lstrs has to be always TRUE.
-    if( index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) then
+    if( index(cpctl,'beren').ne.0 .or. index(cpctl,'lange').ne.0 ) then
       lstrs = .true.
     else
       lstrs = lstrs0
@@ -582,7 +582,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         endif
       endif
 !.....Update dt-related values
-      if( trim(ctctl).eq.'Langevin' ) then
+      if( index(ctctl,'lange').ne.0 ) then
         tgmm = 1d0/trlx
         do ifmv=1,9
           if( ttgt(ifmv).lt.0d0 ) then
@@ -591,7 +591,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
             tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
           endif
         enddo
-      else if( trim(ctctl).eq.'ttm' ) then
+      else if( index(ctctl,'ttm').ne.0 ) then
         tmp = mpi_wtime()
         call set_inner_dt(dt,myid_md,iprint)
         call accum_time('ttm',mpi_wtime()-tmp)
@@ -604,7 +604,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
     enddo
     if( chgopt_method(1:4).eq.'xlag' ) call update_vauxq(aux(iaux_vq,:))
-    if( index(cpctl,'Lange').ne.0 ) call cvel_update_langevin(stnsr,h,mpi_md_world,1)
+    if( index(cpctl,'lange').ne.0 ) call cvel_update_langevin(stnsr,h,mpi_md_world,1)
 
     if( ifdmp.eq.2 ) then
       call vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
@@ -656,9 +656,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,sorg,myid_md,mpi_md_world)
     endif
 
-    if( index(cpctl,'Beren').ne.0 ) then
+    if( index(cpctl,'beren').ne.0 ) then
       call cell_update_berendsen(ah,h,lcellfix,lcell_updated)
-    else if( index(cpctl,'Lange').ne.0 ) then
+    else if( index(cpctl,'lange').ne.0 ) then
       call cell_update_langevin(h,lcellfix,lcell_updated)
     endif
 
@@ -702,7 +702,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Make pair list
       tmp = mpi_wtime()
       call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-           ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+           ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
     else
@@ -710,8 +710,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bacopy_fixed()
       call accum_time('ba_xxx',mpi_wtime()-tmp)
-!.....Not to count update_d2lspr for accum_time
-      call update_d2lspr(namax,natm,nnmax,lspr,h,ra,rc,rbuf,d2lspr)
     endif
 
 !$acc update device(ra,h,lspr)
@@ -730,10 +728,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Structure analysis
     if( trim(cstruct).eq.'CNA' &
          .and. mod(istp,istruct).eq.0 ) then
-      call cna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
+      call cna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
     else if( trim(cstruct).eq.'a-CNA' &
          .and. mod(istp,istruct).eq.0 ) then
-      call acna(namax,natm,nb,nnmax,lspr,d2lspr,rc_struct)
+      call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
     endif
 !.....Color charge NEMD
     if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iaux_clr,:),hi,specorder &
@@ -755,7 +753,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !!$!$acc update host(aa,strs)
 
 !.....Second kick of velocities
-    if( trim(ctctl).eq.'Langevin' ) then
+    if( index(ctctl,'lange').ne.0 ) then
       call vel_update_langevin(natm,tag,va,aa)
     else
       do i=1,natm
@@ -776,9 +774,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          ,vmax,mpi_md_world)
 
 !.....Some thermostats come after get_ekin, since they require ekl values
-    if( trim(ctctl).eq.'Berendsen' ) then
+    if( index(ctctl,'beren').ne.0 ) then
       call vel_update_berendsen(natm,tag,va)
-    else if( trim(ctctl).eq.'ttm' ) then
+    else if( index(ctctl,'ttm').ne.0 ) then
       tmp = mpi_wtime()
       call assign_atom2cell(namax,natm,ra,sorg,boundary)
       call compute_nac(natm,myid_md,mpi_md_world,iprint)
@@ -799,9 +797,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       ptgt = ( pini +(pfin-pini)*istp/nstp ) *gpa2up
     endif
     call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
-    if( index(cpctl,'Beren').ne.0 ) then
+    if( index(cpctl,'beren').ne.0 ) then
       call cell_force_berendsen(stnsr,ah,mpi_md_world)
-    else if( index(cpctl,'Lange').ne.0 ) then
+    else if( index(cpctl,'lange').ne.0 ) then
       call cvel_update_langevin(stnsr,h,mpi_md_world,2)
     endif
     sth(:,:) = stnsr(:,:) *up2gpa
@@ -869,7 +867,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              //',es13.4,2es11.3)') &
              " istp,etime,temp,epot,vol,prss=" &
              ,istp,tcpu,tave,epot,vol,prss
-        if( (index(cpctl,'Beren').ne.0 .or. index(cpctl,'Lange').ne.0 ) &
+        if( (index(cpctl,'beren').ne.0 .or. index(cpctl,'lange').ne.0 ) &
              .and. iprint.ne.0 ) then
           write(6,'(a)') ' Lattice vectors:' !,h(1:3,1:3,0)
           write(6,'(a,"[ ",3f12.3," ]")') '   a = ',h(1:3,1,0)
@@ -883,7 +881,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call flush(6)
       endif
 
-      if( trim(ctctl).eq.'ttm' ) then
+      if( index(ctctl,'ttm').ne.0 ) then
         call output_ttm(istp,simtime,myid_md,iprint)
         call output_energy_balance(istp,simtime,myid_md,iprint)
       endif
@@ -1015,9 +1013,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
     write(6,'(1x,a,f16.5,a)') "  Pressure        = ", &
          prss,' GPa '//trim(ctmp)
-    if( trim(cpctl).eq.'Berendsen' .or. &
-         trim(cpctl).eq.'vc-Berendsen' .or. &
-         trim(cpctl).eq.'vv-Berendsen' ) then
+    if( index(cpctl,'beren').ne.0 ) then
+!!$      if( trim(cpctl).eq.'berendsen' .or. &
+!!$         trim(cpctl).eq.'vc-berendsen' .or. &
+!!$         trim(cpctl).eq.'vv-berendsen' ) then
       call cell_info(h)
     endif
     write(6,*) ''
@@ -1052,7 +1051,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-  deallocate(ra,va,aa,ra0,strs,tag,lspr,d2lspr &
+  deallocate(ra,va,aa,ra0,strs,tag,lspr &
        ,epi,eki,lsb,lsex)
   deallocate(aux)
 end subroutine pmd_core
@@ -1130,7 +1129,7 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----Make pair list
   l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
   lstrs = .true.
 
   if( iprint.ge.ipl_info ) print *,'get_force...'
@@ -1241,7 +1240,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----Make pair list
   l1st = .true.
   call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
   lstrs = .true.
 
   if( .not.lcalcgrad ) then
@@ -1323,7 +1322,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use util,only: itotOf, ifmvOf
   use time, only: sec2hms, accum_time
   use pairlist, only: mk_lspr_para,mk_lscl_para, &
-       update_d2lspr, check_lspr, check_lscl
+       check_lspr, check_lscl
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_cell_min
 
@@ -1445,7 +1444,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----Make pair list
     tmp = mpi_wtime()
     call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-         ,h,hi,anxi,anyi,anzi,lspr,d2lspr,iprint,l1st)
+         ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
     call accum_time('lspr',mpi_wtime()-tmp)
 
     maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
@@ -1455,7 +1454,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !$acc update device(ra,h,lspr)
 !.....Calc forces
-    lstrs = lstrs0 .or. (index(cpctl,'Beren').ne.0)
+    lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
     lcell_updated = .true.
     tmp = mpi_wtime()
@@ -3301,7 +3300,6 @@ subroutine alloc_namax_related()
 !!$  if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
   if( allocated(lspr) ) deallocate(lspr)
-  if( allocated(d2lspr) ) deallocate(d2lspr)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
 !!$  if( allocated(stp) ) deallocate(stp)
@@ -3311,7 +3309,7 @@ subroutine alloc_namax_related()
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
        ,strs(3,3,namax),tag(namax) &
-       ,lspr(0:nnmax,namax),d2lspr(nnmax,namax) &
+       ,lspr(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
 !!$       ,stp(3,3,namax),stn(3,3,namax),stt(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
@@ -3430,16 +3428,6 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call copy_iarr(ndim,iarr,lspr)
   deallocate(iarr)
   mem = mem -4*ndim +4*(nnmax+1)*newnamax
-
-!.....d2lspr
-  ndim = size(d2lspr)
-  allocate(arr(ndim))
-  call copy_arr(ndim,d2lspr,arr)
-  deallocate(d2lspr)
-  allocate(d2lspr(nnmax,newnamax))
-  call copy_arr(ndim,arr,d2lspr)
-  deallocate(arr)
-  mem = mem -8*ndim +8*nnmax*newnamax
 
 !.....epi
   ndim = size(epi)

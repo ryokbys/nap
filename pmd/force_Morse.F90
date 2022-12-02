@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-08-27 12:27:03 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-03 14:28:31 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -88,7 +88,7 @@ module Morse
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr,d2lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -100,7 +100,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),d2lspr(nnmax,namax)
+         ,tag(namax),sv(3,6)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -164,7 +164,6 @@ contains
       xi(1:3)= ra(1:3,i)
       is=int(tag(i))
       do k=1,lspr(0,i)
-        if( d2lspr(k,i).ge.rc2 ) cycle
         j=lspr(k,i)
 !!$        if( j.le.i ) cycle
         js= int(tag(j))
@@ -174,7 +173,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-!!$        if( dij2.gt.rc2 ) cycle
+        if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji

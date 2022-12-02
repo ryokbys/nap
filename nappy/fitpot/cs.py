@@ -130,7 +130,7 @@ class Individual:
             vmin, vmax = self.vranges[i]
             # vmin = self.vranges[i,0]
             # vmax = self.vranges[i,1]
-            v = random.random()*(vmax -vmin) +vmin
+            v = np.random.random()*(vmax -vmin) +vmin
             self.vector[i] = v
             # print(' i,vmin,vmax,v=',i,vmin,vmax,v)
         self.wrap_range()
@@ -155,7 +155,7 @@ class CS:
     """
 
     def __init__(self, N, F, variables, vranges, vhardlimit, loss_func, write_func,
-                 nproc=0,**kwargs):
+                 nproc=0,seed=42,**kwargs):
         """
         Conctructor of CS class.
 
@@ -168,6 +168,8 @@ class CS:
         """
         if N < 2:
             raise ValueError('N must be greater than 1 in CS!')
+        np.random.seed(seed)
+        random.seed(seed)
         self.N = N   # Number of individuals in a generation
         self.F = F   # Fraction of worse individuals to be abondoned
         self.nproc = nproc

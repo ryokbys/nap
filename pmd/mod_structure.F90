@@ -1,6 +1,6 @@
 module structure
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-03-09 10:52:26 Ryo KOBAYASHI>
+!                     Last modified: <2022-11-03 22:40:55 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Routines of structure analyses.
 !-----------------------------------------------------------------------
@@ -142,7 +142,7 @@ contains
 
   end subroutine cna_indices
 !=======================================================================
-  subroutine cna(namax,natm,nbndr,nnmax,lspr,d2lspr,rcut)
+  subroutine cna(namax,natm,h,ra,nbndr,nnmax,lspr,rcut)
 !-----------------------------------------------------------------------
 ! Common Neighbor Analysis using the neighbor list and rcut.
 ! Computes a digit for each atom that represents crystalline structure:
@@ -153,13 +153,13 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,nbndr,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: rcut,d2lspr(nnmax,namax)
+    real(8),intent(in):: rcut,h(3,3),ra(3,namax)
 
     integer,allocatable:: lsnn(:,:)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,n421,n422,n663,n443
-    real(8):: rc2
+    real(8):: rc2,xi(3),xij(3),rij(3),dij2
 
 !-----for parallel code
     if( lcna1st ) then
@@ -181,9 +181,13 @@ contains
     rc2 = rcut*rcut
 
     do i=1,natm+nbndr
+      xi(1:3)= ra(1:3,i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i) .ge. rc2 ) cycle
         j = lspr(jj,i)
+        xij(1:3)= ra(1:3,j) -xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.ge.rc2 ) cycle
         lsnn(0,i) = lsnn(0,i) +1
         lsnn(lsnn(0,i),i) = j
       enddo
@@ -194,7 +198,7 @@ contains
 
   end subroutine cna
 !=======================================================================
-  subroutine acna(namax,natm,nbndr,nnmax,lspr,d2lspr,rcut)
+  subroutine acna(namax,natm,h,ra,nbndr,nnmax,lspr,rcut)
 !-----------------------------------------------------------------------
 ! Adaptive CNA using the full neighbor list, LSPR.
 ! See, [1] Stukowski, MSMSE 20 (2012) 045021.
@@ -207,37 +211,49 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,nbndr,nnmax
-    real(8),intent(inout):: d2lspr(nnmax,namax)
-    real(8),intent(in):: rcut
+    real(8),intent(in):: rcut,h(3,3),ra(3,namax)
     integer,intent(inout):: lspr(0:nnmax,namax)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,kk,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,itmp,lm,istart
-    real(8):: tmp,xi(3),xj(3),xij(3),rij(3),dij,dsum,dsum1,dsum2
-    real(8),allocatable,save:: rcfccs(:),rcbccs(:)
+    real(8):: tmp,xi(3),xj(3),xij(3),rij(3),dij2,dsum,dsum1,dsum2
+    real(8),allocatable,save:: rcfccs(:),rcbccs(:),d2lspr(:,:)
     integer,allocatable,save:: lsnn(:,:)
 
 !-----for parallel code
     if( lcna1st ) then
       allocate(icommon(lmax),ibond(2,mmax),nb(mmax),idc(3,nnmax,namax)&
            ,idcna(namax),lsnn(0:nnsortmax,namax) &
-           ,rcfccs(namax),rcbccs(namax))
+           ,rcfccs(namax),rcbccs(namax),d2lspr(nnmax,namax))
       mem = mem +4*size(icommon) +4*size(ibond) +4*size(nb) &
            +4*size(idc) +4*size(idcna) +4*size(lsnn) &
-           +8*size(rcfccs) +8*size(rcbccs)
+           +8*size(rcfccs) +8*size(rcbccs) +8*size(d2lspr)
       lcna1st = .false.
     endif
 
     if( size(idcna).ne.namax ) then
       mem = mem -4*size(idc) -4*size(idcna) -4*size(lsnn) &
-           -8*size(rcfccs) -8*size(rcbccs)
+           -8*size(rcfccs) -8*size(rcbccs) -8*size(d2lspr)
       deallocate(idc,idcna)
-      allocate(idc(3,nnmax,namax),idcna(namax),lsnn(0:nnsortmax,namax))
+      allocate(idc(3,nnmax,namax),idcna(namax),lsnn(0:nnsortmax,namax) &
+           ,rcfccs(namax),rcbccs(namax),d2lspr(nnmax,namax))
       mem = mem +4*size(idc) +4*size(idcna) +4*size(lsnn) &
-           +8*size(rcfccs) +8*size(rcbccs)
+           +8*size(rcfccs) +8*size(rcbccs) +8*size(d2lspr)
     endif
 
     idcna(:) = 0
+
+!.....Make d2lspr before exchanging lspr and d2lspr
+    do i=1,natm+nbndr
+      xi(1:3)= ra(1:3,i)
+      do jj=1,lspr(0,i)
+        j= lspr(jj,i)
+        xij(1:3)= ra(1:3,j) -xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+        d2lspr(jj,i) = dij2
+      enddo
+    enddo
 
 !.....Compute local cutoff for each atom
     do i=1,natm+nbndr

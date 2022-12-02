@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-10-14 16:18:46 KOBAYASHI Ryo>
+!                     Last modified: <2022-11-28 17:17:53 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -64,6 +64,8 @@ module Coulomb
   real(8):: fbvs = 0.74d0
 !.....Dielectric constant
   real(8):: dielec = 1d0
+!.....Scaling factor multiplied to E_Coulomb
+  real(8):: fscale = 1d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
   real(8),parameter:: qthd = 1d-12
@@ -519,6 +521,10 @@ contains
           backspace(ioprms)
           read(ioprms,*) ctmp, dielec
           cycle
+        else if( trim(c1st).eq.'scale_factor' ) then
+          backspace(ioprms)
+          read(ioprms,*) ctmp, fscale
+          cycle
         else if( trim(c1st).eq.'sigma' ) then
           backspace(ioprms)
           read(ioprms,*) ctmp, sgm_ew
@@ -744,6 +750,7 @@ contains
     call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(dielec,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fscale,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
@@ -814,7 +821,7 @@ contains
 !=======================================================================
   subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
        ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
-       ,myparity,nn,sv,rc,lspr,d2lspr,sorg &
+       ,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
        ,l1st,lcell_updated,lvc,specorder)
 !
@@ -831,7 +838,7 @@ contains
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
     real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),sorg(3),d2lspr(nnmax,namax)
+         ,tag(namax),sv(3,6),sorg(3)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
@@ -844,7 +851,7 @@ contains
     real(8),save:: eself,eselfl
     real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
          ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     if( l1st ) then
       if( .not.allocated(ri) ) then
@@ -852,11 +859,11 @@ contains
              ,dxdj(3),rij(3),xij(3),xj(3),xi(3))
       endif
       if( allocated(strsl) ) then
-        call accum_mem('force_Coulomb',-8*size(strsl))
-        deallocate(strsl)
+        call accum_mem('force_Coulomb',-8*size(strsl)-8*size(aal))
+        deallocate(strsl,aal)
       endif
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
+      allocate(strsl(3,3,namax),aal(3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl)+8*size(aal))
 
       if( trim(cchgs).eq.'fixed_bvs' ) then
         call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
@@ -891,6 +898,7 @@ contains
     endif
 
     strsl(1:3,1:3,1:namax) = 0d0
+    aal(:,1:namax) = 0d0
     elrl = 0d0
     esrl = 0d0
     eselfl = 0d0
@@ -905,40 +913,45 @@ contains
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'short' ) then
-      call Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+      call Ewald_short(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long' ) then
-      call Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+      call Ewald_long(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs &
            ,lcell_updated)
       call mpi_allreduce(elrl,elr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
     if( trim(cterms).eq.'direct' ) then
-      call force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+      call force_direct(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'direct_cut' ) then
-      call force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
+      call force_direct_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
-      call force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-           ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
+      call force_screened_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+           ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
 
-!!$    if( lstrs ) then
-!!$      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-!!$           ,nn,mpi_md_world,strsl,9)
+!.....Scale energies, forces, stresses
+    elr = elr *fscale
+    esr = esr *fscale
+    eself = eself *fscale
+    aal(:,1:natm) = aal(:,1:natm) *fscale
+    strsl(:,:,1:natm) = strsl(:,:,1:natm) *fscale
+
+!.....Copy local variables to global ones
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal(1:3,1:natm)
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-!!$    endif
 
     if( l1st .and. myid.eq.0 .and. iprint.ge.ipl_basic ) then
       if( cterms(1:6).eq.'direct' ) then
@@ -953,14 +966,6 @@ contains
       endif
     endif
 
-!!$    print *,'strs Coulomb:'
-!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
-!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
-
-!!$    epotl = esrl +elrl +eselfl
-!!$!.....Gather epot
-!!$    call mpi_allreduce(epotl,epott,1,mpi_real8 &
-!!$         ,mpi_sum,mpi_md_world,ierr)
     epott = esr +elr +eself
     epot= epot +epott
     if( myid.eq.0 .and. iprint.ge.ipl_info ) &
@@ -969,7 +974,7 @@ contains
   end subroutine force_Coulomb
 !=======================================================================
   subroutine force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+       ,lspr,epi,esrl,iprint,lstrs,rc)
 !
 !  Direct Coulomb interaction with cutoff radius without any cutoff treatment.
 !
@@ -977,7 +982,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),hi(3,3),rc,d2lspr(nnmax,namax)
+         h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
     real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
@@ -994,7 +999,6 @@ contains
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
@@ -1004,7 +1008,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
+        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1038,7 +1042,7 @@ contains
   end subroutine force_direct
 !=======================================================================
   subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
+       ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Direct Coulomb interaction with cutoff radius.
 !  Coulomb potential is shifted by v(rc) and modified by the term (r-rc)*v'(rc).
@@ -1051,7 +1055,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),hi(3,3),rc,d2lspr(nnmax,namax)
+         h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs,l1st
     real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
@@ -1073,7 +1077,6 @@ contains
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
@@ -1082,38 +1085,27 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
+        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
-        vrc = acc*qi*qj/rc /dielec
-        dvdrc = -acc*qi*qj /rc**2 /dielec
+        vrc = acc*qi*qj/rc
+        dvdrc = -acc*qi*qj /rc**2
 !.....potential
         tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp /dielec
-!!$        if( j.le.natm ) then
-!!$          epi(i)= epi(i) +tmp
-!!$          epi(j)= epi(j) +tmp
-!!$          esrl = esrl +tmp +tmp
-!!$        else
-!!$          epi(i)= epi(i) +tmp
-!!$          esrl = esrl +tmp
-!!$        endif
         epi(i)= epi(i) +tmp
         esrl= esrl +tmp
 !.....force
         ftmp = -acc *qi*qj*diji*diji -dvdrc
         ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
-!!$        aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*ftmp
 !.....stress
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
                  -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
-!!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-!!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -1124,7 +1116,7 @@ contains
   end subroutine force_direct_cut
 !=======================================================================
   subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl &
-       ,chg,h,hi,lspr,d2lspr,epi,esrl,iprint,lstrs,rc,l1st)
+       ,chg,h,hi,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Screened Coulomb with cutoff that uses rho_scr.
 !  smoothing using vrc and dVdrc where
@@ -1135,8 +1127,7 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax), &
-         d2lspr(nnmax,namax)
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax)
     real(8),intent(inout):: chg(namax)
     real(8),intent(inout):: strsl(3,3,namax),aa(3,namax)&
          ,epi(namax),esrl
@@ -1158,8 +1149,8 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc /dielec *terfcc
-          dvdrc = -acc /rc /dielec &
+          vrc = acc /rc *terfcc
+          dvdrc = -acc /rc &
                *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
@@ -1180,7 +1171,6 @@ contains
       is= int(tag(i))
       qi= chg(i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i).ge.rc2 ) cycle
         j=lspr(jj,i)
 !!$        if(j.eq.0) exit
 !!$        if(j.le.i) cycle
@@ -1191,7 +1181,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$        if( dij.gt.rc2 ) cycle
+        if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
         diji= 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1236,12 +1226,12 @@ contains
   end subroutine force_screened_cut
 !=======================================================================
   subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
-       ,lspr,d2lspr,epi,esrl,iprint,lstrs,rc)
+       ,lspr,epi,esrl,iprint,lstrs,rc)
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),hi(3,3),rc,d2lspr(nnmax,namax)
+         h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
     real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
@@ -1266,7 +1256,6 @@ contains
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        if( d2lspr(jj,i).ge.rc2 ) cycle
         j = lspr(jj,i)
 !!$        if( j.le.i ) cycle
         js = int(tag(j))
@@ -1275,6 +1264,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.ge.rc2 ) cycle
         dij = sqrt(dij)
         diji = 1d0/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1524,9 +1514,9 @@ contains
         is = int(tag(i))
         qi = chg(i)
         q2 = qi*qi
-        tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-        eselfl = eselfl +tmp/dielec
-        epi(i) = epi(i) +tmp/dielec
+        tmp = (vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2)
+        eselfl = eselfl +tmp
+        epi(i) = epi(i) +tmp
       enddo
     else if( trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long') then ! fixed charge
@@ -1535,8 +1525,9 @@ contains
       do i=1,natm
         is = int(tag(i))
         q2 = chg(i)*chg(i)
-        eselfl = eselfl -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
-        epi(i) = epi(i) -q2 /sgm_ew *acc/sqrt(2d0*pi) /dielec
+        tmp = -q2 /sgm_ew *acc/sqrt(2d0*pi)
+        eselfl = eselfl +tmp
+        epi(i) = epi(i) +tmp
       enddo
     endif
     return
@@ -1607,7 +1598,7 @@ contains
   end subroutine qforce_short
 !=======================================================================
   subroutine qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h &
-       ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
+       ,lspr,iprint,rc,fq,esr,l1st)
 !
 !  Compute q-force of direct_cut Coulomb potential.
 !
@@ -1615,7 +1606,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),rc,d2lspr(nnmax,namax)
+         h(3,3),rc
     real(8),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
 
@@ -1631,37 +1622,32 @@ contains
     rc2 = rc*rc
     esr = 0d0
 !$omp parallel
-!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
+!$omp do private(i,xi,xj,xij,rij,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        dij2 = d2lspr(jj,i)
-        if( dij2.ge.rc2 ) cycle
         j = lspr(jj,i)
-!!$        if( j.eq.0 ) exit
-!!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
-        dij = sqrt(dij2)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
         diji = 1d0/dij
-        vrc = acc/rc /dielec
-        dvdrc = -acc/rc2 /dielec
+        vrc = acc/rc
+        dvdrc = -acc/rc2
 !.....potential
         tmp = acc*diji -vrc -dvdrc*(dij-rc)
         tmp = tmp /dielec
-!!$        if( j.le.natm ) then
-!!$          esr = esr +tmp*qi*qj
-!!$        else
-!!$          esr = esr +0.5d0*tmp*qi*qj
-!!$        endif
         esr = esr +0.5d0*tmp*qi*qj
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
-!!$        fq(j) = fq(j) -tmp*qi
       enddo
     enddo
 !$omp end do
@@ -1671,7 +1657,7 @@ contains
   end subroutine qforce_direct_cut
 !=======================================================================
   subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
-       ,lspr,d2lspr,iprint,rc,fq,esr,l1st)
+       ,lspr,iprint,rc,fq,esr,l1st)
 !
 !  Compute q-force of screened_cut Coulomb potential.
 !
@@ -1679,7 +1665,7 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
     real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
-         h(3,3),rc,d2lspr(nnmax,namax)
+         h(3,3),rc
     real(8),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
 
@@ -1699,8 +1685,8 @@ contains
           if( .not.interact(is,js) ) cycle
           rhoij = rho_scr(is,js)
           terfcc = erfc(rc/rhoij)
-          vrc = acc /rc *terfcc /dielec
-          dvdrc = -acc /rc /dielec &
+          vrc = acc /rc *terfcc
+          dvdrc = -acc /rc &
                *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
@@ -1715,22 +1701,25 @@ contains
     ss2i = 1d0 /sgmsq2
     esr = 0d0
 !$omp parallel
-!$omp do private(i,xi,is,qi,jj,j,js,qj,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
+!$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       qi = chg(i)
       do jj=1,lspr(0,i)
-        dij2 = d2lspr(jj,i)
-        if( dij2.ge.rc2 ) cycle
         j = lspr(jj,i)
 !!$        if( j.eq.0 ) exit
 !!$        if( j.le.i ) cycle
         js = int(tag(j))
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
-        dij = sqrt(dij2)
+        xj(1:3) = ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij.gt.rc2 ) cycle
+        dij = sqrt(dij)
         diji = 1d0/dij
         rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
@@ -1839,15 +1828,20 @@ contains
     real(8):: qi,q2,sgmi,tmp
 
     eself = 0d0
+!$omp parallel
+!$omp do private(i,is,qi,q2,sgmi,tmp) &
+!$omp    reduction(+:eself)
     do i=1,natm
       is = int(tag(i))
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm_ew
       tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
-      eself = eself +tmp /dielec
-      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)/dielec
+      eself = eself +tmp
+      fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)
     enddo
+!$omp end do
+!$omp end parallel
 
   end subroutine qforce_self
 !=======================================================================
@@ -1855,7 +1849,7 @@ contains
 !
 !  Wrapper routine for calculating forces on charges.
 !
-    use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,d2lspr, &
+    use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr, &
          rc,sorg,myid_md,mpi_md_world,iprint
     include "mpif.h"
     real(8),intent(in):: chg(namax)
@@ -1883,7 +1877,7 @@ contains
       call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'direct_cut'  ) then
       call qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h, &
-           lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
+           lspr,iprint,rc,fq,ecshortl,l1st)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
@@ -1891,7 +1885,7 @@ contains
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'screened_cut'  ) then
       call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
-           lspr,d2lspr,iprint,rc,fq,ecshortl,l1st)
+           lspr,iprint,rc,fq,ecshortl,l1st)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
     endif
     epot = eself +ecshort + eclong
@@ -2241,7 +2235,7 @@ contains
     deallocate(bbs)
   end subroutine setup_kspace
 !=======================================================================
-  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr,d2lspr, &
+  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr, &
        rc,sorg,myid,mpi_world,iprint,l1st)
 !
 !  Charge optimization/equilibration by matrix inversion.
@@ -2250,7 +2244,6 @@ contains
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
-    real(8),intent(in):: d2lspr(nnmax,namax)
     logical,intent(in):: l1st
     real(8),intent(inout):: chg(natm)
 

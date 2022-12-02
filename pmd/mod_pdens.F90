@@ -21,8 +21,8 @@ module pdens
   real(8):: orig_pdens(3),hmat_pdens(3,3)
   real(8):: sosub(3),shsub(3,3),shsubi(3,3)
   real(8),allocatable:: pds(:,:,:)
-  integer:: npx = 1  ! Num of divisions of subsystem
-  integer:: npy = 1  ! where flux is evaluated within.
+  integer:: npx = 1  ! Num of divisions of subsystem read as ndiv_pdens in read_input
+  integer:: npy = 1
   integer:: npz = 1
   integer:: np
   real(8):: dpx,dpy,dpz,vol,dpxi,dpyi,dpzi
@@ -34,7 +34,7 @@ contains
 !
 !  Initialize lflux.
 !
-    use util,only: csp2isp
+    use util,only: csp2isp, get_vol
     use vector,only: matinv3,matxvec3
     integer,intent(in):: myid,mpi_world,iprint
     real(8),intent(in):: hmat(3,3)
@@ -61,6 +61,11 @@ contains
     dpyi= 1d0 /dpy
     dpzi= 1d0 /dpz
 
+!.....Reset orig_pdens and hmat_pdens if hmat_pdens is not given
+    if( get_vol(hmat_pdens).lt.1d-8 ) then
+      orig_pdens(:) = 0d0
+      hmat_pdens(:,:) = hmat(:,:)
+    endif
 !.....Sub lattice representation in original hmat
     hmati = matinv3(hmat)
     sosub = matxvec3(hmati,orig_pdens)
@@ -118,7 +123,6 @@ contains
       if( is.ne.ispc_pdens ) cycle
 !.....Convert from hmat-rep to shsub-rep
       ri(1:3) = ra(1:3,i) +sorg(1:3) -sosub(1:3)
-!!$      ri(1:3) = ri(1:3) -anint(ri(1:3))  ! This should be a bug.
       sri(1:3) = matxvec3(shsubi,ri)
 !.....Get subsystem index
       if(  sri(1).lt.0d0 .or. sri(1).ge.1d0 .or. &
@@ -143,7 +147,7 @@ contains
     real(8),intent(in):: hmat(3,3)
 
     integer,parameter:: nmpi = 1
-    integer:: idx,ixyz,is,ia,ix,iy,iz
+    integer:: idx,ixyz,is,ia,ix,iy,iz,inc
     integer:: ierr
     real(8):: vol,dr(3),fac
     real(8),allocatable:: pdl(:,:,:)
@@ -169,11 +173,13 @@ contains
 !.....Volumetric data
       fac = 1d0 /nacc /(vol*ang2bohr**3)
       pdl(:,:,:) = pdl(:,:,:) *fac
+      inc= 0
       do ix=1,npx
         do iy=1,npy
           do iz=1,npz
             write(ionum,'(2x,es11.3)',advance='no') pdl(iz,iy,ix)
-            if( mod(iz,6) .eq. 0 ) write(ionum,*) ''
+            inc = inc +1
+            if( mod(inc,6) .eq. 0 ) write(ionum,*) ''
           enddo
         enddo
       enddo
