@@ -1,12 +1,41 @@
-   iid,Lr,Lth,Lvol,Llat,L=        2    3.1225     0.7950    26.1857     0.0000    30.1031
-   iid,Lr,Lth,Lvol,Llat,L=        4    1.9508     0.7948    20.2581     0.0000    23.0037
-   iid,Lr,Lth,Lvol,Llat,L=        1    1.3376     0.7049     7.7690     0.0000     9.8116
-   iid,Lr,Lth,Lvol,Llat,L=        3    0.8912     0.6027     4.7938     0.0000     6.2877
- step,time,best,vars=      0     40.3    6.2877  1.000  1.142  1.255  1.054  0.868  1.208  2.106  1.778  2.988  2.044  1.921  4.330  2.013  1.536  2.486  1.000
-   iid,Lr,Lth,Lvol,Llat,L=        8    3.1944     0.7949    25.6610     0.0000    29.6503
-   iid,Lr,Lth,Lvol,Llat,L=        7    1.8878     0.7908    19.5151     0.0000    22.1937
-   iid,Lr,Lth,Lvol,Llat,L=        6    1.2444     0.7123     7.4910     0.0000     9.4477
-   iid,Lr,Lth,Lvol,Llat,L=        5    0.8285     0.6159     5.3013     0.0000     6.7457
-   iid,Lr,Lth,Lvol,Llat,L=        9    2.0158     0.7721    15.0153     0.0000    17.8033
- step,time,best,vars=      1    104.3    6.2877  1.000  1.142  1.255  1.054  0.868  1.208  2.106  1.778  2.988  2.044  1.921  4.330  2.013  1.536  2.486  1.000
-elapsed time = 104.290595 sec.
+
+ fp.py --- fit parameters to any target property ---
+
+   Executed as /Users/kobayashi/src/nap/nappy/fitpot/fp.py --nproc 4 --random-seed 42
+            on ts3-rk.ogt.nitech.ac.jp
+            at 2022-12-02 18:04:05
+
+   Please cite:
+     1) R. Kobayashi, J. Open Source Software, 6(57), 2768 (2021)
+     2) R. Kobayashi, Y. Miyaji, K. Nakano, M. Nakayama, APL Materials 8, 081111 (2020)
+
+ Random seed was given: 42
+
+ Input
+ ----------
+   num of processes (given by --nproc option)   4
+   potential       BVSx
+   fitting_method  cs
+   num_individuals    4
+   fraction           0.2500
+   num_iteration   1
+   missing_value   1.0
+ ----------
+
+
+
+ # iid,losses=      iid        rdf        adf        vol      total
+   iid,Lr,Lth,Lvol,Llat,L=        1    2.1411     0.7292     7.0833     0.0000     9.9535
+   iid,Lr,Lth,Lvol,Llat,L=        2    1.4173     0.6783     7.5245     0.0000     9.6201
+   iid,Lr,Lth,Lvol,Llat,L=        3    3.1834     0.3784     1.3966     0.0000     4.9584
+   iid,Lr,Lth,Lvol,Llat,L=        4    1.4595     0.2523     0.8932     0.0000     2.6049
+ step,time,best_iid,best_loss,vars=      0     21.6     4   2.6049  1.000  1.099  1.107  1.073  0.878  1.131  2.062  1.804  2.547  1.955  1.997  4.775  2.182  1.579  2.196  1.000
+   iid,Lr,Lth,Lvol,Llat,L=        8    2.7943     0.7631     9.8891     0.0000    13.4465
+   iid,Lr,Lth,Lvol,Llat,L=        7    1.8079     0.7199     7.5053     0.0000    10.0332
+   iid,Lr,Lth,Lvol,Llat,L=        6    2.0064     0.3617     1.2327     0.0000     3.6008
+   iid,Lr,Lth,Lvol,Llat,L=        5    2.0556     0.3179     1.0886     0.0000     3.4620
+   iid,Lr,Lth,Lvol,Llat,L=        9   58.4652     0.9490    36.4592     0.0000    95.8734
+ step,time,best_iid,best_loss,vars=      1     52.7     4   2.6049  1.000  1.099  1.107  1.073  0.878  1.131  2.062  1.804  2.547  1.955  1.997  4.775  2.182  1.579  2.196  1.000
+
+ fp.py finished since max interation exceeds.
+ Elapsed time = 52.7 sec.

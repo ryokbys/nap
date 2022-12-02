@@ -969,7 +969,8 @@ def main():
     
     opt.run(maxiter)
 
-    print('elapsed time = {0:f} sec.'.format(time.time()-start))
+    print('\n fp.py finished since it exceeds the max interation.')
+    print(' Elapsed time = {0:.1f} sec.'.format(time.time()-start))
     
     return None
 

@@ -13,6 +13,8 @@ cp ../in.pmd.* ../pmdini ./
 #...cd to the directory and clean up
 rm -f dump_* out.* data.pmd.*
 
+export OMP_NUM_THREADS=2
+
 #...Relax pos and cell
 # cp in.pmd.relax in.pmd
 # pmd 2>%1 > out.pmd.relax
@@ -22,6 +24,7 @@ rm -f dump_* out.* data.pmd.*
 #...NpT MD
 cp in.pmd.NpT in.pmd
 # mpirun -np 1 pmd 2>&1 > out.pmd.NpT
+# srun -n 1 -c 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
 mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
 head -n166 out.pmd.NpT
 tail -n20 out.pmd.NpT

@@ -240,15 +240,16 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
             tags = nsys.get_tags()
             iprint = 0
             l1st = True
-            lspr,d2lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
-                                                      rmax,hmat,hmati,
-                                                      iprint,l1st)
-            rd,rdfs= pmods.distfunc.calc_rdf(tags,hmat,rmax,rmin,
-                                             lspr,d2lspr,pairwise,iprint,l1st,
+            lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,
+                                               poss.T,rmax,hmat,hmati,
+                                               iprint,l1st)
+            rd,rdfs= pmods.distfunc.calc_rdf(tags,hmat,poss.T,rmax,rmin,
+                                             lspr,iprint,l1st,pairwise,
                                              nspcs,nr)
             return rd, rdfs.T
-        except:
+        except Exception as e:
             print(' Failed to use the fortran routines...')
+            print(e)
             pass
     
     rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
