@@ -8,7 +8,7 @@
 #=======================================================================
 
 #...copy filed required for pmd calculation
-cp ../in.pmd.* ../pmdini ./
+yes | cp ../in.pmd.* ../pmdini ./
 
 #...cd to the directory and clean up
 rm -f dump_* out.*
@@ -24,9 +24,9 @@ export OMP_NUM_THREADS=2
 # echo "relax done at" `date`
 
 #...NpT MD
-cp in.pmd.NpT in.pmd
-#../../../pmd/pmd 2>&1 > out.pmd.NpT
-mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
+yes | cp in.pmd.NpT in.pmd
+../../../pmd/pmd 2>&1 > out.pmd.NpT
+# mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
 head -n166 out.pmd.NpT
 tail -n20 out.pmd.NpT
 echo "NpT-MD done at" `date`

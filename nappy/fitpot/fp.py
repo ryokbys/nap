@@ -763,12 +763,9 @@ def func_wrapper(variables, **kwargs):
     if print_level > 1:
         print('Running pmd and post-processing at '+subdir, flush=True)
     try:
-        prefix = kwargs['--subjob-prefix']
+        prefix = kwargs['subjob-prefix']
         cmd = prefix +" ./{0:s} > log.iid_{1:d}".format(subjobscript,kwargs['iid'])
-        # subprocess.run(cmd.split(),check=True)
-        # print('subdir,cmd=',subdir,cmd)
         subprocess.run(cmd,shell=True,check=True)
-        # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
             pmddata = get_data2('.',prefix='pmd',**kwargs)
             L = loss_func2(pmddata,**kwargs)

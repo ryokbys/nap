@@ -25,8 +25,8 @@ export OMP_NUM_THREADS=2
 
 #...NpT MD
 cp in.pmd.NpT in.pmd
-# ../../../pmd/pmd 2>&1 > out.pmd.NpT
-mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
+../../../pmd/pmd 2>&1 > out.pmd.NpT
+# mpirun -np 1 ../../../pmd/pmd 2>&1 > out.pmd.NpT
 head -n166 out.pmd.NpT
 tail -n20 out.pmd.NpT
 echo "NpT-MD done at" `date`
