@@ -14,10 +14,12 @@ Options:
               Name of configuration file. [default: in.fitpot]
   --nproc NPROC
               Number of processes to be used. If it's less than 1, use as many processes as possible. [default: 0]
-  --subdir-prefix PREFIX
+  --subdir-prefix PREFIX_DIR
               Prefix for pmd directory. [default: subdir_]
   --subjob-script SCRIPT
               Name of script that performs MD and post-processing. [default: subjob.sh]
+  --subjob-prefix PREFIX_JOB
+              Prefix for performing subjob. [default: ]
   --random-seed SEED
               Random seed for reproducibility, if negative current time in second is applied. [default: -1]
 """
@@ -761,11 +763,9 @@ def func_wrapper(variables, **kwargs):
     if print_level > 1:
         print('Running pmd and post-processing at '+subdir, flush=True)
     try:
-        cmd = "./{0:s} > log.iid_{1:d}".format(subjobscript,kwargs['iid'])
-        # subprocess.run(cmd.split(),check=True)
-        # print('subdir,cmd=',subdir,cmd)
+        prefix = kwargs['subjob-prefix']
+        cmd = prefix +" ./{0:s} > log.iid_{1:d}".format(subjobscript,kwargs['iid'])
         subprocess.run(cmd,shell=True,check=True)
-        # print('Going to get_data from ',subdir)
         if len(kwargs['match']) != 0:
             pmddata = get_data2('.',prefix='pmd',**kwargs)
             L = loss_func2(pmddata,**kwargs)
@@ -886,6 +886,7 @@ def main():
     kwargs['rc3'] = rc3
     kwargs['subdir-prefix'] = args['--subdir-prefix']
     kwargs['subjob-script'] = args['--subjob-script']
+    kwargs['subjob-prefix'] = args['--subjob-prefix']
     kwargs['start'] = start
     kwargs['vopts'] = vopts
 
