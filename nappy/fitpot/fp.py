@@ -608,7 +608,7 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
             for n in range(num):
                 # print('n=',n)
                 diff = pmdd[n] -refd[n]
-                sumdiff2 += diff*diff /(refd[n]**2+eps**2)
+                sumdiff2 += diff*diff /(refd[n]**2+eps)
             losses[name] = min(sumdiff2, luplim)
         else:  # data treated all together (default)
             for n in range(num):
