@@ -1,6 +1,7 @@
 io_format                 ascii
 print_level                 2
 max_num_neighbors          30
+allow_reallocation         T
 
 time_interval              -2.0
 num_iteration             100

@@ -38,7 +38,7 @@ from nappy.napsys import NAPSystem
 import copy
 
 __author__  = 'Ryo KOBAYASHI'
-__version__ = '221031'
+__version__ = '230107'
 __licence__ = 'MIT'
 
 _confname = 'conf.elast.yaml'
@@ -134,7 +134,7 @@ def cdote(strns,*params):
     Compute C_ij*e_j to get s_i.
     """
     ctnsr = params2ctnsr(params)
-    
+
     strss = np.zeros((len(strns),6),dtype=float)
     for i,strn in enumerate(strns):
         strs = np.dot(ctnsr,strn)
@@ -252,20 +252,33 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
-    strns = []
+    print('\n F-matrices:')
+    for i in range(len(fmats)):
+        print('   {0:>3d}:'.format(i),fmats[i].flatten())
+    strns = np.zeros((len(fmats),6),dtype=float)
     for i,fmat in enumerate(fmats):
         emat = np.zeros((3,3),dtype=float)
         emat = 0.5 *(np.dot(fmat.T,fmat) -np.identity(3))
-        strn = np.zeros(6,dtype=float)
-        strn[0] = emat[0,0]
-        strn[1] = emat[1,1]
-        strn[2] = emat[2,2]
-        strn[3] = emat[1,2] *2.0
-        strn[4] = emat[0,2] *2.0
-        strn[5] = emat[0,1] *2.0
-        strns.append(strn)
-
+        # strn = np.zeros(6,dtype=float)
+        # strn[0] = emat[0,0]
+        # strn[1] = emat[1,1]
+        # strn[2] = emat[2,2]
+        # strn[3] = emat[1,2] *2.0
+        # strn[4] = emat[0,2] *2.0
+        # strn[5] = emat[0,1] *2.0
+        # strns.append(strn)
+        strns[i,0] = emat[0,0]
+        strns[i,1] = emat[1,1]
+        strns[i,2] = emat[2,2]
+        strns[i,3] = emat[1,2] *2.0
+        strns[i,4] = emat[0,2] *2.0
+        strns[i,5] = emat[0,1] *2.0
+    print('\n strains:')
+    for i in range(len(fmats)):
+        print('   {0:>3d}:'.format(i),strns[i])
+    
     #...get stress values from external calculations
+    print('\n stresses:')
     strss = np.zeros((len(fmats),6),dtype=float)
     for i in range(len(fmats)):
         dname = _prefix +"{0:02d}".format(i)
@@ -273,6 +286,7 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
             with open(dname+'/'+strsfname,'r') as f:
                 data = f.readline().split()
                 strss[i] = np.array([ float(d) for d in data ])
+                print('   {0:>3d}:'.format(i),strss[i])
         except Exception as e:
             raise
 
@@ -455,7 +469,8 @@ def out4fp_Cij(cij,fname='data.pmd.Cij'):
 
 def main():
 
-    args= docopt(__doc__,version=__version__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
+    # args= docopt(__doc__,version=__version__)
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
     out4fp = args['--out4fp']
@@ -475,7 +490,7 @@ def main():
                 conf = yaml.safe_load(f)
         except Exception as e:
             raise
-        #print('conf=',conf)
+        print(' Loading ',_confname,' done\n   ==> ',conf)
         dlt1max = conf['delta1']
         dlt2max = conf['delta2']
         strsfname = args['STRSFILE']
@@ -483,6 +498,8 @@ def main():
         #...Output Cij for fp.py
         if out4fp:
             out4fp_Cij(cij,fname=out4fp_name)
+            print('\n Wrote ',out4fp_name)
+        print('\n {0:s} analyze done'.format(os.path.basename(sys.argv[0])))
 
     return None
 

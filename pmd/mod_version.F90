@@ -1,6 +1,6 @@
 module version
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-09-22 11:30:15 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-12 17:05:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! A module for version/revision.
 !-----------------------------------------------------------------------
@@ -8,18 +8,18 @@ module version
   private
   save
 
-  public:: write_version, write_authors
+  public:: write_revision, write_authors
   
-  character(len=128),parameter:: cversion = 'rev220922'
+  character(len=128),parameter:: crevision = 'rev230112'
 
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)
   
 contains
-  subroutine write_version()
-    write(6,'(a)') '   Revision: '//trim(cversion)
+  subroutine write_revision()
+    write(6,'(a)') '   Revision: '//trim(crevision)
     return
-  end subroutine write_version
+  end subroutine write_revision
 !=======================================================================
   subroutine write_authors()
     integer:: i

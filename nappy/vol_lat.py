@@ -3,7 +3,7 @@
 Extract averaged volume and lattice parameters from files.
 
 Usage:
-  vol_lat.py [options] FILES [FILES...]
+  {0:s} [options] FILES [FILES...]
 
 Options:
   -h, --help  Show this message and exit.
@@ -24,7 +24,7 @@ from nappy.io import read
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "210527"
+__version__ = "230107"
 
 def nsys2lat(nsys):
     a,b,c = nsys.get_lattice_lengths()
@@ -34,7 +34,9 @@ def nsys2lat(nsys):
     gamma = gamma /np.pi *180.0
     return a,b,c,alpha,beta,gamma
 
-def main(args):
+def main():
+
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
 
     files = args['FILES']
     if len(files) > 1:
@@ -102,7 +104,4 @@ def main(args):
 
     
 if __name__ == "__main__":
-
-    args = docopt(__doc__)
-
-    main(args)
+    main()
