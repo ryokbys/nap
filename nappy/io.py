@@ -69,14 +69,17 @@ def read(fname="pmdini",format=None,specorder=None):
         nsys = read_xsf(fname,specorder=specorder)
     elif format == 'lammps':
         nsys = read_lammps_data(fname,specorder=specorder)
+    elif format == 'cube':
+        nsys = read_cube(fname,specorder=specorder)
     else:
         print('Since the file format is unknown, try to read the file using ASE.')
         try:
             import ase.io
             atoms = ase.io.read(fname)
-            nsys = load_ase_atoms(atoms)
+            nsys = from_ase(atoms)
         except Exception as e:
-            raise IOError('Cannot load input file even ')
+            print(' Failed to load input file even with ase.')
+            raise
     return nsys
 
 def read_pmd(fname='pmdini',specorder=None):
@@ -935,6 +938,80 @@ need to specify the species order correctly with --specorder option.
         nsys.voldata = np.reshape(voldata,ndiv,order='F')
     return nsys
 
+def read_cube(fname, specorder=None):
+    """Read Gaussian cube format file."""
+    from nappy.elements import get_symbol_from_number
+    from nappy.units import Bohr_to_Ang
+    nsys = NAPSystem()
+    if specorder is None:
+        nsys.specorder = []
+    else:
+        nsys.specorder = specorder
+
+    with open(fname, 'r') as f:
+        lines = f.readlines()
+    natm = -1
+    nvdata = -1
+
+    # 1,2-th lines: comments
+
+    # 3rd line: natm, vorig(x,y,x)
+    d = lines[2].split()
+    natm = int(d[0])
+    vorig = np.array([float(o) for o in d[1:4] ])
+    # 4,5,6-th line: ndiv, ax, ay, az
+    ndiv = np.zeros(3,dtype=int)
+    dhmat = np.zeros((3,3),dtype=float)
+    hmat = np.zeros((3,3),dtype=float)
+    for i in range(3):
+        d = lines[3+i].split()
+        ndiv[i] = int(d[0])
+        dhmat[i,:] = [ float(v) for v in d[1:4] ]
+        hmat[i,:] = dhmat[i,:] *ndiv[i]
+    nvoldat = ndiv[0]*ndiv[1]*ndiv[2]
+    hmati = np.linalg.inv(hmat)
+    # 7-(7+natm)-th lines: id, elem-ID, rh[0:3]
+    rpos = np.zeros(3,dtype=float)  # real pos in Bohr
+    sposs = np.zeros((natm,3),dtype=float)  # scaled poss
+    sids = np.zeros(natm, dtype=int)
+    for i in range(natm):
+        d = lines[6+i].split()
+        symbol = get_symbol_from_number(int(eval(d[1])))
+        if symbol not in nsys.specorder:
+            nsys.specorder.append(symbol)
+        sid = nsys.specorder.index(symbol) +1
+        sids[i] = sid
+        rpos = [ float(p)*Bohr_to_Ang for p in d[2:5] ]
+        sposs[i] = np.dot(hmati,rpos)
+    nsys.alc = 1.0
+    nsys.set_hmat(hmat)
+    nsys.atoms[['x','y','z']] = sposs
+    nsys.atoms[['vx','vy','vz']] = np.zeros((natm,3))
+    nsys.atoms[['fx','fy','fz']] = np.zeros((natm,3))
+    nsys.atoms[['sid']] = sids
+    # hereafter, volumetric data if exists
+    if nvoldat > 0:
+        vdata = np.zeros(nvoldat, dtype=float)
+        nlines = int(nvoldat/6) +1
+        inc = 0
+        for il in range(nlines):
+            d = lines[6+natm+il].split()
+            vdata[inc:inc+len(d)] = [ float(v) for v in d ]
+            inc += len(d)
+        nsys.voldata = vdata
+        nsys.nvoldiv = ndiv
+        nsys.volorig = vorig
+    return nsys
+
+def write_cube(nsys, fname='cube', origin=[0.,0.,0.]):
+    """
+    Output the system info including volumetric data to a file in Gaussian cube format.
+    """
+    txt = get_cube_txt(nsys,origin=origin)
+    with open(fname,'w') as f:
+        f.write(txt)
+    return None
+
 def get_cube_txt(nsys,origin=[0.,0.,0.]):
     """
     Conver the system info to Gaussian cube format for the purpose of visualization using py3Dmol.
@@ -962,8 +1039,8 @@ def get_cube_txt(nsys,origin=[0.,0.,0.]):
     txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(nsys.num_atoms(),*org_bohr)
     #...Num of divisions, lattice vectors
     a,b,c = nsys.get_lattice_vectors()
-    if hasattr(nsys,'ndiv'):
-        ndiv = nsys.ndiv
+    if hasattr(nsys,'nvoldiv'):
+        ndiv = nsys.nvoldiv
         ndata = ndiv[0]*ndiv[1]*ndiv[2]
         voldata = nsys.voldata.reshape((ndata,),order='C')
     else:
@@ -998,7 +1075,7 @@ def get_cube_txt(nsys,origin=[0.,0.,0.]):
         txt += ' {0:12.6f} {1:12.6f} {2:12.6f}\n'.format(*pi_bohr)
 
     #...Volumetric data: 6 entries per line
-    if hasattr(nsys,'ndiv'):
+    if hasattr(nsys,'nvoldiv'):
         inc = 0
         for vd in voldata:
             txt += ' {0:12.4e}'.format(vd)
@@ -1010,16 +1087,6 @@ def get_cube_txt(nsys,origin=[0.,0.,0.]):
     else:
         txt += ' {0:12.4e}\n'.format(0.)
     return txt
-
-def write_cube(nsys, fname='cube', origin=[0.,0.,0.]):
-    """
-    Output the system info including volumetric data to a file in Gaussian cube format.
-    """
-    txt = get_cube_txt(nsys,origin=origin)
-    with open(fname,'w') as f:
-        f.write(txt)
-    return None
-        
 
 def get_PDB_txt(nsys,**kwargs):
     """

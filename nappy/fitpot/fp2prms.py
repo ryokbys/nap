@@ -383,6 +383,7 @@ def fp2params(vs,**kwargs):
     The param_files should contain key-phrases such as '{p[0]}' that are converted from fp-vars,
     and the indices in the key-phrases must correspond to those in fp-vars..
     """
+    import re
     try:
         param_fnames = kwargs['param_files']
     except:
@@ -393,6 +394,10 @@ def fp2params(vs,**kwargs):
     for fname in param_fnames:
         try:
             fcontents = kwargs[fname]
+            #...If the format is '{0:.1f}'-style, replace them to '{p[0]:.2f}'-style
+            res = re.search(r'\{[0-9]+:',fcontents)
+            if res != None:
+                fcontents = re.sub(r'\{([0-9]+):',r'{p[\1]:',fcontents)
             new_contents = fcontents.format(p=vs)
         except:
             print('ERROR: Failed to replace the parameters in param_files !!!')

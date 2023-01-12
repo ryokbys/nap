@@ -4,7 +4,7 @@ Calculate the radial distribution function (RDF) from files.
 It takes statistical averaging over atoms in a file and over files.
 
 Usage:
-  rdf.py [options] INFILE [INFILE...]
+  {0:s} [options] INFILE [INFILE...]
 
 Options:
   -h, --help  Show this help message and exit.
@@ -50,7 +50,7 @@ from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "200505"
+__version__ = "230107"
 
 def norm(vector):
     norm= 0.0
@@ -615,7 +615,8 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     return None
 
 def main():
-    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
+
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
     
     infiles= args['INFILE']
     dr= float(args['-d'])
@@ -681,7 +682,7 @@ def main():
     del infiles[:nskip]
     if len(infiles) < 1:
         raise ValueError('No input files to be processed.')
-    print(infiles)
+    print(' Number of files to be processed: ',len(infiles))
 
     tiny = 1.0e-8
     nr= int((rmax-rmin+tiny)/dr) +1

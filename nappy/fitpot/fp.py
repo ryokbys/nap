@@ -500,8 +500,21 @@ def read_data(fname,):
             except:
                 k = None
                 v = None
-            if k != None and v != None:
-                options[k] = v
+            if k != None and v != None: # valid option
+                if len(v) == 1: # options that take only one argument
+                    options[k] = v[0]
+                else: # options that take more than one arguments
+                    if k == 'subject_to':
+                        if len(v) != 4:
+                            raise ValueError('Num of arguments for subject_to option is wrong, len(v)= ',len(v))
+                        if 'subject_to' not in options.keys():
+                            options[k] = []
+                        options[k].append({'pid':int(v[0]),
+                                           'lower':v[1],
+                                           'upper':v[2],
+                                           'penalty':float(v[3])})
+                    else:
+                        options[k] = v
             continue
         ldat = line.split()
         if ndat < 1:
@@ -544,7 +557,7 @@ def parse_option(line):
         return None,None
     optname = words[1]
     k = words[1][:-1]
-    v = words[2]
+    v = words[2:]
     return k,v
 
 def get_data2(basedir,prefix='ref',**kwargs):
@@ -572,7 +585,7 @@ def get_data2(basedir,prefix='ref',**kwargs):
             print('   {0:s}  {1:.3f}'.format(m,data[m]['wdat']))
     return data
 
-def loss_func2(pmddata,eps=1.0e-8,**kwargs):
+def loss_func2(tdata,eps=1.0e-8,**kwargs):
     """
     Compute loss function value using general get_data2 func.
     """
@@ -586,20 +599,20 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         wgt = ref['wdat']
         dtype = ref['datatype']
         eps = ref['eps']
-        pmd = pmddata[name]
-        if pmd == None:
+        trial = tdata[name]
+        if trial == None:
             losses[name] = misval
             L += losses[name] *wgt
             continue
         num = ref['ndat']
         refd = ref['data']
-        pmdd = pmd['data']
+        td = trial['data']
         z2 = 0.0
         sumdiff2 = 0.0
         if dtype[:5] == 'indep':  # independent data
             epss = ref['epss']
             for n in range(num):
-                diff = pmdd[n] - refd[n]
+                diff = td[n] - refd[n]
                 sumdiff2 += diff*diff /epss[n]**2
             if num > 0:
                 sumdiff2 /= num
@@ -607,16 +620,35 @@ def loss_func2(pmddata,eps=1.0e-8,**kwargs):
         elif dtype[:3] == 'sep':  # data treated separately
             for n in range(num):
                 # print('n=',n)
-                diff = pmdd[n] -refd[n]
+                diff = td[n] -refd[n]
                 sumdiff2 += diff*diff /(refd[n]**2+eps)
             losses[name] = min(sumdiff2, luplim)
         else:  # data treated all together (default)
             for n in range(num):
                 # print('n=',n)
-                diff = pmdd[n] -refd[n]
+                diff = td[n] -refd[n]
                 sumdiff2 += diff*diff
                 z2 += refd[n]*refd[n]
             losses[name] = min(sumdiff2 /(z2+eps), luplim)
+
+        if 'subject_to' in ref.keys():
+            import re
+            for prange in ref['subject_to']:
+                pid = prange['pid']  # int
+                lower0 = prange['lower']  # str
+                upper0 = prange['upper']  # str
+                penalty = prange['penalty']  # float
+                lower1 = re.sub(r'\{([0-9]+)\}',r'{p[\1]}',lower0)
+                upper1 = re.sub(r'\{([0-9]+)\}',r'{p[\1]}',upper0)
+                lower2 = lower1.format(p=td)
+                upper2 = upper1.format(p=td)
+                lower = eval(lower2)
+                upper = eval(upper2)
+                if lower > upper:
+                    raise ValueError('lower is greater than upper in subject_to ',pid)
+                if not (lower < td[pid] < upper):
+                    losses[name] += penalty
+
         L += losses[name] *wgt
         
     if kwargs['print_level'] > 0:
@@ -986,7 +1018,7 @@ def headline():
     cmd = ' '.join(s for s in sys.argv)
     print('   Executed as {0:s}'.format(cmd))
     hostname = subprocess.run(['hostname',], stdout=subprocess.PIPE).stdout.decode('utf-8')
-    print('            on {0:s}'.format(hostname.strip()))
+    print('            at {0:s} on {1:s}'.format(os.getcwd(),hostname.strip()))
     print('            at {0:s}'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
     print()
     print('   Please cite:')

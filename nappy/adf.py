@@ -4,7 +4,7 @@ Calculate the angular distribution function (ADF) from files.
 Take an average over atoms in a file or files.
 
 Usage:
-  adf.py [options] INFILE [INFILE...]
+  {0:s} [options] INFILE [INFILE...]
 
 Options:
   -h, --help  Show this help message and exit.
@@ -37,7 +37,7 @@ from nappy.common import get_key
 from nappy.io import read
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "200505"
+__version__ = "230107"
 
 def norm(vector):
     norm= 0.0
@@ -245,7 +245,7 @@ def plot_figures(angd,agr,triplets):
     return None
 
 def main():
-    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])),version=__version__)
     
     infiles= args['INFILE']
     triplets = args['--triplets']
@@ -279,6 +279,7 @@ def main():
         infiles.sort(key=get_key,reverse=True)
     if nskip > 0 and len(infiles) > nskip:
         del infiles[:nskip]
+    print(' Number of files to be processed: ',len(infiles))
 
     na= int(180.0/dang)
     angd,agr= adf_average(infiles,dang=dang,

@@ -46,7 +46,7 @@ from nappy.atom import get_symbol_from_number, get_number_from_symbol
 from nappy.util import pbc
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "200722"
+__version__ = "230107"
 
 #...constants
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
@@ -208,7 +208,7 @@ class NAPSystem(object):
         elif set(self.specorder) == set(specorder):  # Only re-ordering
             newsids = np.zeros(len(self.atoms),dtype=int)
             for i,sid in enumerate(self.atoms.sid):
-                symbol = self.specorder[sids-1]
+                symbol = self.specorder[sid-1]
                 sidnew = specorder.index(symbol)+1
                 newsids[i] = sidnew
             self.atoms.sid = newsids
@@ -303,6 +303,25 @@ class NAPSystem(object):
             self.atoms.reset_index(drop=True,inplace=True)
         except Exception as e:
             raise
+
+        return None
+
+    def tidy_specorder(self):
+        """Tidy up the specorder by removing species of 0 atoms."""
+        natoms = self.natm_per_species()
+        to_remove = []
+        for i,s in enumerate(self.specorder):
+            if natoms[i] == 0:
+                to_remove.append(s)
+        if not len(to_remove) == 0:
+            now_specorder = self.specorder
+            now_symbols = self.get_symbols()
+            new_specorder = copy.copy(now_specorder)
+            for r in to_remove:
+                new_specorder.remove(r)
+            sids = [ new_specorder.index(s)+1 for s in now_symbols ]
+            self.specorder = new_specorder
+            self.atoms['sid'] = sids
 
         return None
 

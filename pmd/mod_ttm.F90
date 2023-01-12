@@ -1,6 +1,6 @@
 module ttm
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-08-08 19:31:59 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-12 17:45:55 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module for two(or three?)-temperature method (TTM).
@@ -2151,6 +2151,13 @@ contains
       do iy=0,ny+1
         do iz=0,nz+1
           te(iz,iy,ix) = tet3d
+        enddo
+      enddo
+!.....Since the range if ta grid is different from te grid...??
+!.....e.g.) iy==0 does not exist for ta grid
+      if( ix.gt.nx ) cycle
+      do iy=1,ny
+        do iz=1,nz
           call ixyz2ic(ix,iy,iz,ic)
           ta(ic) = tat3d
         enddo

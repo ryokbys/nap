@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-11-10 21:31:31 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-12 17:05:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -349,7 +349,7 @@ subroutine write_headline()
   write(6,*) ''
   write(6,'(a)') ' pmd --- Parallel Molecular Dynamics ---'
   write(6,*) ''
-  call write_version()
+  call write_revision()
   call write_authors()
   write(6,*) ''
   call time_stamp(' Job started')
