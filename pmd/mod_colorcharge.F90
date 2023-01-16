@@ -178,15 +178,17 @@ contains
       l1st = .false.
     endif
 
-!.....It is not necessary to do this every step,
-!     but for simplicity it is done every time
-    clraccel(1:3)= hi(1:3,1)*clrfield(1) +hi(1:3,2)*clrfield(2) &
-         +hi(1:3,3)*clrfield(3)
+!!$!.....It is not necessary to do this every step,
+!!$!     but for simplicity it is done every time
+!!$    clraccel(1:3)= hi(1:3,1)*clrfield(1) +hi(1:3,2)*clrfield(2) &
+!!$         +hi(1:3,3)*clrfield(3)
+!.....Now the aa(:,:) is in real unit, not normalized unit,
+!     no need to multiply hi(:,:) matrix
 
     do i=1,natm
       is= int(tag(i))
       if( is.ne.ispc_clrchg ) cycle
-      aa(1:3,i)= aa(1:3,i) +clr(i)*clraccel(1:3)
+      aa(1:3,i)= aa(1:3,i) +clr(i)*clrfield(1:3)
     enddo
     return
   end subroutine clrchg_force

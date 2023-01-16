@@ -469,7 +469,8 @@ def out4fp_Cij(cij,fname='data.pmd.Cij'):
 
 def main():
 
-    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
+                  version=__version__)
     # args= docopt(__doc__,version=__version__)
     dlt1max = float(args['--delta1'])
     dlt2max = float(args['--delta2'])
