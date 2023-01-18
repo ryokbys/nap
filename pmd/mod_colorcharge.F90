@@ -44,13 +44,16 @@ contains
     clrtot(:) = 0d0
     if( trim(clr_init).eq.'read' ) then  ! read from clrini
       call read_clr(ntot,clrtot,myid)
-    else if(  trim(clr_init).eq.'all_one' ) then ! set all the clr == 1.0
+      initialized = .true.
+    else if( trim(clr_init).eq.'all_one' ) then ! set all the clr == 1.0
       call set_clr_one(ntot,tagtot,clrtot,myid,iprint)
-    else  ! random
+      initialized = .true.
+    else if( trim(clr_init).eq.'random' ) then ! random
       call set_clr_random(ntot,tagtot,clrtot,myid,iprint)
+      initialized = .true.
     endif
+! else do nothing for the moment
 
-99  initialized = .true.
     return
   end subroutine init_clrchg
 !=======================================================================
@@ -98,6 +101,23 @@ contains
     endif
 
   end subroutine set_clr_one
+!=======================================================================
+  subroutine set_clr_round_chg(natm,tag,clr,chg,myid,iprint)
+!
+!  Set clr as round(chg)
+!
+    integer,intent(in):: natm,myid,iprint
+    real(8),intent(in):: tag(natm),chg(natm)
+    real(8),intent(inout):: clr(natm)
+
+    integer:: i,is
+
+    do i=1,natm
+      is = int(tag(i))
+      clr(i) = anint(chg(i))
+    enddo
+    return
+  end subroutine set_clr_round_chg
 !=======================================================================
   subroutine set_clr_random(ntot,tagtot,clrtot,myid,iprint)
 !

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2022-11-10 21:29:02 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-17 17:48:53 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -705,6 +705,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
+      maxnn = max(maxnn,calc_maxnn(namax,natm,nnmax,lspr, &
+           myid_md,mpi_md_world))
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
       tmp = mpi_wtime()
@@ -988,6 +990,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   tcpu= tcpu2 -tcpu1
   if( myid_md.eq.0 .and. iprint.ne. 0 ) then
+    write(6,*) ''
+    write(6,'(1x,a,i5)') "Max num of neighbors during MD = ",maxnn
     write(6,*) ''
     write(6,'(1x,a)') "Final values:"
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Kinetic energy  = ",ekin &

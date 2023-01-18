@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-28 17:17:53 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-18 10:14:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -881,13 +881,13 @@ contains
     endif
 
     if( .not.allocated(strsl) ) then
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
+      allocate(strsl(3,3,namax),aal(3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl)+8*size(aal))
     else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Coulomb',-8*size(strsl))
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-      call accum_mem('force_Coulomb',8*size(strsl))
+      call accum_mem('force_Coulomb',-8*size(strsl)-8*size(aal))
+      deallocate(strsl,aal)
+      allocate(strsl(3,3,namax),aal(3,namax))
+      call accum_mem('force_Coulomb',8*size(strsl)+8*size(aal))
     endif
 
     if( trim(cchgs).eq.'fixed' ) then
@@ -2683,8 +2683,10 @@ contains
     if( .not.allocated(aauxq) ) then
       allocate(aauxq(namax))
     else if( size(aauxq).ne.namax ) then
+      call accum_mem('force_Coulomb',-8*size(aauxq))
       deallocate(aauxq)
       allocate(aauxq(namax))
+      call accum_mem('force_Coulomb',8*size(aauxq))
     endif
 
     auxomg2 = omg2dt2 /dt**2
@@ -2740,6 +2742,13 @@ contains
     if( l1st ) then
       allocate(dbuf(nbmax),dbufr(nbmax))
       l1st=.false.
+    endif
+
+    if( size(dbuf).ne.nbmax ) then
+      call accum_mem('force_Coulomb',-8*(size(dbuf)+size(dbufr)))
+      deallocate(dbuf,dbufr)
+      allocate(dbuf(nbmax),dbufr(nbmax))
+      call accum_mem('force_Coulomb',8*(size(dbuf)+size(dbufr)))
     endif
 
     call nid2xyz(myid_md,ix,iy,iz)
@@ -2820,6 +2829,13 @@ contains
       l1st=.false.
     endif
 
+    if( size(dbuf).ne.nbmax ) then
+      call accum_mem('force_Coulomb',-8*(size(dbuf)+size(dbufr)))
+      deallocate(dbuf,dbufr)
+      allocate(dbuf(ndim,nbmax),dbufr(ndim,nbmax))
+      call accum_mem('force_Coulomb',8*(size(dbuf)+size(dbufr)))
+    endif
+    
     call nid2xyz(myid_md,ix,iy,iz)
 
     nbnew= 0

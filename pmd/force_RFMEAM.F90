@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:36:58 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-18 10:06:55 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -502,7 +502,11 @@ contains
       rc2max = rcmax*rcmax
     endif
 
-    if( size(aal).lt.namax ) then
+    if( size(aal).lt.3*namax ) then
+      call accum_mem('force_RFMEAM',-1*(8*(size(aal) +size(strsl) +size(epil) &
+           +size(sij) +size(dsij) +size(sfc) +size(dsfc) &
+           +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
+           +size(dgam) +size(drho) +size(rijs))))
       deallocate(aal,strsl,epil,sij,dsij,sfc,fl,dfl,dsfc, &
            drhoi2,drhoi0,dstrho2,dgam,drho,rijs)
       allocate(aal(3,namax),strsl(3,3,namax),epil(namax),sij(nnmax), &
@@ -510,6 +514,10 @@ contains
            dfl(3,0:lmax,nnmax),dsfc(3,nnmax,nnmax),drhoi2(3,nnmax,lmax), &
            drhoi0(3,nnmax),dstrho2(3,nnmax),dgam(3,nnmax),drho(3,nnmax), &
            rijs(5,nnmax))
+      call accum_mem('force_RFMEAM',(8*(size(aal) +size(strsl) +size(epil) &
+           +size(sij) +size(dsij) +size(sfc) +size(dsfc) &
+           +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
+           +size(dgam) +size(drho) +size(rijs))))
     endif
 
     epotl= 0d0
