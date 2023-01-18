@@ -122,8 +122,8 @@ rdf: ${rdfobj}
 #.....Dependencies
 pmd_main.o: ${mods}
 pmd_core.o: ${mods} ${forces} ${force_common}
-read_input.o:  ${mods} ${force_common}
-node_conv.o:   ${mods}
+read_input.o: ${mods} ${force_common}
+node_conv.o: ${mods}
 pmd2akr.o: ${mods}
 put_interstitials.o: ${mods}
 force_common.o: ${forces}
