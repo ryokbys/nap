@@ -461,6 +461,7 @@ subroutine init_force(linit)
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc,lprmset_desc
+  use dspring, only: ldspring
 !!$  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
   use tersoff,only: init_tersoff
@@ -583,7 +584,7 @@ subroutine init_force(linit)
   endif
   
 !.....Need to set descriptors before NN or linreg
-  if( use_force('DNN') .or. use_force('linreg') ) then
+  if( use_force('DNN') .or. use_force('linreg') .or. ldspring ) then
 !.....If descs are already set, no need to read descs from file.
 !.....This happens when descs are set from fitpot and re-used for all the samples.
     if( .not.lprmset_desc ) then

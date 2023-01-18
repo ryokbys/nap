@@ -1,6 +1,6 @@
 module version
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-16 15:39:31 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-18 14:20:57 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! A module for version/revision.
 !-----------------------------------------------------------------------
@@ -10,7 +10,7 @@ module version
 
   public:: write_revision, write_authors
   
-  character(len=128),parameter:: crevision = 'rev230116'
+  character(len=128),parameter:: crevision = 'rev230118'
 
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)

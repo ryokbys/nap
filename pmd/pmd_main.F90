@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-12 18:43:14 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-18 14:13:35 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -31,6 +31,7 @@ program pmd
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
+  use dspring,only: ldspring
 !$  use omp_lib
   implicit none
   include "mpif.h"
@@ -293,6 +294,7 @@ program pmd
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
+  if( ldspring ) auxtot(iaux_edsp,:) = 0d0
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -591,6 +593,7 @@ subroutine bcast_params()
   use deform,only: cdeform,trlx_deform,dhmat
   use descriptor,only: lout_desc
   use isostat,only: sratemax
+  use dspring,only: ldspring
   implicit none
   include 'mpif.h'
 
@@ -656,6 +659,8 @@ subroutine bcast_params()
   call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
 !.....Descriptor
   call mpi_bcast(lout_desc,1,mpi_logical,0,mpicomm,ierr)
+!.....Descriptor spring
+  call mpi_bcast(ldspring,1,mpi_logical,0,mpicomm,ierr)
 !.....Charge related
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
@@ -983,6 +988,71 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   return
 
 end subroutine determine_division
+!=======================================================================
+subroutine set_cauxarr()
+  use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
+       iaux_clr, ctctl, iaux_edsp
+  use force,only: set_use_charge, set_use_elec_temp, &
+       luse_charge, luse_elec_temp
+  use Coulomb,only: chgopt_method
+  use clrchg,only: lclrchg
+  use dspring,only: ldspring
+
+  integer:: inc
+
+  call set_use_charge()
+  call set_use_elec_temp()
+  naux = 0
+  if( luse_charge ) then
+    naux = naux +1  ! chg
+  endif
+  if( chgopt_method(1:4).eq.'xlag' ) then
+    naux = naux +2  ! auxq, vauxq
+  endif
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
+    naux = naux +1
+  endif
+  if( lclrchg ) then
+    naux = naux +1
+  endif
+  if( ldspring ) then
+    naux = naux +1
+  endif
+  if( allocated(cauxarr) ) then
+    if( size(cauxarr).ne.naux ) deallocate(cauxarr)
+  endif
+  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux))
+  inc = 0
+  if( luse_charge ) then
+    inc = inc +1
+    cauxarr(inc) = 'chg'
+    iaux_chg = inc
+  endif
+  if( chgopt_method(1:4).eq.'xlag' ) then
+    inc = inc +1
+    cauxarr(inc) = 'auxq'
+    iaux_q = inc
+    inc = inc +1
+    cauxarr(inc) = 'vauxq'
+    iaux_vq = inc
+  endif
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
+    inc = inc +1
+    cauxarr(inc) = 'tei'
+    iaux_tei = inc
+  endif
+  if( lclrchg ) then
+    inc = inc +1
+    cauxarr(inc) = 'clr'
+    iaux_clr = inc
+  endif
+  if( ldspring ) then
+    inc = inc +1
+    cauxarr(inc) = 'edsp'
+    iaux_edsp = inc
+  endif
+  
+end subroutine set_cauxarr
 !=======================================================================
 !-----------------------------------------------------------------------
 !     Local Variables:

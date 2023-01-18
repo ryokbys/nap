@@ -46,6 +46,7 @@ subroutine set_variable(ionum,cname)
   use deform,only: cdeform, trlx_deform, dhmat
   use descriptor,only: lout_desc
   use isostat,only: sratemax
+  use dspring,only: ldspring
 #ifdef __WALL__
   use wall
 #endif
@@ -374,6 +375,9 @@ subroutine set_variable(ionum,cname)
 !.....Descriptor
   elseif( trim(cname).eq.'write_desc' ) then
     call read_l1(ionum,lout_desc)
+    return
+  elseif( trim(cname).eq.'desc_spring') then
+    call read_l1(ionum,ldspring)
     return
     
 #ifdef __WALL__
