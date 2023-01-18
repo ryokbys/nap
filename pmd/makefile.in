@@ -157,4 +157,5 @@ mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
 mod_pairlist.o: mod_memory.o
 mod_util.o: mod_pmdvars.o mod_vector.o
 mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
-descriptor.o: $(filter-out descriptor.o, ${mods})
+mod_dspring: mod_pmdvars.o mod_util.o descriptor.o
+descriptor.o: mod_pmdvars.o mod_util.o mod_memory.o

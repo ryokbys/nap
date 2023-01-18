@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-18 14:14:16 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-18 14:51:52 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -358,7 +358,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
   endif
 !.....Color charge NEMD
-  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iaux_clr,:),hi,specorder &
+  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
        ,myid_md,iprint)
 !.....External force
   if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
@@ -747,7 +747,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
     endif
 !.....Color charge NEMD
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iaux_clr,:),hi,specorder &
+    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
          ,myid_md,iprint)
 !.....External force
     if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
@@ -928,7 +928,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       i_conv = 0
     endif
 
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux(iaux_clr,:),hi,specorder &
+    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
          ,myid_md,iprint)
     if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iaux_clr,:),istp,dt &
          ,myid_md,mpi_md_world,nxyz)

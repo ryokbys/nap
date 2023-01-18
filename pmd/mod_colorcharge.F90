@@ -28,6 +28,7 @@ contains
 !  This routine should be called after broadcasting data from node-0,
 !  but before calling space_decomp.
 !
+    use force,only: luse_charge
     integer,intent(in):: myid,iprint,ntot
     character(len=3),intent(in):: specorder(nspmax)
     real(8),intent(in):: tagtot(ntot)
@@ -45,12 +46,15 @@ contains
     if( trim(clr_init).eq.'read' ) then  ! read from clrini
       call read_clr(ntot,clrtot,myid)
       initialized = .true.
-    else if( trim(clr_init).eq.'all_one' ) then ! set all the clr == 1.0
+    else if( trim(clr_init).eq.'all_one' ) then  ! set all the clr == 1.0
       call set_clr_one(ntot,tagtot,clrtot,myid,iprint)
       initialized = .true.
     else if( trim(clr_init).eq.'random' ) then ! random
       call set_clr_random(ntot,tagtot,clrtot,myid,iprint)
       initialized = .true.
+    else if( index(clr_init,'chg').ne.0 ) then  ! charge related
+      if( .not. luse_charge ) stop 'ERROR: clr_init is set as chg related, ' &
+           //'but the potential does not use charges.'
     endif
 ! else do nothing for the moment
 
@@ -173,14 +177,15 @@ contains
 
   end subroutine set_clr_random
 !=======================================================================
-  subroutine clrchg_force(namax,natm,tag,aa,clr,hi,specorder,myid,iprint)
+  subroutine clrchg_force(namax,natm,tag,aa,aux,hi,specorder,myid,iprint)
 !
 !  Add external forces on atoms of specified species
 !
+    use pmdvars,only: naux,iaux_chg,iaux_clr
     integer,intent(in):: namax,natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: tag(namax),hi(3,3),clr(namax)
-    real(8),intent(inout):: aa(3,namax)
+    real(8),intent(in):: tag(namax),hi(3,3)
+    real(8),intent(inout):: aa(3,namax),aux(naux,namax)
     logical,save:: l1st = .true.
 
     integer:: i,is
@@ -205,10 +210,18 @@ contains
 !.....Now the aa(:,:) is in real unit, not normalized unit,
 !     no need to multiply hi(:,:) matrix
 
+    if( trim(clr_init).eq.'round_chg' ) then
+      do i=1,natm
+        aux(iaux_clr,i) = anint(aux(iaux_chg,i))
+      enddo
+    else if( trim(clr_init).eq.'chg' ) then
+      aux(iaux_clr,1:natm) = aux(iaux_chg,1:natm)
+    endif
+
     do i=1,natm
       is= int(tag(i))
       if( is.ne.ispc_clrchg ) cycle
-      aa(1:3,i)= aa(1:3,i) +clr(i)*clrfield(1:3)
+      aa(1:3,i)= aa(1:3,i) +aux(iaux_clr,i)*clrfield(1:3)
     enddo
     return
   end subroutine clrchg_force
