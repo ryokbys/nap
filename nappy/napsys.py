@@ -620,7 +620,7 @@ class NAPSystem(object):
                         'sphere':{'radius':.5,'colorscheme':{'prop':'elem','map':colors}}})
         v.addUnitCell()
         if hasattr(self,'voldata'):
-            cube = self.get_cube_txt()
+            cube = nappy.io.get_cube_txt(self)
             if 'volopts' in locals():
                 v.addVolumetricData(cube, "cube", volopts)
             else:

@@ -77,6 +77,7 @@ def write_gcube(n1,n2,n3,a1,a2,a3,fts,fname='out.lflux.cube',
     elif len(fts.shape) == 3:  # 3D array
         if fts.shape != (n1,n2,n3):
             raise ValueError('Mismatch array shape.')
+        fts.reshape((n1*n2*n3,),order='C')
     if len(a1) != 3 or len(a2) != 3 or len(a3) != 3:
         raise ValueError('Lattice vectors a1,a2,a3 must be set appropriately.')
     if type(a1) != np.ndarray or type(a2) != np.ndarray or type(a3) != np.ndarray:
@@ -113,22 +114,16 @@ def write_gcube(n1,n2,n3,a1,a2,a3,fts,fname='out.lflux.cube',
             f.write('0.0\n')
         else:
             if len(fts.shape) == 1:
-                for i1 in range(n1):
-                    for i2 in range(n2):
-                        for i3 in range(n3):
-                            ig = i1*n2*n3 +i2*n3 +i3
-                            f.write('{0:13.3e} '.format(fts[ig]))
-                            if i3 % 6 == 5:
-                                f.write('\n')
-                        f.write('\n')
-            elif len(fts.shape) == 3:
-                for i1 in range(n1):
-                    for i2 in range(n2):
-                        for i3 in range(n3):
-                            f.write('{0:13.3e} '.format(fts[i1,i2,i3]))
-                            if i3 % 6 == 5:
-                                f.write('\n')
-                        f.write('\n')
+                vtxt = ''
+                inc = 0
+                for vd in fts:
+                    vtxt += f' {vd:12.4e}'
+                    inc += 1
+                    if inc % 6 == 0:
+                        vtxt += '\n'
+                        inc = 0
+                vtxt += '\n'
+                f.write(vtxt)
     return
 
 def read_lflux(fname='out.lflux',noutlflux=1000):
