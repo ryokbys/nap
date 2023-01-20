@@ -40,7 +40,7 @@ subroutine set_variable(ionum,cname)
   use util,only: csp2isp, lowcase
   use force,only: ol_type, ol_force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
-  use clrchg,only: lclrchg,cspc_clrchg,clrfield,clr_init
+  use clrchg,only: lclrchg,cspc_clrchg,clrfield,clrregion,clr_set
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use deform,only: cdeform, trlx_deform, dhmat
@@ -56,7 +56,7 @@ subroutine set_variable(ionum,cname)
 
   character(len=128):: ctmp,cval
   character(len=3):: csp
-  integer:: ndata,nrow,is,itmp
+  integer:: ndata,nrow,is,itmp,ixyz
   real(8):: tmp
 
   if( trim(cname).eq.'time_interval' ) then
@@ -327,8 +327,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'flag_clrchg') then
     call read_l1(ionum,lclrchg)
     return
-  elseif( trim(cname).eq.'clr_init') then
-    call read_c1(ionum,clr_init)
+  elseif( trim(cname).eq.'clr_init' .or. trim(cname).eq.'clr_set') then
+    call read_c1(ionum,clr_set)
     return
   elseif( trim(cname).eq.'spcs_clrchg') then
     call read_c1(ionum,cspc_clrchg)
@@ -336,6 +336,10 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'clrfield') then
     backspace(ionum)
     read(ionum,*) ctmp,clrfield(1:3)
+    return
+  elseif( trim(cname).eq.'clr_region') then
+    backspace(ionum)
+    read(ionum,*) ctmp,ixyz,clrregion(ixyz,1:2)
     return
 !.....Local flux
   elseif( trim(cname).eq.'flag_lflux') then

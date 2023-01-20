@@ -171,12 +171,7 @@ contains
       ilx = int((ra(1,i)+dlx)*dlxi)
       ily = int((ra(2,i)+dly)*dlyi)
       ilz = int((ra(3,i)+dlz)*dlzi)
-!!$      ilx = min(max(ilx,1),nlx)
-!!$      ily = min(max(ily,1),nly)
-!!$      ilz = min(max(ilz,1),nlz)
       idxl = (ilx-1)*nly*nlz +(ily-1)*nlz +ilz
-!!$      write(6,'(a,5i5,2(2x,3es10.2))') 'i,ilx,ily,ilz,idxl,ra=',i,ilx,ily,ilz,idxl &
-!!$           ,ra(1:3,i),va(1:3,i)
       nargn(idxl) = nargn(idxl) +1
 !.....Scale velocity
       vi(1:3) = hmat(1:3,1)*va(1,i) +hmat(1:3,2)*va(2,i) &

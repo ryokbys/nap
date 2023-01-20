@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-18 14:51:52 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-20 17:36:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -27,7 +27,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use deform,only: init_deform, apply_deform, cdeform
   use util,only: itotOf, ifmvOf
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
-  use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg,clr_init
+  use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
@@ -928,8 +928,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       i_conv = 0
     endif
 
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
-         ,myid_md,iprint)
+!!$    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
+!!$         ,myid_md,iprint)
     if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iaux_clr,:),istp,dt &
          ,myid_md,mpi_md_world,nxyz)
     if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)

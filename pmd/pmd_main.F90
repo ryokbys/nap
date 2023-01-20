@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-18 14:13:35 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-20 17:50:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -363,7 +363,7 @@ subroutine write_initial_setting()
   use pmdvars
   use pmdmpi
   use force
-  use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_init
+  use clrchg,only: lclrchg, cspc_clrchg, clrfield, clr_set
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use isostat,only: sratemax
@@ -486,7 +486,7 @@ subroutine write_initial_setting()
 !.....Color charge NEMD
   if( lclrchg ) then
     write(6,'(2x,a,5x,l)') 'flag_clrchg',lclrchg
-    write(6,'(2x,a,5x,a)') 'clr_init',trim(clr_init)
+    write(6,'(2x,a,5x,a)') 'clr_set',trim(clr_set)
     write(6,'(2x,a,5x,a)') 'spcs_clrchg',trim(cspc_clrchg)
     write(6,'(2x,a,3(2x,f0.4))') 'clrfield',clrfield(1:3)
     write(6,'(2x,a)') ''
@@ -587,7 +587,7 @@ subroutine bcast_params()
   use pmdvars
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
-  use clrchg,only: lclrchg,cspc_clrchg,clr_init,clrfield
+  use clrchg,only: lclrchg,cspc_clrchg,clr_set,clrfield,clrregion
   use localflux,only: lflux,nlx,nly,nlz,noutlflux
   use pdens,only: lpdens,npx,npy,npz,cspc_pdens,orig_pdens,hmat_pdens
   use deform,only: cdeform,trlx_deform,dhmat
@@ -688,8 +688,9 @@ subroutine bcast_params()
   call mpi_bcast(lclrchg,1,mpi_logical,0,mpicomm,ierr)
   if( lclrchg ) then
     call mpi_bcast(cspc_clrchg,3,mpi_character,0,mpicomm,ierr)
-    call mpi_bcast(clr_init,20,mpi_character,0,mpicomm,ierr)
+    call mpi_bcast(clr_set,20,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(clrfield,3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(clrregion,6,mpi_real8,0,mpicomm,ierr)
   endif
 !.....Local flux
   call mpi_bcast(lflux,1,mpi_logical,0,mpicomm,ierr)

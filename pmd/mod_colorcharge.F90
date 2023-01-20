@@ -15,10 +15,13 @@ module clrchg
   logical:: initialized = .false.
   character(len=3):: cspc_clrchg = 'non'
   integer:: ispc_clrchg
-  character(len=20):: clr_init = 'random'
+  character(len=20):: clr_set = 'random'
   real(8):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
   real(8):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
   real(8):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
+  real(8):: clrregion(3,2)  ! regional condition
+  data clrregion(1:3,1) / -1d0, -1d0, -1d0 / ! sufficiently smaller than 0
+  data clrregion(1:3,2) /  2d0,  2d0,  2d0 / ! sufficiently greater than 1
   
 contains
 !=======================================================================
@@ -43,17 +46,17 @@ contains
     endif
 
     clrtot(:) = 0d0
-    if( trim(clr_init).eq.'read' ) then  ! read from clrini
+    if( trim(clr_set).eq.'read' ) then  ! read from clrini
       call read_clr(ntot,clrtot,myid)
       initialized = .true.
-    else if( trim(clr_init).eq.'all_one' ) then  ! set all the clr == 1.0
+    else if( trim(clr_set).eq.'all_one' ) then  ! set all the clr == 1.0
       call set_clr_one(ntot,tagtot,clrtot,myid,iprint)
       initialized = .true.
-    else if( trim(clr_init).eq.'random' ) then ! random
+    else if( trim(clr_set).eq.'random' ) then ! random
       call set_clr_random(ntot,tagtot,clrtot,myid,iprint)
       initialized = .true.
-    else if( index(clr_init,'chg').ne.0 ) then  ! charge related
-      if( .not. luse_charge ) stop 'ERROR: clr_init is set as chg related, ' &
+    else if( index(clr_set,'chg').ne.0 ) then  ! charge related
+      if( .not. luse_charge ) stop 'ERROR: clr_set is set as chg related, ' &
            //'but the potential does not use charges.'
     endif
 ! else do nothing for the moment
@@ -181,7 +184,7 @@ contains
 !
 !  Add external forces on atoms of specified species
 !
-    use pmdvars,only: naux,iaux_chg,iaux_clr
+    use pmdvars,only: naux,iaux_chg,iaux_clr,ra,sorg
     integer,intent(in):: namax,natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
     real(8),intent(in):: tag(namax),hi(3,3)
@@ -189,6 +192,7 @@ contains
     logical,save:: l1st = .true.
 
     integer:: i,is
+    real(8):: ri(3)
 
     if( l1st ) then
       if( myid.eq.0 ) then
@@ -196,8 +200,15 @@ contains
         if( iprint.ge.ipl_basic ) then
           print *,''
           print '(a)', ' Color charge NEMD:'
+          print '(a,a)', '   color charge type:', trim(clr_set)
           print '(a,i3,a5)', '   Specified species = ',ispc_clrchg,trim(cspc_clrchg)
           print '(a,3f10.5)', '   Applied field [eV/A] = ',clrfield(1:3)
+          if( trim(clr_set).eq.'region' ) then
+            print '(a)', '   regional condition:'
+            do i=1,3
+              print '(i6,2f6.3)', i, max(clrregion(i,1),0d0), min(clrregion(i,2),1d0)
+            enddo
+          endif
         endif
       endif
       l1st = .false.
@@ -210,17 +221,29 @@ contains
 !.....Now the aa(:,:) is in real unit, not normalized unit,
 !     no need to multiply hi(:,:) matrix
 
-    if( trim(clr_init).eq.'round_chg' ) then
+    if( trim(clr_set).eq.'round_chg' ) then
       do i=1,natm
         aux(iaux_clr,i) = anint(aux(iaux_chg,i))
       enddo
-    else if( trim(clr_init).eq.'chg_cation' ) then
+    else if( trim(clr_set).eq.'chg_cation' ) then
       !...Only cations with greater 0.1 e charges
       do i=1,natm
         if( aux(iaux_chg,i).gt.0.1d0 ) then
           aux(iaux_clr,i) = 1d0
         else
           aux(iaux_clr,i) = 0d0
+        endif
+      enddo
+!.....Set color charges on the atoms inside specified region
+    else if( trim(clr_set).eq.'region') then
+      aux(iaux_clr,1:natm) = 0d0
+      do i=1,natm
+        if( int(tag(i)).ne.ispc_clrchg ) cycle
+        ri(1:3) = ra(1:3,i) +sorg(1:3)
+        if( clrregion(1,1).lt.ri(1) .and. ri(1).lt.clrregion(1,2) .and. &
+            clrregion(2,1).lt.ri(2) .and. ri(2).lt.clrregion(2,2) .and. &
+            clrregion(3,1).lt.ri(3) .and. ri(3).lt.clrregion(3,2) ) then
+          aux(iaux_clr,i) = 1d0
         endif
       enddo
     endif
@@ -292,5 +315,5 @@ contains
 end module clrchg
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
