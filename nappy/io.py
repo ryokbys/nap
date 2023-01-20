@@ -966,7 +966,7 @@ def read_cube(fname, specorder=None):
     for i in range(3):
         d = lines[3+i].split()
         ndiv[i] = int(d[0])
-        dhmat[i,:] = [ float(v) for v in d[1:4] ]
+        dhmat[i,:] = [ float(v)*Bohr_to_Ang for v in d[1:4] ]
         hmat[i,:] = dhmat[i,:] *ndiv[i]
     nvoldat = ndiv[0]*ndiv[1]*ndiv[2]
     hmati = np.linalg.inv(hmat)

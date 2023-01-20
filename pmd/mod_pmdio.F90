@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-04-01 15:03:32 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-20 10:25:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -401,7 +401,7 @@ contains
       rlmp(1:3,i) = 0d0
       call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz &
            ,x,y,z,yz,xz,xy)
-!.....Velocity as well
+!.....Velocity is in real unit (A/fs)
       vlmp(1:3,i) = vtot(1:3,i)
       vlmp(2,i) = vlmp(2,i) -lyz*vtot(3,i)
       vlmp(1,i) = vlmp(1,i) -lxz*vtot(3,i) +(vtot(2,i)*xyp -vlmp(2,i)*xy)/x

@@ -214,8 +214,15 @@ contains
       do i=1,natm
         aux(iaux_clr,i) = anint(aux(iaux_chg,i))
       enddo
-    else if( trim(clr_init).eq.'chg' ) then
-      aux(iaux_clr,1:natm) = aux(iaux_chg,1:natm)
+    else if( trim(clr_init).eq.'chg_cation' ) then
+      !...Only cations with greater 0.1 e charges
+      do i=1,natm
+        if( aux(iaux_chg,i).gt.0.1d0 ) then
+          aux(iaux_clr,i) = 1d0
+        else
+          aux(iaux_clr,i) = 0d0
+        endif
+      enddo
     endif
 
     do i=1,natm
