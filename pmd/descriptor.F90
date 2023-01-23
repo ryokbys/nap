@@ -222,6 +222,20 @@ contains
       endif
     endif
 
+    if( size(gsfi).ne.nsf ) then
+      call accum_mem('descriptor',-8*size(gsfi) -8*size(gscli))
+      deallocate(gsfi,gscli)
+      allocate(gsfi(nsf),gscli(nsf))
+      call accum_mem('descriptor',8*size(gsfi) +8*size(gscli))
+    endif
+
+    if( size(igsfi).ne.nsf*(nnmax+1) ) then
+      call accum_mem('descriptor',-8*size(dgsfi) -2*size(igsfi))
+      deallocate(dgsfi,igsfi)
+      allocate(dgsfi(3,nsf,0:nnmax),igsfi(nsf,0:nnmax))
+      call accum_mem('descriptor',8*size(dgsfi) +2*size(igsfi))
+    endif
+
 !  Since natm and nn can change every step of MD,
 !  if natm/nnlt becomes >nal/nnl, they should be updated and
 !  gsf/dgsf as well.

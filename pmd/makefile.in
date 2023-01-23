@@ -154,7 +154,7 @@ mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o mod_random.o
 mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
-mod_pairlist.o: mod_memory.o
+mod_pairlist.o: mod_memory.o mod_pmdvars.o
 mod_util.o: mod_pmdvars.o mod_vector.o
 mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
 mod_dspring: mod_pmdvars.o mod_util.o descriptor.o

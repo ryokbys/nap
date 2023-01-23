@@ -31,48 +31,64 @@ module pairlist
   
 contains
 !=======================================================================
-  subroutine mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi &
-       ,rc,h,hi,l1st)
+  subroutine mk_lscl_para()
 !
 ! Make a linked cell list.
 ! Codes are slightly different bewteen parallel and single.
 !
-    integer,intent(in):: namax,natm,nbmax,nb
-    real(8),intent(in):: anxi,anyi,anzi,rc,h(3,3),hi(3,3)
-    real(8),intent(inout):: ra(3,namax)
-    logical,intent(in):: l1st
+    use pmdvars,only: namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rbuf, &
+         h,hi
+!!$    integer,intent(in):: namax,natm,nbmax,nb
+!!$    real(8),intent(in):: anxi,anyi,anzi,rc,h(3,3),hi(3,3)
+!!$    real(8),intent(inout):: ra(3,namax)
 
     integer:: i,mx,my,mz,m
+    real(8):: rcut
 
-    if( l1st ) then
-      rc2= rc**2
+    rcut = rc +rbuf
+
+!.....The following code (block) is used to be called once at the 1st call,
+!.....but these variables could change when the cell size and shape change.
+    rc2= rcut**2
 !-----make a linked cell list, LSCL
-      lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
-      lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
-      lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
+    lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rcut
+    lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rcut
+    lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rcut
 !.....In case that system is thinner than rc, modify lc?.
 !.....but notice this modification does not correct results.
-      if( lcx.eq.0 ) lcx=1
-      if( lcy.eq.0 ) lcy=1
-      if( lcz.eq.0 ) lcz=1
-      lcx2= lcx +2
-      lcy2= lcy +2
-      lcz2= lcz +2
-      lcyz2=lcy2*lcz2
-      lcxyz2=lcx2*lcyz2
-      rcx= anxi/lcx
-      rcy= anyi/lcy
-      rcz= anzi/lcz
-      rcxi=1d0/rcx
-      rcyi=1d0/rcy
-      rczi=1d0/rcz
+    if( lcx.eq.0 ) lcx=1
+    if( lcy.eq.0 ) lcy=1
+    if( lcz.eq.0 ) lcz=1
+    lcx2= lcx +2
+    lcy2= lcy +2
+    lcz2= lcz +2
+    lcyz2=lcy2*lcz2
+    lcxyz2=lcx2*lcyz2
+    rcx= anxi/lcx
+    rcy= anyi/lcy
+    rcz= anzi/lcz
+    rcxi=1d0/rcx
+    rcyi=1d0/rcy
+    rczi=1d0/rcz
+
 !-----allocate LSCL & LSHD after obtaining lcxyz2
-      if( allocated(lscl) ) then
-        call accum_mem('pairlist',-4*size(lscl) -4*size(lshd))
-        deallocate(lscl,lshd)
-      endif
-      allocate(lscl(namax+nbmax),lshd(lcxyz2))
+    if( .not.allocated(lscl) ) then
+      allocate(lscl(namax),lshd(lcxyz2))
       call accum_mem('pairlist',4*size(lscl)+4*size(lshd))
+    endif
+
+    if( size(lshd).ne.lcxyz2 ) then
+      call accum_mem('pairlist',-4*size(lshd))
+      deallocate(lshd)
+      allocate(lshd(lcxyz2))
+      call accum_mem('pairlist',4*size(lshd))
+    endif
+
+    if( size(lscl).ne.namax ) then
+      call accum_mem('pairlist',-4*size(lscl))
+      deallocate(lscl)
+      allocate(lscl(namax))
+      call accum_mem('pairlist',4*size(lscl))
     endif
 
 !-----reset headers
@@ -100,7 +116,7 @@ contains
 !-------the last one goes to the header
       lshd(m)= i
     enddo
-    
+
     return
   end subroutine mk_lscl_para
 !=======================================================================
@@ -133,24 +149,40 @@ contains
     return
   end subroutine sort_arrays
 !=======================================================================
-  subroutine mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va &
-       ,rc,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+  subroutine mk_lspr_para(l1st)
 !
 !  Make a pairlist using cell list created in mk_lscl_para.
+!  Cutoff radius is already set in the mk_lscl_para, and thus not given
+!  as an argument.
 !
+    use pmdvars,only: namax,natm,nbmax,nb,nnmax,tag,ra,va,h,hi,&
+         anxi,anyi,anzi,lspr,iprint,rc,rbuf
     implicit none
-    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
-    integer,intent(out):: lspr(0:nnmax,namax)
-    real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
-    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
+!!$    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
+!!$    integer,intent(out):: lspr(0:nnmax,namax)
+!!$    real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
+!!$    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,inc,nni,nnj
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
 
-    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-         ,h,hi,l1st)
+    call mk_lscl_para()
+
+    call set_nnmax()
+
+    if( .not.allocated(lspr) ) then
+      allocate(lspr(0:nnmax,namax))
+      call accum_mem('pairlist',4*size(lspr))
+    endif
+
+    if( size(lspr).ne.(nnmax+1)*namax ) then
+      call accum_mem('pairlist',-4*size(lspr))
+      deallocate(lspr)
+      allocate(lspr(0:nnmax,namax))
+      call accum_mem('pairlist',4*size(lspr))
+    endif
 
 !-----reset pair list, LSPR
     lspr(:,:)= 0
@@ -187,9 +219,9 @@ contains
                 cycle
               endif
               xij(1:3)= ra(1:3,j) -xi(1:3)
-              rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
-              rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
-              rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
+              rij(1)= h(1,1,0)*xij(1) +h(1,2,0)*xij(2) +h(1,3,0)*xij(3)
+              rij(2)= h(2,1,0)*xij(1) +h(2,2,0)*xij(2) +h(2,3,0)*xij(3)
+              rij(3)= h(3,1,0)*xij(1) +h(3,2,0)*xij(2) +h(3,3,0)*xij(3)
               rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
 
               if( rij2.lt.rc2 ) then
@@ -324,8 +356,7 @@ contains
       enddo
     endif
 
-    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-         ,h,hi,l1st)
+    call mk_lscl_para()
 
 !.....Make a converter that converts atom index to cell index
     ia2ic(:) = 0
@@ -518,6 +549,10 @@ contains
 !
 ! Make lspr in serial implimentation taking the periodic boundary
 ! condition into account.
+!
+! NOTICE:
+! This routine is called from a python script nappy/pmd/pairlist.py,
+! so be careful when modfiying the code.
 !
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -950,6 +985,63 @@ contains
     enddo
     return
   end subroutine sort_lspr
+!=======================================================================
+  subroutine set_nnmax()
+!
+!  Estimate and set nnmax from lscl. Thus this must be called after 
+!  lscl and lshd are computed.
+!  The density rho is determined by the max density among lscl. 
+!  And the nnmax is determined by 4*pi*rho*rcut**3 *alpha /3,
+!  where alpha is a mergin of the estimate, like 1.2.
+!
+    use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf,iprint
+    include "mpif.h"
+    
+    integer:: ierr,ic,i,nc,nmaxl,nmax,nnmax_estimate,nnmax_prev
+    real(8):: volc,rho
+    real(8),parameter:: alpha = 1.2d0
+    real(8),parameter:: pi = 3.14159265358979d0
+    logical,save:: l1st = .true. 
+    
+    nmaxl = 0
+    do ic=1,lcxyz2
+      i = lshd(ic)
+      nc = 0
+      do while( i.gt.0 )
+        nc = nc +1
+        i = lscl(i)
+      enddo ! while (j.gt.0)
+      nmaxl = max(nc,nmaxl)
+    enddo
+
+    nmax = 0
+    call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max,mpi_md_world, &
+         ierr)
+
+    volc = vol/(lcx*lcy*lcz)/nxyz
+    rho = dble(nmax)/volc
+    nnmax_estimate = int(4*pi*(rc+rbuf)**3*rho/3) +1
+!!$    print *,'vol,lcx,lcy,lcz=',vol,lcx,lcy,lcz
+!!$    print *,'myid,nmaxl,nmax,volc,rho,nnmax_estimate=', &
+!!$         myid_md,nmaxl,nmax,volc,rho,nnmax_estimate
+!.....If nnmax_estmate < nnmax, do nothing and return
+    if( nnmax_estimate.le.nnmax ) return
+      
+    nnmax_prev = nnmax
+    nnmax = int(nnmax_estimate *alpha)
+
+    if( myid_md.eq.0 .and. iprint.gt.0 ) then
+      if( l1st ) then
+        print *,''
+        print '(a,i4)',' Max num of neighbors is estimated as ',nnmax
+      else
+        print '(a,i4,a,i4)',' Max num of neighbors is updated from ', &
+             nnmax_prev,' to ',nnmax
+      endif
+    endif
+    l1st = .false.
+    return
+  end subroutine set_nnmax
 !=======================================================================
 end module pairlist
 !-----------------------------------------------------------------------

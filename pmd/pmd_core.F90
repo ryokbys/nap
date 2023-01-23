@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-20 17:36:49 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-23 15:02:31 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -31,8 +31,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use localflux,only: lflux,accum_lflux
   use pdens,only: lpdens,accum_pdens
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para, &
-       check_lspr, check_lscl
+  use pairlist, only: mk_lspr_para
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_langevin, vel_update_langevin, vel_update_berendsen, &
        cell_update_berendsen,cell_force_berendsen, setup_cell_langevin, &
@@ -296,21 +295,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
   l1st = .true.
-!!$  if( lsrt_arrs ) then
-!!$    call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-!!$         ,h,hi,l1st)
-!!$    call sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
-!!$    l1st = .false.
-!!$  endif
   tmp = mpi_wtime()
   call bacopy(.true.)
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
-  call check_lscl(myid_md,iprint)
-  call check_lspr(namax,natm,nnmax,lspr,iprint,myid_md,mpi_md_world)
+!!$  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+!!$       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+  call mk_lspr_para(l1st)
   call accum_time('lspr',mpi_wtime()-tmp)
 
   maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
@@ -698,18 +690,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       tmp = mpi_wtime()
       call bamove()
       l1st = .false.
-!!$      if( lsrt_arrs ) then
-!!$        call mk_lscl_para(namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc &
-!!$             ,h,hi,l1st)
-!!$        call sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
-!!$      endif
 !.....Copy RA of boundary atoms
       call bacopy(.false.)
       call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
-      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-           ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+!!$      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+!!$           ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+      call mk_lspr_para(l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
       maxnn = max(maxnn,calc_maxnn(namax,natm,nnmax,lspr, &
@@ -1145,8 +1133,9 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   call bacopy(.true.)
 !-----Make pair list
   l1st = .true.
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+!!$  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+!!$       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+  call mk_lspr_para(l1st)
   lstrs = .true.
 
   if( iprint.ge.ipl_info ) print *,'get_force...'
@@ -1256,8 +1245,9 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   call bacopy(.true.)
 !-----Make pair list
   l1st = .true.
-  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+!!$  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+!!$       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+  call mk_lspr_para(l1st)
   lstrs = .true.
 
   if( .not.lcalcgrad ) then
@@ -1338,8 +1328,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use pmdmpi,only: nid2xyz,xyz2nid
   use util,only: itotOf, ifmvOf
   use time, only: sec2hms, accum_time
-  use pairlist, only: mk_lspr_para,mk_lscl_para, &
-       check_lspr, check_lscl
+  use pairlist, only: mk_lspr_para
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_cell_min
 
@@ -1460,8 +1449,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
     tmp = mpi_wtime()
-    call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-         ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+!!$    call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
+!!$         ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+    call mk_lspr_para(l1st)
     call accum_time('lspr',mpi_wtime()-tmp)
 
     maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
@@ -3258,25 +3248,19 @@ subroutine alloc_namax_related()
   if( allocated(aa) ) deallocate(aa)
   if( allocated(ra0) ) deallocate(ra0)
   if( allocated(strs) ) deallocate(strs)
-!!$  if( allocated(stt) ) deallocate(stt)
   if( allocated(tag) ) deallocate(tag)
-  if( allocated(lspr) ) deallocate(lspr)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
-!!$  if( allocated(stp) ) deallocate(stp)
-!!$  if( allocated(stn) ) deallocate(stn)
   if( allocated(aux) ) deallocate(aux)
   if( allocated(lsb) ) deallocate(lsb)
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
        ,strs(3,3,namax),tag(namax) &
-       ,lspr(0:nnmax,namax) &
        ,epi(namax),eki(3,3,namax) &
-!!$       ,stp(3,3,namax),stn(3,3,namax),stt(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   allocate(aux(naux,namax))
-  mem = 8*namax*(3 +3 +3 +3 +9 +1 +nnmax+1 +nnmax +1 +3 +naux)
-  mem = 4*namax*(nnmax+1) +4*6*(nbmax+1) +4*6*nbmax
+  mem = 8*namax*(3 +3 +3 +3 +9 +1 +1 +9 +naux)
+  mem = 4*6*(nbmax+1) +4*6*nbmax
   call accum_mem('pmd',mem)
   
   return
@@ -3380,15 +3364,15 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   deallocate(arr)
   mem = mem -8*ndim +8*newnamax
 
-!.....lspr
-  ndim = size(lspr)
-  allocate(iarr(ndim))
-  call copy_iarr(ndim,lspr,iarr)
-  deallocate(lspr)
-  allocate(lspr(0:nnmax,newnamax))
-  call copy_iarr(ndim,iarr,lspr)
-  deallocate(iarr)
-  mem = mem -4*ndim +4*(nnmax+1)*newnamax
+!!$!.....lspr
+!!$  ndim = size(lspr)
+!!$  allocate(iarr(ndim))
+!!$  call copy_iarr(ndim,lspr,iarr)
+!!$  deallocate(lspr)
+!!$  allocate(lspr(0:nnmax,newnamax))
+!!$  call copy_iarr(ndim,iarr,lspr)
+!!$  deallocate(iarr)
+!!$  mem = mem -4*ndim +4*(nnmax+1)*newnamax
 
 !.....epi
   ndim = size(epi)

@@ -1,6 +1,6 @@
 module structure
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 22:40:55 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 15:43:45 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Routines of structure analyses.
 !-----------------------------------------------------------------------
@@ -174,6 +174,12 @@ contains
       mem = mem -4*size(idc) -4*size(idcna)
       deallocate(idc,idcna)
       allocate(idc(3,nnmax,namax),idcna(namax))
+      mem = mem +4*size(idc) +4*size(idcna)
+    endif
+
+    if( size(lsnn).ne.(nnmax+1)*namax ) then
+      deallocate(lsnn,idc)
+      allocate(idc(3,nnmax,namax),lsnn(0:nnmax,namax))
     endif
 
     idcna(:) = 0
@@ -239,6 +245,11 @@ contains
            ,rcfccs(namax),rcbccs(namax),d2lspr(nnmax,namax))
       mem = mem +4*size(idc) +4*size(idcna) +4*size(lsnn) &
            +8*size(rcfccs) +8*size(rcbccs) +8*size(d2lspr)
+    endif
+
+    if( size(idc).ne.3*nnmax*namax ) then
+      deallocate(idc,d2lspr)
+      allocate(idc(3,nnmax,namax),d2lspr(nnmax,namax))
     endif
 
     idcna(:) = 0

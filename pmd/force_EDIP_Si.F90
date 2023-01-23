@@ -81,6 +81,11 @@ contains
       l1st=.false.
     endif
 
+    if( size(dz).ne.3*(nnmax+1)*namax ) then
+      deallocate(dz)
+      allocate(dz(3,0:nnmax,namax))
+    endif
+
     epotl= 0d0
     epi(1:namax)= 0d0
     aa2(1:3,1:namax)= 0d0
