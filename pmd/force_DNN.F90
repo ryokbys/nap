@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:46:55 Ryo KOBAYASHI>
+!                     Last modified: <2023-01-23 17:04:11 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -161,7 +161,7 @@ contains
       call accum_mem('force_DNN',8*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
     endif
 
-    if( size(strsl).ne.3*3*namax ) then
+    if( size(strsl).lt.3*3*namax ) then
 !!$      mem = mem -8*size(strsl) -8*size(aal)
       call accum_mem('force_DNN',-8*(size(strsl)+size(aal)))
       deallocate(strsl,aal)

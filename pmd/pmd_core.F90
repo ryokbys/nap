@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-23 15:02:31 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-23 23:39:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -155,6 +155,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     stop
   endif
 
+!-----setup
+  call setup(nspmax,am,fekin,fa2v)
+!-----set HI and SGM
+  call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
+!-----ntset
+  call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
+
 !-----output every these steps, NOUTERG, NOUTPMD
   if( nerg.gt.0 ) then
     nouterg = max(nstp/nerg,1)
@@ -193,13 +200,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          call error_mpi_stop('mod(ntdst,nx).ne.0')
     allocate(tdst(ntdst),nadst(ntdst))
   endif
-
-!-----setup
-  call setup(nspmax,am,fekin,fa2v)
-!-----set HI and SGM
-  call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
-!-----ntset
-  call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
 !.....Convert velocities and forces from scaled unit to real unit
   do ia=1,natm
@@ -2174,9 +2174,9 @@ subroutine bacopy(l1st)
       if( lrealloc ) then
         if (myid_md.eq.0 .and. iprint.ne.0 ) then
           print *,'Updated namax and array since nbmax changed' &
-               //' from ',nbmax,' to ',2*maxb
+               //' from ',nbmax,' to ',int(maxb*1.2)
         endif
-        call realloc_namax_related(namax-nbmax,2*maxb)
+        call realloc_namax_related(namax-nbmax,int(maxb*1.2))
       else
         if( myid_md.eq.0 ) then
           print *,'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
@@ -2888,7 +2888,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
       enddo
       namax = max(int(nalmax*1.2),200)
 !          nbmax = max(namax*27,nbmax)
-      call estimate_nbmax(nalmax,h,nx,ny,nz,rc,rbuf,nbmax,boundary)
+      call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,nbmax,boundary)
       namax = namax +nbmax
       if( iprint.ne.0 ) then
         print '(a,2f6.3)',' rcut, rbuf = ',rc,rbuf
@@ -2897,7 +2897,6 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
         write(6,'(a,i10)')   '   nbmax = ',nbmax
         write(6,'(a,i10)')   '   namax = nalmax*1.2 + nbmax  = ' &
              ,namax
-        write(6,'(a,i10)')   '   nnmax = ',nnmax
       endif
 !.....Reset the tags positive
       do i=1,ntot0
@@ -3204,31 +3203,37 @@ subroutine error_mpi_stop(cerrmsg)
   stop
 end subroutine error_mpi_stop
 !=======================================================================
-subroutine estimate_nbmax(nalmax,h,nx,ny,nz,rcut,rbuf,nbmax,boundary)
+subroutine estimate_nbmax(nalmax,h,nx,ny,nz,vol,rcut,rbuf,nbmax,boundary)
   implicit none
   integer,intent(in):: nalmax,nx,ny,nz
-  real(8),intent(in):: rcut,rbuf,h(3,3)
+  real(8),intent(in):: vol,rcut,rbuf,h(3,3)
   integer,intent(inout):: nbmax
   character(len=3),intent(in):: boundary
 
   integer:: nest
-  real(8):: alx,aly,alz,area,vol,density
+  real(8):: alx,aly,alz,area,dens_2A3,densl,dens,rc,volex,dvol
 
-  alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx
-  aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny
-  alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz
-!.....Estimated volume and area, which is not correct in case of non-orthogonal cell
-  vol = alx*aly*alz
+  rc = rcut +rbuf
+  alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx +2*rc
+  aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny +2*rc
+  alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz +2*rc
+!.....Estimated volume of extended system including immigrants region
+  volex = alx*aly*alz
+  dvol = volex -vol/(nx*ny*nz)
 !.....Density cannot be obtained from nalmax because sometimes the system contains vacuum.
-!.....Density = 0.1 means 1 atom in 10 Ang^3 which is dense enough.
-  density = 0.1d0
-!!$  area = alx*aly*2 +alx*alz*2 +aly*alz*2
-  area = 0.0d0
-  if( boundary(1:1).eq.'p' ) area = area + aly*alz*2
-  if( boundary(2:2).eq.'p' ) area = area + alx*alz*2
-  if( boundary(3:3).eq.'p' ) area = area + alx*aly*2
+!.....Density = 0.1 means 1 atom in 10 A^3 which is dense enough for most cases.
+  dens_2A3 = 0.1d0
+!.....But for very dense cases, used the higher density.
+  densl = dble(nalmax)/(vol/(nx*ny*nz))
+  dens = max(dens_2A3,densl)
+!!$  area = 0.0d0
+!!$  if( boundary(1:1).eq.'p' ) area = area + aly*alz*2
+!!$  if( boundary(2:2).eq.'p' ) area = area + alx*alz*2
+!!$  if( boundary(3:3).eq.'p' ) area = area + alx*aly*2
 !.....Estimated number of atoms in the margin region.
-  nest = density *area*(rcut+rbuf)
+!!$  nest = density *area*(rcut+rbuf)
+  nest = dens *dvol
+!!$  print *, volex,dvol,dens_2A3,densl,dens,nest
   nbmax = max(nbmax,nest)
 
 end subroutine estimate_nbmax

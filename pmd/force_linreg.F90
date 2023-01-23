@@ -1,6 +1,6 @@
 module linreg
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 15:55:33 Ryo KOBAYASHI>
+!                     Last modified: <2023-01-23 17:28:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of linear regression potential for pmd
 !    - 2014.06.11 by R.K. 1st implementation
@@ -97,6 +97,11 @@ contains
     open(81,file='out.dbasis.linreg',status='replace')
     write(81,'(3i10)') natm,nelem
 #endif
+
+    if( size(fat).lt.3*namax ) then
+      deallocate(fat,dbna)
+      allocate(fat(3,namax),dbna(3,nelem,namax))
+    endif
 
     epotl= 0d0
 
@@ -196,13 +201,12 @@ contains
     if( l1st ) then
       if( allocated(aal) ) deallocate(aal,strsl)
       allocate(aal(3,namax),strsl(3,3,namax))
-
+      rcin2 = rcin*rcin
     endif
 
     if( size(aal).lt.3*namax ) then
       deallocate(aal,strsl)
       allocate(aal(3,namax),strsl(3,3,namax))
-      rcin2 = rcin*rcin
     endif
 
     aal(1:3,1:namax) = 0d0

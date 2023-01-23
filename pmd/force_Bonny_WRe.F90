@@ -1,6 +1,6 @@
 module Bonny_WRe
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:47:51 Ryo KOBAYASHI>
+!                     Last modified: <2023-01-23 17:09:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of EAM poetntial of Bonney et al.
 !  See G. Bonny et al., J. Appl. Phys. 121, 165107 (2017).
@@ -192,7 +192,7 @@ contains
       endif
 
       if( allocated(rho) ) deallocate(rho)
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
@@ -201,9 +201,9 @@ contains
       deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
-    if( size(rho).lt.namax+nbmax ) then
+    if( size(rho).lt.namax ) then
       deallocate(rho)
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
     endif
     
     epotl= 0d0

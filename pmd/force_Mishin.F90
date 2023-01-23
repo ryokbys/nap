@@ -129,18 +129,14 @@ contains
 
     if( l1st ) then
       if( allocated(rho) ) deallocate(rho)
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
     endif
 
-    if( size(rho).lt.namax+nbmax ) then
-      deallocate(rho)
-      allocate(rho(namax+nbmax))
-    endif
-    if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
+    if( size(rho).lt.namax ) then
+      deallocate(rho,strsl)
+      allocate(rho(namax),strsl(3,3,namax))
     endif
 
     epotl= 0d0

@@ -34,8 +34,13 @@ contains
     real(8),allocatable,save:: sqrho(:)
 
     if( l1st ) then
-      allocate(sqrho(namax+nbmax))
+      allocate(sqrho(namax))
       l1st=.false.
+    endif
+
+    if( size(sqrho).lt.namax ) then
+      deallocate(sqrho)
+      allocate(sqrho(namax))
     endif
 
     epotl= 0d0

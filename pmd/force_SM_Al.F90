@@ -35,7 +35,7 @@ contains
 
     if( l1st ) then
       if( allocated(sqrho) ) deallocate(sqrho)
-      allocate(sqrho(namax+nbmax))
+      allocate(sqrho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
 !-----smoothing embeded term
@@ -49,14 +49,11 @@ contains
       l1st=.false.
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
+    if( size(sqrho).lt.namax ) then
+      deallocate(sqrho,strsl)
+      allocate(sqrho(namax),strsl(3,3,namax))
     endif
-    if( size(sqrho).lt.namax+nbmax ) then
-      deallocate(sqrho)
-      allocate(sqrho(namax+nbmax))
-    endif
+    
     epotl= 0d0
     sqrho(1:natm)= 0d0
     strsl(1:3,1:3,1:namax) = 0d0

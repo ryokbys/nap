@@ -1,6 +1,6 @@
 module EAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:28:14 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 17:12:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
@@ -254,7 +254,7 @@ contains
 
     if( l1st ) then
       if( allocated(rho) ) deallocate(rho)
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
 !.....Check cutoff radius

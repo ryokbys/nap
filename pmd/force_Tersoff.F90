@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:32:27 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 17:23:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -147,7 +147,7 @@ contains
       l1st = .false.
     endif
 
-    if( size(aa1).ne.3*namax ) then
+    if( size(aa1).lt.3*namax ) then
       deallocate(aa1,aa2,strsl)
       allocate(aa1(3,namax),aa2(3,namax),strsl(3,3,namax))
     endif

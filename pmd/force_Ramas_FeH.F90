@@ -33,7 +33,7 @@ contains
     real(8),save:: rs,rs_feh
 
     if( l1st ) then
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       rs    = a_rs*a0 /(z_fe**(2d0/3) +z_fe**(2d0/3))
       rs_feh= a_rs*a0 /(z_fe**(2d0/3) +z_h**(2d0/3))
 !.....assuming fixed (constant) atomic volume (BCC)
@@ -50,6 +50,11 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
+    endif
+
+    if( size(rho).lt.namax ) then
+      deallocate(rho)
+      allocate(rho(namax))
     endif
 
     aa(1:3,1:natm)=0d0
@@ -241,7 +246,7 @@ contains
     real(8),save:: rs
 
     if( l1st ) then
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       rs=  a_rs /dsqrt(2d0)/z_fe**(1d0/3)
 !.....assuming fixed (constant) atomic volume (BCC)
 !!$      avol= alcfe**3 /2
@@ -257,6 +262,11 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
+    endif
+
+    if( size(rho).lt.namax ) then
+      deallocate(rho)
+      allocate(rho(namax))
     endif
 
     aa(1:3,1:natm)=0d0

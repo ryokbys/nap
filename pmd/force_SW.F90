@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:31:21 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 17:23:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   include "./const.h"
@@ -119,7 +119,7 @@ contains
       l1st=.false.
     endif
 
-    if( size(aa2).ne.3*namax ) then
+    if( size(aa2).lt.3*namax ) then
       deallocate(aa2,aa3,strsl)
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
     endif

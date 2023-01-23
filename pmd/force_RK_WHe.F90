@@ -34,7 +34,7 @@ contains
 !    real(8),external:: v2_IWHe,dv2_IWHe,phi_IWHe,dphi_IWHe
 
     if( l1st ) then
-      allocate(rho(namax+nbmax),sqrho(namax+nbmax))
+      allocate(rho(namax),sqrho(namax))
 !        write(6,'(a,es12.4)') ' Input cutoff    =',rc
 !        write(6,'(a,es12.4)') ' Potential cutoff=',p_rl(2,2)
 !!$!.....assuming fixed (constant) atomic volume (BCC)
@@ -54,9 +54,14 @@ contains
       endif
     endif
 
+    if( size(rho).lt.namax ) then
+      deallocate(rho,sqrho)
+      allocate(rho(namax),sqrho(namax))
+    endif
+
     epotl= 0d0
-    rho(1:namax+nbmax)= 0d0
-    sqrho(1:namax+nbmax)= 0d0
+    rho(:)= 0d0
+    sqrho(:)= 0d0
 
 !-----rho(i)
     do i=1,natm

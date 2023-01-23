@@ -1215,6 +1215,13 @@ subroutine chgopt_damping(chg,l1st)
     call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
   endif
 
+  if( size(vq).lt.namax ) then
+    call accum_mem('force_common',-8*(size(vq)+size(fq)+size(dq)))
+    deallocate(vq,fq,dq)
+    allocate(vq(namax),fq(namax),dq(namax))
+    call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
+  endif
+
 !!$  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)
 
 !.....Gather forces on charges
@@ -1343,6 +1350,13 @@ subroutine chgopt_xlag(chg,auxq,iflag)
     allocate(fq(namax))
     call accum_mem('force_common',+8*size(fq))
     l1st = .false.
+  endif
+
+  if( size(fq).lt.namax ) then
+    call accum_mem('force_common', -8*size(fq))
+    deallocate(fq)
+    allocate(fq(namax))
+    call accum_mem('force_common',+8*size(fq))
   endif
 
   dqmax = -1d0
@@ -1611,7 +1625,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
 
   if( .not.allocated(chgt) ) then
     allocate( chgt(namax),fqt(namax) )
-  else if( size(chgt).ne.namax ) then
+  else if( size(chgt).lt.namax ) then
     deallocate(chgt,fqt)
     allocate( chgt(namax),fqt(namax) )
   endif
@@ -1709,7 +1723,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
 
   if( .not.allocated(fqt) ) then
     allocate(fqt(namax),chgt(namax))
-  else if( size(fqt).ne.namax ) then
+  else if( size(fqt).lt.namax ) then
     deallocate(fqt,chgt)
     allocate(fqt(namax),chgt(namax))
   endif

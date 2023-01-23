@@ -51,6 +51,11 @@ contains
       l1st=.false.
     endif
 
+    if( size(aa1).lt.3*namax ) then
+      deallocate(aa1,aa2)
+      allocate(aa1(3,namax),aa2(3,namax))
+    endif
+
 
 !-----initialize
     aa1(1:3,1:namax)= 0d0

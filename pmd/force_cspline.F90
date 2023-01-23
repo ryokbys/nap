@@ -122,12 +122,8 @@ contains
     endif
 
     if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-    endif
-    if( size(aa2).lt.3*namax ) then
-      deallocate(aa2,aa3)
-      allocate(aa2(3,namax),aa3(3,namax))
+      deallocate(strsl,aa2,aa3)
+      allocate(strsl(3,3,namax),aa2(3,namax),aa3(3,namax))
     endif
 
     epotl= 0d0

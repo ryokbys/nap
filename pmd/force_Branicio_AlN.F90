@@ -74,6 +74,11 @@ contains
       l1st=.false.
     endif
 
+    if( size(aa2).lt.3*namax ) then
+      deallocate(aa2,aa3)
+      allocate(aa2(3,namax),aa3(3,namax))
+    endif
+
     epotl= 0d0
     aa2(1:3,1:namax)= 0d0
     aa3(1:3,1:namax)= 0d0

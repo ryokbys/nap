@@ -998,21 +998,36 @@ contains
     include "mpif.h"
     
     integer:: ierr,ic,i,nc,nmaxl,nmax,nnmax_estimate,nnmax_prev
+    integer:: ix,iy,iz
     real(8):: volc,rho
     real(8),parameter:: alpha = 1.2d0
     real(8),parameter:: pi = 3.14159265358979d0
     logical,save:: l1st = .true. 
     
     nmaxl = 0
-    do ic=1,lcxyz2
-      i = lshd(ic)
-      nc = 0
-      do while( i.gt.0 )
-        nc = nc +1
-        i = lscl(i)
-      enddo ! while (j.gt.0)
-      nmaxl = max(nc,nmaxl)
+    do ix=1,lcx
+      do iy=1,lcy
+        do iz=1,lcz
+          ic = ix*lcyz2 +iy*lcz2 +iz +1
+          i = lshd(ic)
+          nc = 0
+          do while( i.gt.0 )
+            nc = nc +1
+            i = lscl(i)
+          enddo ! while (j.gt.0)
+          nmaxl = max(nc,nmaxl)
+        enddo
+      enddo
     enddo
+!!$    do ic=1,lcxyz2
+!!$      i = lshd(ic)
+!!$      nc = 0
+!!$      do while( i.gt.0 )
+!!$        nc = nc +1
+!!$        i = lscl(i)
+!!$      enddo ! while (j.gt.0)
+!!$      nmaxl = max(nc,nmaxl)
+!!$    enddo
 
     nmax = 0
     call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max,mpi_md_world, &

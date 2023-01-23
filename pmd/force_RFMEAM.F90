@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-21 18:38:17 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 17:01:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -513,7 +513,7 @@ contains
            +size(dgam) +size(drho) +size(rijs))))
     endif
 
-    if( size(sfc).eq.nnmax ) then
+    if( size(sfc).ne.nnmax ) then
       call accum_mem('force_RFMEAM', -8*(size(sij) +size(dsij) &
            +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &

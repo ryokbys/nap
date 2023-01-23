@@ -33,7 +33,7 @@ contains
     real(8),save:: rs,rs_feh
 
     if( l1st ) then
-      allocate(rho(namax+nbmax))
+      allocate(rho(namax))
       rs= a_rs /dsqrt(2d0)/z_fe**(1d0/3)
       rs_feh= a_rs /sqrt(z_fe**(2d0/3)+z_h**(2d0/3))
 !!$!.....assuming fixed (constant) atomic volume (BCC)
@@ -53,8 +53,13 @@ contains
       endif
     endif
 
+    if( size(rho).lt.namax ) then
+      deallocate(rho)
+      allocate(rho(namax))
+    endif
+
     epotl= 0d0
-    rho(1:natm)= 0d0
+    rho(:)= 0d0
 
 !.....rho(i)
     do i=1,natm

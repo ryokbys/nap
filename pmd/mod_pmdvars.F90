@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-01-23 12:47:04 KOBAYASHI Ryo>
+!                    Last modified: <2023-01-23 16:59:06 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -34,9 +34,9 @@ module pmdvars
 
 
 !.....max. num. of atoms in a node
-  integer:: namax = 20000
+  integer:: namax = 200
 !.....max. num. of boundary-particles
-  integer:: nbmax = 10000
+  integer:: nbmax = 100
 !.....max. num. of neighbors
   integer:: nnmax = 50
 
@@ -203,7 +203,7 @@ module pmdvars
   logical:: lcell_updated = .true.
 
 !.....Reallocation
-  logical:: lrealloc = .false.
+  logical:: lrealloc = .true.
 
 !.....Shear stress
   real(8):: shrfx

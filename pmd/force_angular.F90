@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-08-05 09:21:06 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-23 17:03:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -99,14 +99,14 @@ contains
       endif
     endif
 
-    if( size(aa3).ne.3*namax ) then
+    if( size(aa3).lt.3*namax ) then
       call accum_mem('force_angular',-8*(size(aa3)+size(strsl)))
       deallocate(aa3,strsl)
       allocate(aa3(3,namax),strsl(3,3,namax))
       call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
     endif
 
-    strsl(1:3,1:3,1:natm+nb)= 0d0
+    strsl(1:3,1:3,1:namax)= 0d0
     epotl3= 0d0
     aa3(1:3,1:namax)= 0d0
 !.....Loop over i

@@ -31,11 +31,16 @@ contains
     real(8),save:: rhoc,drhoc
 
     if( l1st ) then
-      allocate(sqrho(namax+nbmax))
+      allocate(sqrho(namax))
 !.....smoothing embeded term
       rhoc = (sc_a/rc)**sc_m
       drhoc= -sc_m*rhoc/rc
       l1st=.false.
+    endif
+
+    if( size(sqrho).le.namax ) then
+      deallocate(sqrho)
+      allocate(sqrho(namax))
     endif
 
     epotl= 0d0

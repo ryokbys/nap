@@ -37,7 +37,7 @@ contains
     if( l1st ) then
       if( myid.eq.0 ) write(6,'(a)') ' use force_Ito3_Whe'
       if( allocated(rho) ) deallocate(rho,sqrho)
-      allocate(rho(namax+nbmax),sqrho(namax+nbmax))
+      allocate(rho(namax),sqrho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
 !.....check cutoff radius
@@ -55,18 +55,14 @@ contains
       l1st=.false.
     endif
 
-    if( size(strsl).lt.3*3*namax ) then
-      deallocate(strsl)
-      allocate(strsl(3,3,namax))
-    endif
-    if( size(rho).lt.namax+nbmax ) then
-      deallocate(rho,sqrho)
-      allocate(rho(namax+nbmax),sqrho(namax+nbmax))
+    if( size(rho).lt.namax ) then
+      deallocate(rho,sqrho,strsl)
+      allocate(rho(namax),sqrho(namax),strsl(3,3,namax))
     endif
 
     epotl= 0d0
     strsl(1:3,1:3,1:namax) = 0d0
-    rho(1:namax+nbmax)= 0d0
+    rho(1:namax)= 0d0
 
 !-----rho(i)
     do i=1,natm
