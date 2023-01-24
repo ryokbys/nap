@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-23 23:39:14 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-24 15:22:11 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -52,7 +52,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: epot,ekin,stnsr(3,3)
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr,maxnn
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
   integer:: ihour,imin,isec
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
@@ -71,8 +71,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   character(len=20):: cfstime = 'es18.10'
   character(len=20):: cfetime = 'f12.2' ! for elapsed time
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
-
-  integer,external:: calc_maxnn
 
   tcpu0= mpi_wtime()
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
@@ -305,7 +303,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call mk_lspr_para(l1st)
   call accum_time('lspr',mpi_wtime()-tmp)
 
-  maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
   if( iprint.gt.0 .and. myid_md.eq.0 ) then
     print '(/a,i5)', ' Max num of neighbors = ',maxnn
   endif
@@ -700,8 +697,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call mk_lspr_para(l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
-      maxnn = max(maxnn,calc_maxnn(namax,natm,nnmax,lspr, &
-           myid_md,mpi_md_world))
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
       tmp = mpi_wtime()
@@ -990,8 +985,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   tcpu= tcpu2 -tcpu1
   if( myid_md.eq.0 .and. iprint.ne. 0 ) then
     write(6,*) ''
-    write(6,'(1x,a,i5)') "Max num of neighbors during MD = ",maxnn
-    write(6,*) ''
     write(6,'(1x,a)') "Final values:"
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Kinetic energy  = ",ekin &
          ,' eV = ',ekin/ntot0,' eV/atom'
@@ -1022,6 +1015,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !!$         trim(cpctl).eq.'vv-berendsen' ) then
       call cell_info(h)
     endif
+    write(6,*) ''
+    write(6,'(1x,a,i0)') "Max num of neighbors during MD = ",maxnn
+    write(6,'(1x,a,i0)') "Max num of boundary atoms during MD = ",maxnb
     write(6,*) ''
   endif
 
@@ -1344,7 +1340,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: epot,stnsr(3,3)
 
-  integer:: ifmv,ierr,i_conv,maxnn,i
+  integer:: ifmv,ierr,i_conv,i
   real(8):: tmp,tave,prss,epotp,sth(3,3),ekin
   logical:: l1st
   logical:: lconverged = .false.
@@ -1354,7 +1350,6 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   character(len=20):: cfstime = 'es18.10'
   character(len=20):: cfetime = 'f12.2' ! for elapsed time
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
-  integer,external:: calc_maxnn
 
   if( nodes_md.ne.1 ) then
     write(6,'(a)') 'Error: CG minimization is not available in parallel.'
@@ -1454,7 +1449,6 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call mk_lspr_para(l1st)
     call accum_time('lspr',mpi_wtime()-tmp)
 
-    maxnn = calc_maxnn(namax,natm,nnmax,lspr,myid_md,mpi_md_world)
     if( iprint.gt.0 .and. myid_md.eq.0 ) then
       print '(/a,i5)', ' Max num of neighbors = ',maxnn
     endif
@@ -2259,6 +2253,7 @@ subroutine bacopy(l1st)
 
 !-----num. of received boundary atoms
   nb=nbnew
+  maxnb = max(maxnb,nb)
 
 end subroutine bacopy
 !=======================================================================
@@ -3537,26 +3532,6 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
 
 end subroutine sanity_check
 !=======================================================================
-function calc_maxnn(namax,natm,nnmax,lspr,myid,mpi_world) result(maxnn)
-  implicit none 
-  include "mpif.h"
-  integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
-  integer,intent(in):: myid,mpi_world
-  integer:: maxnn
-
-  integer:: ia,maxnnl,ierr
-
-  maxnn = 0
-  maxnnl = 0
-  do ia=1,natm
-    maxnnl = max(maxnnl, lspr(0,ia))
-  enddo
-  call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0,mpi_world,ierr)
-
-  return
-end function calc_maxnn
-!=======================================================================
-
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

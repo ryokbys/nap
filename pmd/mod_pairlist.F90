@@ -155,17 +155,18 @@ contains
 !  Cutoff radius is already set in the mk_lscl_para, and thus not given
 !  as an argument.
 !
-    use pmdvars,only: namax,natm,nbmax,nb,nnmax,tag,ra,va,h,hi,&
-         anxi,anyi,anzi,lspr,iprint,rc,rbuf
+    use pmdvars,only: namax,natm,nbmax,nb,nnmax,maxnn,tag,ra,va,h,hi,&
+         anxi,anyi,anzi,lspr,iprint,rc,rbuf,mpi_md_world
     implicit none
+    include "mpif.h"
 !!$    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
 !!$    integer,intent(out):: lspr(0:nnmax,namax)
 !!$    real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
 !!$    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
     logical,intent(in):: l1st
 
-    integer:: i,j,k,l,m,n,inc,nni,nnj
-    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
+    integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr
+    integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
 
     call mk_lscl_para()
@@ -187,6 +188,7 @@ contains
 !-----reset pair list, LSPR
     lspr(:,:)= 0
 
+    maxnnl = 0
 !-----make a pair list, LSPR
 !.....Scan atoms (not scanning cells)
 !$omp parallel
@@ -234,6 +236,8 @@ contains
           enddo  ! kuz
         enddo  ! kuy
       enddo  ! kux
+!$omp atomic
+      maxnnl = max(maxnnl,lspr(0,i))
     enddo  ! i=1,natm
 !$omp end do
 !$omp end parallel
@@ -298,6 +302,10 @@ contains
 !!$        enddo
 !!$      enddo
 !!$    enddo
+
+!.....Reduce maxnn to node-0
+    call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0, &
+         mpi_md_world,ierr)
 
   end subroutine mk_lspr_para
 !=======================================================================
@@ -1000,7 +1008,7 @@ contains
     integer:: ierr,ic,i,nc,nmaxl,nmax,nnmax_estimate,nnmax_prev
     integer:: ix,iy,iz
     real(8):: volc,rho
-    real(8),parameter:: alpha = 1.2d0
+    real(8),parameter:: alpha = 1.1d0
     real(8),parameter:: pi = 3.14159265358979d0
     logical,save:: l1st = .true. 
     
@@ -1019,15 +1027,6 @@ contains
         enddo
       enddo
     enddo
-!!$    do ic=1,lcxyz2
-!!$      i = lshd(ic)
-!!$      nc = 0
-!!$      do while( i.gt.0 )
-!!$        nc = nc +1
-!!$        i = lscl(i)
-!!$      enddo ! while (j.gt.0)
-!!$      nmaxl = max(nc,nmaxl)
-!!$    enddo
 
     nmax = 0
     call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max,mpi_md_world, &
@@ -1047,11 +1046,16 @@ contains
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       if( l1st ) then
-        print *,''
-        print '(a,i4)',' Max num of neighbors is estimated as ',nnmax
+        write(6,*) ''
+        write(6,'(a)') ' Estimation of num of neighbors:'
+        write(6,'(a,i5)') '   Max num in link-list cell = ',nmax
+        write(6,'(a,f0.1,3x,f6.4)') '   Cell volume and density = ',volc,rho
+        write(6,'(a,i4)') '   Max num of neighbors incl. margin = ',nnmax
+        call flush(6)
       else
-        print '(a,i4,a,i4)',' Max num of neighbors is updated from ', &
+        write(6,'(a,i4,a,i4)') ' Max num of neighbors is updated from ', &
              nnmax_prev,' to ',nnmax
+        call flush(6)
       endif
     endif
     l1st = .false.

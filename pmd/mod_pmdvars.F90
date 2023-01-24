@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-01-23 16:59:06 KOBAYASHI Ryo>
+!                    Last modified: <2023-01-24 15:09:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -163,6 +163,8 @@ module pmdvars
   integer:: nstp_done
   integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
   integer:: natm,nb,nsp,nalmax,ntot
+  integer:: maxnn = 0
+  integer:: maxnb = 0
   real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm,cgmm,cmass
