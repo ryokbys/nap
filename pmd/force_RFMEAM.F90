@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-23 17:01:19 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-25 11:40:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -611,16 +611,18 @@ contains
           dphi = alpha/dp *ep*expeta *(eta*(1d0 -2d0*c2) &
                +eta**2 *(c2 -3d0*c3) +c3*eta**3)
           dtmp = 0.5d0 *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
-          aal(1:3,i) = aal(1:3,i) -dtmp*driji(1:3)
           do ixyz=1,3
+!$omp atomic
+            aal(ixyz,i) = aal(ixyz,i) -dtmp*driji(ixyz)
 !$omp atomic
             aal(ixyz,j) = aal(ixyz,j) -dtmp*drijj(ixyz)
           enddo
           phifc = 0.5d0 *phi *fcij
           do kk=1,nni
             k = lspr(kk,i)
-            aal(1:3,i) = aal(1:3,i) +phifc*dsij(1:3,kk)
             do ixyz=1,3
+!$omp atomic
+              aal(ixyz,i) = aal(ixyz,i) +phifc*dsij(ixyz,kk)
 !$omp atomic
               aal(ixyz,k) = aal(ixyz,k) -phifc*dsij(ixyz,kk)
             enddo
@@ -628,6 +630,7 @@ contains
 !.....Atomic stress for pair part
           do ixyz=1,3
             do jxyz=1,3
+!$omp atomic
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                    -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
 !$omp atomic
@@ -639,6 +642,7 @@ contains
             k = lspr(kk,i)
             do ixyz=1,3
               do jxyz=1,3
+!$omp atomic
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                      -0.5d0*phifc*dsij(jxyz,kk)
 !$omp atomic
@@ -657,15 +661,17 @@ contains
             epot2l = epot2l +tmp
 !.....Type-2 2-body forces
             dtmp = 0.5d0 *dphi2 *sij(jj)
-            aal(1:3,i) = aal(1:3,i) -dtmp *driji(1:3)
             do ixyz=1,3
+!$omp atomic
+              aal(ixyz,i) = aal(ixyz,i) -dtmp *driji(ixyz)
 !$omp atomic
               aal(ixyz,j) = aal(ixyz,j) -dtmp *drijj(ixyz)
             enddo
             do kk=1,nni
               k = lspr(kk,i)
-              aal(1:3,i) = aal(1:3,i) +0.5d0*phi2*dsij(1:3,kk)
               do ixyz=1,3
+!$omp atomic
+                aal(ixyz,i) = aal(ixyz,i) +0.5d0*phi2*dsij(ixyz,kk)
 !$omp atomic
                 aal(ixyz,k) = aal(ixyz,k) -0.5d0*phi2*dsij(ixyz,kk)
               enddo
@@ -673,6 +679,7 @@ contains
 !.....Atomic stress for pair part
             do ixyz=1,3
               do jxyz=1,3
+!$omp atomic
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                      -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
 !$omp atomic
@@ -684,6 +691,7 @@ contains
               k = lspr(kk,i)
               do ixyz=1,3
                 do jxyz=1,3
+!$omp atomic
                   strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                        -0.25d0*phi2*dsij(jxyz,kk)
 !$omp atomic
@@ -849,13 +857,15 @@ contains
         if( dij2.gt.trcij2(is,js) ) cycle
         rij(1:3) = rijs(1:3,jj)
         atmp(1:3) = dfdy /ni(is) *drho(1:3,jj)
-        aal(1:3,i) = aal(1:3,i) +atmp(1:3)
         do ixyz=1,3
+!$omp atomic
+          aal(ixyz,i) = aal(ixyz,i) +atmp(ixyz)
 !$omp atomic
           aal(ixyz,j) = aal(ixyz,j) -atmp(ixyz)
         enddo
         do ixyz=1,3
           do jxyz=1,3
+!$omp atomic
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                  -0.5d0*rij(ixyz)*atmp(jxyz)
 !$omp atomic

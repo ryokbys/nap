@@ -1,6 +1,6 @@
 module angular
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-23 17:03:04 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-25 12:15:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
@@ -175,27 +175,25 @@ contains
           dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
           tmpj(1:3)= dhcsn*dcsnj(1:3) +dhrij*drijj(1:3)
           tmpk(1:3)= dhcsn*dcsnk(1:3) +dhrik*drikk(1:3)
-          aa3(1:3,i)= aa3(1:3,i) +(tmpj(1:3)+tmpk(1:3))
 !...Use omp atomic instead of reduction(+:aa3) for better parallel performace.
           do ixyz=1,3
 !$omp atomic
+            aa3(ixyz,i)= aa3(ixyz,i) +(tmpj(ixyz)+tmpk(ixyz))
+!$omp atomic
             aa3(ixyz,j)= aa3(ixyz,j) -tmpj(ixyz)
-          enddo
-          do ixyz=1,3
 !$omp atomic
             aa3(ixyz,k)= aa3(ixyz,k) -tmpk(ixyz)
           enddo
 !.....Stress
           do jxyz=1,3
-            strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*tmpj(1:3) & !*volj &
-                 -0.5d0*xik(jxyz)*tmpk(1:3) !*volk
             do ixyz=1,3
+!$omp atomic
+              strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) + &
+                   (-0.5d0*xij(jxyz)*tmpj(ixyz) &
+                   -0.5d0*xik(jxyz)*tmpk(ixyz))
 !$omp atomic
               strsl(ixyz,jxyz,j)=strsl(ixyz,jxyz,j) &
                    -0.5d0*xij(jxyz)*tmpj(ixyz) !*volj
-            enddo
-            do ixyz=1,3
 !$omp atomic
               strsl(ixyz,jxyz,k)=strsl(ixyz,jxyz,k) &
                    -0.5d0*xik(jxyz)*tmpk(ixyz) !*volk

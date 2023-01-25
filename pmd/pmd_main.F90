@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-20 17:50:03 KOBAYASHI Ryo>
+!                     Last-modified: <2023-01-25 10:04:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -291,7 +291,7 @@ program pmd
   if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iaux_clr,:),tagtot &
        ,myid_md,iprint)
 !.....Init for local flux
-  if( lflux ) call init_lflux(myid_md,nx,ny,nz,lclrchg &
+  if( lflux ) call init_lflux(myid_md,nx,ny,nz,hmat,lclrchg &
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
   if( ldspring ) auxtot(iaux_edsp,:) = 0d0

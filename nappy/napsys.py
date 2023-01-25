@@ -52,9 +52,15 @@ __version__ = "230107"
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
 #                 'cube','CHGCAR','pdb')
 DEFAULT_LABELS = ('x','y','z','vx','vy','vz','fx','fy','fz','sid')
+DEFAULT_DTYPES = {'x':'float64', 'y':'float64', 'z':'float64',
+                  'vx':'float32', 'vy':'float32', 'vz':'float32',
+                  'fx':'float32', 'fy':'float32', 'fz':'float32',
+                  'sid':'int8', 'chg':'float16', 'ekin':'float32',
+                  'epot':'float32'}
 # _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
 #                  'cube','CHGCAR')
 # _default_labels = ('pos','vel','frc','sid')
+
 
 class NAPSystem(object):
     """
@@ -106,6 +112,18 @@ class NAPSystem(object):
     def set_atoms(self,newatoms):
         self.atoms = copy.deepcopy(newatoms)
         self.atoms.reset_index(drop=True,inplace=True)
+        self._reset_atoms_dtypes()
+        return None
+
+    def _reset_atoms_dtypes(self):
+        """Reset dtypes of atoms dataframe according to the default setting."""
+        cols = self.atoms.columns.to_list()
+        for c in cols:
+            try:
+                t = DEFAULT_DTYPES[c]
+                self.atoms[c] = self.atoms[c].astype(t)
+            except KeyError as ke:
+                pass
         return None
         
     def get_aux_names(self):
@@ -292,6 +310,7 @@ class NAPSystem(object):
         newatoms.sid = [ sid for sid in sids ]
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)
+        self._reset_atoms_dtypes()
         return None
 
     def remove_atoms(self,*indices):

@@ -31,17 +31,18 @@ module localflux
 
 contains
 !=======================================================================
-  subroutine init_lflux(myid,nx,ny,nz,lclrchg,maxstp,mpi_world,iprint)
+  subroutine init_lflux(myid,nx,ny,nz,h,lclrchg,maxstp,mpi_world,iprint)
 !
 !  Initialize lflux.
 !
     use clrchg,only: clrfield
     integer,intent(in):: myid,mpi_world,nx,ny,nz,iprint,maxstp
+    real(8),intent(in):: h(3,3)
     logical,intent(in):: lclrchg
     
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
     integer:: idxlfg,ilfgx,ilfgy,ilfgz,mem
-    real(8):: anxi,anyi,anzi,fext
+    real(8):: anxi,anyi,anzi,fext,alx,aly,alz
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -57,6 +58,9 @@ contains
     anyi= 1d0/ny
     anzi= 1d0/nz
     nxyz = nx*ny*nz
+    alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2) *anxi
+    aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2) *anyi
+    alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2) *anzi
 
 !.....Number of local-flux regions in a node and global
     nl = nlx*nly*nlz
@@ -71,6 +75,9 @@ contains
     dlxi = 1d0/dlx
     dlyi = 1d0/dly
     dlzi = 1d0/dlz
+    alx = alx /nlx
+    aly = aly /nly
+    alz = alz /nlz
 
     allocate(fluxl(3,nl),fluxt(3,nl),idxl2g(nl,0:nxyz-1),nargn(nl))
     allocate(idxl2gt(nl))
@@ -132,6 +139,8 @@ contains
            ,ngx,ngy,ngz,ng
       print '(a,4f7.3)','   Normalized lengths(x,y,z) of local region = ' &
            ,dlx,dly,dlz
+      print '(a,4f7.1)','   Real lengths(x,y,z) (Ang.) of local region = ' &
+           ,alx,aly,alz
       print '(a,3f7.3)', '   Unit vector along Fext = ',evflux(1:3)
       print '(a)', '   Output file = '//trim(cfoutlf)
 

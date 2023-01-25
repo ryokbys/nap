@@ -80,6 +80,7 @@ def read(fname="pmdini",format=None,specorder=None):
         except Exception as e:
             print(' Failed to load input file even with ase.')
             raise
+    nsys._reset_atoms_dtypes()
     return nsys
 
 def read_pmd(fname='pmdini',specorder=None):
