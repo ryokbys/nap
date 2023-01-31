@@ -50,7 +50,7 @@ contains
 !.....The following code (block) is used to be called once at the 1st call,
 !.....but these variables could change when the cell size and shape change.
     rc2= rcut**2
-!-----make a linked cell list, LSCL
+!.....Number of division along each lattice vector
     lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rcut
     lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rcut
     lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rcut
@@ -156,7 +156,8 @@ contains
 !  as an argument.
 !
     use pmdvars,only: namax,natm,nbmax,nb,nnmax,maxnn,tag,ra,va,h,hi,&
-         anxi,anyi,anzi,lspr,iprint,rc,rbuf,mpi_md_world
+         anxi,anyi,anzi,lspr,iprint,rc,rbuf,mpi_md_world,myid_md, &
+         ratio_nnmax_update
     implicit none
     include "mpif.h"
 !!$    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
@@ -168,6 +169,7 @@ contains
     integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
+    integer:: nnmax_exceed, nnmax_exl, nnmax_prev
 
     call mk_lscl_para()
 
@@ -178,6 +180,19 @@ contains
       call accum_mem('pairlist',4*size(lspr))
     endif
 
+    nnmax_exceed = 0
+
+10  continue
+    if( nnmax_exceed .gt. 0 ) then
+      nnmax_prev = nnmax
+      nnmax = int(nnmax*ratio_nnmax_update)
+      if( myid_md.eq.0 .and. iprint.gt.0 ) then
+        write(6,'(a,i4,a,i4)') ' Max num of neighbors is updated from ', &
+             nnmax_prev,' to ',nnmax
+        call flush(6)
+      endif
+    endif
+    
     if( size(lspr).ne.(nnmax+1)*namax ) then
       call accum_mem('pairlist',-4*size(lspr))
       deallocate(lspr)
@@ -185,10 +200,12 @@ contains
       call accum_mem('pairlist',4*size(lspr))
     endif
 
+
 !-----reset pair list, LSPR
     lspr(:,:)= 0
 
     maxnnl = 0
+    nnmax_exl = 0
 !-----make a pair list, LSPR
 !.....Scan atoms (not scanning cells)
 !$omp parallel
@@ -215,7 +232,7 @@ contains
             m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
             if(lshd(m1).eq.0) cycle
             j=lshd(m1)
-            do while( j.gt.0 )
+            do while( j.gt.0 .and. nnmax_exl.eq.0 )
               if( j.eq.i ) then
                 j = lscl(j)
                 cycle
@@ -229,6 +246,7 @@ contains
               if( rij2.lt.rc2 ) then
                 lspr(0,i) = lspr(0,i) +1
                 lspr(lspr(0,i),i) = j
+                if( lspr(0,i).eq.nnmax ) nnmax_exl = 1
               endif
 
               j=lscl(j)
@@ -242,66 +260,9 @@ contains
 !$omp end do
 !$omp end parallel
 
-!.....Scan resident cells, which would be inefficient with OpenMP.
-!!$    do mz=0,lcz+1
-!!$      do my=0,lcy+1
-!!$        do mx=0,lcx+1
-!!$          m= mx*lcyz2 +my*lcz2 +mz +1
-!!$          if(lshd(m).eq.0) cycle
-!!$          do kuz= -1,1
-!!$            m1z= mz +kuz
-!!$            if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
-!!$            do kuy= -1,1
-!!$              m1y= my +kuy
-!!$              if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
-!!$              do kux= -1,1
-!!$                m1x= mx +kux
-!!$                if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
-!!$                m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
-!!$                if(lshd(m1).eq.0) cycle
-!!$
-!!$                i=lshd(m)
-!!$                do while( i.gt.0 )
-!!$                  if( i.gt.natm ) then
-!!$                    i = lscl(i)
-!!$                    cycle
-!!$                  endif
-!!$                  ic= int(tag(i))
-!!$                  xi(1:3)= ra(1:3,i)
-!!$
-!!$                  j=lshd(m1)
-!!$                  do while( j.gt.0 )
-!!$                    if( j.le.i ) then
-!!$                      j = lscl(j)
-!!$                      cycle
-!!$                    endif
-!!$
-!!$                    jc= int(tag(j))
-!!$                    xij(1:3)= ra(1:3,j) -xi(1:3)
-!!$                    rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
-!!$                    rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
-!!$                    rij(3)= h(3,1)*xij(1) +h(3,2)*xij(2) +h(3,3)*xij(3)
-!!$                    rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-!!$
-!!$                    if( rij2.lt.rc2 ) then
-!!$                      lspr(0,i)= lspr(0,i) +1
-!!$                      lspr(0,j)= lspr(0,j) +1
-!!$                      lspr(lspr(0,i),i)=j
-!!$                      lspr(lspr(0,j),j)=i
-!!$                    endif
-!!$
-!!$                    j=lscl(j)
-!!$                  enddo
-!!$
-!!$                  i=lscl(i)
-!!$                enddo
-!!$
-!!$              enddo
-!!$            enddo
-!!$          enddo
-!!$        enddo
-!!$      enddo
-!!$    enddo
+    call mpi_allreduce(nnmax_exl,nnmax_exceed,1,mpi_integer,mpi_max, &
+         mpi_md_world,ierr)
+    if( nnmax_exceed.gt.0 ) goto 10
 
 !.....Reduce maxnn to node-0
     call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0, &
@@ -1002,13 +963,13 @@ contains
 !  And the nnmax is determined by 4*pi*rho*rcut**3 *alpha /3,
 !  where alpha is a mergin of the estimate, like 1.2.
 !
-    use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf,iprint
+    use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf, &
+         iprint,ratio_nnmax_update
     include "mpif.h"
     
     integer:: ierr,ic,i,nc,nmaxl,nmax,nnmax_estimate,nnmax_prev
     integer:: ix,iy,iz
     real(8):: volc,rho
-    real(8),parameter:: alpha = 1.1d0
     real(8),parameter:: pi = 3.14159265358979d0
     logical,save:: l1st = .true. 
     
@@ -1022,7 +983,7 @@ contains
           do while( i.gt.0 )
             nc = nc +1
             i = lscl(i)
-          enddo ! while (j.gt.0)
+          enddo ! while (i.gt.0)
           nmaxl = max(nc,nmaxl)
         enddo
       enddo
@@ -1042,7 +1003,7 @@ contains
     if( nnmax_estimate.le.nnmax ) return
       
     nnmax_prev = nnmax
-    nnmax = int(nnmax_estimate *alpha)
+    nnmax = int(nnmax_estimate *ratio_nnmax_update)
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       if( l1st ) then
@@ -1050,7 +1011,8 @@ contains
         write(6,'(a)') ' Estimation of num of neighbors:'
         write(6,'(a,i5)') '   Max num in link-list cell = ',nmax
         write(6,'(a,f0.1,3x,f6.4)') '   Cell volume and density = ',volc,rho
-        write(6,'(a,i4)') '   Max num of neighbors incl. margin = ',nnmax
+        write(6,'(a,2i4)') '   Max num of neighbors, that incl. margin = ', &
+             nnmax_estimate, nnmax
         call flush(6)
       else
         write(6,'(a,i4,a,i4)') ' Max num of neighbors is updated from ', &

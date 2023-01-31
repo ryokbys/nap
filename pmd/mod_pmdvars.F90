@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-01-24 15:09:29 KOBAYASHI Ryo>
+!                    Last modified: <2023-01-27 17:10:53 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -155,6 +155,8 @@ module pmdvars
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
 
+!.....nnmax update ratio
+  real(8):: ratio_nnmax_update = 1.1d0
 
 !-----------------------------------------------------------------------
 !  Global variables used in pmd

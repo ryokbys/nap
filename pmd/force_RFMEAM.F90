@@ -1,6 +1,6 @@
 module RFMEAM
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-25 11:40:29 KOBAYASHI Ryo>
+!                     Last modified: <2023-01-27 22:26:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of the RF-MEAM pontential.
 !  Ref:
@@ -449,22 +449,22 @@ contains
     real(8),allocatable,save:: aal(:,:),strsl(:,:,:),epil(:)
     real(8),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
          dfl(:,:,:),dsfc(:,:,:),drhoi2(:,:,:),drhoi0(:,:),dstrho2(:,:), &
-         dgam(:,:),drho(:,:),rijs(:,:)
+         dgam(:,:),drho(:,:),rijs(:,:),skij(:)
 
     if( l1st ) then
       if( allocated(aal) ) then
         deallocate(aal,strsl,epil,sij,dsij,sfc,fl,dfl,dsfc, &
-             drhoi2,drhoi0,dstrho2,dgam,drho,rijs)
+             drhoi2,drhoi0,dstrho2,dgam,drho,rijs,skij)
       endif
       allocate(aal(3,namax),strsl(3,3,namax),epil(namax),sij(nnmax), &
            dsij(3,nnmax),sfc(nnmax),fl(0:lmax,nnmax), &
            dfl(3,0:lmax,nnmax),dsfc(3,nnmax,nnmax),drhoi2(3,nnmax,lmax), &
            drhoi0(3,nnmax),dstrho2(3,nnmax),dgam(3,nnmax),drho(3,nnmax), &
-           rijs(5,nnmax))
+           rijs(5,nnmax),skij(nnmax))
       call accum_mem('force_RFMEAM',8*(size(aal) +size(strsl) +size(epil) &
            +size(sij) +size(dsij) +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
-           +size(dgam) +size(drho) +size(rijs)))
+           +size(dgam) +size(drho) +size(rijs) +size(skij)))
 !.....True rcut = max(rc, rc*Cmax/(2*sqrt(Cmax -1)))
       cmaxmax = 0d0
       rcmax = 0d0
@@ -507,28 +507,24 @@ contains
            +size(epil))))
       deallocate(aal,strsl,epil)
       allocate(aal(3,namax),strsl(3,3,namax),epil(namax))
-      call accum_mem('force_RFMEAM',(8*(size(aal) +size(strsl) +size(epil) &
-           +size(sij) +size(dsij) +size(sfc) +size(dsfc) &
-           +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
-           +size(dgam) +size(drho) +size(rijs))))
+      call accum_mem('force_RFMEAM',(8*(size(aal) +size(strsl) +size(epil))))
     endif
 
     if( size(sfc).ne.nnmax ) then
       call accum_mem('force_RFMEAM', -8*(size(sij) +size(dsij) &
            +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
-           +size(dgam) +size(drho) +size(rijs)))
+           +size(dgam) +size(drho) +size(rijs) +size(skij)))
       deallocate(sij,dsij,sfc,fl,dfl,dsfc, &
-           drhoi2,drhoi0,dstrho2,dgam,drho,rijs)
-      allocate(sij(nnmax), &
-           dsij(3,nnmax),sfc(nnmax),fl(0:lmax,nnmax), &
+           drhoi2,drhoi0,dstrho2,dgam,drho,rijs,skij)
+      allocate(sij(nnmax),dsij(3,nnmax),sfc(nnmax),fl(0:lmax,nnmax), &
            dfl(3,0:lmax,nnmax),dsfc(3,nnmax,nnmax),drhoi2(3,nnmax,lmax), &
            drhoi0(3,nnmax),dstrho2(3,nnmax),dgam(3,nnmax),drho(3,nnmax), &
-           rijs(5,nnmax))
+           rijs(5,nnmax),skij(nnmax))
       call accum_mem('force_RFMEAM', 8*(size(sij) +size(dsij) &
            +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
-           +size(dgam) +size(drho) +size(rijs)))
+           +size(dgam) +size(drho) +size(rijs) +size(skij)))
     endif
 
     epotl= 0d0
@@ -546,7 +542,7 @@ contains
 !$omp            ixyz,jxyz,l,eqjr,ks,dik2,dik,rik,rhoi2,cs,cs2,plcs,sfcjk, &
 !$omp            rhoi0,gam,egam,ggam,rhoi,yi,gyi,fyi,frhoi,drhoi2,drhoi0, &
 !$omp            fcik,pcs,pcsi,dcsdij,dcsdik,dplcs,strho2,dstrho2, &
-!$omp            dgam,dgdgam,drho,dgdy,dfdy,atmp,phi2,dphi2)
+!$omp            dgam,dgdgam,drho,dgdy,dfdy,atmp,phi2,dphi2,skij)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
@@ -581,7 +577,7 @@ contains
         rij(1:3) = rijs(1:3,jj)
         dij = rijs(5,jj)
         call compute_sij(i,j,jj,is,js,rijs, &
-             namax,natm,nnmax,tag,lspr,sij(jj),dsij(:,:))
+             namax,natm,nnmax,tag,lspr,sij(jj),dsij(:,:),skij)
 !!$!.....Debugging
 !!$        sij(jj) = 1d0
 !!$        dsij(:,:) = 0d0
@@ -909,7 +905,7 @@ contains
   end subroutine force_RFMEAM
 !=======================================================================
   subroutine compute_sij(i,j,jj,is,js,rijs, &
-       namax,natm,nnmax,tag,lspr,sij,dsij)
+       namax,natm,nnmax,tag,lspr,sij,dsij,skij)
 !
 !  Compute Sij and its derivatives wrt r_(i,x).
 !  
@@ -924,7 +920,7 @@ contains
     integer,intent(in):: lspr(0:nnmax,namax)
     real(8),intent(in):: rijs(5,nnmax)
     real(8),intent(in):: tag(namax)
-    real(8),intent(out):: sij,dsij(3,nnmax)
+    real(8),intent(out):: sij,dsij(3,nnmax),skij(nnmax)
 
     integer:: kk,k,ks
     real(8):: dij4,cmaxkij,cminkij,dij,dij2,rij(3)
@@ -933,7 +929,7 @@ contains
     real(8):: dc,driki(3),drikk(3),pcs,pcsi,qcs,cs,sn, &
          ddij,ddik,dcsdij(3),dcsdik(3), &
          dcdij(3),dcdik(3),dbdy,tmp,dnumdcs,ddendcs,dcdcs, &
-         dydc,sijperkij,skij(nnmax)
+         dydc,sijperkij
 
 !!$    print *,' compute_...'
     rij(1:3) = rijs(1:3,jj)
