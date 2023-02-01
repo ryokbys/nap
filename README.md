@@ -38,7 +38,7 @@ To compile *pmd* and *fitpot*, the following programs/libraries are required:
 For the short test, whether or not you can use this program in your environment,
 
 ```bash
-$ git clone https://github.com/ryokbys/nap.git
+$ git clone https://github.com/ryokbys/nap.git ./nap
 $ cd nap/
 $ ./configure --prefix=$(pwd)
 $ make test

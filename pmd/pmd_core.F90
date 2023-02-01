@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-24 15:22:11 KOBAYASHI Ryo>
+!                     Last-modified: <2023-02-01 16:19:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -359,9 +359,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( lrdcfrc ) then
     call reduce_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
   endif
-!!$  print *,'updating host(aa,strs)...'
-!!$!$acc update host(aa,strs)
-!!$  print *,'updating host...'
 
 #ifdef __DISL__
   call perf_disl_pos_by_pot(epith,natm,ra,h,epi,sorg &
@@ -746,7 +743,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Force_modify
     if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
          ,h,nnmax,lspr)
-!!$!$acc update host(aa,strs)
 
 !.....Second kick of velocities
     if( index(ctctl,'lange').ne.0 ) then

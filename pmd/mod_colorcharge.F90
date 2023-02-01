@@ -281,6 +281,7 @@ contains
 !
 !  Remove translational momentum of all the atoms except specified species.
 !
+    use pmdvars,only: nrmtrans
     include 'mpif.h'
     integer,intent(in):: natm,mpi_world,myid,iprint
     real(8),intent(in):: tag(natm),am(nspmax)
@@ -288,6 +289,10 @@ contains
     
     integer:: i,is,ierr
     real(8):: sump(3),tmps(3),tmp,amtot,ami
+
+!.....If nrmtrans < 0, not to remove translation,
+!.....because the user must set that intentionally.
+    if( nrmtrans.lt.0 ) return
 
     sump(:)= 0d0
     amtot = 0d0
