@@ -4,7 +4,7 @@ num_iter_eval   5
 converge_num    3
 
 # print_level 12
-max_num_neighbors   300
+# max_num_neighbors   300
 
 test_ratio 0.1
 

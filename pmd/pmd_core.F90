@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-02-01 16:19:43 KOBAYASHI Ryo>
+!                     Last-modified: <2023-02-06 18:34:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -160,6 +160,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
+!!$  print *,'Time at 0 = ',mpi_wtime() -tcpu0
 !-----output every these steps, NOUTERG, NOUTPMD
   if( nerg.gt.0 ) then
     nouterg = max(nstp/nerg,1)
@@ -191,6 +192,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif
   enddo
 #endif
+
+!!$  print *,'Time at 1 = ',mpi_wtime() -tcpu0
 
 !.....NEMD setting
   if( ltdst ) then
@@ -298,6 +301,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call accum_time('ba_xxx',mpi_wtime()-tmp)
 !-----Make pair list
   tmp = mpi_wtime()
+!$acc update device(ra,h)
 !!$  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
 !!$       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
   call mk_lspr_para(l1st)
@@ -320,7 +324,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( ldspring ) call init_dspring(myid_md,mpi_md_world,iprint)
 
-!$acc update device(ra,h,lspr)
+!!$  print *,'Time at 2 = ',mpi_wtime() -tcpu0
 !.....Calc forces
   lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
@@ -454,6 +458,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
   
+!!$  print *,'Time at 3 = ',mpi_wtime() -tcpu0
 !.....output initial configuration including epi, eki, and strs
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
@@ -547,6 +552,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,myid_md,mpi_md_world,nxyz)
   if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
 
+!!$  print *,'Time at 4 = ',mpi_wtime() -tcpu0
   i_conv = 0
   lconverged = .false.
 !-----velocity-Verlet loop starts---------------------------------------
@@ -626,6 +632,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,mpi_md_world,myid_md,iprint)
     endif
 
+!!$    print *,'Time at 5 = ',mpi_wtime() -tcpu0
 !.....Update positions
     if( lconst ) then
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
@@ -689,19 +696,20 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call accum_time('ba_xxx',mpi_wtime()-tmp)
 !.....Make pair list
       tmp = mpi_wtime()
-!!$      call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
-!!$           ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
+!$acc update device(ra,h)
       call mk_lspr_para(l1st)
       call accum_time('lspr',mpi_wtime()-tmp)
       rbufres = rbuf
+!!$!$acc update device(lspr)
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
       tmp = mpi_wtime()
       call bacopy_fixed()
       call accum_time('ba_xxx',mpi_wtime()-tmp)
+!$acc update device(ra,h)
     endif
+!!$    print *,'Time at 6 = ',mpi_wtime() -tcpu0
 
-!$acc update device(ra,h,lspr)
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
       lstrs = lstrs0
     endif
@@ -743,6 +751,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Force_modify
     if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
          ,h,nnmax,lspr)
+!!$    print *,'Time at 7 = ',mpi_wtime() -tcpu0
 
 !.....Second kick of velocities
     if( index(ctctl,'lange').ne.0 ) then
@@ -764,6 +773,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     vmaxold= vmax
     call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
          ,vmax,mpi_md_world)
+!!$    print *,'Time at 8 = ',mpi_wtime() -tcpu0
 
 !.....Some thermostats come after get_ekin, since they require ekl values
     if( index(ctctl,'beren').ne.0 ) then
@@ -1208,6 +1218,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
+  call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
   call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
 
 !.....Some conversions
@@ -1449,7 +1460,6 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       print '(/a,i5)', ' Max num of neighbors = ',maxnn
     endif
 
-!$acc update device(ra,h,lspr)
 !.....Calc forces
     lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
@@ -2831,6 +2841,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
   integer:: myxt,myyt,myzt,nmin
   real(8):: sxogt,syogt,szogt
   real(8):: t0
+  logical,save:: l1st = .true.
 
   t0 = mpi_wtime()
 
@@ -2881,12 +2892,15 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
 !          nbmax = max(namax*27,nbmax)
       call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,nbmax,boundary)
       namax = namax +nbmax
-      if( iprint.ne.0 ) then
-        print '(a,2f6.3)',' rcut, rbuf = ',rc,rbuf
-        write(6,'(a,i10)') ' Min number of local atoms = ',nmin
-        write(6,'(a,i10)') ' Max number of local atoms = ',nalmax
-        write(6,'(a,i10)')   '   nbmax = ',nbmax
-        write(6,'(a,i10)')   '   namax = nalmax*1.2 + nbmax  = ' &
+      if( iprint.ne.0 .and. l1st ) then
+        l1st = .false.
+        print *,''
+        print '(a)', ' space_decomp:'
+        print '(a,2f6.3)','   rcut, rbuf = ',rc,rbuf
+        write(6,'(a,i10)') '   Min number of local atoms = ',nmin
+        write(6,'(a,i10)') '   Max number of local atoms = ',nalmax
+        write(6,'(a,i10)')   '     nbmax = ',nbmax
+        write(6,'(a,i10)')   '     namax = nalmax*1.2 + nbmax  = ' &
              ,namax
       endif
 !.....Reset the tags positive
@@ -3527,6 +3541,71 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
   return
 
 end subroutine sanity_check
+!=======================================================================
+subroutine set_cauxarr()
+  use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
+       iaux_clr, ctctl, iaux_edsp
+  use force,only: set_use_charge, set_use_elec_temp, &
+       luse_charge, luse_elec_temp
+  use Coulomb,only: chgopt_method
+  use clrchg,only: lclrchg
+  use dspring,only: ldspring
+
+  integer:: inc
+
+  call set_use_charge()
+  call set_use_elec_temp()
+  naux = 0
+  if( luse_charge ) then
+    naux = naux +1  ! chg
+  endif
+  if( chgopt_method(1:4).eq.'xlag' ) then
+    naux = naux +2  ! auxq, vauxq
+  endif
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
+    naux = naux +1
+  endif
+  if( lclrchg ) then
+    naux = naux +1
+  endif
+  if( ldspring ) then
+    naux = naux +1
+  endif
+  if( allocated(cauxarr) ) then
+    if( size(cauxarr).ne.naux ) deallocate(cauxarr)
+  endif
+  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux))
+  inc = 0
+  if( luse_charge ) then
+    inc = inc +1
+    cauxarr(inc) = 'chg'
+    iaux_chg = inc
+  endif
+  if( chgopt_method(1:4).eq.'xlag' ) then
+    inc = inc +1
+    cauxarr(inc) = 'auxq'
+    iaux_q = inc
+    inc = inc +1
+    cauxarr(inc) = 'vauxq'
+    iaux_vq = inc
+  endif
+  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
+    inc = inc +1
+    cauxarr(inc) = 'tei'
+    iaux_tei = inc
+  endif
+  if( lclrchg ) then
+    inc = inc +1
+    cauxarr(inc) = 'clr'
+    iaux_clr = inc
+  endif
+  if( ldspring ) then
+    inc = inc +1
+    cauxarr(inc) = 'edsp'
+    iaux_edsp = inc
+  endif
+  
+end subroutine set_cauxarr
 !=======================================================================
 !-----------------------------------------------------------------------
 !     Local Variables:

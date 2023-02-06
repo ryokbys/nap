@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-27 15:46:40 KOBAYASHI Ryo>
+!                     Last-modified: <2023-02-06 18:09:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -989,71 +989,6 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
   return
 
 end subroutine determine_division
-!=======================================================================
-subroutine set_cauxarr()
-  use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
-       iaux_clr, ctctl, iaux_edsp
-  use force,only: set_use_charge, set_use_elec_temp, &
-       luse_charge, luse_elec_temp
-  use Coulomb,only: chgopt_method
-  use clrchg,only: lclrchg
-  use dspring,only: ldspring
-
-  integer:: inc
-
-  call set_use_charge()
-  call set_use_elec_temp()
-  naux = 0
-  if( luse_charge ) then
-    naux = naux +1  ! chg
-  endif
-  if( chgopt_method(1:4).eq.'xlag' ) then
-    naux = naux +2  ! auxq, vauxq
-  endif
-  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
-    naux = naux +1
-  endif
-  if( lclrchg ) then
-    naux = naux +1
-  endif
-  if( ldspring ) then
-    naux = naux +1
-  endif
-  if( allocated(cauxarr) ) then
-    if( size(cauxarr).ne.naux ) deallocate(cauxarr)
-  endif
-  if( .not.allocated(cauxarr) ) allocate(cauxarr(naux))
-  inc = 0
-  if( luse_charge ) then
-    inc = inc +1
-    cauxarr(inc) = 'chg'
-    iaux_chg = inc
-  endif
-  if( chgopt_method(1:4).eq.'xlag' ) then
-    inc = inc +1
-    cauxarr(inc) = 'auxq'
-    iaux_q = inc
-    inc = inc +1
-    cauxarr(inc) = 'vauxq'
-    iaux_vq = inc
-  endif
-  if( luse_elec_temp .or. trim(ctctl).eq.'ttm' ) then
-    inc = inc +1
-    cauxarr(inc) = 'tei'
-    iaux_tei = inc
-  endif
-  if( lclrchg ) then
-    inc = inc +1
-    cauxarr(inc) = 'clr'
-    iaux_clr = inc
-  endif
-  if( ldspring ) then
-    inc = inc +1
-    cauxarr(inc) = 'edsp'
-    iaux_edsp = inc
-  endif
-  
-end subroutine set_cauxarr
 !=======================================================================
 !-----------------------------------------------------------------------
 !     Local Variables:

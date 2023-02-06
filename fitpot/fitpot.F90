@@ -1,6 +1,6 @@
 Program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-01-13 22:51:03 KOBAYASHI Ryo>
+!                     Last modified: <2023-02-06 18:11:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -35,7 +35,7 @@ Program fitpot
     write(6,'(a)') '========================================================================'
     write(6,'(a)') ' FITPOT: A program for FITting interatomic POTential parameters'
     write(6,*) ''
-    call write_version()
+    call write_revision()
     call write_authors()
     write(6,'(a)') '========================================================================'
     write(6,*) ''

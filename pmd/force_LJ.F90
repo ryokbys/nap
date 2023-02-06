@@ -1,9 +1,6 @@
 module LJ
   use pmdvars, only: nspmax
   use util,only: csp2isp
-#ifdef __OPENACC__
-  use openacc
-#endif
   implicit none
   include "mpif.h"
   include "./params_unit.h"
@@ -30,10 +27,6 @@ module LJ
   real(8):: rpl_c(msp,msp), rpl_rc(msp,msp)
   integer:: rpl_n(msp,msp)
 
-#ifdef __OPENACC__
-  type(c_devptr):: ptr_strs
-#endif
-  
 contains
   subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -84,12 +77,6 @@ contains
     endif
 
     epotl= 0d0
-!-----loop over resident atoms
-!!$#ifdef __OPENACC__
-!!$    ptr_strs = acc_deviceptr(strs)
-!!$    call acc_unmap_data(strs)
-!!$    call acc_map_data(strsl,ptr_strs,size(strs)*8)
-!!$#endif
     
 !$omp parallel
 !$omp do private(i,xi,j,k,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
@@ -139,11 +126,6 @@ contains
     
 !$acc end kernels
 !$acc update host(aal,strsl,epi)
-
-!!$#ifdef __OPENACC__
-!!$    call acc_unmap_data(strsl)
-!!$    call acc_map_data(strs,ptr_strs,size(strs)*8)
-!!$#endif
 
     aa(:,1:natm) = aa(:,1:natm) +aal(:,1:natm)
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)

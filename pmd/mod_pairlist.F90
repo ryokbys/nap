@@ -14,6 +14,7 @@ module pairlist
        swap, qsort_list, sort_lspr
   
   integer,allocatable:: lscl(:),lshd(:)
+!$acc declare create(lscl,lshd)
   real(8):: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
   integer:: lcx,lcy,lcz,lcxyz,lcyz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
   real(8),allocatable:: tmparr(:)
@@ -116,6 +117,8 @@ contains
 !-------the last one goes to the header
       lshd(m)= i
     enddo
+!!$    print *,'lshd(1:5)=',lshd(1:5)
+!$acc update device(lshd,lscl)
 
     return
   end subroutine mk_lscl_para
@@ -160,10 +163,6 @@ contains
          ratio_nnmax_update
     implicit none
     include "mpif.h"
-!!$    integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
-!!$    integer,intent(out):: lspr(0:nnmax,namax)
-!!$    real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
-!!$    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr
@@ -200,17 +199,24 @@ contains
       call accum_mem('pairlist',4*size(lspr))
     endif
 
-
-!-----reset pair list, LSPR
-    lspr(:,:)= 0
-
     maxnnl = 0
     nnmax_exl = 0
+!!$    print *,'nnmax_exl,maxnnl=',nnmax_exl,maxnnl
 !-----make a pair list, LSPR
 !.....Scan atoms (not scanning cells)
 !$omp parallel
 !$omp do private(mz,my,mx,m,kuz,kuy,kux,m1z,m1y,m1x,m1,i,j,xi,xij,rij,rij2)
+
+!$acc data present(ra,h,lspr,lshd,lscl), &
+!$acc      copy(maxnnl,nnmax_exl), &
+!$acc      copyin(rcx,rcy,rcz,rcxi,rcyi,rczi,lcx,lcy,lcz, &
+!$acc             lcz2,lcyz2,rc2,natm,nnmax), &
+!$acc      pcreate(xi,xij,rij)
+!$acc kernels
+!$acc loop independent private(xi,xij,rij) &
+!$acc      reduction(max:maxnnl,nnmax_exl) gang worker vector
     do i=1,natm
+      lspr(:,i) = 0  ! initialize
       xi(1:3) = ra(1:3,i)
 !-------assign a vector cell index
       mx=(xi(1)+rcx)*rcxi
@@ -220,19 +226,28 @@ contains
       my= min(max(my,0),lcy+1)
       mz= min(max(mz,0),lcz+1)
       m= mx*lcyz2 +my*lcz2 +mz +1
+!!$      if( i.eq.1 .or. i.eq.natm ) then
+!!$        print *,'i,m,lshd(m),nnmax_exl,maxnnl=',i,m,lshd(m),nnmax_exl,maxnnl
+!!$      endif
+!$acc loop seq
       do kux= -1,1
         m1x= mx +kux
         if( m1x.lt.0 .or. m1x.gt.lcx+1 ) cycle
+!$acc loop seq
         do kuy= -1,1
           m1y= my +kuy
           if( m1y.lt.0 .or. m1y.gt.lcy+1 ) cycle
+!$acc loop seq
           do kuz= -1,1
             m1z= mz +kuz
             if( m1z.lt.0 .or. m1z.gt.lcz+1 ) cycle
             m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
             if(lshd(m1).eq.0) cycle
             j=lshd(m1)
-            do while( j.gt.0 .and. nnmax_exl.eq.0 )
+            do while( j.gt.0 .and. nnmax_exl.le.0 )
+!!$              if( i.eq.1 ) then
+!!$                print *,'i,m1,j=',i,m1,j
+!!$              endif
               if( j.eq.i ) then
                 j = lscl(j)
                 cycle
@@ -257,8 +272,13 @@ contains
 !$omp atomic
       maxnnl = max(maxnnl,lspr(0,i))
     enddo  ! i=1,natm
+!$acc end kernels
+!$acc end data
+    
 !$omp end do
 !$omp end parallel
+
+!!$    print *,'nnmax_exl,maxnnl=',nnmax_exl,maxnnl
 
     call mpi_allreduce(nnmax_exl,nnmax_exceed,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
