@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-02-07 10:56:21 KOBAYASHI Ryo>
+!                     Last-modified: <2023-02-07 21:30:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -369,36 +369,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,nodes_md,myid_md,mpi_md_world,0,21)
 #endif
 
-!!$  if( trim(cpctl).eq.'vv-berendsen' ) then
-!!$    if( abs(pini-pfin).gt. 0.1d0 ) then
-!!$      if(myid_md.eq.0 .and. iprint.ne.0 ) then
-!!$        write(6,*) ''
-!!$        write(6,'(a)') ' Barostat: variable-volume Berendsen'
-!!$        write(6,'(a,f0.3,a,f0.3,a)') &
-!!$             '   Target pressure from = ',pini,' GPa to ' &
-!!$             ,pfin,' GPa'
-!!$      endif
-!!$      ptgt = pini *gpa2up
-!!$    else
-!!$      if(myid_md.eq.0 .and. iprint.ne.0 ) then
-!!$        write(6,*) ''
-!!$        write(6,'(a)') ' Barostat: variable-volume Berendsen'
-!!$        write(6,'(a,f0.3,a)') &
-!!$             '   Target pressure = ',ptgt,' GPa'
-!!$      endif
-!!$      ptgt = ptgt *gpa2up
-!!$    endif
-!!$  else if( index(cpctl,'Beren').ne.0 ) then
-!!$    if(myid_md.eq.0 .and. iprint.ne.0 ) then
-!!$      write(6,*) ''
-!!$      write(6,'(a)') ' Barostat: variable-cell Berendsen'
-!!$      write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
-!!$           ,stgt(1,1),stgt(2,2),stgt(3,3) &
-!!$           ,stgt(2,3),stgt(3,1),stgt(1,2)
-!!$    endif
-!!$    stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
-!!$  endif
-
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   if( index(cpctl,'beren').ne.0 ) then
     call setup_cell_berendsen(myid_md,iprint)
@@ -447,7 +417,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          sth(2,3),sth(3,1),sth(1,2)
     write(6,*) ''
 
-!!$    print '(a,20f8.5)',' alphas=',ol_alphas(0,1:natm)
     if( tave.gt.100000d0 ) cftave = 'es12.4'
     tcpu = mpi_wtime() -tcpu0
     write(6,'(a,'//cfistp//','//cfetime//','//cftave &

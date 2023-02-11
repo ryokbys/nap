@@ -11,7 +11,7 @@ module pairlist
   public:: mk_lspr_para,mk_lscl_para,sort_arrays, &
        check_lspr, check_lscl
   public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, &
-       swap, qsort_list, sort_lspr
+       swap, qsort_list, sort_lspr, set_nnmax
   
   integer,allocatable:: lscl(:),lshd(:)
 !$acc declare create(lscl,lshd)
