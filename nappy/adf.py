@@ -140,7 +140,7 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
                                                 dang,na)
             return angd, adfs.T
         except Exception as e:
-            print(' Failed to use the fortran routines...')
+            print(' Since failed to use the fortran routines, use python instead')
             print(e)
             pass
 

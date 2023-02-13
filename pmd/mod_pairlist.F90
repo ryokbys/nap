@@ -578,10 +578,7 @@ contains
       call accum_mem('pairlist',4*size(lscl)+4*size(lshd))
     endif
 
-!-----reset pair list, LSPR
-    lspr(0,1:natm)= 0
-
-!-----reset headers
+!.....Reset header
     lshd(1:lcxyz)= 0
 
 !-----construct a linked-cell list, LSCL, & a header list, LSHD
@@ -600,87 +597,54 @@ contains
     enddo
 !      write(6,'(a)') ' lscl,lshd done'
 
-!-----make a pair list, LSPR
-!-----Scan resident cells
-    do mz=1,lcz
-      do my=1,lcy
-        do mx=1,lcx
-          m= (mx-1)*lcyz +(my-1)*lcz +mz
-          if (lshd(m).eq.0) goto 5
-          do kuz= -1,1
+!.....Reset pair list
+    lspr(:,:)= 0
+    do i=1,natm
+      ierr = 0
+      xi(1:3) = ra(1:3,i)
+!.....Assign a vector cell index
+      mx = (xi(1)+rcx)*rcxi
+      my = (xi(2)+rcy)*rcyi
+      mz = (xi(3)+rcz)*rczi
+      mx= min(max(mx,1),lcx)
+      my= min(max(my,1),lcy)
+      mz= min(max(mz,1),lcz)
+      m= (mx-1)*lcyz +(my-1)*lcz +mz
+      do kux=-1,1
+        m1x = mx +kux
+        if( m1x.lt.1   ) m1x= m1x +lcx
+        if( m1x.gt.lcx ) m1x= m1x -lcx
+        do kuy=-1,1
+          m1y= my +kuy
+          if( m1y.lt.1   ) m1y= m1y +lcy
+          if( m1y.gt.lcy ) m1y= m1y -lcy
+          do kuz=-1,1
             m1z= mz +kuz
             if( m1z.lt.1   ) m1z= m1z +lcz
             if( m1z.gt.lcz ) m1z= m1z -lcz
-            do kuy= -1,1
-              m1y= my +kuy
-              if( m1y.lt.1   ) m1y= m1y +lcy
-              if( m1y.gt.lcy ) m1y= m1y -lcy
-              do kux= -1,1
-                m1x= mx +kux
-                if( m1x.lt.1   ) m1x= m1x +lcx
-                if( m1x.gt.lcx ) m1x= m1x -lcx
-                m1=(m1x-1)*lcyz +(m1y-1)*lcz +m1z
-                if (lshd(m1).eq.0) goto 6
+            m1= (m1x-1)*lcyz +(m1y-1)*lcz +m1z
+            if( lshd(m1).eq.0 ) cycle
+            j = lshd(m1)
+            do while( j.gt.0 .and. ierr.le.0 )
+              if( j.eq.i ) then
+                j = lscl(j)
+                cycle
+              endif
+              xij(1:3)= ra(1:3,j)-xi(1:3) -anint(ra(1:3,j)-xi(1:3))
+              rij(1:3)=h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+              rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
+              if( rij2.lt.rc2 ) then
+                lspr(0,i) = lspr(0,i) +1
+                lspr(lspr(0,i),i) = j
+                if( lspr(0,i).eq.nnmax ) ierr = 1
+              endif
 
-                i=lshd(m)
-1               continue
-                if (natm.lt.i) goto 4
-
-                ic= int(tag(i))
-                xi(1:3)= ra(1:3,i)
-
-                j=lshd(m1)
-
-2               continue
-!          if (j.eq.i) goto 3
-                if( j.le.i ) goto 3
-                jc= int(tag(j))
-                xij(1:3)= ra(1:3,j)-xi(1:3) -anint(ra(1:3,j)-xi(1:3))
-                rij(1:3)=h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-                rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
-
-                if(rij2.lt.rc2) then
-                  do l=1,lspr(0,i)
-                    if( lspr(l,i).eq.j ) then
-!.....If there is the same index in the neighbor, skip storing this j
-                      goto 3
-                    endif
-                  enddo
-                  lspr(0,i)= lspr(0,i) +1
-                  if(lspr(0,i).gt.nnmax ) then
-                    write(6,'(a)') " [Error] lspr(0,i) > nnmax"
-                    print *, '   i,nnmax,lspr(0,i) =' &
-                         ,i,nnmax,lspr(0,i)
-                    stop
-                  endif
-                  lspr(lspr(0,i),i)=j
-!.....Store i in j's neighbor list
-                  lspr(0,j)= lspr(0,j)+1
-                  if( lspr(0,j).gt.nnmax ) then
-                    write(6,'(a)') " Error: lspr(0,j) > nnmax"
-                    write(6,'(a,3i5)') "  nnmax, lspr(0,j) = " &
-                         ,nnmax,lspr(0,j)
-                    stop
-                  endif
-                  lspr(lspr(0,j),j)=i
-                endif
-
-!---------Continue until j= 0
-3               j=lscl(j)
-                if (j.gt.0) goto 2
-
-!---------Continue until i= 0
-4               i=lscl(i)
-                if (i.gt.0) goto 1
-
-6               continue
-              enddo
-            enddo
-          enddo
-5         continue
-        enddo
-      enddo
-    enddo
+              j= lscl(j)
+            enddo  ! while(j.gt.0)
+          enddo  ! kuz
+        enddo  ! kuy
+      enddo  ! kux
+    enddo  ! i=1,natm
 
   end subroutine mk_lspr_sngl
 !=======================================================================

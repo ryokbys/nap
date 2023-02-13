@@ -43,23 +43,24 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
-        xij(1:3)= ra(1:3,ja) -xi(1:3)
+        xij(1:3)= ra(1:3,ja) -xi(1:3) -anint(ra(1:3,ja) -xi(1:3))
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.ge.rc2 ) cycle
         dij = dsqrt(dij2)
         rrdr = (dij-rmin)/dr
-        if( rrdr.lt.0 ) cycle
+        if( rrdr.lt.0d0 ) cycle
         ib = min(int(rrdr)+1,nbins)
-        rdfs(ib,js,is) = rdfs(ib,js,is) + 1d0
+        rdfs(ib,js,is) = rdfs(ib,js,is) +1d0
+        rdfs(ib,0,0) = rdfs(ib,0,0) +1d0
 !!$      if( js.ne.is ) rdfs(js,is,ib) = rdfs(js,is,ib) + 1d0
       enddo
     enddo
-    do is=1,msp
-      do js=1,msp
-        rdfs(:,0,0) = rdfs(:,0,0) +rdfs(:,js,is)
-      enddo
-    enddo
+!!$    do is=1,msp
+!!$      do js=1,msp
+!!$        rdfs(:,0,0) = rdfs(:,0,0) +rdfs(:,js,is)
+!!$      enddo
+!!$    enddo
 
     vol = h(1,1)*(h(2,2)*h(3,3)-h(3,2)*h(2,3)) &
          +h(2,1)*(h(3,2)*h(1,3)-h(1,2)*h(3,3)) &
@@ -96,13 +97,14 @@ contains
         enddo
       enddo
     else
-      tmp = 4d0 *pi *natm**2 /vol *dr
+      tmp = 4d0 *pi *natm*(natm-1) /vol *dr
       do ib=1,nbins
         r = dists(ib)
         rdfs(ib,0,0) = rdfs(ib,0,0)/ (tmp*r*r)
       enddo
     endif
-    
+
+10  continue
     return
 
   end subroutine calc_rdf
@@ -181,5 +183,5 @@ contains
 end module distfunc
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "gfortran -c mod_distfunc.F90"
+!     compile-command: "make pmd lib"
 !     End:

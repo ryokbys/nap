@@ -902,7 +902,7 @@ class NAPSystem(object):
         Compute expansion digits along a1, a2, and a3 from a given *length*.
         System size should be larger than the *length*.
         """
-        h= np.zeros((3,3),dtype=np.float)
+        h= np.zeros((3,3),dtype=float)
         h[0]= self.a1 *self.alc
         h[1]= self.a2 *self.alc
         h[2]= self.a3 *self.alc

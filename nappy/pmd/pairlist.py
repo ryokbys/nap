@@ -24,5 +24,5 @@ def fmake_pairlist(nsys,rcut=3.0,iprint=1,l1st=True,nnmax=100):
     lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,pos.T,
                                        rcut,hmat,hmati,
                                        iprint,l1st)
-    #...lspr, d2lspr come back as (nnmax+1,natm)-shape arrays
+    #...lspr comes back as (nnmax+1,natm)-shape arrays
     return lspr.T

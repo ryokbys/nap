@@ -28,7 +28,7 @@ def gsmear(xd,yd,sigma,ngwidth=3):
     ndat= len(xd)
     nwidth = int(sigma*ngwidth)
     #nwidth = ndat
-    gdat= np.zeros(ndat,dtype=np.float)
+    gdat= np.zeros(ndat,dtype=float)
     expfact = 1.0/sgm**2/2
     for ix in range(ndat):
         #gdat[ix]= yd[ix]
@@ -53,8 +53,8 @@ def gsmear_file(infname,sigma,xp,yp):
             continue
         nline += 1
     infile.seek(0)
-    xd= np.zeros(nline,dtype=np.float)
-    yd= np.zeros(nline,dtype=np.float)
+    xd= np.zeros(nline,dtype=float)
+    yd= np.zeros(nline,dtype=float)
     il= 0
     for line in infile.readlines():
         if line[0] == "#":

@@ -63,7 +63,7 @@ def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
     Compute RDF of specified atom.
     """
     #...Radial points
-    nr = int(rmax/dr) +1
+    nr = int(rmax/dr) #+1
     rd = np.array([dr*ir+dr/2 for ir in range(nr)],)
     
     nspcs = len(nsys.specorder)
@@ -213,20 +213,21 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     #     if len(mask) != natm0:
     #         raise ValueError('len(mask) != len(nsys0)')
         
-    vol= nsys0.get_volume()
-    natms = [ float(natm0) ]
-    for ispcs in range(1,nspcs+1):
-        natms.append(float(nsys0.num_atoms(ispcs)))
-
     rmax = rmin +dr*nr  # Use corrected rmax to cover regions of NR bins
     r2max = rmax*rmax
     
     nsys = copy.deepcopy(nsys0)
-    n1,n2,n3= nsys.get_expansion_num(2.0*rmax)
+    n1,n2,n3= nsys.get_expansion_num(3.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
         print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
         nsys.repeat(n1,n2,n3)
 
+    natm = len(nsys)
+    natms = [ float(natm) ]
+    for ispcs in range(1,nspcs+1):
+        natms.append(float(nsys.num_atoms(ispcs)))
+    vol= nsys.get_volume()
+        
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
@@ -248,7 +249,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
                                              nspcs,nr)
             return rd, rdfs.T
         except Exception as e:
-            print(' Failed to use the fortran routines...')
+            print(' Since failed to use the fortran routines, use python instead...')
             print(e)
             pass
     
@@ -256,9 +257,9 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
-    for ia in range(natm0):
+    for ia in range(natm):
         isid = sids[ia]
-        ndr[:,:] = 0.0
+        # ndr[:,:] = 0.0
         for ja,dij in nsys.neighbors_of(ia,distance=True):
             jsid = sids[ja]
             rrdr= (dij-rmin)/dr
@@ -269,18 +270,22 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
                 print('Something is wrong: ir<0 ')
                 print(ia,ja,dij,rrdr,ir)
                 raise
-            ndr[0,0,ir] += 1.0
-            ndr[isid,jsid,ir] += 1.0
-        for ir in range(nr):
-            nadr[:,:,ir] += ndr[:,:,ir]
+            # ndr[0,0,ir] += 1.0
+            # ndr[isid,jsid,ir] += 1.0
+            nadr[0,0,ir] += 1.0
+            nadr[isid,jsid,ir] += 1.0
+        # for ir in range(nr):
+        #     nadr[:,:,ir] += ndr[:,:,ir]
 
     #...normalize
     if pairwise:
+        #...Total
         tmp = 4.0 *np.pi *natms[0]*(natms[0]-1)/vol *dr
         for ir in range(nr):
             # r= rmin +dr*(ir+0.5)
             r = rd[ir]
             nadr[0,0,ir] /= tmp*r*r
+        #...Pairwise
         for isid in range(1,nspcs+1):
             ni = natms[isid]
             if ni == 0: continue
@@ -298,7 +303,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
                     r = rd[ir]
                     nadr[isid,jsid,ir] /= tmp*r*r
     else:
-        tmp = 4.0 *np.pi *natms[0]*natms[0]/vol *dr
+        tmp = 4.0 *np.pi *natms[0]*(natms[0]-1)/vol *dr
         for ir in range(nr):
             # r= dr *(ir -0.5)
             r = rd[ir]
@@ -309,7 +314,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
 def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=100,fortran=False):
     nspcs = len(specorder)
     tiny = 1.0e-8
-    nr = int((rmax-rmin+tiny)/dr)+1
+    nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsum= 0
     for infname in infiles:
@@ -565,7 +570,7 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
 
     nspcs = len(nsys.specorder)
     try:
-        nr = int((rmax-rmin)/dr)+1
+        nr = int((rmax-rmin)/dr) #+1
         rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,nnmax=nnmax)
     except:
         raise Exception('rdf(..) failed.')
@@ -685,7 +690,7 @@ def main():
     print(' Number of files to be processed: ',len(infiles))
 
     tiny = 1.0e-8
-    nr= int((rmax-rmin+tiny)/dr) +1
+    nr= int((rmax-rmin+tiny)/dr) #+1
     rd,agr= rdf_average(infiles,specorder,dr=dr,rmin=rmin,rmax=rmax,
                         pairwise=pairwise,nnmax=nnmax,fortran=fortran)
 
