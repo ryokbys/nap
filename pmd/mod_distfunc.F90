@@ -183,5 +183,5 @@ contains
 end module distfunc
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd lib"
+!     compile-command: "gfortran -c -fPIC mod_distfunc.F90"
 !     End:

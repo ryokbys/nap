@@ -1,24 +1,27 @@
-.phony: clean veryclean pmd_wrapper mods
+.phony: clean veryclean pmd_wrapper
 
 all: pmd_wrapper mods
 
 obj= pmd_wrapper.F90
 pmddir= ${HOME}/src/nap/pmd
-modobj= ${pmddir}/mod_pairlist.F90 ${pmddir}/mod_distfunc.F90 ${pmddir}/mod_memory.F90 ${pmddir}/sort.F90
+# modobj= ${pmddir}/mod_pairlist.F90 ${pmddir}/mod_distfunc.F90 ${pmddir}/mod_memory.F90 ${pmddir}/sort.F90
 
 # In case of macOS (at least in my environment), need to use gfortran with mpi options instead of using mpif90.
 # You should modify paths in the following.
 mpiopts= -I/usr/local/Cellar/open-mpi/4.1.1_2/include -L/usr/local/opt/libevent/lib -L/usr/local/Cellar/open-mpi/4.1.1_2/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
 ompopts=  --f90flags="-fopenmp" -lgomp
 
-pmd_wrapper: ${obj}
-	f2py --f90exec=@FC@ --quiet -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd   # for linux, use mpif90 directly
-#	f2py --quiet -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${mpiopts}       # for mac, use gfortran and mpiopts defined above
-#	f2py --f90exec=@FC@ --quiet -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${ompopts}  # add ompopts if pmd was compiled with -fopenmp
+compopts= --f90exec=@FC@ --quiet
+# compopts= --f90exec=@FC@ --quiet --fcompiler=gnu95
 
-mods: ${modojb}
-	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj}
-#	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj} ${ompopts}
+pmd_wrapper: ${obj}
+	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd   # for linux, use mpif90 directly
+#	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${mpiopts}       # for mac, use gfortran and mpiopts defined above
+#	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${ompopts}  # add ompopts if pmd was compiled with -fopenmp
+
+# mods: ${modojb}
+# 	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj}
+# #	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj} ${ompopts}
 
 clean:
 	rm -f *.o *.so *~

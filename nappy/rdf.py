@@ -236,17 +236,20 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     natm = len(nsys)
     if fortran:
         try:
-            import nappy.pmd.mods as pmods
+            # import nappy.pmd.mods as pmods
+            import nappy.pmd.pmd_wrapper as pw
             hmati = nsys.get_hmat_inv()
             tags = nsys.get_tags()
             iprint = 0
             l1st = True
-            lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,
-                                               poss.T,rmax,hmat,hmati,
-                                               iprint,l1st)
-            rd,rdfs= pmods.distfunc.calc_rdf(tags,hmat,poss.T,rmax,rmin,
-                                             lspr,iprint,l1st,pairwise,
-                                             nspcs,nr)
+            # lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,
+            #                                    poss.T,rmax,hmat,hmati,
+            #                                    iprint,l1st)
+            # rd,rdfs= pmods.distfunc.calc_rdf(tags,hmat,poss.T,rmax,rmin,
+            #                                  lspr,iprint,l1st,pairwise,
+            #                                  nspcs,nr)
+            rd,rdfs= pw.wrap_calc_rdf(poss.T,tags,hmat,hmati,rmax,rmin,l1st,
+                                      pairwise,nr,nspcs)
             return rd, rdfs.T
         except Exception as e:
             print(' Since failed to use the fortran routines, use python instead...')

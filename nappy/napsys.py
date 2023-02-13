@@ -130,10 +130,8 @@ class NAPSystem(object):
         aux_names = list(self.atoms.columns)
         for l in DEFAULT_LABELS:
             aux_names.remove(l)
-        if 'lspr' in aux_names:
-            aux_names.remove('lspr')
-        if 'distance' in aux_names:
-            aux_names.remove('distance')
+        if 'neighbors' in aux_names:
+            aux_names.remove('neighbors')
         return aux_names
 
     def set_lattice_constant(self,alc):
@@ -694,7 +692,7 @@ class NAPSystem(object):
     def make_pair_list(self,rcut=3.0,rcuts=None,nnmax=100):
         """
         Make a neighbor list.
-        The neighbor list of each atom is stored as lspr in the self.atoms column.
+        The neighbor list of each atom is stored as neighbors in the self.atoms column.
 
         INPUT:
             rcut: float
@@ -710,14 +708,11 @@ class NAPSystem(object):
         """
         try:
             import nappy.pmd.pairlist as pl
-            plst,dist = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
+            plst = pl.fmake_pairlist(self,rcut=rcut,nnmax=nnmax)
             lspr = []
-            dists = []
             for ia in range(self.num_atoms()):
                 lspr.append( [ plst[ia,1+j]-1 for j in range(plst[ia,0]) ] )
-                dists.append( [ np.sqrt(dist[ia,j]) for j in range(plst[ia,0])] )
-            self.atoms['lspr'] = lspr
-            self.atoms['distance'] = dists
+            self.atoms['neighbors'] = lspr
             return None
         except:
             pass
@@ -799,8 +794,7 @@ class NAPSystem(object):
         nplspr = np.zeros((self.num_atoms(),nnmax*27),dtype=int)
         nplspr[:,:] = -1
         nlspr = np.zeros(self.num_atoms(),dtype=int)
-        dists = np.zeros((self.num_atoms(),nnmax*27),dtype=float)
-        # self.atoms['lspr'] = emptylist
+        # self.atoms['neighbors'] = emptylist
         sids = self.atoms.sid
 
         for ia in range(self.num_atoms()):
@@ -842,48 +836,33 @@ class NAPSystem(object):
                                 nplspr[ia,nlspr[ia]] = ja
                                 nplspr[ja,nlspr[ja]] = ia
                                 dij = np.sqrt(rij2)
-                                dists[ia,nlspr[ia]] = dij
-                                dists[ja,nlspr[ja]] = dij
                                 nlspr[ia] += 1
                                 nlspr[ja] += 1
                                 
                             ja = lscl[ja]
         #...Finally add the lspr to atoms DataFrame
         lspr = []
-        distances = []
         for ia in range(self.num_atoms()):
             lspr.append([ nplspr[ia,ja] for ja in range(nlspr[ia]) ])
-            distances.append([ dists[ia,ja] for ja in range(nlspr[ia]) ])
-        self.atoms['lspr'] = lspr
-        self.atoms['distance'] = distances
+        self.atoms['neighbors'] = lspr
         return None
 
     def remove_pair_list(self):
         try:
-            del self.atoms['lspr']
-            if 'distance' in self.atoms.columns:
-                del self.atoms['distance']
+            del self.atoms['neighbors']
         except:
             raise
         return None
 
-    def neighbors_of(self,ia,rcut=3.0,distance=False):
+    def neighbors_of(self,ia,rcut=3.0):
         """
         Generator of the neighbors of a given atom-i.
         """
-        if 'lspr' not in self.atoms.columns:
+        if 'neighbors' not in self.atoms.columns:
             self.make_pair_list(rcut=rcut)
-        if distance and 'distance' not in self.atoms.columns:
-            raise ValueError('Distance is not in atoms dataframe, perform make_pair_list'
-                             +' with distance=True.')
         lspri = self.atoms.lspr[ia]
-        if distance:
-            dists = self.atoms.distance[ia]
-            for jj in range(len(lspri)):
-                yield lspri[jj], dists[jj]
-        else:
-            for jj in range(len(lspri)):
-                yield lspri[jj]
+        for jj in range(len(lspri)):
+            yield lspri[jj]
 
     def assign_pbc(self):
         poss = self.get_scaled_positions()
@@ -1185,7 +1164,7 @@ class NAPSystem(object):
         Judgement of overlap is done by comparing the distance between
         atoms and *criterion*.
         """
-        if 'lspr' not in self.atoms.columns:
+        if 'neighbors' not in self.atoms.columns:
             self.make_pair_list(rcut=1.0)
         remove_ids = []
         h = np.zeros((3,3),dtype=float)

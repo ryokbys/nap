@@ -168,6 +168,93 @@ subroutine set_mpivars(mpi_comm,nodes,myid)
   myid_md = myid
   mpi_md_world = mpi_comm
 end subroutine set_mpivars
+!=======================================================================
+subroutine wrap_calc_rdf(natm,ra,tag,h,hi,rmax,rmin,l1st, &
+     lpairwise,nbin,msp,dists,rdfs)
+!
+! Wrapper for calling distfunc.calc_rdf from python 
+!
+  use distfunc,only: calc_rdf
+  use pairlist,only: mk_lspr_sngl
+  use util,only: get_vol
+  implicit none
+  integer,intent(in):: natm,nbin,msp
+  real(8),intent(in):: ra(3,natm),tag(natm),h(3,3),hi(3,3)
+  real(8),intent(in):: rmax,rmin
+  logical,intent(in):: l1st,lpairwise
+  real(8),intent(out):: dists(nbin)
+  real(8),intent(out):: rdfs(nbin,0:msp,0:msp)
+
+  real(8),parameter:: pi = 3.14159265358979d0
+  integer:: iprint,nnmax
+  real(8):: vol,rho
+  integer,allocatable:: lspr(:,:)
+
+!.....Estimate nnmax
+  vol = get_vol(h)
+  rho = max(dble(natm)/vol, 0.2d0)
+  nnmax = 1.2d0 *rho *4d0*pi*rmax**3 /3  ! margin 20 %
+  allocate(lspr(0:nnmax,natm))
+  
+  iprint = 1
+  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rmax,h,hi,lspr,iprint,l1st)
+
+  call calc_rdf(natm,nnmax,tag,h,ra,rmax,rmin,lspr,iprint,l1st, &
+       lpairwise,msp,nbin,dists,rdfs)
+  deallocate(lspr)
+end subroutine wrap_calc_rdf
+!=======================================================================
+subroutine wrap_calc_adf(natm,ra,tag,h,hi,rmax,ntrpl,itriples, &
+     nbin,angs,adfs,l1st)
+!
+! Wrapper for calling distfunc.calc_adf from python 
+!
+  use distfunc,only: calc_adf
+  use pairlist,only: mk_lspr_sngl
+  use util,only: get_vol
+  implicit none
+  integer,intent(in):: natm,nbin,ntrpl
+  real(8),intent(in):: ra(3,natm),tag(natm),h(3,3),hi(3,3)
+  real(8),intent(in):: rmax
+  integer,intent(in):: itriples(3,ntrpl)
+  logical,intent(in):: l1st
+  real(8),intent(out):: angs(nbin)
+  real(8),intent(out):: adfs(nbin,ntrpl)
+
+  real(8),parameter:: pi = 3.14159265358979d0
+  integer:: iprint,nnmax
+  real(8):: vol,rho,dang
+  integer,allocatable:: lspr(:,:)
+
+!.....Estimate nnmax
+  vol = get_vol(h)
+  rho = max(dble(natm)/vol, 0.2d0)
+  nnmax = int(1.2d0 *rho *4d0*pi*rmax**3 /3)  ! margin 20 %
+  allocate(lspr(0:nnmax,natm))
+  
+  iprint = 1
+  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rmax,h,hi,lspr,iprint,l1st)
+
+  dang = 180d0 /nbin
+  call calc_adf(natm,nnmax,tag,h,ra,rmax,lspr,ntrpl,itriples, &
+       dang,nbin,angs,adfs)
+  deallocate(lspr)
+end subroutine wrap_calc_adf
+!=======================================================================
+subroutine wrap_lspr_sngl(natm,ra,tag,h,hi,rcut,iprint,l1st,nnmax,lspr)
+!
+! Wrapper for calling distfunc.calc_adf from python 
+!
+  use pairlist,only: mk_lspr_sngl
+  implicit none
+  integer,intent(in):: natm,nnmax,iprint
+  real(8),intent(in):: ra(3,natm),tag(natm),h(3,3),hi(3,3)
+  real(8),intent(in):: rcut
+  logical,intent(in):: l1st
+  integer,intent(out):: lspr(0:nnmax,natm)
+
+  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rcut,h,hi,lspr,iprint,l1st)
+end subroutine wrap_lspr_sngl
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make"

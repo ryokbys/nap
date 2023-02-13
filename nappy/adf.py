@@ -115,16 +115,14 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
     
     if fortran:
         try:
-            import nappy.pmd.mods as pmods
+            # import nappy.pmd.mods as pmods
+            import nappy.pmd.pmd_wrapper as pw
             natm = len(nsys)
             tags = nsys.get_tags()
             hmat = nsys.get_hmat()
             hmati = nsys.get_hmat_inv()
             iprint = 0
             l1st = True
-            lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
-                                               rcut,hmat,hmati,
-                                               iprint,l1st)
             itriples = np.zeros((len(triplets),3),dtype=int)
             specorder = nsys.specorder
             for it,t in enumerate(triplets):
@@ -135,9 +133,14 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
                 itriples[it,0] = isp
                 itriples[it,1] = jsp
                 itriples[it,2] = ksp
-            angd,adfs = pmods.distfunc.calc_adf(tags,hmat,poss.T,rcut,
-                                                lspr,itriples.T,
-                                                dang,na)
+            # lspr = pmods.pairlist.mk_lspr_sngl(natm,nnmax,tags,poss.T,
+            #                                    rcut,hmat,hmati,
+            #                                    iprint,l1st)
+            # angd,adfs = pmods.distfunc.calc_adf(tags,hmat,poss.T,rcut,
+            #                                     lspr,itriples.T,
+            #                                     dang,na)
+            angd,adfs = pw.wrap_calc_adf(poss.T,tags,hmat,hmati,rcut,
+                                         itriples.T,na,l1st)
             return angd, adfs.T
         except Exception as e:
             print(' Since failed to use the fortran routines, use python instead')
