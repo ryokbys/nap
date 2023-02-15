@@ -151,7 +151,7 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
     anda= np.zeros((len(triplets),na),dtype=float)
     angd= np.array([ dang/2 +dang*ia for ia in range(na) ])
     symbols = nsys.get_symbols()
-    lspr = nsys.atoms.lspr
+    lspr = nsys.atoms.neighbors
     for it,t in enumerate(triplets):
         si,sj,sk = t
         for ia in range(natm0):

@@ -151,6 +151,7 @@ contains
         if( dij2.ge.rc2 ) cycle
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
+          if( ka.eq.ja ) cycle
           ks = int(tag(ka))
           xik(1:3) = ra(1:3,ka) -xi(1:3) -anint(ra(1:3,ka) -xi(1:3))
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
@@ -183,5 +184,5 @@ contains
 end module distfunc
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "gfortran -c -fPIC mod_distfunc.F90"
+!     compile-command: "make pmd lib"
 !     End:
