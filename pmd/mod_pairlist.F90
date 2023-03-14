@@ -988,7 +988,7 @@ contains
         write(6,'(a)') ' Estimation of num of neighbors:'
         write(6,'(a,i5)') '   Max num in link-list cell = ',nmax
         write(6,'(a,f0.1,3x,f6.4)') '   Cell volume and density = ',volc,rho
-        write(6,'(a,2i4)') '   Max num of neighbors, that incl. margin = ', &
+        write(6,'(a,2(2x,i0))') '   Max num of neighbors, that incl. margin = ', &
              nnmax_estimate, nnmax
         call flush(6)
       else

@@ -860,7 +860,7 @@ class NAPSystem(object):
         """
         if 'neighbors' not in self.atoms.columns:
             self.make_pair_list(rcut=rcut)
-        lspri = self.atoms.lspr[ia]
+        lspri = self.atoms['neighbors'][ia]
         for jj in range(len(lspri)):
             yield lspri[jj]
 

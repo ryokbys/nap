@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-02-07 21:30:43 KOBAYASHI Ryo>
+!                     Last-modified: <2023-03-14 17:15:18 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2051,6 +2051,19 @@ subroutine bacopy(l1st)
     print '(a)',' bacopy info:'
     write(6,'(a,3f10.3)') '   rcv = ',rcv(1:3)
     write(6,'(a,3i10)')   '   nex = ',nex(1:3)
+  endif
+
+!.....Update nbmax if nex(i)>1,
+  if( nex(1).gt.1 .or. nex(2).gt.1 .or.nex(3).gt.1 ) then
+    maxb = ((2*nex(1)+1)*(2*nex(2)+1)*(2*nex(3)+1)-1)*natm
+    if( maxb.gt.nbmax ) then
+      if (myid_md.eq.0 .and. iprint.ne.0 ) then
+        print *,'Updated namax and array since nbmax changed' &
+             //' from ',nbmax,' to ',int(maxb*1.2), &
+             ' because of nex(i)>1.'
+      endif
+      call realloc_namax_related(namax-nbmax,int(maxb*1.2))
+    endif
   endif
 
 !-----loop over x, y, & z directions

@@ -260,11 +260,18 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     nsys.make_pair_list(rcut=rmax,nnmax=nnmax)
+    hmat = nsys.get_hmat()
     for ia in range(natm):
         isid = sids[ia]
         # ndr[:,:] = 0.0
-        for ja,dij in nsys.neighbors_of(ia,distance=True):
+        pi = poss[ia]
+        for ja in nsys.neighbors_of(ia,):
             jsid = sids[ja]
+            pj = poss[ja]
+            pij = pj -pi -np.round(pj-pi)
+            vij = np.dot(hmat,pij)
+            dij2 = np.dot(vij,vij)
+            dij = np.sqrt(dij2)
             rrdr= (dij-rmin)/dr
             if rrdr < 0.0:
                 continue
@@ -560,6 +567,8 @@ def plot_figures(specorder,rd,agr):
 def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     """
     Plot RDFs of given nsys on the jupyter notebook.
+
+    pairs option should be in the form of list of species pair list, e.g., (('Si','Si'),('Si','O')).
     """
     if not 'JPY_PARENT_PID' in os.environ:
         raise Exception('This routine must be called on jupyter notebook.')
