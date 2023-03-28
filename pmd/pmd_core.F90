@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-03-14 17:15:18 KOBAYASHI Ryo>
+!                     Last-modified: <2023-03-27 14:11:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -16,7 +16,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use ttm,only: init_ttm,langevin_ttm,output_ttm, &
        calc_Ta,update_ttm,assign_atom2cell,output_energy_balance, &
        remove_ablated_atoms,set_inner_dt, te2tei, non_reflecting_bc, &
-       set_3d1d_bc_pos, couple_3d1d, compute_nac
+       set_3d1d_bc_pos, lcouple_3d1d, couple_3d1d, compute_nac
   use pmdmpi,only: nid2xyz,xyz2nid
   use metadynamics,only: init_metaD,update_metaD,force_metaD &
        ,write_metaD_potential
@@ -284,7 +284,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,aux(iaux_tei,:))
-    call couple_3d1d(myid_md,mpi_md_world,iprint)
+    if( lcouple_3d1d ) then
+      call couple_3d1d(myid_md,mpi_md_world,iprint)
+    endif
     call output_ttm(0,simtime,myid_md,iprint)
     call accum_time('ttm',mpi_wtime()-tmp)
   endif
@@ -759,8 +761,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call non_reflecting_bc(natm,tag,ra,va,h,sorg,dt,nspmax,am,fa2v &
            ,myid_md,mpi_md_world,iprint)
       call te2tei(namax,natm,aux(iaux_tei,:))
-      call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
-      call couple_3d1d(myid_md,mpi_md_world,iprint)
+      if( lcouple_3d1d ) then
+        call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
+        call couple_3d1d(myid_md,mpi_md_world,iprint)
+      endif
       call accum_time('ttm',mpi_wtime()-tmp)
     endif
     
@@ -3012,6 +3016,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
       itag = ixyz*nmpi -nmpi
       call mpi_recv(natmt,1,mpi_integer,ixyz,itag &
            ,mpi_md_world,istat,ierr)
+      if( natmt.eq.0 ) cycle
       ntott = ntott + natmt
       call mpi_recv(tagtot(n0),natmt,mpi_real8 &
            ,ixyz,itag+1,mpi_md_world,istat,ierr)
@@ -3044,29 +3049,31 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
     itag = myid_md*nmpi -nmpi
     call mpi_send(natm,1,mpi_integer,0,itag &
          ,mpi_md_world,ierr)
-    call mpi_send(tag,natm,mpi_real8,0,itag+1 &
-         ,mpi_md_world,ierr)
-!.....Positions should be shifted, velocities and forces should be converted to scaled ones
-    do i=1,natm
-      ratmp(1:3,i) = ra(1:3,i) + sorg(1:3)
-      vatmp(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
-      aatmp(1:3,i) = hi(1:3,1)*aa(1,i) +hi(1:3,2)*aa(2,i) +hi(1:3,3)*aa(3,i)
-    enddo
-    call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2 &
-         ,mpi_md_world,ierr)
-    call mpi_send(va,3*natm,mpi_real8,0,itag+3 &
-         ,mpi_md_world,ierr)
-    call mpi_send(epi,natm,mpi_real8,0,itag+4 &
-         ,mpi_md_world,ierr)
-    call mpi_send(eki,3*3*natm,mpi_real8,0,itag+5 &
-         ,mpi_md_world,ierr)
-    call mpi_send(strs,3*3*natm,mpi_real8,0,itag+6 &
-         ,mpi_md_world,ierr)
-    call mpi_send(aa,3*natm,mpi_real8,0,itag+7 &
-         ,mpi_md_world,ierr)
-    if( naux.gt.0 ) then
-      call mpi_send(aux,natm*naux,mpi_real8,0,itag+11 &
+    if( natm.gt.0 ) then
+      call mpi_send(tag,natm,mpi_real8,0,itag+1 &
            ,mpi_md_world,ierr)
+!.....Positions should be shifted, velocities and forces should be converted to scaled ones
+      do i=1,natm
+        ratmp(1:3,i) = ra(1:3,i) + sorg(1:3)
+        vatmp(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
+        aatmp(1:3,i) = hi(1:3,1)*aa(1,i) +hi(1:3,2)*aa(2,i) +hi(1:3,3)*aa(3,i)
+      enddo
+      call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2 &
+           ,mpi_md_world,ierr)
+      call mpi_send(va,3*natm,mpi_real8,0,itag+3 &
+           ,mpi_md_world,ierr)
+      call mpi_send(epi,natm,mpi_real8,0,itag+4 &
+           ,mpi_md_world,ierr)
+      call mpi_send(eki,3*3*natm,mpi_real8,0,itag+5 &
+           ,mpi_md_world,ierr)
+      call mpi_send(strs,3*3*natm,mpi_real8,0,itag+6 &
+           ,mpi_md_world,ierr)
+      call mpi_send(aa,3*natm,mpi_real8,0,itag+7 &
+           ,mpi_md_world,ierr)
+      if( naux.gt.0 ) then
+        call mpi_send(aux,natm*naux,mpi_real8,0,itag+11 &
+             ,mpi_md_world,ierr)
+      endif
     endif
   endif
   call mpi_barrier(mpi_md_world,ierr)
