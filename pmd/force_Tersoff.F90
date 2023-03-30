@@ -1,6 +1,6 @@
 module tersoff
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-23 17:23:46 KOBAYASHI Ryo>
+!                     Last modified: <2023-03-30 14:31:10 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Ref:
 !   [1] Tersoff, Physical Review B, 38(14), 9902–9905 (1988).
@@ -39,6 +39,10 @@ module tersoff
        ts_rc3in(nspmax,nspmax), ts_rc3out(nspmax,nspmax), &
        ts_r(nspmax,nspmax), ts_d(nspmax,nspmax), &
        ts_rc(nspmax,nspmax), ts_rc2(nspmax,nspmax)
+
+!$omp threadprivate(ts_a,ts_b,ts_lmbd1,ts_lmbd2,ts_eta,ts_delta,ts_alpha,ts_beta,ts_c1, &
+!$omp               ts_c2,ts_c3,ts_c4,ts_c5,ts_h,ts_rc2in,ts_rc2out,ts_f0,&
+!$omp               ts_rc3in,ts_rc3out,ts_r,ts_d,ts_rc,ts_rc2 )
 
   logical:: interact(nspmax,nspmax)
 
@@ -102,7 +106,7 @@ contains
     real(8),intent(in),optional:: tei(namax)
 
 !.....local variables
-    integer:: ia,ja,ka,jj,kk,ierr,ixyz,is,js,ks
+    integer:: ia,ja,ka,jj,kk,ierr,ixyz,jxyz,is,js,ks
     real(8):: xi(3),xij(3),rij(3),xik(3),rik(3),dij2,dij,diji &
          ,dik2,dik,diki,fc,dfc,fcij,dfcij,fcik,dfcik,tmp,dvdr &
          ,texp2ij,faij,zeta,texp3,zijk,gzijk,bij,dfaij,dvdij &
@@ -160,6 +164,13 @@ contains
 !.....Repulsive term which contains only 2-body
     epotl1 = 0d0
     aa1(:,1:natm+nb) = 0d0
+!$omp parallel copyin(ts_a,ts_b,ts_lmbd1,ts_lmbd2,ts_eta,ts_delta,ts_alpha,ts_beta,ts_c1, &
+!$omp                 ts_c2,ts_c3,ts_c4,ts_c5,ts_h,ts_rc2in,ts_rc2out,ts_f0,&
+!$omp                 ts_rc3in,ts_rc3out,ts_r,ts_d,ts_rc,ts_rc2)
+
+!$omp do private(ia,xi,is,jj,ja,js,xij,rij,dij2,dij,fc,dfc,texp,tmp, &
+!$omp            diji,dirij,djrij,dvdr,ixyz,jxyz ) &
+!$omp    reduction(+:epotl1)
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
       is = int(tag(ia))
@@ -179,9 +190,11 @@ contains
         dfc = df_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         texp = exp(-ts_lmbd1(is,js)*dij)
         tmp = 0.5d0 *fc *ts_a(is,js) *texp
+!omp atomic
         epi(ia)= epi(ia) +tmp
         epotl1 = epotl1 +tmp
         if( ja.le.natm ) then
+!omp atomic
           epi(ja)= epi(ja) +tmp
           epotl1 = epotl1 +tmp
         endif
@@ -190,32 +203,52 @@ contains
         dirij(1:3)= -rij(1:3)*diji
         djrij(1:3)= -dirij(1:3)
         dvdr= ts_a(is,js)*texp *(dfc -ts_lmbd1(is,js)*fc)
-        aa1(1:3,ia)= aa1(1:3,ia) -dvdr*dirij(1:3)
-        aa1(1:3,ja)= aa1(1:3,ja) -dvdr*djrij(1:3)
+        do ixyz=1,3
+!$omp atomic
+          aa1(ixyz,ia)= aa1(ixyz,ia) -dvdr*dirij(ixyz)
+!$omp atomic
+          aa1(ixyz,ja)= aa1(ixyz,ja) -dvdr*djrij(ixyz)
+        enddo
 !.....Stress
-        if( .not.lstrs ) cycle
         if( ja.le.natm) then
           do ixyz=1,3
-            strsl(1:3,ixyz,ia)= strsl(1:3,ixyz,ia) &
-                 -0.5d0 *rij(ixyz) *dvdr *djrij(1:3)
-            strsl(1:3,ixyz,ja)= strsl(1:3,ixyz,ja) &
-                 -0.5d0 *rij(ixyz) *dvdr *djrij(1:3)
+            do jxyz=1,3
+!$omp atomic
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+!$omp atomic
+              strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+            enddo
           enddo
         else
           do ixyz=1,3
-            strsl(1:3,ixyz,ia)= strsl(1:3,ixyz,ia) &
-                 -0.5d0 *rij(ixyz) *dvdr *djrij(1:3)
+            do jxyz=1,3
+!$omp atomic
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+            enddo
           enddo
         endif
       enddo
+!$omp atomic
       epi(ia) = epi(ia) +ts_f0(is,is)
       epotl1 = epotl1 +ts_f0(is,is)
     enddo
-!!$    print *,'epotl1 =',epotl1
+!$omp end do
 
 !.....Attractive term which contains 3-body as well
+!$omp single
     epotl2 = 0d0
     aa2(:,1:natm+nb) = 0d0
+!$omp end single
+    
+!$omp do private(ia,is,xi,jj,ja,js,xij,rij,dij2,dij,diji,dirij,djrij,fcij, &
+!$omp            texp2ij,faij,zeta,kk,ka,ks,xik,rik,dik2,dik,fcik,texp3,ixyz,jxyz, &
+!$omp            cs,zijk,gzijk,bij,tmp,dfcij,dfaij,dvdij,dbijpref,pref,sumj, &
+!$omp            diki,dirik,dkrik,dfcik, &
+!$omp            dexp3ij,dexp3ik,dzdcs,dgzijk,djcs,dkcs,dics,diz,djz,dkz,tmpk ) &
+!$omp    reduction(+:epotl2)
     do ia=1,natm
       is = int(tag(ia))
       if( ts_type(1:2).eq.'Te' ) call set_ted_params(tei(ia),is)
@@ -259,7 +292,9 @@ contains
 !.....Potential
         bij = (1d0 +zeta**ts_eta(is,js))**(-ts_delta(is,js))
         tmp = 0.25d0 *fcij*bij*faij
+!$omp atomic
         epi(ia)= epi(ia) +tmp
+!$omp atomic
         epi(ja)= epi(ja) +tmp
         epotl2 = epotl2 +tmp +tmp
 !.....Force except derivative of bij
@@ -269,17 +304,23 @@ contains
 !.....Since bij contains the angle around atom-i that is not symmetric to ia and ja,
 !     the contribution to ja should be considered as well, even if the summations
 !     of ia and ja are taken fully.
-        aa2(1:3,ia)= aa2(1:3,ia) -dvdij*dirij(1:3)
-        aa2(1:3,ja)= aa2(1:3,ja) -dvdij*djrij(1:3)
+        do ixyz=1,3
+!$omp atomic
+          aa2(ixyz,ia)= aa2(ixyz,ia) -dvdij*dirij(ixyz)
+!$omp atomic
+          aa2(ixyz,ja)= aa2(ixyz,ja) -dvdij*djrij(ixyz)
+        enddo
 !.....Stress
-        if( lstrs ) then
-          do ixyz=1,3
-            strsl(1:3,ixyz,ja)= strsl(1:3,ixyz,ja) &
-                 -0.5d0 *rij(ixyz) *dvdij *djrij(1:3)
-            strsl(1:3,ixyz,ia)= strsl(1:3,ixyz,ia) &
-                 -0.5d0 *rij(ixyz) *dvdij *djrij(1:3)
+        do ixyz=1,3
+          do jxyz=1,3
+!$omp atomic
+            strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                 -0.5d0 *rij(ixyz) *dvdij *djrij(jxyz)
+!$omp atomic
+            strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                 -0.5d0 *rij(ixyz) *dvdij *djrij(jxyz)
           enddo
-        endif
+        enddo
 !.....Force w.r.t. derivative of bij
         dbijpref = (-ts_delta(is,js))*(1d0 +zeta**ts_eta(is,js))**(-(ts_delta(is,js)+1d0))  &
              *ts_eta(is,js) *zeta**(ts_eta(is,js)-1d0)
@@ -319,29 +360,45 @@ contains
                +gzijk*dexp3ij*djrij(1:3))
           tmpk(1:3)= dfcik*gzijk*texp3*dkrik(1:3) &
                +dgzijk*fcik*texp3*dkz(1:3) +fcik*gzijk*dexp3ik*dkrik(1:3)
-          aa2(1:3,ka)= aa2(1:3,ka) -tmpk(1:3) *pref
-          aa2(1:3,ia)= aa2(1:3,ia) +tmpk(1:3) *pref
-!.....Stress
-          if( .not.lstrs ) cycle
           do ixyz=1,3
-            strsl(1:3,ixyz,ka)= strsl(1:3,ixyz,ka) &
-                 -0.5d0 *rik(ixyz) *pref *tmpk(1:3)
-            strsl(1:3,ixyz,ia)= strsl(1:3,ixyz,ia) &
-                 -0.5d0 *rik(ixyz) *pref *tmpk(1:3)
+!$omp atomic
+            aa2(ixyz,ka)= aa2(ixyz,ka) -tmpk(ixyz) *pref
+!$omp atomic
+            aa2(ixyz,ia)= aa2(ixyz,ia) +tmpk(ixyz) *pref
+          enddo
+!.....Stress
+          do ixyz=1,3
+            do jxyz=1,3
+!$omp atomic
+              strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
+                   -0.5d0 *rik(ixyz) *pref *tmpk(jxyz)
+!$omp atomic
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *rik(ixyz) *pref *tmpk(jxyz)
+            enddo
           enddo
         enddo
-        aa2(1:3,ja) = aa2(1:3,ja) -pref*sumj(1:3)
-        aa2(1:3,ia) = aa2(1:3,ia) +pref*sumj(1:3)
-!.....Stress
-        if( .not.lstrs ) cycle
         do ixyz=1,3
-          strsl(1:3,ixyz,ja)= strsl(1:3,ixyz,ja) &
-               -0.5d0 *rij(ixyz) *pref *sumj(1:3)
-          strsl(1:3,ixyz,ia)= strsl(1:3,ixyz,ia) &
-               -0.5d0 *rij(ixyz) *pref *sumj(1:3)
+!$omp atomic
+          aa2(ixyz,ja) = aa2(ixyz,ja) -pref*sumj(ixyz)
+!$omp atomic
+          aa2(ixyz,ia) = aa2(ixyz,ia) +pref*sumj(ixyz)
+        enddo
+!.....Stress
+        do ixyz=1,3
+          do jxyz=1,3
+!$omp atomic
+            strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                 -0.5d0 *rij(ixyz) *pref *sumj(jxyz)
+!$omp atomic
+            strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                 -0.5d0 *rij(ixyz) *pref *sumj(jxyz)
+          enddo
         enddo
       enddo  ! jj=...
     enddo  ! ia=...
+!$omp end do    
+!$omp end parallel
 
 !.....send back forces and potentials on immigrants
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -349,16 +406,9 @@ contains
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,epi,1)
     aa(1:3,1:natm)= aa(1:3,1:natm) +aa1(1:3,1:natm) +aa2(1:3,1:natm)
-
-    if( lstrs ) then
-      call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-           ,nn,mpi_world,strsl,9)
-      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-    endif
-
-!!$    print *,'strs Tersoff:'
-!!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
-!!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strsl,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !.....gather epot
     epotl = epotl1 +epotl2
@@ -663,6 +713,7 @@ contains
                  trim(cspi),trim(cspj)
             cycle
           endif
+
           ts_a(isp,jsp) = a
           ts_b(isp,jsp) = b
           ts_lmbd1(isp,jsp) = lmbd1
@@ -747,6 +798,7 @@ contains
       call mpi_bcast(ted_c4,ntemp,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ted_c5,ntemp,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ted_f0,ntemp,mpi_real8,0,mpi_world,ierr)
+
       ts_a(:,:) = ted_a(1)
       ts_b(:,:) = ted_b(1)
       ts_lmbd1(:,:) = ted_lmbd1(1)
@@ -767,6 +819,7 @@ contains
       ts_c5(:,:) = ted_c5(1)
       ts_f0(:,:) = ted_f0(1)
       interact(:,:) = .true.
+
     else
       call mpi_bcast(ts_a,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
       call mpi_bcast(ts_b,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
