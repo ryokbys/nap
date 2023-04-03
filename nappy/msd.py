@@ -17,7 +17,7 @@ Options:
   -m, --measure MEASURE
                 Num of measuring lane. In case of 1, it is identical to non-staggered measuring. [default: 1]
   -s, --shift SHIFT
-                Shift of each staggered lane. [default: 20]
+                Shift of each staggered lane. [default: -1]
   --dt DT       Time interval (fs) between sequential files. [default: -1.0]
   -o FILENAME   Output filename. [default: out.msd]
   --xyz         Decompose MSD to x,y,z-direction. [default: False]
@@ -199,6 +199,9 @@ if __name__ == "__main__":
         nmeasure = 1
         nshift = len(files)
         print(' Since nmeasure < 2, nmeasure and nshift are set to ',nmeasure,nshift)
+    elif nshift < 0:
+        nshift = int(len(files)/nmeasure)
+        print(' Since nshift is not given, set nshift by len(files)/nmeasure = ',nshift)
     
     #...compute sampling time-window from nmeasure and nshift
     ntwindow= len(files) -(nmeasure-1)*nshift
