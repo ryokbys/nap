@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-10 21:26:10 KOBAYASHI Ryo>
+!                     Last modified: <2023-04-05 13:39:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -301,8 +301,7 @@ contains
           do l=1,3
             tmp = tmp + ( stgt(ixyz,l)-stnsr(ixyz,l) ) *sgm(l,jxyz)
           enddo
-          tmp = tmp *stbeta*dt/3/srlx /sgmnrm
-!!$        tmp = stbeta*dt/3/srlx*( stgt(ixyz,jxyz)-stnsr(ixyz,jxyz) )
+          tmp = tmp *(stbeta/gpa2up)*dt/3/srlx /sgmnrm
           tmp = min(max(tmp,-sratemax),sratemax)
           ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
         enddo
@@ -310,7 +309,7 @@ contains
 !.....Berendsen for variable-volume not variable-cell
     else if( trim(cpctl).eq.'vv-berendsen' ) then
       prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
-      fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
+      fac = 1.0 -(stbeta/gpa2up)*dt/3/srlx *(ptgt-prss)
 !.....Limit change rate of h (ah) to RMAX
       fac = min(max(fac,1d0-sratemax),1d0+sratemax)
       ah(1:3,1:3) = ah(1:3,1:3)*fac

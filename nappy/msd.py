@@ -55,7 +55,7 @@ def get_ids(nsys,ids):
     return atom_ids
 
     
-def get_msd(files,ids0,nmeasure,nshift,specorder=None):
+def get_msd(files, ids0, nmeasure, nshift, specorder=None):
     """
     Compute MSD of specified species-ID from sequential structure FILES.
     
@@ -80,11 +80,6 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     nsys = read(fname=files[0],specorder=specorder)
     if specorder is None:
         specorder = copy.copy(nsys.specorder)
-    # if specorder is not None:
-    #     #nsys = NAPSystem(fname=files[0],specorder=specorder)
-    # else:
-    #     nsys = NAPSystem(fname=files[0],)
-    #     specorder = copy.copy(nsys.specorder)
     
     nspc = len(specorder)
     if ids0 is not None:
@@ -102,7 +97,7 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
     # msd= np.zeros((len(files),nmeasure,nspc,3))
-    msd= np.zeros((len(files)-(nmeasure-1)*nshift+1,nmeasure,nspc,3))
+    msd= np.zeros((len(files)-(nmeasure-1)*nshift+1, nmeasure, nspc, 3))
     npbc= np.zeros((len(ids),3))
     hmat= np.zeros((3,3))
     for ifile in range(len(files)):
@@ -110,7 +105,6 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
         sys.stdout.write('\r{0:5d}/{1:d}: {2:s}'.format(ifile+1,len(files),fname),)
         sys.stdout.flush()
         if ifile != 0:
-            #nsys= NAPSystem(fname=fname,specorder=specorder)
             nsys = read(fname=fname,specorder=specorder)
         poss = nsys.get_scaled_positions()
         sids = nsys.atoms.sid
@@ -171,30 +165,9 @@ def get_msd(files,ids0,nmeasure,nshift,specorder=None):
     print('')
     return msd,specorder
 
+def main(files=[], dt=1.0, nmeasure=1, nshift=-1, ids=None,
+         specorder=[], xyz=False):
 
-if __name__ == "__main__":
-
-    args = docopt(__doc__)
-
-    files = args['FILES']
-    ids = [ int(i) for i in args['--id'].split(',') if i != '' ]
-    for i in ids:
-        if i < 0:
-            ids = None
-            break
-    nmeasure = int(args['--measure'])
-    nshift = int(args['--shift'])
-    dt = float(args['--dt'])
-    if dt < 0.0:
-        raise ValueError('Current version of msd.py requires --dt option to be set by the user.\n'
-                         +'See the help with -h option.')
-    outfname= args['-o']
-    specorder = args['--specorder']
-    if specorder == 'None' or specorder is None:
-        specorder = None
-    else:
-        specorder = [ s for s in specorder.split(',')]
-    xyz = args['--xyz']
     if nmeasure < 2:
         nmeasure = 1
         nshift = len(files)
@@ -211,8 +184,6 @@ if __name__ == "__main__":
         raise ValueError(err)
 
     files.sort(key=get_key,reverse=True)
-    # for i in range(len(files)):
-    #     print i,files[i]
     
     msd,specorder = get_msd(files,ids,nmeasure,nshift,specorder)
 
@@ -264,3 +235,37 @@ if __name__ == "__main__":
                         f.write(' {:12.3e}'.format(dev2[0]+dev2[1]+dev2[2]))
                     f.write('\n')
     print(' Wrote a file: {0:s}'.format(outfname))
+    return None
+
+if __name__ == "__main__":
+
+    args = docopt(__doc__)
+    files = args['FILES']
+    if len(files) == 0:
+        raise ValueError('No file is given.')
+    ids = [ int(i) for i in args['--id'].split(',') if i != '' ]
+    for i in ids:
+        if i < 0:
+            ids = None
+            break
+    nmeasure = int(args['--measure'])
+    nshift = int(args['--shift'])
+    dt = float(args['--dt'])
+    if dt < 0.0:
+        raise ValueError('Current version of msd.py requires --dt option to be set by the user.\n'
+                         +'See the help with -h option.')
+    outfname= args['-o']
+    specorder = args['--specorder']
+    if specorder == 'None' or specorder is None:
+        specorder = None
+    else:
+        specorder = [ s for s in specorder.split(',')]
+    xyz = args['--xyz']
+
+    main(files=files,
+         dt=dt,
+         nmeasure=nmeasure,
+         nshift=nshift,
+         ids=ids,
+         specorder=specorder,
+         xyz=xyz)

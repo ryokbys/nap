@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-01-27 17:10:53 KOBAYASHI Ryo>
+!                    Last modified: <2023-04-05 13:36:35 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -117,7 +117,7 @@ module pmdvars
   real(8):: pini   = 0d0
   real(8):: pfin   = 0d0
   real(8):: srlx   = 100d0  ! relaxation time [fs]
-  real(8):: stbeta = 1d0
+  real(8):: stbeta = 1d-2   ! 1/B where B is the bulk modulus [GPa]
   real(8):: strfin = 0.0d0
   real(8):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
   logical:: lcellfix(1:3,1:3)= .false.

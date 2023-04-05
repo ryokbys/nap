@@ -213,6 +213,9 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'pressure_relax_time' ) then
     call read_r1(ionum,srlx)
     return
+  elseif( trim(cname).eq.'stress_beta' ) then
+    call read_r1(ionum,stbeta)
+    return
   elseif( trim(cname).eq.'stress_control' ) then
     call read_c1(ionum,cpctl)
     cpctl = lowcase(cpctl)
