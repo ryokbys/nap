@@ -203,7 +203,8 @@ contains
 !-----make a pair list, LSPR
 !.....Scan atoms (not scanning cells)
 !$omp parallel
-!$omp do private(mz,my,mx,m,kuz,kuy,kux,m1z,m1y,m1x,m1,i,j,xi,xij,rij,rij2)
+!$omp do private(mz,my,mx,m,kuz,kuy,kux,m1z,m1y,m1x,m1,i,j,xi,xij,rij,rij2) &
+!$omp    reduction(max:maxnnl,ierr_max)
 
 !$acc data present(ra,h,lspr,lshd,lscl), &
 !$acc      copyin(rcx,rcy,rcz,rcxi,rcyi,rczi,lcx,lcy,lcz, &
@@ -264,7 +265,6 @@ contains
           enddo  ! kuz
         enddo  ! kuy
       enddo  ! kux
-!$omp atomic
       maxnnl = max(maxnnl,lspr(0,i))
     enddo  ! i=1,natm
 !$acc end kernels

@@ -165,52 +165,55 @@ contains
     time0 = mpi_wtime()
 
     if( l1st ) then
+!.....nal and nnl are used only when called from fitpot
+      if( lfitpot ) then
 !  To reduce the memory usage, compute num of atoms and num of neighbors,
 !  and add some margin for those numbers because they can change during
 !  the simulation.
-      nal = max(nal,int(natm*1.1))
-      nnl = max(nnl,int(nnt*1.1))
-      if( nal .gt. namax ) then
-        write(6,'(a)') ' [Error] nal .gt.namax'
-        write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
-        stop
-      endif
-      if( nnl.gt.nnmax ) then
-        write(6,'(a)') ' [Error] nnl.gt.nnmax'
-        write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
-        stop
-      endif
-      if( myid.ge.0 ) then
-        call mpi_reduce(nal,nag,1,mpi_integer,mpi_max,0,mpi_world,ierr)
-        call mpi_reduce(nnl,nng,1,mpi_integer,mpi_max,0,mpi_world,ierr)
-      else
-        nag = nal
-        nng = nnl
-      endif
-      if( myid.le.0 .and. iprint.ne.0 ) then
-        print *,''
-        print *,'make_gsf_arrays @descriptor:'
-        write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nag
-        write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nng
-        write(6,'(a,f10.3,a)') '   gsf size  = ', &
-             dble(nsf*nag*8)/1000/1000,' MB'
-        write(6,'(a,f10.3,a)') '   dgsf size = ', &
-             dble(3*nsf*(nng+1)*nag*8)/1000/1000,' MB'
-        write(6,'(a,f10.3,a)') '   igsf size = ', &
-             dble(nsf*(nng+1)*nag*2)/1000/1000,' MB'
-      endif
-      if( allocated(gsf) ) then
-        ns_gsf = shape(gsf)
-        ns_dgsf = shape(dgsf)
-        if( ns_gsf(1).lt.nsf .or. ns_gsf(2).lt.nal .or. &
-             ns_dgsf(3).lt.(nnl+1) ) then
-          lrealloc = .true.
-        else
-          lrealloc = .false.
+        nal = max(nal,int(natm*1.1))
+        nnl = max(nnl,int(nnt*1.1))
+        if( nal .gt. namax ) then
+          write(6,'(a)') ' [Error] nal.gt.namax'
+          write(6,'(a,3i10)') '   myid,nal,namax = ',myid,nal,namax
+          stop
         endif
-      else
-        lrealloc = .true.
-      endif
+        if( nnl .gt. nnmax ) then
+          write(6,'(a)') ' [Error] nnl.gt.nnmax'
+          write(6,'(a,3i10)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
+          stop
+        endif
+        if( myid.ge.0 ) then
+          call mpi_reduce(nal,nag,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+          call mpi_reduce(nnl,nng,1,mpi_integer,mpi_max,0,mpi_world,ierr)
+        else
+          nag = nal
+          nng = nnl
+        endif
+        if( myid.le.0 .and. iprint.ne.0 ) then
+          print *,''
+          print *,'make_gsf_arrays @descriptor:'
+          write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nag
+          write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nng
+          write(6,'(a,f10.3,a)') '   gsf size  = ', &
+               dble(nsf*nag*8)/1000/1000,' MB'
+          write(6,'(a,f10.3,a)') '   dgsf size = ', &
+               dble(3*nsf*(nng+1)*nag*8)/1000/1000,' MB'
+          write(6,'(a,f10.3,a)') '   igsf size = ', &
+               dble(nsf*(nng+1)*nag*2)/1000/1000,' MB'
+        endif
+        if( allocated(gsf) ) then
+          ns_gsf = shape(gsf)
+          ns_dgsf = shape(dgsf)
+          if( ns_gsf(1).lt.nsf .or. ns_gsf(2).lt.nal .or. &
+               ns_dgsf(3).lt.(nnl+1) ) then
+            lrealloc = .true.
+          else
+            lrealloc = .false.
+          endif
+        else
+          lrealloc = .true.
+        endif
+      endif  ! lfitpot
 
 !.....gsfi,dgsfi,igsfi are independend on number of atoms but on nnlmax
       if( .not. allocated(gsfi) ) then
@@ -236,43 +239,45 @@ contains
       call accum_mem('descriptor',8*size(dgsfi) +2*size(igsfi))
     endif
 
+!.....Following error handling only happens when it is called from fitpot
+    if( lfitpot ) then
 !  Since natm and nn can change every step of MD,
 !  if natm/nnlt becomes >nal/nnl, they should be updated and
 !  gsf/dgsf as well.
-    if( natm.gt.nal ) then
-      nal = max(nal,int(natm*1.1))
-      if( iprint.ge.ipl_warn ) print *,'Since natm.gt.nal, nal was updated at myid =',myid
-      if( nal .gt. namax ) then
-        write(6,'(a)') ' [Error] nal.gt.namax'
-        write(6,'(a,3i0)') '   myid,nal,namax = ',myid,nal,namax
-        stop
+      if( natm.gt.nal ) then
+        nal = max(nal,int(natm*1.1))
+        if( iprint.ge.ipl_warn ) print *,'Since natm.gt.nal, nal was updated at myid =',myid
+        if( nal .gt. namax ) then
+          write(6,'(a)') ' [Error] nal.gt.namax'
+          write(6,'(a,3i0)') '   myid,nal,namax = ',myid,nal,namax
+          stop
+        endif
+        lrealloc=.true.
       endif
-      lrealloc=.true.
-    endif
-
-    if( nnt.gt.nnl ) then
-      nnl = max(nnl,int(nnt*1.1))
-      if( iprint.ge.ipl_warn ) print *,'Since nnt.gt.nnl, nnl was updated at myid =',myid
-      if( nnl.gt.nnmax ) then
-        write(6,'(a)') ' [Error] nnl.gt.nnmax'
-        write(6,'(a,3i0)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
-        stop
+  
+      if( nnt.gt.nnl ) then
+        nnl = max(nnl,int(nnt*1.1))
+        if( iprint.ge.ipl_warn ) print *,'Since nnt.gt.nnl, nnl was updated at myid =',myid
+        if( nnl.gt.nnmax ) then
+          write(6,'(a)') ' [Error] nnl.gt.nnmax'
+          write(6,'(a,3i0)') '   myid,nnl,nnmax = ',myid,nnl,nnmax
+          stop
+        endif
+        lrealloc=.true.
       endif
-      lrealloc=.true.
-    endif
 
 !.....gsf and dgsf are used only in fitpot, not in pmd
-    if( lrealloc .and. lfitpot ) then
-      if( allocated(gsf) ) then
-!!$        mem = mem -8*size(gsf) -8*size(dgsf) -2*size(igsf)
-        call accum_mem('descriptor',-8*(size(gsf)+size(dgsf))+2*size(igsf))
-        deallocate( gsf,dgsf,igsf )
+      if( lrealloc ) then
+        if( allocated(gsf) ) then
+          call accum_mem('descriptor',-8*(size(gsf)+size(dgsf))+2*size(igsf))
+          deallocate( gsf,dgsf,igsf )
+        endif
+        allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
+             ,igsf(nsf,0:nnl,nal))
+        call accum_mem('descriptor',8*(size(gsf)+size(dgsf))+2*size(igsf))
+        mem = mem +8*size(gsf) +8*size(dgsf) +2*size(igsf)
+        lrealloc=.false.
       endif
-      allocate( gsf(nsf,nal),dgsf(3,nsf,0:nnl,nal) &
-           ,igsf(nsf,0:nnl,nal))
-      call accum_mem('descriptor',8*(size(gsf)+size(dgsf))+2*size(igsf))
-      mem = mem +8*size(gsf) +8*size(dgsf) +2*size(igsf)
-      lrealloc=.false.
     endif
 
     time = time +(mpi_wtime() -time0)
