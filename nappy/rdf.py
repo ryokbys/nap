@@ -44,7 +44,6 @@ import numpy as np
 import copy
 from docopt import docopt
 
-#from nappy.napsys import NAPSystem
 import nappy
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
