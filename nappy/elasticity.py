@@ -28,7 +28,7 @@ from __future__ import print_function
 import os,sys
 import numpy as np
 from docopt import docopt
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, least_squares
 import spglib
 import yaml
 
@@ -134,7 +134,6 @@ def cdote(strns,*params):
     Compute C_ij*e_j to get s_i.
     """
     ctnsr = params2ctnsr(params)
-
     strss = np.zeros((len(strns),6),dtype=float)
     for i,strn in enumerate(strns):
         strs = np.dot(ctnsr,strn)
@@ -174,10 +173,12 @@ def func(x,*args):
         strs = np.dot(ctnsr,strn)
         strs0 = strss0[i]
         for j in range(len(strs)):
+            strsj = strs[j]
+            strsj0= strs0[j]
             val += (strs[j]-strs0[j])**2
             n += 1
     val /= n
-    print('val = ',val)
+    # print('val = ',val)
     return val
 
 def dfunc(x,*args):
@@ -242,7 +243,6 @@ def params2ctnsr(params):
             ctnsr[j,i] = ctnsr[i,j]
     return ctnsr
 
-
 def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
 
     #...original system
@@ -295,10 +295,17 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
     #...parameters 13 elements
     #params = np.zeros(13,dtype=float)
     
-    #...fit
-    strss = strss.flatten()
-    opt,covar = curve_fit(cdote,strns,strss,p0=params)
-
+    #...optimize using curve_fit method, which may result in segmentation fault (230423)
+    # strss = strss.flatten()
+    # print('curve_fit...')
+    # opt,covar = curve_fit(cdote,strns,strss,p0=params)
+    
+    #...Optimize using least_squares method, which would be more stable than curve_fit?
+    args = [ strns, strss ]
+    res = least_squares(func, params, args=args)
+    opt = res.x
+    
+    print('params2ctnsr')
     ctnsr = params2ctnsr(opt)
     # perr = np.sqrt(np.diag(covar))
     # print('std dev = ',perr)
