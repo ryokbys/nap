@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-20 10:25:14 KOBAYASHI Ryo>
+!                     Last modified: <2023-04-26 17:50:23 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -321,12 +321,13 @@ contains
 !     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
 !
     use vector,only: norm,dot,cross
+    use pmdvars,only: boundary
     integer,intent(in):: ntot
     real(8),intent(in):: h(3,3),rtot(3,ntot),vtot(3,ntot)
     real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz &
          ,rlmp(3,ntot),vlmp(3,ntot)
 
-    integer:: i,lxy,lxz,lyz
+    integer:: i,lxy,lxz,lyz,ixyz
     real(8):: a0(3),b0(3),c0(3),a1(3),a2(3),a3(3) &
          ,b1(3),b2(3),b3(3),rt(3),vt(3),amat(3,3),bmat(3,3) &
          ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
@@ -399,8 +400,15 @@ contains
     xyp = xy -lxy*x
     do i=1,ntot
       rlmp(1:3,i) = 0d0
-      call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz &
-           ,x,y,z,yz,xz,xy)
+!!$      call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz &
+!!$           ,x,y,z,yz,xz,xy)
+!.....Shift positions
+      rlmp(1:3,i) = rtot(1:3,i)
+      rlmp(2,i) = rlmp(2,i) -lyz*rtot(3,i)
+      rlmp(1,i) = rlmp(1,i) -lxz*rtot(3,i) +(rtot(2,i)*xyp -rlmp(2,i)*xy)/x
+      do ixyz=1,3
+        if( boundary(ixyz:ixyz).eq.'p' ) rlmp(ixyz,i) = pbc(rlmp(ixyz,i))
+      enddo
 !.....Velocity is in real unit (A/fs)
       vlmp(1:3,i) = vtot(1:3,i)
       vlmp(2,i) = vlmp(2,i) -lyz*vtot(3,i)

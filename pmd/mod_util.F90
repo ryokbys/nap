@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-10 21:35:34 KOBAYASHI Ryo>
+!                     Last modified: <2023-04-26 18:18:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -235,8 +235,6 @@ contains
     allocate(cdumpauxarr(ndumpaux))
     read(cdumpaux,*) (cdumpauxarr(i),i=1,ndumpaux)
 !.....If cdumpauxarr contains vx,vy,vz, bring them to the beginning of the array
-    ivx = idumpauxof('vx')
-    ivy = idumpauxof('vy')
     ivz = idumpauxof('vz')
     if( ivz.gt.0 ) then
       ctmp = cdumpauxarr(ivz)
@@ -245,6 +243,7 @@ contains
       enddo
       cdumpauxarr(1) = ctmp
     endif
+    ivy = idumpauxof('vy')
     if( ivy.gt.0 ) then
       ctmp = cdumpauxarr(ivy)
       do i=ivy-1,1,-1
@@ -252,6 +251,7 @@ contains
       enddo
       cdumpauxarr(1) = ctmp
     endif
+    ivx = idumpauxof('vx')
     if( ivx.gt.0 ) then
       ctmp = cdumpauxarr(ivx)
       do i=ivx-1,1,-1

@@ -321,6 +321,10 @@ def write_POSCAR(nsys,fname='POSCAR'):
     return None
 
 def read_dump(fname="dump",specorder=None):
+    """
+    LAMMPS dump file stores positions and velocities data in real unit, not in scaled unit.
+    Thus, nappy has to convert these from real unit to scaled unit.
+    """
     nsys = NAPSystem()
     f=open(fname,'r')
     mode= 'None'
@@ -372,7 +376,7 @@ def read_dump(fname="dump",specorder=None):
                 aux_names.remove('id')
                 aux_names.remove('type')
                 if ('x' not in aux_names and 'xu' not in aux_names) or \
-                   ('y' not in aux_names and 'zu' not in aux_names) or \
+                   ('y' not in aux_names and 'yu' not in aux_names) or \
                    ('z' not in aux_names and 'zu' not in aux_names):
                     raise ValueError('Not enough coordinate info.\nCheck the dump file format.')
                 try:
