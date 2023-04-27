@@ -184,7 +184,7 @@ def write_pmd(nsys,fname='pmdini'):
         tag = get_tag(sid,ifmv,i+1)  # assuming ifmv=1
         f.write(" {0:22.14e}".format(tag)
                 +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
-                +"  {0:8.4f}  {1:8.4f}  {2:8.4f}".format(*vi)
+                +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
                 +"\n")
     f.close()
     return None

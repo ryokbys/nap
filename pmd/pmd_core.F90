@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-03-27 14:11:43 KOBAYASHI Ryo>
+!                     Last-modified: <2023-04-27 22:19:40 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -76,14 +76,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
-!.....Scale velocity from scaled unit to real unit (Ang.)
-  if( myid_md.eq.0 ) then
-    do ia=1,ntot0
-      vtot(1:3,ia)= h(1:3,1,0)*vtot(1,ia) &
-           +h(1:3,2,0)*vtot(2,ia) &
-           +h(1:3,3,0)*vtot(3,ia)
-    enddo
-  endif
 
   call calc_nfmv(ntot0,tagtot)
 
@@ -201,12 +193,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          call error_mpi_stop('mod(ntdst,nx).ne.0')
     allocate(tdst(ntdst),nadst(ntdst))
   endif
-
-!.....Convert velocities and forces from scaled unit to real unit
-  do ia=1,natm
-    va(1:3,ia) = h(1:3,1,0)*va(1,ia) +h(1:3,2,0)*va(2,ia) +h(1:3,3,0)*va(3,ia)
-    aa(1:3,ia) = h(1:3,1,0)*aa(1,ia) +h(1:3,2,0)*aa(2,ia) +h(1:3,3,0)*aa(3,ia)
-  enddo
 
 !.....Deformation setup
   if( trim(cdeform).ne.'none' ) then
@@ -1000,17 +986,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,*) ''
   endif
 
-!.....Convert velocities and forces to scaled unit
-  if( myid_md.eq.0 ) then
-    do ia=1,ntot0
-      atot(1:3,ia)= hi(1:3,1)*atot(1,ia) &
-           +hi(1:3,2)*atot(2,ia) &
-           +hi(1:3,3)*atot(3,ia)
-      vtot(1:3,ia)= hi(1:3,1)*vtot(1,ia) &
-           +hi(1:3,2)*vtot(2,ia) &
-           +hi(1:3,3)*vtot(3,ia)
-    enddo
-  endif
   hmat(:,:,:) = h(:,:,:)  ! Return h-matrix as hmat
 
 !.....Return stnsr in human-friendly unit, GPa
@@ -2924,7 +2899,10 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
           natm = natm +1
           tag(natm)= tagtot(i)
           ra(1:3,natm)= rtot(1:3,i)
-          va(1:3,natm)= vtot(1:3,i)
+!!$          va(1:3,natm)= vtot(1:3,i)
+!.....va is in real unit, whereas vtot is in scaled unit
+          va(1:3,natm)= h(1:3,1,0)*vtot(1,i) +h(1:3,2,0)*vtot(2,i) &
+               +h(1:3,3,0)*vtot(3,i)
           tagtot(i) = -tagtot(i)
           if( naux.gt.0 ) aux(1:naux,natm) = auxtot(1:naux,i)
         endif
@@ -3060,7 +3038,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
       enddo
       call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2 &
            ,mpi_md_world,ierr)
-      call mpi_send(va,3*natm,mpi_real8,0,itag+3 &
+      call mpi_send(vatmp,3*natm,mpi_real8,0,itag+3 &
            ,mpi_md_world,ierr)
       call mpi_send(epi,natm,mpi_real8,0,itag+4 &
            ,mpi_md_world,ierr)
@@ -3068,7 +3046,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
            ,mpi_md_world,ierr)
       call mpi_send(strs,3*3*natm,mpi_real8,0,itag+6 &
            ,mpi_md_world,ierr)
-      call mpi_send(aa,3*natm,mpi_real8,0,itag+7 &
+      call mpi_send(aatmp,3*natm,mpi_real8,0,itag+7 &
            ,mpi_md_world,ierr)
       if( naux.gt.0 ) then
         call mpi_send(aux,natm*naux,mpi_real8,0,itag+11 &
