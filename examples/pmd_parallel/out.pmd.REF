@@ -1,11 +1,11 @@
  
- pmd --- Parallel Molecular Dynamics ---
+ PMD --- Parallel Molecular Dynamics ---
  
-   Revision: rev220922
+   Revision: rev230405
    Contributors: 
      - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
  
- Job started at 16:11:11 on 2022-10-14
+ Job started at 22:38:21 on 2023-04-27
  
  Read pmdini in ascii mode.
  Species order read from pmdini option: 
@@ -30,7 +30,8 @@
    Zr :  16
  
  Num of MPI processes = 1
- Num of OpenMP processes = 1
+ Warning: No such in.pmd entry, flag_coulomb !!!
+ Num of OpenMP processes = 8
  
 ------------------------------------------------------------------------
            Initial setting   
@@ -120,13 +121,19 @@
  Ensemble = NVE
  
  Number of ifmvs = 1
- rcut, rbuf =  6.000 0.300
- Min number of local atoms =        192
- Max number of local atoms =        192
-   nbmax =      10000
-   namax = nalmax*1.2 + nbmax  =      10230
-   nnmax =        200
+ 
+ space_decomp:
+   rcut, rbuf =  6.000 0.300
+   Min number of local atoms =        192
+   Max number of local atoms =        192
+     nbmax =       1469
+     namax = nalmax*1.2 + nbmax  =       1699
  Degrees of freedom for each ifmv =  576  0  0  0  0  0  0  0  0
+ 
+ Estimation of num of neighbors:
+   Max num in link-list cell =    25
+   Cell volume and density = 279.7   0.0894
+   Max num of neighbors, that incl. margin =   94  103
 
  Max num of neighbors =    98
  
@@ -142,25 +149,28 @@
    Long-range term   =       0.0000 eV
  
  Initial values:
-   Kinetic energy  =         11.99187 eV =      0.062 eV/atom
+   Kinetic energy  =          7.46180 eV =      0.039 eV/atom
    Potential energy=       -158.31108 eV =     -0.825 eV/atom
-   Temperature 1   =        485.72367 K
-   Temperature     =        485.72367 K
-   Pressure        =         26.82084 GPa (compressive)
-   Stress tensor   =    29.032    27.124    24.307     0.266    -0.503    -0.124
+   Temperature 1   =        302.23600 K
+   Temperature     =        302.23600 K
+   Pressure        =         26.60458 GPa (compressive)
+   Stress tensor   =    28.724    26.956    24.134     0.291    -0.477    -0.203
  
- istp,etime,temp,epot,vol,prss= 0        0.00      485.72  -1.5831E+02  2.237E+03  2.682E+01
- istp,etime,temp,epot,vol,prss= 1        0.01      481.62  -1.5821E+02  2.237E+03  2.685E+01
- istp,etime,temp,epot,vol,prss= 2        0.01      479.33  -1.5815E+02  2.237E+03  2.685E+01
+ istp,etime,temp,epot,vol,prss= 0        0.00      302.24  -1.5831E+02  2.237E+03  2.660E+01
+ istp,etime,temp,epot,vol,prss= 1        0.00      300.56  -1.5827E+02  2.237E+03  2.659E+01
+ istp,etime,temp,epot,vol,prss= 2        0.01      303.31  -1.5834E+02  2.237E+03  2.653E+01
  
  Final values:
-   Kinetic energy  =         11.83403 eV =      0.062 eV/atom
-   Potential energy=       -158.15301 eV =     -0.824 eV/atom
-   Temperature 1   =        479.33076 K
-   Temperature     =        479.33076 K
-   Pressure        =         26.85377 GPa (compressive)
+   Kinetic energy  =          7.48833 eV =      0.039 eV/atom
+   Potential energy=       -158.33772 eV =     -0.825 eV/atom
+   Temperature 1   =        303.31072 K
+   Temperature     =        303.31072 K
+   Pressure        =         26.53042 GPa (compressive)
  
- Time   total =      0.012 sec =   0h00m00s
- Memory per MPI-proc =     10.305 MB  
+ Max num of neighbors during MD = 99
+ Max num of boundary atoms during MD = 1141
  
- Job finished at 16:11:11 on 2022-10-14
+ Time   total =      0.013 sec =   0h00m00s
+ Memory per MPI-proc =      1.116 MB  
+ 
+ Job finished at 22:38:21 on 2023-04-27
