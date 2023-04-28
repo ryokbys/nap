@@ -33,7 +33,7 @@ from scipy.fftpack import fft
 from scipy.ndimage import gaussian_filter
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "230421"
+__version__ = "230428"
 
 def main(args):
 
@@ -168,7 +168,7 @@ def main(args):
     freqs = np.fft.fftfreq(2*ntw-1,dt/1000)[:ntw]
     ps0= np.zeros((ntw,nspcs))
     for ispc in range(nspcs):
-        ps0[:,ispc] = (abs(fft(pad(ac[:,ispc])))**2)[:ntw]
+        ps0[:,ispc] = (abs(fft(pad(ac[:,ispc])))**2)[:ntw]/tmax
 
     ps = copy.deepcopy(ps0)
     if sgm > 0:
