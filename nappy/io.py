@@ -14,6 +14,7 @@ import os,sys
 from docopt import docopt
 import numpy as np
 import copy
+import gzip
 
 from nappy.napsys import NAPSystem
 from nappy.util import get_tag, decode_tag, pbc, \
@@ -53,24 +54,30 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
 
     return None
 
-def read(fname="pmdini",format=None,specorder=None):
+def read(fname="pmdini",format=None, specorder=None):
     if format in (None, 'None'):
         format= parse_filename(fname)
 
+    rmode = 'r'
+    if fname[-3:] == '.gz':
+        global open
+        open = gzip.open
+        rmode = 'rt'
+
     if format == 'pmd':
-        nsys = read_pmd(fname,specorder=specorder)
+        nsys = read_pmd(fname,specorder=specorder, rmode=rmode)
     elif format in ('POSCAR','CONTCAR','vasp','VASP'):
-        nsys = read_POSCAR(fname,specorder=specorder)
+        nsys = read_POSCAR(fname,specorder=specorder, rmode=rmode)
     elif format == 'CHGCAR':
-        nsys = read_CHGCAR(fname,specorder=specorder)
+        nsys = read_CHGCAR(fname,specorder=specorder, rmode=rmode)
     elif format == 'dump':
-        nsys = read_dump(fname,specorder=specorder)
+        nsys = read_dump(fname,specorder=specorder, rmode=rmode)
     elif format == 'xsf':
-        nsys = read_xsf(fname,specorder=specorder)
+        nsys = read_xsf(fname,specorder=specorder, rmode=rmode)
     elif format == 'lammps':
-        nsys = read_lammps_data(fname,specorder=specorder)
+        nsys = read_lammps_data(fname,specorder=specorder, rmode=rmode)
     elif format == 'cube':
-        nsys = read_cube(fname,specorder=specorder)
+        nsys = read_cube(fname,specorder=specorder, rmode=rmode)
     else:
         print('Since the file format is unknown, try to read the file using ASE.')
         try:
@@ -83,15 +90,16 @@ def read(fname="pmdini",format=None,specorder=None):
     nsys._reset_atoms_dtypes()
     return nsys
 
-def read_pmd(fname='pmdini',specorder=None):
+def read_pmd(fname='pmdini',specorder=None,rmode='r'):
     nsys = NAPSystem()
     if specorder is not None:
         nsys.specorder = specorder
     incatm = 0
-    with open(fname,'r') as f:
+    with open(fname,rmode) as f:
         iline = 0
         symbol = None
-        for line in f.readlines():
+        lines = f.readlines()
+        for line in lines:
             if line[0] in ('#','!'):  # comment line
                 if 'specorder:' in line:  # overwrite specorder if specified in file
                     data = line.split()
@@ -189,9 +197,9 @@ def write_pmd(nsys,fname='pmdini'):
     f.close()
     return None
 
-def read_POSCAR(fname='POSCAR',specorder=None):
+def read_POSCAR(fname='POSCAR',specorder=None,rmode='r'):
     nsys = NAPSystem()
-    with open(fname,'r') as f:
+    with open(fname,rmode) as f:
         # 1st line: comment
         f.readline()
         # 2nd: lattice constant
@@ -320,13 +328,13 @@ def write_POSCAR(nsys,fname='POSCAR'):
     f.close()
     return None
 
-def read_dump(fname="dump",specorder=None):
+def read_dump(fname="dump",specorder=None,rmode='r'):
     """
     LAMMPS dump file stores positions and velocities data in real unit, not in scaled unit.
     Thus, nappy has to convert these from real unit to scaled unit.
     """
     nsys = NAPSystem()
-    f=open(fname,'r')
+    f=open(fname,rmode)
     mode= 'None'
     ixyz= 0
     iatm= 0
@@ -361,7 +369,8 @@ def read_dump(fname="dump",specorder=None):
     ifx = -1
     ify = -1
     ifz = -1
-    for line in f.readlines():
+    lines = f.readlines()
+    for line in lines:
         data = line.split()
         if 'ITEM' in line:
             if 'NUMBER OF ATOMS' in line:
@@ -587,13 +596,14 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz']):
     f.close()
     return None
 
-def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None):
+def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None,
+                     rmode='r'):
     nsys = NAPSystem()
     if specorder is None:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
-    f=open(fname,'r')
+    f=open(fname,rmode)
     mode= 'None'
     iatm= 0
     symbol = None
@@ -713,14 +723,14 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic'):
     f.close()
     return None
 
-def read_xsf(fname="xsf",specorder=None):
+def read_xsf(fname="xsf",specorder=None, rmode='r'):
     from nappy.elements import get_symbol_from_number
     nsys = NAPSystem()
     if specorder is None:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
-    f=open(fname,'r')
+    f=open(fname,rmode)
     mode= 'None'
     ixyz= 0
     iatm= 0
@@ -837,7 +847,7 @@ def write_xsf(nsys,fname='xsf'):
     f.close()
     return None
 
-def read_CHGCAR(fname='CHGCAR',specorder=None):
+def read_CHGCAR(fname='CHGCAR',specorder=None,rmode='r'):
     """
     Read CHGCAR file and get information of cell, atoms, and volumetric data.
 
@@ -847,7 +857,7 @@ def read_CHGCAR(fname='CHGCAR',specorder=None):
          File name to be read.
     """
     nsys = NAPSystem()
-    with open(fname,'r') as f:
+    with open(fname,rmode) as f:
         # 1st line: comment
         f.readline()
         # 2nd: lattice constant
@@ -943,7 +953,7 @@ need to specify the species order correctly with --specorder option.
         nsys.voldata = np.reshape(voldata,ndiv,order='F')
     return nsys
 
-def read_cube(fname, specorder=None):
+def read_cube(fname, specorder=None, rmode='r'):
     """Read Gaussian cube format file."""
     from nappy.elements import get_symbol_from_number
     from nappy.units import Bohr_to_Ang
@@ -953,7 +963,7 @@ def read_cube(fname, specorder=None):
     else:
         nsys.specorder = specorder
 
-    with open(fname, 'r') as f:
+    with open(fname, rmode) as f:
         lines = f.readlines()
     natm = -1
     nvdata = -1
