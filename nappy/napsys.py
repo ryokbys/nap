@@ -453,6 +453,18 @@ class NAPSystem(object):
         self.atoms[['vx','vy','vz']] = svels
         return None
 
+    def set_real_velocities(self,vels):
+        if len(vels) != len(self.atoms):
+            raise ValueError('Array size inconsistent.')
+        if type(vels) == list:
+            vels = np.array(vels)
+        svels = np.zeros(vels.shape)
+        hmati = self.get_hmat_inv()
+        for ia in range(len(self.atoms)):
+            svels[ia,:] = np.dot(hmati,vels[ia,:])
+        self.atoms[['vx','vy','vz']] = svels
+        return None
+
     def get_scaled_forces(self):
         return self.atoms[['fx','fy','fz']].to_numpy()
 
@@ -990,9 +1002,13 @@ class NAPSystem(object):
                         x= pi0[0]/m1 +1.0/m1*i1
                         y= pi0[1]/m2 +1.0/m2*i2
                         z= pi0[2]/m3 +1.0/m3*i3
+                        vi0 = vels[i0]
+                        vx= vi0[0]/m1 +1.0/m1*i1
+                        vy= vi0[1]/m2 +1.0/m2*i2
+                        vz= vi0[2]/m3 +1.0/m3*i3
                         newsids[inc] = self.atoms.sid[i0]
                         newposs[inc,:] = [x,y,z]
-                        newvels[inc,:] = vels[i0,:]
+                        newvels[inc,:] = [vx,vy,vz]
                         newfrcs[inc,:] = frcs[i0,:]
                         for auxname in auxnames:
                             newauxs[auxname].append(self.atoms.loc[i0,auxname])
