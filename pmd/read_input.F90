@@ -205,7 +205,8 @@ subroutine set_variable(ionum,cname)
     call read_r1(ionum,pfin)
     return
   elseif( trim(cname).eq.'stress_target' ) then
-    call read_rs(ionum,3,3,stgt(1:3,1:3))
+!!$    call read_rs(ionum,3,3,stgt(1:3,1:3))
+    call read_stress_target(ionum)
 !.....It is not necesarry, but copy average stgt to ptgt as well...
     ptgt = (stgt(1,1)+stgt(2,2)+stgt(3,3))/3
     return
@@ -585,6 +586,38 @@ subroutine read_dumpaux(ionum)
 !!$  ldumpaux_changed = .true.
   deallocate(ctmp1)
 end subroutine read_dumpaux
+!=======================================================================
+subroutine read_stress_target(ionum)
+!
+!  Read stress_target which depends on the number of entries
+!
+  use pmdvars, only: lhydrostatic, stgt
+  use util, only: num_data
+  implicit none 
+  integer,intent(in):: ionum
+  
+  character(len=1024):: ctmp
+  character(len=20),allocatable:: ctmp1(:)
+  integer:: ndat,i
+  
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  backspace(ionum)
+
+  if( ndat .eq. 4 ) then
+    read(ionum,*) ctmp, stgt(1,1), stgt(2,2), stgt(3,3)
+    lhydrostatic = .true.
+  else if( ndat .eq. 7 ) then
+    read(ionum,*) ctmp, stgt(1,1), stgt(2,2), stgt(3,3), &
+         stgt(2,3), stgt(1,3), stgt(1,2)
+    stgt(3,2) = stgt(2,3)
+    stgt(3,1) = stgt(1,3)
+    stgt(2,1) = stgt(1,2)
+    lhydrostatic = .false.
+  endif
+  return
+end subroutine read_stress_target
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

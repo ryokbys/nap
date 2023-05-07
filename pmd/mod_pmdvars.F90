@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-04-13 14:52:43 KOBAYASHI Ryo>
+!                    Last modified: <2023-05-06 23:36:27 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -12,6 +12,7 @@ module pmdvars
   integer,parameter:: iotemp= 12
   integer,parameter:: iostrs= 13
   integer,parameter:: iotdst= 14
+  integer,parameter:: iozload= 15
 
   character(len=20),parameter:: cinpmd='in.pmd'
 
@@ -121,6 +122,7 @@ module pmdvars
   real(8):: strfin = 0.0d0
   real(8):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
   logical:: lcellfix(1:3,1:3)= .false.
+  logical:: lhydrostatic = .false.  ! enforce only hydrostatic pressure
 !.....charge optimize or variable charge
   logical:: lvc = .false.
 !.....Charge setting

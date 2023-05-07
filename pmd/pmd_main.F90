@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-04-05 12:52:56 KOBAYASHI Ryo>
+!                     Last-modified: <2023-05-07 14:40:42 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -436,28 +436,34 @@ subroutine write_initial_setting()
   write(6,'(2x,a)') ''
 !.....pressure control
   write(6,'(2x,a,5x,a)') 'stress_control',trim(cpctl)
-  if( trim(cpctl).eq.'berendsen' .or. &
-       trim(cpctl).eq.'vc-berendsen' ) then
-    write(6,'(2x,a,2x,f0.1)') 'stress_relax_time',srlx
-    write(6,'(2x,a)') 'stress_target'
-    write(6,'(5x,3es11.3)') stgt(1,1:3)
-    write(6,'(5x,3es11.3)') stgt(2,1:3)
-    write(6,'(5x,3es11.3)') stgt(3,1:3)
-    write(6,'(2x,a)') 'cell_fix'
-    write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
-    write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
-    write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
-    write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
-    
-  else if( trim(cpctl).eq.'vv-berendsen' ) then
-    write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
-    write(6,'(2x,a,2x,f0.1)') 'pressure_relax_time',srlx
-    write(6,'(2x,a)') 'cell_fix'
-    write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
-    write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
-    write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
-    write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
+  if( index(cpctl,'beren').ne.0 )then  ! Berendsen isobaric
+    if( index(cpctl,'vv').eq.0 ) then  ! vc-Berendsen
+      write(6,'(2x,a,2x,f0.1)') 'stress_relax_time',srlx
+      if( lhydrostatic ) then
+        write(6,'(2x,a,2x,3(1x,f0.1))') 'stress_target',stgt(1,1),stgt(2,2),stgt(3,3)
+      else
+        write(6,'(2x,a,2x,6(1x,f0.1))') 'stress_target', &
+             stgt(1,1),stgt(2,2),stgt(3,3), &
+             stgt(2,3), stgt(1,3), stgt(1,2)
+      endif
+!!$    write(6,'(5x,3es11.3)') stgt(1,1:3)
+!!$    write(6,'(5x,3es11.3)') stgt(2,1:3)
+!!$    write(6,'(5x,3es11.3)') stgt(3,1:3)
+      write(6,'(2x,a)') 'cell_fix'
+      write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
+      write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
+      write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
+      write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
 
+    else  ! vv-Berendsen
+      write(6,'(2x,a,5x,f0.3)') 'pressure_target',ptgt
+      write(6,'(2x,a,2x,f0.1)') 'pressure_relax_time',srlx
+      write(6,'(2x,a)') 'cell_fix'
+      write(6,'(5x,3(2x,l))') lcellfix(1,1:3)
+      write(6,'(5x,3(2x,l))') lcellfix(2,1:3)
+      write(6,'(5x,3(2x,l))') lcellfix(3,1:3)
+      write(6,'(2x,a,f10.3)') 'max_strain_rate',sratemax
+    endif
   endif
   write(6,*) ''
 !.....strain control
@@ -650,6 +656,7 @@ subroutine bcast_params()
   call mpi_bcast(ciofmt,6,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(nrmtrans,6,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(lhydrostatic,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)

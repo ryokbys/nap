@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-04-05 13:39:03 KOBAYASHI Ryo>
+!                     Last modified: <2023-05-06 23:43:36 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -21,7 +21,7 @@ module isostat
 !-----------------------------------------------------------------------
   use pmdvars,only: tinit,tfin,trlx,nstp,istp,tgmm,ttgt,dt,am,fa2v,tfac, &
        ndof,ekl,temp,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
-       pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm
+       pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm,lhydrostatic
   use util,only: ifmvOf
   use random,only: box_muller
   implicit none
@@ -157,9 +157,15 @@ contains
       if(myid.eq.0 .and. iprint.ne.0 ) then
         write(6,*) ''
         write(6,'(a)') ' Barostat: variable-cell Berendsen'
-        write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
-             ,stgt(1,1),stgt(2,2),stgt(3,3) &
-             ,stgt(2,3),stgt(3,1),stgt(1,2)
+        if( lhydrostatic ) then
+          write(6,'(a,l)') '   Hydrostatic pressure: TRUE'
+          write(6,'(a,3f10.3)') '   Target stress [GPa]: ' &
+               ,stgt(1,1),stgt(2,2),stgt(3,3)
+        else
+          write(6,'(a,6f10.3)') '   Target stress [GPa]: ' &
+               ,stgt(1,1),stgt(2,2),stgt(3,3) &
+               ,stgt(2,3),stgt(3,1),stgt(1,2)
+        endif
       endif
       stgt(1:3,1:3)= stgt(1:3,1:3) *gpa2up
     endif
@@ -298,9 +304,13 @@ contains
         sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
         do ixyz=1,3
           tmp = 0d0
-          do l=1,3
-            tmp = tmp + ( stgt(ixyz,l)-stnsr(ixyz,l) ) *sgm(l,jxyz)
-          enddo
+          if( lhydrostatic ) then
+            tmp = tmp + ( stgt(ixyz,ixyz)-stnsr(ixyz,ixyz) ) *sgm(ixyz,jxyz)
+          else
+            do l=1,3
+              tmp = tmp + ( stgt(ixyz,l)-stnsr(ixyz,l) ) *sgm(l,jxyz)
+            enddo
+          endif
           tmp = tmp *(stbeta/gpa2up)*dt/3/srlx /sgmnrm
           tmp = min(max(tmp,-sratemax),sratemax)
           ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp

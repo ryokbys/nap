@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-04-27 22:19:40 KOBAYASHI Ryo>
+!                     Last-modified: <2023-05-05 14:38:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -464,6 +464,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            //','//cftave//',2es16.7e3)') istp &
            ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
       call flush(ioerg)
+!.....Write stress components
+      open(iostrs,file="out.strs",status='replace')
+      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+           //'  3:sxx[GPa],  4:syy,  5:szz,  6:syz,  7:sxz,  8:sxy'
+      call flush(iostrs)
     endif
 !c.....write out temperatures
 !        open(iotemp,file='out.temperature',status='replace')
@@ -475,8 +480,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....write out tensile forces
     if(trim(czload_type).eq.'atoms' .or. trim(czload_type).eq.'box' &
          .or. trim(czload_type).eq.'shear' ) then
-      open(iostrs,file='out.zload',status='replace')
-      write(iostrs,'(a)') '#  istp,   strnow,      ftop,     fbot'
+      open(iozload,file='out.zload',status='replace')
+      write(iozload,'(a)') '#  istp,   strnow,      ftop,     fbot'
     endif
   endif
 
@@ -485,8 +490,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call get_forces_on_base(natm,ra,aa,tag,h,ftop &
          ,fbot,sorg,myid_md,mpi_md_world,iprint,czload_type)
     if( myid_md.eq.0 ) then
-      write(iostrs,'(i8,3es15.7)') 0,0.0,ftop,fbot
-      call flush(iostrs)
+      write(iozload,'(i8,3es15.7)') 0,0.0,ftop,fbot
+      call flush(iozload)
     endif
   endif
 
@@ -809,13 +814,17 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              //','//cftave//',2es16.7e3)') istp &
              ,simtime,ekin+epot,ekin,epot,tave,vol,prss
         call flush(ioerg)
+!.....write stresses
+        write(iostrs,'('//cfistp//','//cfstime//',6es12.3e3)') istp &
+             ,simtime, sth(1,1), sth(2,2), sth(3,3), sth(2,3), sth(1,3), sth(1,2)
+        call flush(iostrs)
 !.....write temperature
         ediff(1:9)= 0d0
 
         if( trim(czload_type).eq.'atoms' .or. &
              trim(czload_type).eq.'shear' ) then
-          write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
-          call flush(iostrs)
+          write(iozload,'(i8,3es15.7)') istp,strnow,ftop,fbot
+          call flush(iozload)
         endif
       endif   ! myid_md.eq.0
 
@@ -939,10 +948,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   tcpu2= mpi_wtime()
 
   if(myid_md.eq.0) then
-    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) close(ioerg)
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
+      close(ioerg)
+      close(iostrs)
+    endif
 !        close(iotemp)
     if(czload_type.eq.'atoms' .or. czload_type.eq.'box') then
-      close(iostrs)
+      close(iozload)
     endif
     if( ltdst ) close(iotdst)
   endif
@@ -1378,6 +1390,11 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
       write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
       call flush(ioerg)
+!.....Write stress components
+      open(iostrs,file="out.strs",status='replace')
+      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+           //'  3:sxx[GPa],  4:syy,  5:szz,  6:syz,  7:sxz,  8:sxy'
+      call flush(iostrs)
     endif
   endif
 
@@ -1488,6 +1505,10 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              //','//cftave//',2es16.7e3)') istp &
              ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
         call flush(ioerg)
+!.....write stresses
+        write(iostrs,'('//cfistp//','//cfstime//',6es11.3e3)') istp &
+             ,simtime, sth(1,1), sth(2,2), sth(3,3), sth(2,3), sth(1,3), sth(1,2)
+        call flush(iostrs)
       endif
     endif
 
@@ -1499,7 +1520,10 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   tcpu2= mpi_wtime()
 
   if(myid_md.eq.0) then
-    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) close(ioerg)
+    if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
+      close(ioerg)
+      close(iostrs)
+    endif
   endif
 
   tcpu= tcpu2 -tcpu1
