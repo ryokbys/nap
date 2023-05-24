@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-05-05 14:38:19 KOBAYASHI Ryo>
+!                     Last-modified: <2023-05-24 16:48:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -466,7 +466,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call flush(ioerg)
 !.....Write stress components
       open(iostrs,file="out.strs",status='replace')
-      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+      write(iostrs,'(a)') '# 1:istp, 2:simtime[fs],' &
            //'  3:sxx[GPa],  4:syy,  5:szz,  6:syz,  7:sxz,  8:sxy'
       call flush(iostrs)
     endif
