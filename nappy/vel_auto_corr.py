@@ -134,41 +134,31 @@ def main(args):
         acfile.write(f' {sumac:11.3e}\n')
     acfile.close()
 
-    # #...Power spectrum
-    # mwmax = int(ntw/2)
-    # dw = 2.0*np.pi /tmax
-    # ps = np.zeros((mwmax,3))
-    # for mw in range(mwmax):
-    #     w = dw *mw
-    #     for it in range(ntw):
-    #         t = it*dt
-    #         decay = np.exp(-(t/tdamp)**2)
-    #         coswt = np.cos(w*t)
-    #         ps[mw,:] += 2.0 *ac[it,:] *decay *coswt *dt
-    # #...Normalize in THz freq unit
-    # pst = np.zeros(3)
-    # for mw in range(mwmax):
-    #     freq = float(mw) /(tmax/1000)
-    #     pst[:] += ps[mw,:]*freq
-    # for mw in range(mwmax):
-    #     ps[mw,:] /= pst[:]
-    # with open('dat.power','w') as f:
-    #     f.write('# Power spectrum of velocity auto correlation from vel_auto_corr.py ' +
-    #             'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-    #     f.write('#      f [THz],   Ix(f),    Iy(f),    Iz(f),   I(f)\n')
-    #     for mw in range(mwmax):
-    #         freq = float(mw) /(tmax/1000)
-    #         f.write(f' {freq:11.3e}' +
-    #                 f' {ps[mw,0]:11.3e} {ps[mw,1]:11.3e} {ps[mw,2]:11.3e}' +
-    #                 ' {0:11.3e}\n'.format(ps[mw,0]+ps[mw,1]+ps[mw,2]))
+    #...Power spectrum
+    mwmax = int(ntw/2)
+    dw = 2.0*np.pi /tmax
+    ps0 = np.zeros((mwmax,nspcs))
+    for mw in range(mwmax):
+        w = dw *mw
+        for it in range(ntw):
+            t = it*dt
+            decay = np.exp(-(t/tdamp)**2)
+            coswt = np.cos(w*t)
+            if it == 0:
+                ps0[mw,:] += 1.0 *ac[it,:] *decay *coswt *dt
+            else:
+                ps0[mw,:] += 2.0 *ac[it,:] *decay *coswt *dt
 
-    pad = lambda x: pad_zeros(x, nadd=len(x) -1)
-    w = welch(ntw)
-    t = np.array([ dt*it/1000 for it in range(ntw) ])  # [ps]
-    freqs = np.fft.fftfreq(2*ntw-1,dt/1000)[:ntw]
-    ps0= np.zeros((ntw,nspcs))
-    for ispc in range(nspcs):
-        ps0[:,ispc] = (abs(fft(pad(ac[:,ispc])))**2)[:ntw]/tmax
+    #...Normalize in THz freq unit
+    pst = np.zeros(nspcs)
+    for mw in range(mwmax):
+        freq = float(mw) /(tmax/1000)
+        pst[:] += ps0[mw,:]*freq
+    for mw in range(mwmax):
+        ps0[mw,:] /= pst[:]
+        #...Negative values to zero
+        for ispc in range(nspcs):
+            ps0[mw,ispc] = max(ps0[mw,ispc],0.0)
 
     ps = copy.deepcopy(ps0)
     if sgm > 0:
@@ -178,14 +168,41 @@ def main(args):
     with open('dat.power','w') as f:
         f.write('# Power spectrum of velocity auto correlation from vel_auto_corr.py ' +
                 'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        f.write('#      f [THz],   I(f) of each species,    sum of speices-I(f)\n')
-        for it in range(ntw):
-            f.write(f' {freqs[it]:11.3e}' )
+        f.write('#      f [THz],   I(f) of each species,   sum of species-I(f)\n')
+        for mw in range(mwmax):
+            freq = float(mw) /(tmax/1000)
+            f.write(f' {freq:11.3e}')
             sumps = 0.0
             for ispc in range(nspcs):
-                f.write(' {0:11.3e}'.format(ps[it,ispc]))
-                sumps += ps[it,ispc]
+                f.write(' {0:11.3e}'.format(ps[mw,ispc]))
+                sumps += ps[mw,ispc]
             f.write(f' {sumps:11.3e}\n')
+
+
+    # pad = lambda x: pad_zeros(x, nadd=len(x) -1)
+    # w = welch(ntw)
+    # t = np.array([ dt*it/1000 for it in range(ntw) ])  # [ps]
+    # freqs = np.fft.fftfreq(2*ntw-1,dt/1000)[:ntw]
+    # ps0= np.zeros((ntw,nspcs))
+    # for ispc in range(nspcs):
+    #     ps0[:,ispc] = (abs(fft(pad(ac[:,ispc])))**2)[:ntw]/tmax
+
+    # ps = copy.deepcopy(ps0)
+    # if sgm > 0:
+    #     for ispc in range(nspcs):
+    #         ps[:,ispc] = gaussian_filter(ps0[:,ispc], sigma=[sgm],)
+    
+    # with open('dat.power','w') as f:
+    #     f.write('# Power spectrum of velocity auto correlation from vel_auto_corr.py ' +
+    #             'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+    #     f.write('#      f [THz],   I(f) of each species,    sum of species-I(f)\n')
+    #     for it in range(ntw):
+    #         f.write(f' {freqs[it]:11.3e}' )
+    #         sumps = 0.0
+    #         for ispc in range(nspcs):
+    #             f.write(' {0:11.3e}'.format(ps[it,ispc]))
+    #             sumps += ps[it,ispc]
+    #         f.write(f' {sumps:11.3e}\n')
 
     print(' Wrote dat.autocorr and dat.power.')
     
