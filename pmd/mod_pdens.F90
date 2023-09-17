@@ -179,7 +179,9 @@ contains
           do iz=1,npz
             write(ionum,'(2x,es11.3)',advance='no') pdl(iz,iy,ix)
             inc = inc +1
-            if( mod(inc,6) .eq. 0 ) write(ionum,*) ''
+            if( mod(inc,6) .eq. 0 ) then
+              write(ionum,*) ''
+            endif
           enddo
         enddo
       enddo

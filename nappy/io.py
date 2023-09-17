@@ -1033,7 +1033,7 @@ def read_cube(fname, specorder=None,):
     # hereafter, volumetric data if exists
     if nvoldat > 0:
         vdata = np.zeros(nvoldat, dtype=float)
-        nlines = int(nvoldat/6) +1
+        nlines = int(nvoldat/6) #+1
         inc = 0
         for il in range(nlines):
             d = lines[6+natm+il].split()

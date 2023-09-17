@@ -1,14 +1,16 @@
 subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
      naux,auxtot,hmat,ispcs,ekin,epot,stnsr,linit)
-  use pmdvars,only: nx,ny,nz,iprint,nstp
+  use pmdvars,only: nx,ny,nz,iprint,nstp,ifpmd
   implicit none
   integer,intent(in):: ntot0,ispcs(ntot0),naux
   real(8),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
+!f2py integer,intent(hide),depend(ispcs):: ntot0=shape(ispcs,0)
 !f2py intent(in,out):: rtot,vtot,hmat
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0), &
        epitot(ntot0),auxtot(naux,ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: linit
 
+  integer:: i
   integer:: ntot
   real(8):: hunit,tagtot(ntot0)
   
@@ -55,7 +57,9 @@ end subroutine get_naux
 !=======================================================================
 subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
      iprint0,nstp0,dt0, & !,naux0,laux,cauxarr0
-     ifdmp0,dmp0,eps_conv0,n_conv0,lcpctl,cpctl0,ptgt0,stgt0,srlx0, &
+     ifdmp0,dmp0,eps_conv0,n_conv0, &
+     lctctl,ctctl0,tinit0,tfin0,ttgt0,trlx0,nrmtrans0, &
+     lcpctl,cpctl0,ptgt0,stgt0,srlx0,lcellfix0, &
      ifpmd0,npmd0,nerg0,nnmax0,lrealloc0)
 !
 !  Set variables to be stored in pmdvars module that are required 
@@ -63,7 +67,8 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 !
   use pmdvars,only: specorder,nspmax,nsp,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
        am,nstp,naux,ifpmd,npmd,nerg,cauxarr,ifdmp,dmp,eps_conv,n_conv, &
-       cpctl,ptgt,stgt,srlx,nnmax,lrealloc
+       cpctl,ptgt,stgt,srlx,lcellfix,nnmax,lrealloc, &
+       ctctl,tinit,tfin,ttgt,trlx,nrmtrans
   use force
   use element
   implicit none
@@ -79,7 +84,14 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 !!$  integer,intent(in):: naux0,laux
 !!$  character(len=1),intent(in):: cauxarr0(naux0,laux)
 !!$!f2py integer,intent(hide),depend(cauxarr0):: laux=shape(cauxarr0,1)
+  integer,intent(in):: lctctl
+  character(len=1),intent(in):: ctctl0(lctctl)
+!f2py integer,intent(hide),depend(ctctl0):: lctctl=shape(ctctl0,0)
+  real(8),intent(in):: tinit0, tfin0, trlx0
+  real(8),intent(in):: ttgt0(9)
+  integer,intent(in):: nrmtrans0
   real(8),intent(in):: ptgt0,srlx0,stgt0(3,3)
+  logical,intent(in):: lcellfix0(3,3)
   integer,intent(in):: lcpctl
   character(len=1),intent(in):: cpctl0(lcpctl)
 !f2py integer,intent(hide),depend(cpctl0):: lcpctl=shape(cpctl0,0)
@@ -128,6 +140,8 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 
   write(c20,'(20a1)') cpctl0(1:lcpctl)
   cpctl = trim(c20)
+  write(c20,'(20a1)') ctctl0(1:lctctl)
+  ctctl = trim(c20)
 
 !!$  naux = naux0
   nstp = nstp0
@@ -146,7 +160,7 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   ny = 1
   nz = 1
   nerg = nerg0
-  ifpmd = 0
+  ifpmd = ifpmd0
   npmd = npmd0
   ifdmp = ifdmp0
   dmp = dmp0
@@ -155,8 +169,14 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
   ptgt = ptgt0
   stgt(:,:) = stgt0(:,:)
   srlx = srlx0
+  lcellfix(:,:) = lcellfix0(:,:)
   nnmax = nnmax0
   lrealloc = lrealloc0
+  tinit = tinit0
+  tfin = tfin0
+  trlx = trlx0
+  ttgt(:) = ttgt0(:)
+  nrmtrans = nrmtrans0
 
 end subroutine set_pmdvars
 !=======================================================================

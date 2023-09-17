@@ -33,7 +33,7 @@ from scipy.fftpack import fft
 from scipy.ndimage import gaussian_filter
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "230428"
+__version__ = "230531"
 
 def main(args):
 
@@ -60,7 +60,7 @@ def main(args):
     
     #...compute sampling time-window from nmeasure and nshift
     ntw= len(infiles) -(nmeasure-1)*nshift
-    tmax = ntw *dt
+    tmax = (ntw-1) *dt
     tdamp = tmax/np.sqrt(3.0)
     print(' ntw =',ntw)
     print(' tmax     =',tmax,'fs')
@@ -178,31 +178,6 @@ def main(args):
                 sumps += ps[mw,ispc]
             f.write(f' {sumps:11.3e}\n')
 
-
-    # pad = lambda x: pad_zeros(x, nadd=len(x) -1)
-    # w = welch(ntw)
-    # t = np.array([ dt*it/1000 for it in range(ntw) ])  # [ps]
-    # freqs = np.fft.fftfreq(2*ntw-1,dt/1000)[:ntw]
-    # ps0= np.zeros((ntw,nspcs))
-    # for ispc in range(nspcs):
-    #     ps0[:,ispc] = (abs(fft(pad(ac[:,ispc])))**2)[:ntw]/tmax
-
-    # ps = copy.deepcopy(ps0)
-    # if sgm > 0:
-    #     for ispc in range(nspcs):
-    #         ps[:,ispc] = gaussian_filter(ps0[:,ispc], sigma=[sgm],)
-    
-    # with open('dat.power','w') as f:
-    #     f.write('# Power spectrum of velocity auto correlation from vel_auto_corr.py ' +
-    #             'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-    #     f.write('#      f [THz],   I(f) of each species,    sum of species-I(f)\n')
-    #     for it in range(ntw):
-    #         f.write(f' {freqs[it]:11.3e}' )
-    #         sumps = 0.0
-    #         for ispc in range(nspcs):
-    #             f.write(' {0:11.3e}'.format(ps[it,ispc]))
-    #             sumps += ps[it,ispc]
-    #         f.write(f' {sumps:11.3e}\n')
 
     print(' Wrote dat.autocorr and dat.power.')
     

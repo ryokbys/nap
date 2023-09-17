@@ -41,11 +41,13 @@ _entry_to_varname = {
     'stress_relax_time': 'srlx',
     'pressure_relax_time': 'srlx',
     'flag_compute_stress': 'lstrs0',
+    'cell_fix': 'lcellfix',
     'zload_type': 'czload_type',
     'final_strain': 'strfin',
     'boundary': 'boundary',
     'max_num_neighbors': 'nnmax',
     'allow_reallocation': 'lrealloc',
+    'remove_translation': 'nrmtrans',
 }
 
 _default_params = {
@@ -58,7 +60,7 @@ _default_params = {
     'num_iteration': 0,
     'min_iteration': 0,
     'num_out_energy': 10,
-    'flag_out_pmd': 2,
+    'flag_out_pmd': 0,
     'num_out_pmd': 1,
     'flag_sort': 1,
     'force_type': None,
@@ -71,24 +73,37 @@ _default_params = {
     'initial_temperature': -10.0,
     'final_temperature': -10.0,
     'temperature_control': 'none',
-    'temperature_target': [300.0, 100.0,],
+    'temperature_target': [300.0, 100.0, 300.0,
+                           300.0, 300.0, 300.0,
+                           300.0, 300.0, 300.0],
     'temperature_relax_time': 100.0,
     'temperature_limit': 1.0e+5,
-    'flag_temp_dist': 'F',
+    'remove_translation': 1,
+    'flag_temp_dist': False,
     'factor_direction':[[1.0, 1.0, 1.0],
-                        [1.0, 0.0, 1.0]],
+                        [1.0, 0.0, 1.0],
+                        [1.0, 1.0, 1.0],
+                        [1.0, 0.0, 1.0],
+                        [1.0, 1.0, 1.0],
+                        [1.0, 0.0, 1.0],
+                        [1.0, 1.0, 1.0],
+                        [1.0, 0.0, 1.0],
+                        [1.0, 1.0, 1.0]],
     'stress_control': 'none',
     'pressure_target': 0.0,
     'stress_target': [[0.0, 0.0, 0.0],
                       [0.0, 0.0, 0.0],
                       [0.0, 0.0, 0.0]],
     'stress_relax_time': 20.0,
-    'flag_compute_stress': 'T',
+    'cell_fix': [[False,False,False],
+                 [False,False,False],
+                 [False,False,False]],
+    'flag_compute_stress': True,
     'zload_type': 'none',
     'final_strain': 0.0,
     'boundary': 'ppp',
     'max_num_neighbors': 200,
-    'allow_reallocation': 'F',
+    'allow_reallocation': False,
 }
 
 _int_keys = [
@@ -96,7 +111,7 @@ _int_keys = [
     'num_iteration','num_out_energy','flag_out_pmd',
     'num_out_pmd','flag_damping',
     'converge_num','min_iteration','flag_sort',
-    'print_level','max_num_neighbors',
+    'print_level','max_num_neighbors','remove_translation'
 ]
 _float_keys = [
     'time_interval','cutoff_radius','cutoff_buffer',
@@ -108,9 +123,12 @@ _float_keys = [
 ]
 _str_keys = [
     'io_format','force_type','temperature_control',
-    'stress_control','flag_temp_dist',
-    'flag_compute_stress','zload_type','boundary',
-    'overlay_type', 'allow_reallocation',
+    'stress_control',
+    'zload_type','boundary',
+    'overlay_type',
+]
+_bool_keys = [
+    'allow_reallocation','flag_temp_dist','flag_compute_stress',
 ]
 
 def get_default():
@@ -149,9 +167,12 @@ def read_inpmd(fname='in.pmd'):
             mode = None
         if mode is not None:
             if mode == 'factor_direction':
-                inputs[mode].append([ float(x) for x in data ])
+                inputs[mode][facdir_inc] = [ float(x) for x in data ]
+                facdir_inc += 1
             elif mode == 'stress_target':
                 inputs[mode].append([ float(x) for x in data ])
+            elif mode == 'cell_fix':
+                inputs[mode].append([ x in ('T','True','.true.') for x in data ])
             else:
                 continue
         else:
@@ -160,15 +181,17 @@ def read_inpmd(fname='in.pmd'):
                 inputs[key] = data[1:]
                 mode = None
             elif key == 'temperatuer_target':
-                if type(inputs[key]) is list:
-                    pass
-                else:
-                    inputs[key] = []
-                inputs[key].append(float(data[2]))
+                ifmv = int(data[1])
+                if not 1 <= ifmv <= 9:
+                    ValueError('temperature_target ifmv wrong.')
+                inputs[key][ifmv-1] = float(data[2])
                 mode = None
             elif key == 'factor_direction':
                 mode = key
-                inputs[key] = []
+                facdir_dim = int(data[1])
+                facdir_num = int(data[2])
+                facdir_inc = 0
+                # inputs[key] = []
                 continue
             elif key == 'stress_target':
                 mode = key
@@ -183,6 +206,9 @@ def read_inpmd(fname='in.pmd'):
                 mode = None
             elif key in _str_keys:
                 inputs[key] = data[1]
+                mode = None
+            elif key in _bool_keys:
+                inputs[key] = data[1] in ('T','True','.true.')
                 mode = None
 
     return inputs

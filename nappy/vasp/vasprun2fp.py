@@ -29,7 +29,7 @@ from ase.io import read,write
 from docopt import docopt
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "221010"
+__version__ = "230917"
 
 _kb2gpa = 160.2176487
 
@@ -62,10 +62,10 @@ def write_pos(atoms,fname="pos",specorder=None):
             atom= atoms[i]
             f.write(' {0:s}'.format(get_tag(atom.symbol,i+1,specorder)))
             f.write(' {0:12.8f} {1:12.8f} {2:12.8f}'.format(pos[i,0],pos[i,1],pos[i,2]))
-            f.write(' 0.0 0.0 0.0 ')
-            f.write(' 0.0 0.0 ' 
-                    +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
-
+            f.write('  0.0  0.0  0.0\n')
+            # f.write(' 0.0 0.0 ' 
+            #         +' 0.0 0.0 0.0 0.0 0.0 0.0\n')
+    return None
 
 def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
     if not keep_const:
@@ -161,9 +161,9 @@ def main():
             #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
             sysname, nodename, release, version, machine = os.uname()
             if 'Darwin' in sysname:
-                os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+                os.system("sed -i '' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
             else:
-                os.system("sed -i'' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+                os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
             atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         except Exception as e:
             print(' Failed to read vasprun.xml, so skip it.')

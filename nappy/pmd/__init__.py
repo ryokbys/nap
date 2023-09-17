@@ -47,14 +47,15 @@ class PMD:
         return None
 
     def run(self, nstp=0, dt=1.0, ifdmp=0, dmp=0.99, conveps=1e-5, convnum=3,
-            initialize=True ):
+            initialize=True, iprint=0 ):
         """
         Call pmd and store the result to self.result.
         """
         if self.nsys == None:
             raise ValueError('nsys must be set beofre calling run().')
         self.set_params(num_iteration=nstp, time_interval=dt, flag_damping=ifdmp,
-                        damping_coeff=dmp, converge_eps=conveps, converge_num=convnum)
+                        damping_coeff=dmp, converge_eps=conveps, converge_num=convnum,
+                        print_level=iprint)
         # self.params['num_iteration'] = nstp
         # self.params['time_interval'] = dt
         self.update_mpivars()
@@ -130,18 +131,26 @@ class PMD:
         conveps = self.param2var('converge_eps',1e-5)
         convnum = self.param2var('converge_num',3)
         tinit = self.param2var('initial_temperature',300.0)
-        # tfin  = self.param2var('final_temperature',-10.0)
-        # tcontrol = self.param2var('temperature_control','none')
-        # ttgt = self.param2var('temperature_target',[300.0,100.0])
-        # trlx = self.param2var('temperature_relax_time',50.0)
+        tfin  = self.param2var('final_temperature',-10.0)
+        tctl = self.param2var('temperature_control','none')
+        ttgt = np.array(self.param2var('temperature_target',
+                                       [300.0, 100.0, 300.0,
+                                        300.0, 300.0, 300.0,
+                                        300.0, 300.0, 300.0]))
+        trlx = self.param2var('temperature_relax_time',50.0)
+        nrmtrans = self.param2var('remove_translation',0)
         sctrl = self.param2var('stress_control','vc-Berendsen')
         ptgt = self.param2var('pressure_target',0.0)
         stgt = np.array(self.param2var('stress_target',
-                                       [[0.1, 0.0, 0.0],
-                                        [0.0, 0.1, 0.0],
-                                        [0.0, 0.0, 0.1]]))
+                                       [[0.0, 0.0, 0.0],
+                                        [0.0, 0.0, 0.0],
+                                        [0.0, 0.0, 0.0]]))
         srlx = self.param2var('stress_relax_time',50.0)
-        ifpmd = self.param2var('flag_out_pmd',2)
+        lcellfix = np.array(self.param2var('cell_fix',
+                                           [[False, False, False],
+                                            [False, False, False],
+                                            [False, False, False]]))
+        ifpmd = self.param2var('flag_out_pmd',0)
         npmd = self.param2var('num_out_pmd',0)
         nerg = self.param2var('num_out_energy',100)
         nnmax = self.param2var('max_num_neighbors',200)
@@ -159,11 +168,15 @@ class PMD:
         #     cauxarr[1] = 'chi   '
 
         cpctrl = np.empty(20,dtype='c')
-        cpctrl = str2char(sctrl,20)
+        cpctrl = str2char(sctrl.lower(),20)
+        ctctl = np.empty(20,dtype='c')
+        ctctl = str2char(tctl.lower(),20)
 
+        # print('ifpmd = ',ifpmd)
         pw.set_pmdvars(nsp,cspcs,cfrcs,rc,rbuf,iprint,nstp,dt,
                        ifdmp,dmpcoeff,conveps,convnum,
-                       cpctrl,ptgt,stgt.T,srlx,
+                       ctctl,tinit,tfin,ttgt,trlx,nrmtrans,
+                       cpctrl,ptgt,stgt.T,srlx,lcellfix.T,
                        ifpmd,npmd,nerg,nnmax,lrealloc)
         return None
 
@@ -201,7 +214,7 @@ class PMD:
         """
         Load in.params.XXX files needed to initialize force parameters.
         """
-        
+        return None
         
     def set_system(self,nsys):
         self.nsys = copy.deepcopy(nsys)
