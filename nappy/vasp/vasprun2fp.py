@@ -5,7 +5,7 @@ to erg.ref, frc.ref, and pos files.
 Note that reading a lot of vasprun.xml takes a lot of time.
 
 Usage:
-  vasprun2fp.py [options] DIR [DIR...]
+  vasprun2fp.py [options]
 
 Options:
   -h,--help  Show this message and exit.
@@ -106,7 +106,7 @@ def output_for_fitpot(atoms,keep_const,dirname='./',specorder=[]):
 
 def main():
     args=docopt(__doc__)
-    dirs= args['DIR']
+    # dirs= args['DIR']
     specorder= args['--specorder'].split(',')
     sequence = args['--sequence']
     keep_const = args['--keep-constraints']
@@ -142,65 +142,55 @@ def main():
     if keep_const:
         print(' Keep constraints originaly set to the system.')
 
-    ndirs= len(dirs)
-    print(' Number of directories to be processed = ',ndirs)
+    # ndirs= len(dirs)
+    # print(' Number of directories to be processed = ',ndirs)
 
-    cwd=os.getcwd()
-    for i,d in enumerate(dirs):
-        os.chdir(cwd)
-        print('{0:5d}/{1:d}: '.format(i+1,ndirs)+d)
-        os.chdir(d)
-        if not os.path.exists('vasprun.xml'):
-            print(' No vasprun.xml, so skip.')
-            continue
-        if os.path.exists('erg.ref') and \
-           os.stat('erg.ref').st_mtime > os.stat('vasprun.xml').st_mtime:
-            print(' Since there is newer erg.ref, skip it.')
-            continue
-        try:
-            #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
-            sysname, nodename, release, version, machine = os.uname()
-            if 'Darwin' in sysname:
-                os.system("sed -i '' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
-            else:
-                os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
-            atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
-        except Exception as e:
-            print(' Failed to read vasprun.xml, so skip it.')
-            print(e)
-            continue
+    if not os.path.exists('vasprun.xml'):
+        raise FileNotFoundError(' No vasprun.xml found!')
+    if os.path.exists('erg.ref') and \
+       os.stat('erg.ref').st_mtime > os.stat('vasprun.xml').st_mtime:
+        raise ValueError(' There is newer erg.ref than vasprun.xml.')
+    try:
+        #...Since there is a bug in vasp, species "r" needs to be replaced by "Zr"
+        sysname, nodename, release, version, machine = os.uname()
+        if 'Darwin' in sysname:
+            os.system("sed -i '' -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+        else:
+            os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
+        atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
+    except Exception as e:
+        raise Exception(' Failed to read vasprun.xml because of {0}.'.format(e))
 
-        if type(index) is list:
-            print(' Extracting specified steps from ',len(atoms),' steps in total')
-            n = 0
-            for j,a in enumerate(atoms):
-                if j not in index:
-                    continue
-                dirname = '{0:05d}/'.format(n)
-                print('  {0:s}'.format(dirname))
-                os.system('mkdir -p {0:s}'.format(dirname))
-                output_for_fitpot(a,keep_const,dirname=dirname,
-                                  specorder=specorder)
-                n += 1
-        elif sequence or type(index) is slice:  # Whole MD sequence
-            print(' Extracting sequence of ',len(atoms),' steps')
-            indices = []
-            # if sequence:  # Whole MD sequence
-            #     indices = [ i for i in range(len(atoms)) ]
-            # else:  # Sliced indices
-            #     indices = [ i for i in range(index.start, index.stop, index.step) ]
-            for j,a in enumerate(atoms):
-                dirname = '{0:05d}/'.format(j)
-                print('  {0:s}'.format(dirname))
-                os.system('mkdir -p {0:s}'.format(dirname))
-                output_for_fitpot(a,keep_const,dirname=dirname,
-                                  specorder=specorder)
-            pass
-        else:   # snapshopt
-            dirname = './'
-            output_for_fitpot(atoms,keep_const,dirname=dirname,
+    if type(index) is list:
+        print(' Extracting specified steps from ',len(atoms),' steps in total')
+        n = 0
+        for j,a in enumerate(atoms):
+            if j not in index:
+                continue
+            dirname = '{0:05d}/'.format(n)
+            print('  {0:s}'.format(dirname))
+            os.system('mkdir -p {0:s}'.format(dirname))
+            output_for_fitpot(a,keep_const,dirname=dirname,
                               specorder=specorder)
-    os.chdir(cwd)
+            n += 1
+    elif sequence or type(index) is slice:  # Whole MD sequence
+        print(' Extracting sequence of ',len(atoms),' steps')
+        indices = []
+        # if sequence:  # Whole MD sequence
+        #     indices = [ i for i in range(len(atoms)) ]
+        # else:  # Sliced indices
+        #     indices = [ i for i in range(index.start, index.stop, index.step) ]
+        for j,a in enumerate(atoms):
+            dirname = '{0:05d}/'.format(j)
+            print('  {0:s}'.format(dirname))
+            os.system('mkdir -p {0:s}'.format(dirname))
+            output_for_fitpot(a,keep_const,dirname=dirname,
+                              specorder=specorder)
+        pass
+    else:   # snapshopt
+        dirname = './'
+        output_for_fitpot(atoms,keep_const,dirname=dirname,
+                          specorder=specorder)
     return None
 
 if __name__ == "__main__":
