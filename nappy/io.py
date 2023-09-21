@@ -105,6 +105,7 @@ def read(fname="pmdini",format=None, specorder=None):
 
 def read_pmd(fname='pmdini',specorder=None):
     global myopen
+    forces = False
     nsys = NAPSystem()
     if specorder is not None:
         nsys.specorder = specorder
@@ -116,13 +117,32 @@ def read_pmd(fname='pmdini',specorder=None):
         lines = f.readlines()
         for line in lines:
             if line[0] in ('#','!'):  # comment line
-                if 'specorder:' in line:  # overwrite specorder if specified in file
-                    data = line.split()
-                    specorder = [ d for d in data[2:len(data)]]
+                values = line.split()
+                if len(values) < 2:
+                    continue
+                option = values[1]
+                if option == 'specorder:':  # overwrite specorder if specified in file
+                    specorder = [ v for v in values[2:len(values)]]
                     if nsys.specorder and set(nsys.specorder)!=set(specorder):
                         print(' WARNING: specorders are inconsistent, '
                               +'use one in the file.')
                     nsys.specorder = specorder
+                elif option == 'potential_energy:':
+                    epot = float(values[2])
+                    nsys.set_potential_energy(epot)
+                elif option == 'stress:':
+                    strs = [ float(v.strip('[').strip(']')) for v in values[2:] ]
+                    #...Voigt repr. to tensor repr.
+                    stensor = np.zeros((3,3), dtype=float)
+                    stensor[0,0] = strs[0]
+                    stensor[1,1] = strs[1]
+                    stensor[2,2] = strs[2]
+                    stensor[1,2] = stensor[2,1] = strs[3]
+                    stensor[0,2] = stensor[2,0] = strs[4]
+                    stensor[0,1] = stensor[1,0] = strs[5]
+                elif option == 'forces:':
+                    if values[2] not in ('False', 'false', 'F'):
+                        forces = True
             else:
                 if nsys.specorder is None or len(nsys.specorder) == 0:
                     raise ValueError('Specorder must be specified via the file or an argument.')
@@ -162,6 +182,9 @@ def read_pmd(fname='pmdini',specorder=None):
                     # vels[incatm][:] = fdata[4:7]
                     poss[incatm,:] = fdata[1:4]
                     vels[incatm,:] = fdata[4:7]
+                    #...Read forces, only if forces exist and the forces-flag is on.
+                    if forces:
+                        frcs[incatm,:] = fdata[7:10]
                     sids[incatm] = sid
                     incatm += 1
     nsys.atoms[['x','y','z']] = poss
@@ -170,16 +193,18 @@ def read_pmd(fname='pmdini',specorder=None):
     nsys.atoms['sid'] = sids
     return nsys
 
-def write_pmd(nsys,fname='pmdini'):
+def write_pmd(nsys,fname='pmdini', **kwargs):
     myopen, mode = get_open_func(fname,'w')
     f=myopen(fname,mode)
+    f.write("!\n")
     if nsys.specorder and len(nsys.specorder)> 0:
-        f.write("!\n")
         f.write("!  specorder: ")
         for s in nsys.specorder:
             f.write(" {0:<3s}".format(s))
         f.write("\n")
-        f.write("!\n")
+    for k,v in kwargs.items():
+        f.write(f'!  {k:s}: {v}\n')
+    f.write("!\n")
     # lattice constant
     f.write(" {0:15.9f}\n".format(nsys.alc))
     # cell vectors
@@ -195,6 +220,9 @@ def write_pmd(nsys,fname='pmdini'):
     # atom positions
     poss = nsys.get_scaled_positions()
     vels = nsys.get_velocities()
+    frcs = None
+    if 'forces' in kwargs.keys() and kwargs['forces']:
+        frcs = nsys.get_forces()
     sids = nsys.atoms.sid
     if 'ifmv' not in nsys.atoms.columns:
         ifmvs = [ 1 for i in range(len(poss)) ]
@@ -206,10 +234,18 @@ def write_pmd(nsys,fname='pmdini'):
         sid = sids[i]
         ifmv = ifmvs[i]
         tag = get_tag(sid,ifmv,i+1)  # assuming ifmv=1
-        f.write(" {0:22.14e}".format(tag)
-                +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
-                +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
-                +"\n")
+        if frcs is not None:
+            fi = frcs[i]
+            f.write(" {0:22.14e}".format(tag)
+                    +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
+                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
+                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*fi)
+                    +"\n")
+        else:
+            f.write(" {0:22.14e}".format(tag)
+                    +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
+                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
+                    +"\n")
     f.close()
     return None
 
