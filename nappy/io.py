@@ -131,7 +131,7 @@ def read_pmd(fname='pmdini',specorder=None):
                     epot = float(values[2])
                     nsys.set_potential_energy(epot)
                 elif option == 'stress:':
-                    strs = [ float(v.strip('[').strip(']')) for v in values[2:] ]
+                    strs = [ float(v) for v in values[2:] ]
                     #...Voigt repr. to tensor repr.
                     stensor = np.zeros((3,3), dtype=float)
                     stensor[0,0] = strs[0]
@@ -203,7 +203,13 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
             f.write(" {0:<3s}".format(s))
         f.write("\n")
     for k,v in kwargs.items():
-        f.write(f'!  {k:s}: {v}\n')
+        if type(v) is list or type(v) is np.ndarray:
+            f.write(f'!  {k:s}:')
+            for vi in v:
+                f.write(f'  {vi}')
+            f.write('\n')
+        else:
+            f.write(f'!  {k:s}: {v}\n')
     f.write("!\n")
     # lattice constant
     f.write(" {0:15.9f}\n".format(nsys.alc))
