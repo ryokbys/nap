@@ -26,11 +26,11 @@ Options:
   --plot      Plot figures. [default: False]
   --fortran   Try using fortran routine for ADF calculation.
 """
-from __future__ import print_function
 
 import os,sys
 import numpy as np
 from docopt import docopt
+from datetime import datetime
 
 from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
@@ -217,11 +217,12 @@ def write_out4fp(fname,triplets,na,angd,agr,rcut,nperline=6):
             n += 1
     
     with open(fname,'w') as f:
-        f.write('# ADF for triplets:')
-        for it,t in enumerate(triplets):
-            f.write(' {0:s}-{1:s}-{2:s},'.format(*t))
-        f.write('\n')
-        f.write('# rcut, na = {0:.3f}, {1:d}\n'.format(rcut,na))
+        cmd = ' '.join(s for s in sys.argv)
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cwd = os.getcwd()
+        f.write('# Output from {cmd:s}\n')
+        f.write(f'#   at {cwd:s}\n')
+        f.write(f'#   at {now:s}\n')
         f.write('#\n')
         #...Num of data, weight for the data
         f.write(' {0:6d}  {1:7.3f}\n'.format(ndat,1.0))

@@ -36,104 +36,6 @@ __version__ = "230917"
 
 _kb2gpa = 160.2176487
 
-def read_vasprun_xml(fname='vasprun.xml', velocity=False):
-    """
-    Based on read_vasp_xml in ase.io.vasp.py.
-    """
-    import xml.etree.ElementTree as ET
-    
-    tree = ET.iterparse(fname, events=['start', 'end'])
-    calcs = []
-    dt = -1.0
-    specorder = []
-    try:
-        for event, elem in tree:
-            if event == 'end':
-                if elem.tag == 'atominfo':
-                    species = []
-                    for entry in elem.find("array[@name='atoms']/set"):
-                        species.append(entry[0].text.strip())
-                    natoms = len(species)
-                    specorder = sorted(list(set(species)),key=species.index)
-                elif elem.tag == 'incar':
-                    for e in elem.iter():
-                        if 'name' in e.attrib.keys() \
-                          and e.attrib['name'] == 'POTIM':
-                            dt = float(e.text)
-            elif event == 'start' and elem.tag == 'calculation':
-                calcs.append(elem)
-    except ET.ParseError as e:
-        raise e
-    
-    if len(calcs)==0:
-        raise ValueError(f'There is no calculation in {fname}')
-    
-    nsyss = []
-    for calc in calcs:
-        nsys = nappy.napsys.NAPSystem(specorder=specorder)
-
-        lastscf = calc.findall('scstep/energy')[-1]
-        de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
-              float(lastscf.find('i[@name="e_fr_energy"]').text))
-        e_free = float(calc.find('energy/i[@name="e_fr_energy"]').text)
-        epot = e_free + de
-        nsys.set_potential_energy(epot)
-        
-        cell = np.zeros((3, 3), dtype=float)
-        for i, vector in enumerate(
-                calc.find('structure/crystal/varray[@name="basis"]')):
-            cell[i] = np.array([float(val) for val in vector.text.split()])
-
-        sposs = np.zeros((natoms, 3), dtype=float)
-        for i, vector in enumerate(
-                calc.find('structure/varray[@name="positions"]')):
-            sposs[i] = np.array([float(val) for val in vector.text.split()])
-
-        frcs = None
-        fblocks = calc.find('varray[@name="forces"]')
-        if fblocks is not None:
-            frcs = np.zeros((natoms, 3), dtype=float)
-            for i, vector in enumerate(fblocks):
-                frcs[i] = np.array(
-                    [float(val) for val in vector.text.split()])
-
-        strs = None
-        sblocks = calc.find('varray[@name="stress"]')
-        if sblocks is not None:
-            strs = np.zeros((3, 3), dtype=float)
-            for i, vector in enumerate(sblocks):
-                strs[i] = np.array(
-                    [float(val) for val in vector.text.split()])
-            #strs *= -0.1 * GPa
-            #strs = strss.reshape(9)[[0, 4, 8, 5, 2, 1]]
-        
-        nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
-        nsys.add_atoms(species, sposs, frcs=frcs)
-        nsys.set_stress_tensor(strs)
-        nsyss.append(nsys)
-    
-    if velocity:
-        # Assuming that the change/velocity of the cell does not contribute to atom velocities,
-        # which is a common assumption in Andersen and Parrinello-Rahman methods.
-        # But this assumption may not be apropriate when the precise measurement of velocity is important.
-        nsys0 = nsyss[0]
-        vels = np.zeros((natoms,3), dtype=float)
-        for n in range(1,len(nsyss)):
-            nsys1 = nsyss[n]
-            hmat0 = nsys0.get_hmat()
-            sposs0 = nsys0.get_scaled_positions()
-            sposs1 = nsys1.get_scaled_positions()
-            for i in range(len(sposs0)):
-                dpos = sposs1[i] -sposs0[i]
-                dpos = dpos -np.round(dpos)
-                vels[i] = np.dot(hmat0, dpos) /dt
-            nsyss[n-1].set_real_velocities(vels)
-            nsys0 = nsys1
-        # Since velocities of the last step cannot be computed in this definition,
-        # remove the last one for data consistency...
-        del nsyss[-1]
-    return nsyss
-
 def get_tag(symbol,atom_id,specorder):
     sid= specorder.index(symbol)+1
     tag= float(sid) +0.1 +atom_id*1e-14
@@ -263,7 +165,7 @@ def main():
         else:
             os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
         #atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
-        nsyss = read_vasprun_xml(fname='vasprun.xml', velocity=velocity)[index]
+        nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml', velocity=velocity)[index]
     except Exception as e:
         raise Exception(' Failed to read vasprun.xml because of {0}.'.format(e))
 

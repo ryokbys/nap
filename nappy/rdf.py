@@ -36,7 +36,6 @@ Options:
               Scattering lengths of corresponding species. [default: None]
   --fortran   Try using fortran function for computing RDF.
 """
-from __future__ import print_function
 
 import os,sys
 from datetime import datetime
