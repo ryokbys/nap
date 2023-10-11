@@ -87,20 +87,22 @@ def paths2files(paths=[]):
 
 def msds2Ds(files,temps,dim=3,offset=0,specorder=[],spc=None):
     from nappy.msd2diff import read_out_msd, msd2D
-    Ts = np.zeros(len(files))
-    Ds = np.zeros(len(files))
-    Dstds = np.zeros(len(files))
+    Ts = []
+    Ds = []
+    Dstds = []
     fac = 1.0e-16 /1.0e-15  # A^2/fs to cm^2/s
     for i,f in enumerate(files):
         T = temps[i]
         # ts,msds = read_out_msd(d+'/out.msd',offset=offset,column=specorder.index(spc)+1)
         ts,msds = read_out_msd(f,offset=offset,column=specorder.index(spc)+1)
         D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
+        if D < 0.0:
+            continue
         print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
-        Ts[i] = float(T)
-        Ds[i] = D
-        Dstds[i] = Dstd
-    return Ts,Ds,Dstds
+        Ts.append(float(T))
+        Ds.append(D)
+        Dstds.append(Dstd)
+    return np.array(Ts),np.array(Ds),np.array(Dstds)
     
     
 if __name__ == "__main__":
@@ -121,22 +123,6 @@ if __name__ == "__main__":
     if spc not in specorder:
         raise ValueError('SPC must be in SPECORDER')
 
-    #...Sort dirs list in numerical order
-    # dirs.sort(cmp=lambda x,y: cmp(int(x.replace('K','')), int(y.replace('K',''))),
-    #           reverse=True)
-
-    # Ts = np.zeros(len(dirs))
-    # Ds = np.zeros(len(dirs))
-    # Dstds = np.zeros(len(dirs))
-    # fac = 1.0e-16 /1.0e-15 #...A^2/fs to cm^2/s
-    # for i,d in enumerate(dirs):
-    #     T = d.replace('K','')
-    #     ts,msds = read_out_msd(d+'/out.msd',offset)
-    #     D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
-    #     print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
-    #     Ts[i] = float(T)
-    #     Ds[i] = D
-    #     Dstds[i] = Dstd
     files, temps = paths2files(paths)
     Ts,Ds,Dstds = msds2Ds(files,temps,dim=dim,offset=offset,specorder=specorder,spc=spc)
 
@@ -145,14 +131,22 @@ if __name__ == "__main__":
         for T,D,Dstd in zip(Ts,Ds,Dstds):
             f.write('    {0:8.2f}  {1:12.4e}  {2:12.4e}\n'.format(T,D,Dstd))
     print(' Wrote {0:s}'.format(outfname))
-    
-    Tinvs = np.array([ 1.0/T for T in Ts ])
-    log10Ds = np.array([ np.log10(D) for D in Ds ])
-    a,b,r,p,stderr = stats.linregress(Tinvs,log10Ds)
-    
-    Eact = a *(-_kB) /np.log10(np.exp(1.0))
-    Eaerr = stderr *_kB /np.log10(np.exp(1.0))
-    D0 = 10.0**b
+
+    Tinvs = []
+    logDs = []
+    for i,D in enumerate(Ds):
+        if D <= 0.0:
+            continue
+        Tinvs.append( 1.0/Ts[i] )
+        logDs.append( np.log(D) )
+    Tinvs = np.array(Tinvs)
+    logDs = np.array(logDs)
+    # Tinvs = np.array([ 1.0/T for T in Ts ])
+    # logDs = np.array([ np.log(D) for D in Ds ])
+    a,b,r,p,stderr = stats.linregress(Tinvs,logDs)
+    Eact = a *(-_kB) /np.log(np.exp(1.0))
+    Eaerr = stderr *_kB /np.log(np.exp(1.0))
+    D0 = np.exp(b)
     print(' Ea = {0:.3e} +/- {1:.3e} [eV]'.format(Eact,Eaerr))
     print(' D0 = {0:.4e} [cm^2/s]'.format(D0))
 
