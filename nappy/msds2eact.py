@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 """
 Compute activation energy from temperature vs diffusion coefficient.
-DIRS should be like '300K' and the digits before 'K' is used as temperature.
+If PATHS are directories,
+PATHS should be like '300K' and the digits before 'K' is used as temperature.
+else if PATHS are files,
+PATHS should be like 'out.msd.300' and the digit at the end is used as temperature.
 
 Usage:
-  msds2eact.py [options] DIRS [DIRS...]
+  msds2eact.py [options] PATHS [PATHS...]
 
 Options:
   -h, --help  Show this message and exit.
@@ -27,6 +30,7 @@ from docopt import docopt
 import numpy as np
 from scipy import stats
 from functools import cmp_to_key
+from nappy.common import get_key
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "191212"
@@ -50,21 +54,47 @@ def cmp(a,b):
     if a == b: return 0
     return -1 if a < b else 1
 
-def cmpstr(a,b):
+def cmpstr_dir(a,b):
     return cmp(int(a.replace('K','')),int(b.replace('K','')))
 
-def msds2Ds(dirs=[],dim=3,offset=0,specorder=[],spc=None):
+def cmpstr_file(a,b):
+    return cmp(int(a.replace('out.msd.','')),int(b.replace('out.msd.','')))
+
+def paths2files(paths=[]):
+    assert len(paths) > 0, 'len(paths) == 0'
+    pathtype = None
+    if os.path.isfile(paths[0]):
+        pathtype = 'file'
+    elif os.path.isdir(paths[0]):
+        pathtype = 'dir'
+    assert pathtype != None, 'Unknow pathtype...'
+
+    files = []
+    temps = []
+    if pathtype == 'dir':
+        paths.sort(key=cmp_to_key(cmpstr_dir),reverse=True)
+        for d in paths:
+            T = d.replace('K','')
+            files.append(d+'/out.msd')
+            temps.append(float(T))
+    elif pathtype == 'file':
+        paths.sort(key=cmp_to_key(cmpstr_file),reverse=True)
+        for f in paths:
+            T = f.replace('out.msd.','')
+            files.append(f)
+            temps.append(float(T))
+    return files,temps
+
+def msds2Ds(files,temps,dim=3,offset=0,specorder=[],spc=None):
     from nappy.msd2diff import read_out_msd, msd2D
-    if not len(dirs) > 0:
-        raise ValueError('Not len(dirs) > 0')
-    dirs.sort(key=cmp_to_key(cmpstr),reverse=True)
-    Ts = np.zeros(len(dirs))
-    Ds = np.zeros(len(dirs))
-    Dstds = np.zeros(len(dirs))
+    Ts = np.zeros(len(files))
+    Ds = np.zeros(len(files))
+    Dstds = np.zeros(len(files))
     fac = 1.0e-16 /1.0e-15  # A^2/fs to cm^2/s
-    for i,d in enumerate(dirs):
-        T = d.replace('K','')
-        ts,msds = read_out_msd(d+'/out.msd',offset=offset,column=specorder.index(spc)+1)
+    for i,f in enumerate(files):
+        T = temps[i]
+        # ts,msds = read_out_msd(d+'/out.msd',offset=offset,column=specorder.index(spc)+1)
+        ts,msds = read_out_msd(f,offset=offset,column=specorder.index(spc)+1)
         D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
         print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
         Ts[i] = float(T)
@@ -76,7 +106,7 @@ def msds2Ds(dirs=[],dim=3,offset=0,specorder=[],spc=None):
 if __name__ == "__main__":
 
     args = docopt(__doc__)
-    dirs = args['DIRS']
+    paths = args['PATHS']
     outfname = args['-o']
     offset = int(args['--offset'])
     plot = args['--plot']
@@ -107,7 +137,8 @@ if __name__ == "__main__":
     #     Ts[i] = float(T)
     #     Ds[i] = D
     #     Dstds[i] = Dstd
-    Ts,Ds,Dstds = msds2Ds(dirs,dim=dim,offset=offset,specorder=specorder,spc=spc)
+    files, temps = paths2files(paths)
+    Ts,Ds,Dstds = msds2Ds(files,temps,dim=dim,offset=offset,specorder=specorder,spc=spc)
 
     with open(outfname,'w') as f:
         f.write('# T [K],       D [cm^2/sec],    sgm(D) [cm^2/sec]\n')

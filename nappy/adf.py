@@ -187,6 +187,13 @@ def write_normal(fname,triplets,na,angd,agr):
     Write out ADF data in normal ADF format.
     """
     outfile= open(fname,'w')
+    cmd = ' '.join(s for s in sys.argv)
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cwd = os.getcwd()
+    outfile.write(f'# Output from {cmd:s}\n')
+    outfile.write(f'#   at {cwd:s}\n')
+    outfile.write(f'#   at {now:s}\n')
+    outfile.write('#\n')
     outfile.write('# 1:theta[i], ')
     for it,t in enumerate(triplets):
         outfile.write(' {0:d}:{1:s}-{2:s}-{3:s},'.format(it+2,*t))
@@ -220,7 +227,7 @@ def write_out4fp(fname,triplets,na,angd,agr,rcut,nperline=6):
         cmd = ' '.join(s for s in sys.argv)
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cwd = os.getcwd()
-        f.write('# Output from {cmd:s}\n')
+        f.write(f'# Output from {cmd:s}\n')
         f.write(f'#   at {cwd:s}\n')
         f.write(f'#   at {now:s}\n')
         f.write('#\n')

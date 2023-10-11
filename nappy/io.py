@@ -8,8 +8,6 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np
@@ -164,13 +162,15 @@ def read_pmd(fname='pmdini',specorder=None):
                 # 8th: num of atoms
                 elif iline == 8:
                     natm = int(data[0])
-                    sids = [ 0 for i in range(natm) ]
+                    # sids = [ 0 for i in range(natm) ]
                     # poss = [ np.zeros(3) for i in range(natm) ]
                     # vels = [ np.zeros(3) for i in range(natm) ]
                     # frcs = [ np.zeros(3) for i in range(natm) ]
                     poss = np.zeros((natm,3))
                     vels = np.zeros((natm,3))
                     frcs = np.zeros((natm,3))
+                    ifmvs= np.zeros((natm))
+                    sids = np.zeros((natm))
                 # 9th-: atom positions
                 else:
                     if incatm > natm:
@@ -186,11 +186,13 @@ def read_pmd(fname='pmdini',specorder=None):
                     if forces:
                         frcs[incatm,:] = fdata[7:10]
                     sids[incatm] = sid
+                    ifmvs[incatm]= ifmv
                     incatm += 1
     nsys.atoms[['x','y','z']] = poss
     nsys.atoms[['vx','vy','vz']] = vels
     nsys.atoms[['fx','fy','fz']] = frcs
     nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv']= ifmvs
     return nsys
 
 def write_pmd(nsys,fname='pmdini', **kwargs):
@@ -1429,6 +1431,8 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     
     if len(calcs)==0:
         raise ValueError(f'There is no calculation in {fname}')
+    else:
+        print(f' Num of calculations in vasprun.xml = {len(calcs):d}')
     
     nsyss = []
     for calc in calcs:
@@ -1471,7 +1475,8 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
         
         nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
         nsys.add_atoms(species, sposs, frcs=frcs)
-        nsys.set_stress_tensor(strs)
+        if strs:
+            nsys.set_stress_tensor(strs)
         nsyss.append(nsys)
     
     if velocity:

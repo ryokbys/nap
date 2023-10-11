@@ -88,7 +88,7 @@ def output_for_fitpot(nsys, dirname='./', specorder=[],
         f.write("{0:12.7f}\n".format(epot))
     with open(dirname+'/frc.ref','w') as f:
         f.write("{0:6d}\n".format(len(nsys)))
-        frcs= nsys.get_forces()
+        frcs= nsys.get_scaled_forces()
         for frc in frcs:
             f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
     if not os.path.exists(dirname+'/POSCAR'):
@@ -143,7 +143,7 @@ def main():
         print('')
         ase_index = ':'
     elif type(index) is slice:
-        print(' The sliced steps are to be extracted: ')
+        print(' The sliced steps are to be extracted, '+args['--index'])
         ase_index = index
     elif sequence:
         print(' All the sequence are to be extracted.')
