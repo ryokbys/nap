@@ -1,13 +1,13 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2022-11-03 14:28:31 KOBAYASHI Ryo>
+!                     Last modified: <2023-10-30 13:12:08 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
-  use pmdvars,only: nspmax
-  use util,only: csp2isp
+  use pmdvars,only: nspmax,rc
+  use util,only: csp2isp, num_data
   use memory,only: accum_mem
   use vector,only: dot
   implicit none
@@ -28,8 +28,12 @@ module Morse
 !!$  integer,parameter:: nspmax = 9
   integer:: nsp
 !.....Morse parameters
-  real(8):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax)
+  real(8):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax), &
+       rcs(nspmax,nspmax),rc2s(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
+!.....fixed_bond Morse parameters
+  real(8):: rc_fb(nspmax,nspmax)
+  logical:: lfixbond(nspmax,nspmax)
 
 !.....Smooth cutoff
   real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
@@ -88,7 +92,7 @@ module Morse
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rct,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
@@ -99,7 +103,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
          ,tag(namax),sv(3,6)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -108,8 +112,8 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
-         ,d0ij,alpij,rminij,dij2,vrc,dvdrc
-    real(8),save:: rc2
+         ,d0ij,alpij,rminij,dij2,vrc,dvdrc,rc,rc2
+!!$    real(8),save:: rc2
     real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
@@ -121,12 +125,15 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Morse',8*size(strsl))
-      rc2 = rc*rc
+!!$      rc2 = rc*rc
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0d0
       dvdrcs(:,:) = 0d0
       do is=1,nspmax
         do js=is,nspmax
+          rc = rcs(is,js)
+          rc2s(is,js) = rc**2
+          rc2s(js,is) = rc**2
           rminij = rmin(is,js)
           if( rmin(is,js).lt.0d0 ) cycle
           alpij = alp(is,js)
@@ -158,7 +165,7 @@ contains
 !.....Loop over resident atoms
 !$omp parallel
 !$omp do private(i,xi,is,k,j,js,xj,xij,rij,dij2,dij,diji,dxdi, &
-!$omp     d0ij,alpij,rminij,vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
+!$omp     d0ij,alpij,rminij,rc2,rc,vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
@@ -173,6 +180,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        rc2 = rc2s(is,js)
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
         diji= 1d0/dij
@@ -181,6 +189,7 @@ contains
         alpij= alp(is,js)
         rminij=rmin(is,js)
         vrc = vrcs(is,js)
+        rc = rcs(is,js)
         dvdrc = dvdrcs(is,js)
         texp = exp(alpij*(rminij-dij))
 !.....potential
@@ -355,6 +364,147 @@ contains
 !!$    write(6,'(a,es15.7)') ' Morse repul epott = ',epott
  
   end subroutine force_Morse_repul
+!=======================================================================
+  subroutine force_fbMorse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
+!
+!  Fixed-bond (fb) Morse potential
+!  
+!  To use fbMorse, specify "fbMorse" for potential in in.pmd file.
+!  Atraction forces on specified bonds are replaced with spring force
+!  whose spring-constant is given by 2.0 *alpha**2 *D. (see the note on 2023-10-13).
+!  The bond pairs are specified in "in.params.Morse" file.
+!
+    use util,only: itotOf
+    implicit none
+    include "mpif.h"
+    include "./params_unit.h"
+!!$    include "params_BVS_Morse.h"
+    integer,intent(in):: namax,natm,nnmax,nismax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: mpi_md_world,myid
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+         ,tag(namax),sv(3,6)
+    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st
+    logical:: lstrs
+
+    integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
+    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
+         ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
+         ,d0ij,alpij,rminij,dij2,vrc,dvdrc
+    real(8),save:: rc2
+    real(8),external:: fcut1,dfcut1
+
+    if( l1st ) then
+!!$      call init_Morse(natm,tag,mpi_md_world)
+!!$      call read_params_Morse(myid,mpi_md_world,iprint)
+      if( allocated(strsl) ) then
+        call accum_mem('force_fbMorse',-8*size(strsl))
+        deallocate(strsl)
+      endif
+      allocate(strsl(3,3,namax))
+      call accum_mem('force_fbMorse',8*size(strsl))
+      rc2 = rc*rc
+!.....Initialize smooth cutoff
+      vrcs(:,:) = 0d0
+      dvdrcs(:,:) = 0d0
+      do is=1,nspmax
+        do js=is,nspmax
+          rminij = rmin(is,js)
+          if( rmin(is,js).lt.0d0 ) cycle
+          alpij = alp(is,js)
+          d0ij = d0(is,js)
+          texp = exp( alpij*(rminij -rc))
+          vrc = d0ij*( (texp-1d0)**2 -1d0 )
+          vrcs(is,js) = vrc
+          vrcs(js,is) = vrc
+          dvdrc = 2d0 *alpij *d0ij *texp *(1d0-texp)
+          dvdrcs(is,js) = dvdrc
+          dvdrcs(js,is) = dvdrc
+        enddo
+      enddo
+    endif
+
+    if( .not.allocated(strsl) ) then
+      allocate(strsl(3,3,namax))
+      call accum_mem('force_fbMorse',8*size(strsl))
+    else if( size(strsl).lt.3*3*namax ) then
+      call accum_mem('force_fbMorse',-8*size(strsl))
+      deallocate(strsl)
+      allocate(strsl(3,3,namax))
+      call accum_mem('force_fbMorse',8*size(strsl))
+    endif
+
+    epotl= 0d0
+    strsl(1:3,1:3,1:namax) = 0d0
+
+!.....Loop over resident atoms
+!$omp parallel
+!$omp do private(i,xi,is,k,j,js,xj,xij,rij,dij2,dij,diji,dxdi, &
+!$omp     d0ij,alpij,rminij,vrc,dvdrc,texp,tmp,tmp2,dedr,ixyz,jxyz) &
+!$omp     reduction(+:epotl)
+    do i=1,natm
+      xi(1:3)= ra(1:3,i)
+      is=int(tag(i))
+      do k=1,lspr(0,i)
+        j=lspr(k,i)
+!!$        if( j.le.i ) cycle
+        js= int(tag(j))
+!.....Check if these two species interact
+        if( .not. interact(is,js) ) cycle
+        xj(1:3)= ra(1:3,j)
+        xij(1:3)= xj(1:3)-xi(1:3)
+        rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2.gt.rc2 ) cycle
+        dij= sqrt(dij2)
+        diji= 1d0/dij
+        dxdi(1:3)= -rij(1:3)*diji
+        d0ij = d0(is,js)
+        alpij= alp(is,js)
+        rminij=rmin(is,js)
+        if( lfixbond(is,js) .and. dij.lt.rc_fb(is,js) .and. dij.gt.rminij ) then
+          tmp2 = 0.25d0 *2d0 *alpij**2 *d0ij *(dij-rminij)**2  &
+               -(d0ij -vrc -dvdrc*(dij-rc))
+          dedr = 2d0 *alpij**2 *d0ij *(dij-rminij)
+        else
+          vrc = vrcs(is,js)
+          dvdrc = dvdrcs(is,js)
+          texp = exp(alpij*(rminij-dij))
+!.....potential
+          tmp= d0ij*((texp-1d0)**2 -1d0)
+          tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+!.....force
+          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
+        endif
+        epi(i)= epi(i) +tmp2
+        epotl= epotl +tmp2
+        aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
+!.....stress
+        do ixyz=1,3
+          do jxyz=1,3
+            strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
+                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+          enddo
+        enddo
+      enddo
+    enddo
+!$omp end do
+!$omp end parallel
+
+    strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+
+!-----gather epot
+    epott= 0d0
+    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+         ,MPI_SUM,mpi_md_world,ierr)
+    epot= epot +epott
+    if( iprint.ge.ipl_info ) print *,'epot Morse = ',epott
+    return
+  end subroutine force_fbMorse
 !=======================================================================
   subroutine force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs,chg &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -630,11 +780,12 @@ contains
     include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    integer:: i,j,isp,jsp,id,ierr
-    character(len=128):: cline,fname
+    integer:: i,j,isp,jsp,id,ierr,jerr,ndat
+    character(len=128):: cline,fname,ctmp,cerr
     character(len=3):: cspi,cspj
-    real(8):: d,r,a
+    real(8):: d,r,a,rct
 
+    jerr = 0
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -642,46 +793,91 @@ contains
       d0(1:nspmax,1:nspmax)= 0d0
       rmin(1:nspmax,1:nspmax)= 0d0
       alp(1:nspmax,1:nspmax)= 0d0
+      rcs(1:nspmax,1:nspmax) = rc
+      rc_fb(1:nspmax,1:nspmax) = -1.0
+      lfixbond(1:nspmax,1:nspmax) = .false.
       if( iprint.ne.0 ) write(6,'(/,a)') ' Morse parameters:'
       do while(.true.)
-        read(ioprms,*,end=10) cline
+        read(ioprms,'(a)',end=10) cline
         if( cline(1:1).eq.'#' .or. cline(1:1).eq.'!' ) cycle
-        backspace(ioprms)
+!!$        backspace(ioprms)
 !!$        read(ioprms,*) isp,jsp,d,a,r
-        read(ioprms,*) cspi,cspj,d,a,r
-        isp = csp2isp(cspi)
-        jsp = csp2isp(cspj)
-        if( isp.gt.0 .and. jsp.gt.0 ) then
-          d0(isp,jsp) = d
-          rmin(isp,jsp) = r
-          alp(isp,jsp) = a
-          interact(isp,jsp) = .true.
-          if( iprint.ge.ipl_basic ) then
-            write(6,'(a,2a4,3f7.3)') '   cspi,cspj,D,alpha,rmin = ',trim(cspi),trim(cspj),d,a,r
+        read(cline,*,iostat=ierr) ctmp
+        if( ierr .ne. 0 ) cycle
+        if( ctmp.eq.'fix_bond' ) then
+          read(cline,*) ctmp, cspi,cspj,rct
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            rc_fb(isp,jsp) = rct
+            rc_fb(jsp,isp) = rct
+            lfixbond(isp,jsp) = .true.
+            lfixbond(jsp,isp) = .true.
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,2a4,f7.3)') '   fix_bond: cspi,cspj,rc_fb = ', &
+                   trim(cspi),trim(cspj),rct
+            endif
           endif
+        else if( ctmp.eq.'' ) then
+          cycle
+        else ! not fix_bond, normal entry of Morse potential parameters
+          ndat = num_data(cline, ' ')
+          if( ndat.eq.5 ) then
+            read(cline,*) cspi,cspj,d,a,r
+          else if( ndat.eq.6 ) then
+            read(cline,*) cspi,cspj,d,a,r,rct
+          else
+            jerr = 80
+            cerr = 'Number of values in a line must be 5 or 6 in in.params.Morse.'
+            exit
+          endif
+          isp = csp2isp(cspi)
+          jsp = csp2isp(cspj)
+          if( isp.gt.0 .and. jsp.gt.0 ) then
+            d0(isp,jsp) = d
+            rmin(isp,jsp) = r
+            alp(isp,jsp) = a
+            interact(isp,jsp) = .true.
 !.....Symmetrize parameters
-          d0(jsp,isp) = d0(isp,jsp)
-          rmin(jsp,isp)= rmin(isp,jsp)
-          alp(jsp,isp)= alp(isp,jsp)
-          interact(jsp,isp)= interact(isp,jsp)
-        else
-          if( iprint.ge.ipl_info ) then
-            print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
+            d0(jsp,isp) = d0(isp,jsp)
+            rmin(jsp,isp)= rmin(isp,jsp)
+            alp(jsp,isp)= alp(isp,jsp)
+            interact(jsp,isp)= interact(isp,jsp)
+            if( ndat.eq.6 ) then
+              rcs(isp,jsp) = min(rct,rc)
+              rcs(jsp,isp) = min(rct,rc)
+            endif
+            if( iprint.ge.ipl_basic ) then
+              write(6,'(a,2a4,4f7.3)') '   cspi,cspj,D,alpha,rmin,rc = ',trim(cspi),trim(cspj),d,a,r,rcs(isp,jsp)
+            endif
+          else
+            if( iprint.ge.ipl_info ) then
+              print *,' Morse parameter read but not used: cspi,cspj=',cspi,cspj
+            endif
           endif
         endif
-      enddo
+      enddo  ! do while(.true.)
 
 10    close(ioprms)
-      if( iprint.ge.ipl_debug ) then
+      if( iprint.ge.ipl_debug .and. jerr.eq.0 ) then
         write(6,'(a)') ' Finished reading '//trim(fname)
         write(6,*) ''
       endif
+    endif
+
+    call mpi_bcast(jerr,1,mpi_integer,0,mpi_md_world,ierr)
+    if( jerr.gt.0 ) then
+      if( myid_md.eq.0 ) print *,'Error: ',trim(cerr)
+      stop
     endif
 
     call mpi_bcast(d0,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(rmin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(alp,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(rcs,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rc_fb,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(lfixbond,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_Morse
 !=======================================================================

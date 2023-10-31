@@ -32,7 +32,7 @@ subroutine get_force(l1st,epot,stnsr)
   use DNN,only: force_DNN
   use Coulomb, only: force_Coulomb, init_for_Ewald, &
        chgopt_method, bacopy_auxq_fixed, qtop, qbot
-  use Morse, only: force_Morse, force_Morse_repul, force_vcMorse
+  use Morse, only: force_Morse, force_Morse_repul, force_vcMorse, force_fbMorse
   use Buckingham,only:force_Buckingham
   use Bonny_WRe,only: force_Bonny_WRe
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
@@ -338,6 +338,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Morse_repul',mpi_wtime() -tmp)
   endif
+  if( use_force('fbMorse') ) then
+    tmp = mpi_wtime()
+    call force_fbMorse(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+    call accum_time('force_fbMorse',mpi_wtime() -tmp)
+  endif
 !!$  if( use_force('vcMorse') ) then
 !!$    tmp = mpi_wtime()
 !!$    call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
@@ -528,7 +535,7 @@ subroutine init_force(linit)
 !!$    call read_element_descriptors(myid_md,mpi_md_world,iprint)
 !!$  endif
 !.....Morse
-  if( use_force('Morse') .or. use_force('Morse_repul') ) then
+  if( use_force('Morse') .or. use_force('Morse_repul') .or. use_force('fbMorse') ) then
     if( .not.lprmset_Morse ) then
       if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print*,'read_params_Morse...'
       call read_params_Morse(myid_md,mpi_md_world,iprint,specorder)

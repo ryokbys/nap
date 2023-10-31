@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-05-07 14:40:42 KOBAYASHI Ryo>
+!                     Last-modified: <2023-10-31 21:13:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -313,7 +313,7 @@ program pmd
              tagtot,rtot,vtot)
     elseif( trim(ciofmt).eq.'ascii' ) then
       call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,hmat, &
-             tagtot,rtot,vtot)
+             tagtot,rtot,vtot,atot,epot,ekin,stnsr,.true.)
     endif
     call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
@@ -323,7 +323,7 @@ program pmd
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
-    call write_force(21,'.pmd',hmat,epot,ntot,tagtot,atot,stnsr)
+!!$    call write_force(21,'.pmd',hmat,epot,ntot,tagtot,atot,stnsr)
     call accum_time('total',mpi_wtime()-t0)
     call report_time(6,iprint)
     call report_mem(6,iprint)

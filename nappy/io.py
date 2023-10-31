@@ -138,7 +138,8 @@ def read_pmd(fname='pmdini',specorder=None):
                     stensor[1,2] = stensor[2,1] = strs[3]
                     stensor[0,2] = stensor[2,0] = strs[4]
                     stensor[0,1] = stensor[1,0] = strs[5]
-                elif option == 'forces:':
+                    nsys.set_stress_tensor(stensor)
+                elif option in ('forces:','force:'):
                     if values[2] not in ('False', 'false', 'F'):
                         forces = True
             else:
@@ -1428,6 +1429,9 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
         print(f' WARNING: {fname} ends incorrectly, but keep going...')
         if calcs and calcs[-1].find('energy') is None:
             calcs = calcs[:-1]
+    except Exception as e:
+        print(f' Exception: {e}')
+        raise
     
     if len(calcs)==0:
         raise ValueError(f'There is no calculation in {fname}')
@@ -1475,7 +1479,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
         
         nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
         nsys.add_atoms(species, sposs, frcs=frcs)
-        if strs:
+        if strs is not None:
             nsys.set_stress_tensor(strs)
         nsyss.append(nsys)
     
@@ -1498,7 +1502,10 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
             nsys0 = nsys1
         # Since velocities of the last step cannot be computed in this definition,
         # remove the last one for data consistency...
+        if len(nsyss)==1:
+            raise ValueError('--velocity option cannot be applied to only 1 calculation in vasprun.xml !!!')
         del nsyss[-1]
+
     return nsyss
 
 if __name__ == "__main__":

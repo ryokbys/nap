@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-05-24 16:48:22 KOBAYASHI Ryo>
+!                     Last-modified: <2023-10-31 21:13:45 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -438,7 +438,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot)
       elseif( trim(ciofmt).eq.'ascii' ) then
         call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot)
+             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
@@ -917,7 +917,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
             call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot)
+             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
@@ -1487,8 +1487,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
                tagtot,rtot,vtot)
         elseif( trim(ciofmt).eq.'ascii' ) then
+          sth(:,:) = stnsr(:,:)*up2gpa
           call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot)
+               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
         call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &

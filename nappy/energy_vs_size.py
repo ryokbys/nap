@@ -100,15 +100,15 @@ def erg_vs_size(fname,al_min,al_max,niter,mdexec):
         print('   al_min, al_orig, al_max=',al_min, al_orig, al_max)
         #sys.exit()
 
-    dl= (al_max -al_min)/niter
+    dl= (al_max -al_min)/(niter-1)
 
-    als = np.zeros(niter+1)
-    vols = np.zeros(niter+1)
-    prss = np.zeros(niter+1)
-    ergs = np.zeros(niter+1)
+    als = np.zeros(niter)
+    vols = np.zeros(niter)
+    prss = np.zeros(niter)
+    ergs = np.zeros(niter)
 
     print('     al        vol        erg             prss')
-    for i in range(niter+1):
+    for i in range(niter):
         al= al_min +dl*i
         replace_1st_line(al,fname)
         #os.system('rm -f out.pmd')

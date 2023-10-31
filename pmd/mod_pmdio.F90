@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-04-26 17:50:23 KOBAYASHI Ryo>
+!                     Last modified: <2023-10-31 21:37:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -89,15 +89,18 @@ contains
   end subroutine read_pmdtot_ascii
 !=======================================================================
   subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot)
+       rtot,vtot,atot,epot,ekin,stnsr,lforce)
     use pmdvars,only: has_specorder,specorder
     include './params_unit.h'
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in) :: cfname
     real(8),intent(in):: hunit,h(3,3,0:1)
-    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
+    real(8),intent(in):: epot,ekin,stnsr(3,3)
+    logical,intent(in):: lforce
 
     integer:: ia,ib,l,i,msp
+    real(8):: atmp(3)
 
     open(ionum,file=cfname,status='replace')
     if( has_specorder ) then
@@ -105,18 +108,35 @@ contains
       do i=1,ntot
         msp = max(msp,int(tagtot(i)))
       enddo
-      write(ionum,'(a)') '!'
-      write(ionum,'(a,9(2x,a))') '!  specorder: ',(trim(specorder(i)),i=1,msp)
-      write(ionum,'(a)') '!'
+      write(ionum,'(a)') '#'
+      write(ionum,'(a,9(2x,a))') '#  specorder: ',(trim(specorder(i)),i=1,msp)
+      write(ionum,'(a,es14.6)') '#  potential_energy: ', epot
+      write(ionum,'(a,es14.6)') '#  kinetic_energy:   ', ekin
+      !.....Positive stress as compressive, negative as tensile
+      write(ionum,'(a,6es11.3)') '#  stress:   ',  &
+           stnsr(1,1), stnsr(2,2), stnsr(3,3), &
+           stnsr(3,2), stnsr(1,3), stnsr(1,2)
+      write(ionum,'(a,l0)') '#  forces:  ',lforce
+      write(ionum,'(a)') '#'
     endif
     write(ionum,'(es23.14e3)') hunit
     write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
          ,ib=1,3),l=0,1)
     write(ionum,'(i10)') ntot
-    do i=1,ntot
-      write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
-           ,rtot(1:3,i),vtot(1:3,i)    ! dt
-    enddo
+    if( lforce ) then ! write forces in [eV/A]
+      do i=1,ntot
+        atmp(1)= h(1,1,0)*atot(1,i) +h(1,2,0)*atot(2,i) +h(1,3,0)*atot(3,i)
+        atmp(2)= h(2,1,0)*atot(1,i) +h(2,2,0)*atot(2,i) +h(2,3,0)*atot(3,i)
+        atmp(3)= h(3,1,0)*atot(1,i) +h(3,2,0)*atot(2,i) +h(3,3,0)*atot(3,i)
+        write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
+             ,rtot(1:3,i) ,vtot(1:3,i) ,atmp(1:3)    ! dt
+      enddo
+    else
+      do i=1,ntot
+        write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
+             ,rtot(1:3,i),vtot(1:3,i)    ! dt
+      enddo
+    endif
     close(ionum)
     return
   end subroutine write_pmdtot_ascii
@@ -509,7 +529,7 @@ contains
 !  Currently available options are:
 !    - "specorder:", Species order. The number of species limited up to 9.
 !
-    use pmdvars,only: specorder,has_specorder,iprint
+    use pmdvars,only: specorder,has_specorder,iprint,has_forces
     use util, only: num_data
     include "./const.h"
     character(len=*),intent(in):: cline

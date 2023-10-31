@@ -165,9 +165,11 @@ def main():
         else:
             os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
         #atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
-        nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml', velocity=velocity)[index]
+        #...read_vasprun_xml always returns a list object
+        nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml', velocity=velocity)
     except Exception as e:
-        raise Exception(' Failed to read vasprun.xml because of {0}.'.format(e))
+        print(f' Failed to read vasprun.xml because of {e}.')
+        raise
 
     if type(index) is list:
         print(' Extracting specified steps from ',len(nsyss),' steps in total')

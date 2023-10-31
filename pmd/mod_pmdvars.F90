@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2023-05-06 23:36:27 KOBAYASHI Ryo>
+!                    Last modified: <2023-10-31 21:26:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -153,6 +153,8 @@ module pmdvars
 !.....species name
   character(len=3):: specorder(nspmax) = 'x'
   logical:: has_specorder = .false.
+!.....forces in in.pmd [default: false]
+  logical:: has_forces = .false.
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'
