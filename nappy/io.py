@@ -199,21 +199,21 @@ def read_pmd(fname='pmdini',specorder=None):
 def write_pmd(nsys,fname='pmdini', **kwargs):
     myopen, mode = get_open_func(fname,'w')
     f=myopen(fname,mode)
-    f.write("!\n")
+    f.write("#\n")
     if nsys.specorder and len(nsys.specorder)> 0:
-        f.write("!  specorder: ")
+        f.write("#  specorder: ")
         for s in nsys.specorder:
             f.write(" {0:<3s}".format(s))
         f.write("\n")
     for k,v in kwargs.items():
         if type(v) is list or type(v) is np.ndarray:
-            f.write(f'!  {k:s}:')
+            f.write(f'#  {k:s}:')
             for vi in v:
                 f.write(f'  {vi}')
             f.write('\n')
         else:
-            f.write(f'!  {k:s}: {v}\n')
-    f.write("!\n")
+            f.write(f'#  {k:s}: {v}\n')
+    f.write("#\n")
     # lattice constant
     f.write(" {0:15.9f}\n".format(nsys.alc))
     # cell vectors

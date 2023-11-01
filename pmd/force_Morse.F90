@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-10-30 13:12:08 KOBAYASHI Ryo>
+!                     Last modified: <2023-11-01 10:48:45 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -366,7 +366,7 @@ contains
   end subroutine force_Morse_repul
 !=======================================================================
   subroutine force_fbMorse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rct,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
 !  Fixed-bond (fb) Morse potential
@@ -385,7 +385,7 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
          ,tag(namax),sv(3,6)
     real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
@@ -394,8 +394,7 @@ contains
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
     real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
-         ,d0ij,alpij,rminij,dij2,vrc,dvdrc
-    real(8),save:: rc2
+         ,d0ij,alpij,rminij,dij2,vrc,dvdrc,rc,rc2
     real(8),external:: fcut1,dfcut1
 
     if( l1st ) then
@@ -407,12 +406,15 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_fbMorse',8*size(strsl))
-      rc2 = rc*rc
+!!$      rc2 = rc*rc
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0d0
       dvdrcs(:,:) = 0d0
       do is=1,nspmax
         do js=is,nspmax
+          rc = rcs(is,js)
+          rc2s(is,js) = rc**2
+          rc2s(js,is) = rc**2
           rminij = rmin(is,js)
           if( rmin(is,js).lt.0d0 ) cycle
           alpij = alp(is,js)
@@ -459,6 +461,7 @@ contains
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        rc2 = rc2s(is,js)
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
         diji= 1d0/dij
@@ -466,9 +469,10 @@ contains
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
+        rc = rcs(is,js)
         if( lfixbond(is,js) .and. dij.lt.rc_fb(is,js) .and. dij.gt.rminij ) then
           tmp2 = 0.25d0 *2d0 *alpij**2 *d0ij *(dij-rminij)**2  &
-               -(d0ij -vrc -dvdrc*(dij-rc))
+               -(d0ij -vrc -dvdrc*(dij-rct))
           dedr = 2d0 *alpij**2 *d0ij *(dij-rminij)
         else
           vrc = vrcs(is,js)
