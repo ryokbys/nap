@@ -23,8 +23,6 @@ Options:
   --out4fp-name OUTNAME
               File name for --out4fp. [default: data.pmd.D] 
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np
@@ -139,14 +137,12 @@ def main():
         from datetime import datetime
         with open(out4fpname,'w') as f:
             f.write(gen_header(sys.argv))
+            f.write('# datatype: independent\n')
             f.write('#\n')
             ndat = len(Ds)
             f.write(f'   {ndat:d}     1.0\n')
             for i,D in enumerate(Ds):
-                f.write(f'  {D:12.4e}')
-                if (i+1) % 6 == 0:
-                    f.write('\n')
-            f.write('\n')
+                f.write(f'  {D:12.4e}  {D:12.4e}\n')
 
     if plot:
         import matplotlib.pyplot as plt

@@ -11,7 +11,6 @@ Options:
 from __future__ import print_function
 
 import os,sys
-from datetime import datetime
 from docopt import docopt
 import numpy as np
 
@@ -121,6 +120,7 @@ def gen_header(argv):
     Generate header that contains command line itself and datetime string.
     ARGV is usually 'sys.argv'.
     """
+    from datetime import datetime
     tnow = datetime.now()
     dstr = tnow.strftime('%Y-%m-%d %H:%M:%S')
     header = '# Generated at {0:s} \n'.format(dstr)
