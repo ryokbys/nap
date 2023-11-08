@@ -6,10 +6,11 @@ which is different from the style of previous version where DT is extracted
 from in.pmd file in the same directory.
 
 Usage:
-  msd2diff.py [options] MSD_FILE
+  msd2diff.py [options] MSD_FILE [MSD_FILE...]
 
 Options:
   -h, --help  Show this message and exit.
+  --dim DIM   Dimension of diffusion. [default: 3]
   --offset OFFSET
               Offset of the given data. [default: 0]
   --main-SID MAINSID
@@ -30,7 +31,7 @@ import numpy as np
 from nappy.util import parse_option, gen_header
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "221010"
+__version__ = "231108"
 
 def read_out_msd(fname='out.msd',offset=0,column=1):
         
@@ -93,48 +94,65 @@ def msd2D(ts,msds,fac,dim=3):
     p,res,_,_ = np.linalg.lstsq(A,msds,rcond=None)
     a = p[0]
     b = p[1]
-    # fac = 1.0e-16 /1.e-15
+    # fac = 1.0e-5 /1.e-4
     a = a *fac /(2.0*dim)
     b = b *fac
     # print(res[0],xvar,np.mean(A[:,0]),len(ts))
     std = np.sqrt(res[0]/len(ts)/xvar) *fac /(2.0*dim)
     return a,b,std
 
+def main():
 
-if __name__ == "__main__":
-
-    args = docopt(__doc__)
-    fname = args['MSD_FILE']
+    #args = docopt(__doc__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
+    
+    fnames = args['MSD_FILE']
     offset = int(args['--offset'])
+    dim = int(args['--dim'])
     sidmain = int(args['--main-SID'])
     sidsub = int(args['--subtract-SID'])
     plot = args['--plot']
     out4fp = args['--out4fp']
     out4fpname = args['--out4fp-name']
 
-    ts,msdmain = read_out_msd(fname,offset,column=sidmain)
-    if sidsub > 0:
-        tmp, msdsub = read_out_msd(fname,offset,column=sidsub)
-        msdmain = msdmain -msdsub
-    #...Assuming input MSD unit in A^2/fs and output in cm^2/s
-    fac = 1.0e-16 /1.0e-15
-    #...Least square
-    a,b,std = msd2D(ts,msdmain,fac)
-    print(' Diffusion coefficient = {0:12.4e}'.format(a)+
-          ' +/- {0:12.4e} [cm^2/s]'.format(std))
+    Ds = []
+    Bs = []
+    MSDs = []
+    Ts = []
+    for fname in fnames:
+        ts,msdmain = read_out_msd(fname,offset,column=sidmain)
+        if sidsub > 0:
+            tmp, msdsub = read_out_msd(fname,offset,column=sidsub)
+            msdmain = msdmain -msdsub
+        #...Assuming input MSD unit in A^2/fs and output in cm^2/s
+        fac = 1.0e-5 /1.0e-4
+        #...Least square
+        D,b,std = msd2D(ts,msdmain,fac,dim=dim)
+        print(f' {fname:s}:  Diffusion coefficient = {D:12.4e}'+
+              f' +/- {std:12.4e} [cm^2/s]')
+        Ds.append(D)
+        Bs.append(b)
+        Ts.append(ts)
+        MSDs.append(msdmain)
 
     if out4fp:
         from datetime import datetime
         with open(out4fpname,'w') as f:
             f.write(gen_header(sys.argv))
             f.write('#\n')
-            f.write('    1    1.0\n')
-            f.write('   {0:12.4e}\n'.format(a))
+            ndat = len(Ds)
+            f.write(f'   {ndat:d}     1.0\n')
+            for i,D in enumerate(Ds):
+                f.write(f'  {D:12.4e}')
+                if (i+1) % 6 == 0:
+                    f.write('\n')
+            f.write('\n')
 
     if plot:
         import matplotlib.pyplot as plt
         import seaborn as sns
         sns.set(context='talk',style='ticks')
+        cmap = plt.get_cmap("tab10")
         #...Original time unit == fs
         unit = 'fs'
         tfac = 1.0
@@ -142,11 +160,25 @@ if __name__ == "__main__":
             unit = 'ps'
             tfac = 1.0e-3
         plt.xlabel('Time ({0:s})'.format(unit))
-        plt.ylabel('MSD (A^2/{0:s})'.format(unit))
-        fvals = np.array([ (t*a+b)/fac for t in ts ])
-        plt.plot(ts*tfac,msdmain/tfac,'b-',label='MSD data')
-        plt.plot(ts*tfac,fvals/tfac,'r-',label='Fitted curve')
+        plt.ylabel(r'MSD ($\mathrm{\AA}^2$)')
+        for i,fname in enumerate(fnames):
+            #...cm^2/s --> A^2/fs
+            D = Ds[i] /fac *(2*dim)
+            #...cm^2 --> A^2
+            b = Bs[i] /fac
+            ts = Ts[i]
+            MSD = MSDs[i]
+            fvals = np.array([ t*D+b for t in ts ])
+            c = cmap(i)
+            plt.plot(ts*tfac,MSD/tfac,'-',color=c,label=f'MSD ({fname:s})')
+            plt.plot(ts*tfac,fvals/tfac,'--',color=c,label=f'Fit ({fname:s})')
+        #plt.legend(loc='best')
         plt.savefig("graph_msd2D.png", format='png',
                     dpi=300, bbox_inches='tight')
         print(' Wrote graph_msd2D.png')
+
+    return None
         
+if __name__ == "__main__":
+
+    main()

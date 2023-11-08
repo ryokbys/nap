@@ -580,6 +580,14 @@ class NAPSystem(object):
     def get_stress_tensor(self):
         return getattr(self,'stnsr',None)
 
+    def get_stress(self):
+        return np.array([self.stnsr[0,0],
+                         self.stnsr[1,1],
+                         self.stnsr[2,2],
+                         self.stnsr[1,2],
+                         self.stnsr[0,2],
+                         self.stnsr[0,1]])
+    
     def get_atom(self,idatm=-1):
         """
         Return a dictionary data of an atom specified by IDATM.

@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-10-31 21:37:04 KOBAYASHI Ryo>
+!                     Last modified: <2023-11-06 12:32:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -116,7 +116,7 @@ contains
       write(ionum,'(a,6es11.3)') '#  stress:   ',  &
            stnsr(1,1), stnsr(2,2), stnsr(3,3), &
            stnsr(3,2), stnsr(1,3), stnsr(1,2)
-      write(ionum,'(a,l0)') '#  forces:  ',lforce
+      write(ionum,'(a,l1)') '#  forces:  ',lforce
       write(ionum,'(a)') '#'
     endif
     write(ionum,'(es23.14e3)') hunit

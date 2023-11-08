@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-11-01 10:48:45 KOBAYASHI Ryo>
+!                     Last modified: <2023-11-01 12:29:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
@@ -472,7 +472,7 @@ contains
         rc = rcs(is,js)
         if( lfixbond(is,js) .and. dij.lt.rc_fb(is,js) .and. dij.gt.rminij ) then
           tmp2 = 0.25d0 *2d0 *alpij**2 *d0ij *(dij-rminij)**2  &
-               -(d0ij -vrc -dvdrc*(dij-rct))
+               -0.5d0*(d0ij -vrc -dvdrc*(dij-rc))
           dedr = 2d0 *alpij**2 *d0ij *(dij-rminij)
         else
           vrc = vrcs(is,js)
