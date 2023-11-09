@@ -544,7 +544,7 @@ contains
 
     integer:: i,j,k,l,m,n
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-    real(8):: xi(3),xij(3),rij(3),rij2
+    real(8):: xi(3),xij(3),rij(3),rij2,shft(3)
 
 !!$    integer,allocatable,save:: lscl(:),lshd(:)
 !!$    real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi,rc1nn2
@@ -611,17 +611,35 @@ contains
       mz= min(max(mz,1),lcz)
       m= (mx-1)*lcyz +(my-1)*lcz +mz
       do kux=-1,1
+        shft(1) = 0d0
         m1x = mx +kux
-        if( m1x.lt.1   ) m1x= m1x +lcx
-        if( m1x.gt.lcx ) m1x= m1x -lcx
+        if( m1x.lt.1   ) then
+          m1x= m1x +lcx
+          shft(1) = -1d0
+        else if( m1x.gt.lcx ) then
+          m1x= m1x -lcx
+          shft(1) = +1d0
+        endif
         do kuy=-1,1
+          shft(2) = 0d0
           m1y= my +kuy
-          if( m1y.lt.1   ) m1y= m1y +lcy
-          if( m1y.gt.lcy ) m1y= m1y -lcy
+          if( m1y.lt.1   ) then
+            m1y= m1y +lcy
+            shft(2) = -1d0
+          else if( m1y.gt.lcy ) then
+            m1y= m1y -lcy
+            shft(2) = +1d0
+          endif
           do kuz=-1,1
+            shft(3) = 0d0
             m1z= mz +kuz
-            if( m1z.lt.1   ) m1z= m1z +lcz
-            if( m1z.gt.lcz ) m1z= m1z -lcz
+            if( m1z.lt.1   ) then
+              m1z= m1z +lcz
+              shft(3) = -1d0
+            else if( m1z.gt.lcz ) then
+              m1z= m1z -lcz
+              shft(3) = +1d0
+            endif
             m1= (m1x-1)*lcyz +(m1y-1)*lcz +m1z
             if( lshd(m1).eq.0 ) cycle
             j = lshd(m1)
@@ -630,7 +648,8 @@ contains
                 j = lscl(j)
                 cycle
               endif
-              xij(1:3)= ra(1:3,j)-xi(1:3) -anint(ra(1:3,j)-xi(1:3))
+              xij(1:3)= ra(1:3,j) -xi(1:3) +shft(1:3)
+!!$              xij(1:3)= xij(1:3) -anint(xij(1:3))  !! This is wrong in this case.
               rij(1:3)=h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
               rij2= rij(1)**2 +rij(2)**2 +rij(3)**2
               if( rij2.lt.rc2 ) then

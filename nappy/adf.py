@@ -74,10 +74,10 @@ def adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk):
         if rij2 >= rcut2:
             continue
         rij= np.sqrt(rij2)
-        for ki in range(len(lspri)):
+        for ki in range(ji+1,len(lspri)):
             ka= lspri[ki]
-            if ka == ia or ka <= ja:
-                continue
+            # if ka == ia or ka <= ja:
+            #     continue
             ski = symbols[ka]
             if set((sji,ski)) != set((sj,sk)):
                 continue
@@ -96,7 +96,6 @@ def adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk):
             else:
                 rad= np.arccos(cs)
             deg= rad/np.pi *180.0
-
             nda[int(deg/dang)] += 1
     return nda
 
