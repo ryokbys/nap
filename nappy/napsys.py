@@ -504,6 +504,16 @@ class NAPSystem(object):
             symbols.append(self.specorder[sid-1])
         return symbols
 
+    def get_symbol_of(self,ia):
+        """
+        Returns
+        -------
+        symbol : string
+              The symbol of a specified atoms-ia.
+        """
+        sid = self.atoms.loc[ia,'sid']
+        return self.specorder[sid-1]
+
     def set_symbols(self,symbols):
         """
         Set symbols of all atoms and append new symbols

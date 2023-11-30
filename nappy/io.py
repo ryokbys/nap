@@ -40,7 +40,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
     elif format == 'POSCAR':
         write_POSCAR(nsys,fname,)
     elif format == 'dump':
-        write_dump(nsys,fname,)
+        write_dump(nsys,fname,**kwargs)
     elif format == 'xsf':
         write_xsf(nsys,fname,)
     elif format == 'lammps':

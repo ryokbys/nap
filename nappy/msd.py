@@ -21,11 +21,10 @@ Options:
   --dt DT       Time interval (fs) between sequential files. [default: -1.0]
   -o FILENAME   Output filename. [default: out.msd]
   --xyz         Decompose MSD to x,y,z-direction. [default: False]
+  --com         Write MSD of center of motion (COM), which is not available with --xyz. [default: False]
   --specorder SPECORDER
                 Species order of the given system, separated by comma. [default: None]
 """
-from __future__ import print_function
-
 import sys
 import numpy as np
 from docopt import docopt
@@ -61,7 +60,6 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
     
     Parameters
     ----------
-
     files: list
          List of files used for the MSD calculation.
     ids0: list
@@ -75,8 +73,11 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
 
     Returns
     -------
-    msd : Numpy array of dimension, (len(files),nmeasure,3).
+    msd : Numpy array of dimension, (len(files),nmeasure,nspc,3).
+    specorder: list
     """
+    from tqdm import tqdm
+
     nsys = read(fname=files[0],specorder=specorder)
     if specorder is None:
         specorder = copy.copy(nsys.specorder)
@@ -96,14 +97,18 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
     symbols = nsys.get_symbols()
     p0= np.zeros((nmeasure,len(ids),3))
     pp= np.zeros((len(ids),3))
+    com = np.zeros((len(files),nspc,3))
+    com0 = np.zeros((nmeasure,nspc,3))
     # msd= np.zeros((len(files),nmeasure,nspc,3))
     msd= np.zeros((len(files)-(nmeasure-1)*nshift+1, nmeasure, nspc, 3))
+    msdcom= np.zeros((len(files)-(nmeasure-1)*nshift+1, nmeasure, nspc, 3))
     npbc= np.zeros((len(ids),3))
     hmat= np.zeros((3,3))
-    for ifile in range(len(files)):
+    
+    for ifile in tqdm(range(len(files))):
         fname= files[ifile]
-        sys.stdout.write('\r{0:5d}/{1:d}: {2:s}'.format(ifile+1,len(files),fname),)
-        sys.stdout.flush()
+        # sys.stdout.write('\r{0:5d}/{1:d}: {2:s}'.format(ifile+1,len(files),fname),)
+        # sys.stdout.flush()
         if ifile != 0:
             nsys = read(fname=fname,specorder=specorder)
         poss = nsys.get_scaled_positions()
@@ -136,6 +141,11 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
                 #...store current position
                 pp[ia,:]= pi[:]
 
+            com[ifile,sid,:] += pi[:] +npbc[ia,:]
+            for nm in range(nmeasure):
+                if ifile == nm*nshift:
+                    com0[nm,sid,:] += pi[:] +npbc[ia,:]
+
             for nm in range(nmeasure):
                 if ifile == nm*nshift:
                     p0[nm,ia,0]= pi[0] +npbc[ia,0]
@@ -151,6 +161,19 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
                     msd[ifile-nm*nshift,nm,sid,1] += dev[1]**2
                     msd[ifile-nm*nshift,nm,sid,2] += dev[2]**2
                         
+    for ifile in range(len(files)):
+        for sid in range(nspc):
+            com[ifile,sid,:] = np.dot(hmat,com[ifile,sid,:])
+    for nm in range(nmeasure):
+        for sid in range(nspc):
+            com0[nm,sid,:] = np.dot(hmat,com0[nm,sid,:])
+
+    for ifile in range(len(files)):
+        for sid in range(nspc):
+            for nm in range(nmeasure):
+                if nm*nshift < ifile <= (nm+1)*nshift:
+                    dev = com[ifile,sid,:] -com0[nm,sid,:]
+                    msdcom[ifile-nm*nshift,nm,sid,:] = dev[:]**2 /naps[sid]
 
     for ifile in range(len(files)):
         for nm in range(nmeasure):
@@ -163,10 +186,10 @@ def get_msd(files, ids0, nmeasure, nshift, specorder=None):
                 msd[ifile-nm*nshift,nm,:,2] /= naps[:]
 
     print('')
-    return msd,specorder
+    return msd,msdcom,specorder
 
 def main(files=[], dt=1.0, nmeasure=1, nshift=-1, ids=None,
-         specorder=[], xyz=False):
+         specorder=[], xyz=False, lcom=False):
 
     if nmeasure < 2:
         nmeasure = 1
@@ -185,26 +208,26 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, ids=None,
 
     files.sort(key=get_key,reverse=True)
     
-    msd,specorder = get_msd(files,ids,nmeasure,nshift,specorder)
+    msd,msdcom,specorder = get_msd(files,ids,nmeasure,nshift,specorder)
 
     #...make output data files
     with open(outfname,'w') as f:
         f.write(gen_header(sys.argv))
         if dt > 0.0:
-            f.write('# dt: {0:0.1f}    ! Time interval in fs\n'.format(dt))
+            f.write(f'# dt: {dt:0.1f}    ! Time interval in fs\n')
         if xyz:
             f.write('#   data_ID,')
             for spc in specorder:
-                f.write('  msd_{0:<2s} (x,y,z),                   '.format(spc))
+                f.write(f'  msd_{spc:<2s} (x,y,z),                   ')
             f.write('\n')
             for idat in range(len(files)-(nmeasure-1)*nshift):
                 if idat == 0:
-                    f.write(' {:10d}'.format(idat))
+                    f.write(f' {idat:10d}')
                     for isp in range(len(specorder)):
                         f.write(' {0:11.3e} {0:11.3e} {0:11.3e}'.format(0.0,))
                     f.write('\n')
                 else:
-                    f.write(' {:10d}'.format(idat))
+                    f.write(f' {idat:10d}')
                     for isp in range(len(specorder)):
                         dev2= np.zeros(3)
                         for nm in range(nmeasure):
@@ -215,24 +238,37 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, ids=None,
                                 +' {:11.3e}'.format(dev2[2]) )
                     f.write('\n')
         else:  # not xyz
-            f.write('#   data_ID, ')
+            f.write('#   data_ID,')
             for spc in specorder:
-                f.write('  msd_{0:<2s},    '.format(spc))
+                f.write(f'   msd_{spc:<2s},   ')
+            if lcom:
+                for spc in specorder:
+                    f.write(f'   msdcom_{spc:<2s},')
             f.write('\n')
             for idat in range(len(files)-(nmeasure-1)*nshift):
                 if idat == 0:
-                    f.write(' {:10d}'.format(idat))
+                    f.write(f' {idat:10d}')
                     for isp in range(len(specorder)):
                         f.write(' {:12.3e}'.format(0.))
+                    if lcom:
+                        for isp in range(len(specorder)):
+                            f.write(' {:12.3e}'.format(0.))
                     f.write('\n')
                 else:
-                    f.write(' {:10d}'.format(idat))
+                    f.write(f' {idat:10d}')
                     for isp in range(len(specorder)):
                         dev2 = np.zeros(3)
                         for nm in range(nmeasure):
                             dev2[:] += msd[idat,nm,isp,:]
                         dev2 /= nmeasure
                         f.write(' {:12.3e}'.format(dev2[0]+dev2[1]+dev2[2]))
+                    if lcom:
+                        for isp in range(len(specorder)):
+                            dev2 = np.zeros(3)
+                            for nm in range(nmeasure):
+                                dev2[:] += msdcom[idat,nm,isp,:]
+                            dev2 /= nmeasure
+                            f.write(' {:12.3e}'.format(dev2[0]+dev2[1]+dev2[2]))
                     f.write('\n')
     print(' Wrote a file: {0:s}'.format(outfname))
     return None
@@ -261,6 +297,7 @@ if __name__ == "__main__":
     else:
         specorder = [ s for s in specorder.split(',')]
     xyz = args['--xyz']
+    lcom = args['--com']
 
     main(files=files,
          dt=dt,
@@ -268,4 +305,5 @@ if __name__ == "__main__":
          nshift=nshift,
          ids=ids,
          specorder=specorder,
-         xyz=xyz)
+         xyz=xyz,
+         lcom=lcom)
