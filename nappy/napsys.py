@@ -1261,8 +1261,9 @@ def analyze_msg(nsys):
         for i,s in enumerate(nsys.specorder):
             msg +='   {0:<2s}: {1:>4d}\n'.format(s,nspcs[i])
             mass += nspcs[i] *elements[s]['mass']
-        msg +=' density = {0:7.2f} g/cm^3\n'.format(mass*amu_to_g
-                                                    /(vol*Ang_to_cm**3) )
+        msg +=' density = {0:5.2f} g/cm^3'.format(mass*amu_to_g
+                                                  /(vol*Ang_to_cm**3))
+        msg +=' = {0:6.4f} atom/Ang^3\n'.format(float(len(nsys))/vol)
     return msg
     
 def analyze(nsys):
