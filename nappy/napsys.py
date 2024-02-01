@@ -626,7 +626,30 @@ class NAPSystem(object):
             raise ValueError('attr_name must be in the list,',self.atoms.columns)
 
         return self.atoms.loc[idatm,attr_name]
-        
+
+    def get_density(self,):
+        from nappy.elements import elements
+        from nappy.units import amu_to_g, Ang_to_cm
+        mass = 0.0
+        vol = self.get_volume()
+        nspcs = self.natm_per_species()
+        for i,s in enumerate(self.specorder):
+            mass += nspcs[i] *elements[s]['mass']
+        return mass*amu_to_g/(vol*Ang_to_cm**3)
+
+    def get_num_density(self, species=None):
+        from nappy.elements import elements
+        from nappy.units import amu_to_g, Ang_to_cm
+        mass = 0.0
+        vol = self.get_volume()
+        nspcs = self.natm_per_species()
+        if species:
+            try:
+                sid = self.specorder.index(species)
+            except Exception:
+                raise
+            return float(nspcs[sid])/vol
+        return float(len(self))/vol
 
     def view(self,backend='3Dmol',**options):
         """
@@ -1261,9 +1284,9 @@ def analyze_msg(nsys):
         for i,s in enumerate(nsys.specorder):
             msg +='   {0:<2s}: {1:>4d}\n'.format(s,nspcs[i])
             mass += nspcs[i] *elements[s]['mass']
-        msg +=' density = {0:5.2f} g/cm^3'.format(mass*amu_to_g
+        msg +=' density = {0:5.3f} g/cm^3'.format(mass*amu_to_g
                                                   /(vol*Ang_to_cm**3))
-        msg +=' = {0:6.4f} atom/Ang^3\n'.format(float(len(nsys))/vol)
+        msg +=' = {0:7.5f} atom/Ang^3\n'.format(float(len(nsys))/vol)
     return msg
     
 def analyze(nsys):

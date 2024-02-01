@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-05-06 23:43:36 KOBAYASHI Ryo>
+!                     Last modified: <2023-12-28 17:16:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -288,8 +288,9 @@ contains
     real(8),intent(out):: ah(3,3)
 
 
-    integer:: i,ixyz,jxyz,ierr,l
+    integer:: i,ixyz,jxyz,ierr,l,jm,jp,im,ip
     real(8):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
+    real(8):: detah,ahcof(3,3)
 
 !.....now ah is scaling factor for h-mat
       ah(1:3,1:3)= 0d0
@@ -298,7 +299,8 @@ contains
       ah(3,3)= 1d0
 !.....Berendsen for variable-cell
     if( trim(cpctl).eq.'berendsen' .or. &
-         trim(cpctl).eq.'vc-berendsen' ) then
+         trim(cpctl).eq.'vc-berendsen' .or. &
+         trim(cpctl).eq.'cv-berendsen' ) then
 !.....Limit change rate of h (ah) to sratemax
       do jxyz=1,3
         sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
@@ -316,6 +318,20 @@ contains
           ah(ixyz,jxyz) = ah(ixyz,jxyz) -tmp
         enddo
       enddo
+!.....Conserving (constant)-volume
+      if( cpctl(1:3).eq.'cv-' ) then
+        do jxyz=1,3
+          jm=mod(jxyz+1,3)+1
+          jp=mod(jxyz,  3)+1
+          do ixyz=1,3
+            im=mod(ixyz+1,3)+1
+            ip=mod(ixyz,  3)+1
+            ahcof(ixyz,jxyz)= ah(ip,jp)*ah(im,jm) -ah(im,jp)*ah(ip,jm)
+          enddo
+        enddo
+        detah = ah(1,1)*ahcof(1,1) +ah(2,1)*ahcof(2,1) +ah(3,1)*ahcof(3,1)
+        ah(:,:) = ah(:,:) /detah**(1d0/3)
+      endif
 !.....Berendsen for variable-volume not variable-cell
     else if( trim(cpctl).eq.'vv-berendsen' ) then
       prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3

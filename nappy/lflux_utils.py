@@ -3,20 +3,23 @@
 IO utilities that can be used in the project, lflux.
 
 Usage:
-  lflux_utils.py [options]
+  lflux_utils.py [options] INFILE
 
 Options:
   -h, --help  Show this message and exit.
+  --nproc NPROC  Number of processes. [default: 1]
+  --noutlflux NOUT  Number of output data in out.lflux. [default: 200]
+  --sysfile SYSFILE  File that contains the base system information. [default: dump_0]
 """
-from __future__ import print_function
 
 import os,sys
 from docopt import docopt
 import numpy as np
 import copy
+from tqdm import tqdm
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "221213"
+__version__ = "230115"
 
 _ang2bohr = 1.0/0.529177
 _bohr2ang = 1.0 /_ang2bohr
@@ -130,7 +133,7 @@ def read_lflux(fname='out.lflux',noutlflux=1000):
     with open(fname,'r') as f:
         inc = 0
         time = np.zeros(noutlflux+1)
-        for il,line in enumerate(f.readlines()):
+        for il,line in tqdm(enumerate(f.readlines())):
             if line[0] == '#':
                 if 'ngx,ngy,ngz,ng' in line:
                     print(line)
@@ -169,21 +172,71 @@ def fit_dflux_time(dflux,time):
             print('  {0:5d}/{1:5d}'.format(ig,ng))
     return fts,errs
 
+def fit_flux_time_grid(ig,nout,flux,time):
+    from scipy.optimize import curve_fit
+    popt, pcov = curve_fit(func1,time[int(nout/2):nout],flux[int(nout/2):nout])
+    return popt[0], pcov[0,0]
+
 def conv_lflux_to_gcube(infname='out.lflux',noutlflux=1000,outfname='out.lflux.cube',
-                        a1=[], a2=[], a3=[]):
+                        a1=[], a2=[], a3=[], nproc=1):
     """
     Convert out.lflux file to Gaussian cube format.
     """
     if len(a1) != 3 or len(a2) != 3 or len(a3) != 3:
         raise ValueError('Lattice vectors a1,a2,a3 must be given appropriately.')
     
+    from multiprocess import Pool
+    if nproc > 0:
+        pool = Pool(processes=nproc)
+    else:
+        pool = Pool()
+
+    print(' Reading out.lflux...')
     nx,ny,nz,ncell,dflux,time = read_lflux(fname=infname, noutlflux=noutlflux)
-    fts, errs = fit_dflux_time(dflux,time)
+    nout, ng = dflux.shape
+    fts = np.zeros(ng)
+    errs = np.zeros(ng)
+
+    print(' Processing grids...')
+    # inc = 0
+    for igg in tqdm(range(0,ng,nproc)):
+        prcs = []
+        for ip in range(nproc):
+            ig = igg +ip
+            if ig >= ng: continue
+            flux = dflux[:,ig]
+            prcs.append(pool.apply_async(fit_flux_time_grid,
+                                         (ig,nout,flux,time) ))
+        results = [ res.get() for res in prcs ]
+        for ip in range(nproc):
+            ig = igg +ip
+            if ig >= ng: continue
+            ft, err = results[ip]
+            fts[ig] = ft
+            errs[ig] = err
+        # if igg > int(ng/10*inc):
+        #     print('  {0:5d}/{1:5d}'.format(igg,ng))
+        #     inc += 1
+    #fts, errs = fit_dflux_time(dflux,time)
+    print(' Writing cube file...')
     write_gcube(nx,ny,nz,a1,a2,a3,fts,fname=outfname)
     return None
 
 
 if __name__ == "__main__":
-
-    args = docopt(__doc__)
+    import nappy
     
+    args = docopt(__doc__)
+    nproc = int(args['--nproc'])
+    nout = int(args['--noutlflux'])
+    sysfile = args['--sysfile']
+    infile = args['INFILE']
+
+    nsys = nappy.io.read(sysfile)
+    a1,a2,a3 = nsys.get_lattice_vectors()
+    outfile = infile +'.cube'
+    conv_lflux_to_gcube(infname=infile,
+                        noutlflux=nout,
+                        outfname=outfile,
+                        a1=a1, a2=a2, a3=a3,
+                        nproc=nproc)

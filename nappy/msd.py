@@ -163,7 +163,7 @@ def get_msd(files, nmeasure, nshift, error=False):
         return msd.mean(axis=1), msdc.mean(axis=1), specorder
 
 def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
-         error=False, spcs='None'):
+         error=False, spcs=None):
 
     if nmeasure < 2:
         nmeasure = 1
@@ -188,6 +188,13 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
     else:
         msd,msdc,specorder = get_msd(files,nmeasure,nshift,error=error)
 
+    if spcs is None:
+        spcs = specorder
+    elif type(spcs) != list and type(spcs) == str:
+        spcs = [spcs]
+    else:
+        raise TypeError('spcs is in invalid form: ', spcs)
+
     #...make output data files
     with open(outfname,'w') as f:
         f.write(gen_header(sys.argv))
@@ -198,7 +205,7 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
             f.write(f'#   {icol:d}:data_ID,')
             icol += 1
             for spc in specorder:
-                if spc != spcs: continue
+                if spc not in spcs: continue
                 f.write(f'  {icol:d}-{icol+2:d}:msd_{spc:<2s} (x,y,z),             ')
                 icol += 3
                 if error:
@@ -206,7 +213,7 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
                     icol += 3
             if lcom:
                 for spc in specorder:
-                    if spc != spcs: continue
+                    if spc not in  spcs: continue
                     f.write(f'   {icol:d}-{icol+2:d}:msdc_{spc:<2s} (x,y,z),             ')
                     icol += 3
                     if error:
@@ -216,13 +223,13 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
             for idat in range(len(msd)):
                 f.write(f' {idat:10d}')
                 for isp,spc in enumerate(specorder):
-                    if spc != spcs: continue
+                    if spc not in spcs: continue
                     f.write(' {0:11.3e} {1:11.3e} {2:11.3e}'.format(*msd[idat,isp,:]))
                     if error:
                         f.write(' {0:11.3e} {1:11.3e} {2:11.3e}'.format(*err[idat,isp,:]))
                 if lcom:
                     for isp,spc in enumerate(specorder):
-                        if spc != spcs: continue
+                        if spc not in spcs: continue
                         f.write(' {0:11.3e} {1:11.3e} {2:11.3e}'.format(*msdc[idat,isp,:]))
                         if error:
                             f.write(' {0:11.3e} {1:11.3e} {2:11.3e}'.format(*errc[idat,isp,:]))
@@ -231,7 +238,7 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
             icol = 1
             f.write(f'# {icol:d}:data_ID,')
             for spc in specorder:
-                if spc != spcs: continue
+                if spc not in spcs: continue
                 icol += 1
                 f.write(f'   {icol:d}:msd_{spc:<2s}, ')
                 if error:
@@ -239,7 +246,7 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
                     f.write(f'   {icol:d}:err_{spc:<2s}, ')
             if lcom:
                 for spc in specorder:
-                    if spc != spcs: continue
+                    if spc not in spcs: continue
                     icol += 1
                     f.write(f'   {icol:d}:msdc_{spc:<2s},')
                     if error:
@@ -249,13 +256,13 @@ def main(files=[], dt=1.0, nmeasure=1, nshift=-1, xyz=False, lcom=False,
             for idat in range(len(msd)):
                 f.write(f' {idat:10d}')
                 for isp,spc in enumerate(specorder):
-                    if spc != spcs: continue
+                    if spc not in spcs: continue
                     f.write(f' {msd[idat,isp].sum():12.3e}')
                     if error:
                         f.write(f' {err[idat,isp].sum():12.3e}')
                 if lcom:
                     for isp,spc in enumerate(specorder):
-                        if spc != spcs: continue
+                        if spc not in spcs: continue
                         f.write(f' {msdc[idat,isp].sum():12.3e}')
                         if error:
                             f.write(f' {errc[idat,isp].sum():12.3e}')

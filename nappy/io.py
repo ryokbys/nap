@@ -189,9 +189,16 @@ def read_pmd(fname='pmdini',specorder=None):
                     sids[incatm] = sid
                     ifmvs[incatm]= ifmv
                     incatm += 1
-    nsys.atoms[['x','y','z']] = poss
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
     nsys.atoms['sid'] = sids
     nsys.atoms['ifmv']= ifmvs
     return nsys
@@ -336,9 +343,16 @@ need to specify the species order correctly with --specorder option.
                 x1,x2,x3 = pos[0],pos[1],pos[2]
             poss[i,:] = [x1,x2,x3]
 
-    nsys.atoms[['x','y','z']] = poss
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
+
     nsys.atoms['sid'] = sids
     return nsys
             
@@ -571,9 +585,16 @@ def read_dump(fname="dump",specorder=None,):
 
             iatm += 1
 
-    nsys.atoms[['x','y','z']] = poss
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
+
     nsys.atoms['sid'] = sids
     for ia in range(len(aux_names)):
         name = aux_names[ia]
@@ -745,9 +766,16 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None,):
                 poss[iatm,:] = [x,y,z]
                 iatm += 1
     f.close()
-    nsys.atoms[['x','y','z']] = poss
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
+
     nsys.atoms['sid'] = sids
     return nsys
 
@@ -872,9 +900,16 @@ def read_xsf(fname="xsf",specorder=None,):
                 continue
             iatm += 1
     nsys.alc= 1.0
-    nsys.atoms[['x','y','z']] = poss
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
+
     nsys.atoms['sid'] = sids
     f.close()
     return nsys
@@ -1000,9 +1035,16 @@ need to specify the species order correctly with --specorder option.
             poss[i][:] = [x1,x2,x3]
 
         #...Up to here, code should be the same as read_POSCAR, in case of CHGCAR lines follow
-        nsys.atoms[['x','y','z']] = poss
-        nsys.atoms[['vx','vy','vz']] = vels
-        nsys.atoms[['fx','fy','fz']] = frcs
+        nsys.atoms['x'] = poss[:,0]
+        nsys.atoms['y'] = poss[:,1]
+        nsys.atoms['z'] = poss[:,2]
+        nsys.atoms['vx']= vels[:,0]
+        nsys.atoms['vy']= vels[:,1]
+        nsys.atoms['vz']= vels[:,2]
+        nsys.atoms['fx']= frcs[:,0]
+        nsys.atoms['fy']= frcs[:,1]
+        nsys.atoms['fz']= frcs[:,2]
+
         nsys.atoms['sid'] = sids
 
         #...Read volumetric data
@@ -1071,10 +1113,17 @@ def read_cube(fname, specorder=None,):
         sposs[i] = np.dot(hmati,rpos)
     nsys.alc = 1.0
     nsys.set_hmat(hmat)
-    nsys.atoms[['x','y','z']] = sposs
-    nsys.atoms[['vx','vy','vz']] = np.zeros((natm,3))
-    nsys.atoms[['fx','fy','fz']] = np.zeros((natm,3))
-    nsys.atoms[['sid']] = sids
+    nsys.atoms['x'] = sposs[:,0]
+    nsys.atoms['y'] = sposs[:,1]
+    nsys.atoms['z'] = sposs[:,2]
+    # nsys.atoms['vx']= vels[:,0]
+    # nsys.atoms['vy']= vels[:,1]
+    # nsys.atoms['vz']= vels[:,2]
+    # nsys.atoms['fx']= frcs[:,0]
+    # nsys.atoms['fy']= frcs[:,1]
+    # nsys.atoms['fz']= frcs[:,2]
+
+    nsys.atoms['sid'] = sids
     # hereafter, volumetric data if exists
     if nvoldat > 0:
         vdata = np.zeros(nvoldat, dtype=float)
@@ -1269,11 +1318,19 @@ def from_ase(atoms,specorder=None):
     #...Create arrays to be installed into nsys.atoms
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]
     nsys.atoms.sid = sids
-    nsys.atoms[['x','y','z']] = poss
+
     for i in range(len(vels)):
         vels[i] = np.dot(celli,vels[i])
-    nsys.atoms[['vx','vy','vz']] = vels
-    nsys.atoms[['fx','fy','fz']] = frcs
+
+    nsys.atoms['x'] = poss[:,0]
+    nsys.atoms['y'] = poss[:,1]
+    nsys.atoms['z'] = poss[:,2]
+    nsys.atoms['vx']= vels[:,0]
+    nsys.atoms['vy']= vels[:,1]
+    nsys.atoms['vz']= vels[:,2]
+    nsys.atoms['fx']= frcs[:,0]
+    nsys.atoms['fy']= frcs[:,1]
+    nsys.atoms['fz']= frcs[:,2]
 
     return nsys
 
