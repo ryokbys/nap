@@ -33,7 +33,6 @@ Options:
               If it is set and the output format accepts, charges are written.
               [default: None]
 """
-from __future__ import print_function
 from __future__ import division
 
 import copy
@@ -46,7 +45,7 @@ from nappy.atom import get_symbol_from_number, get_number_from_symbol
 from nappy.util import pbc
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "230107"
+__version__ = "240202"
 
 #...constants
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
