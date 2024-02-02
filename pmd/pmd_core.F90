@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-02-02 14:16:46 KOBAYASHI Ryo>
+!                     Last-modified: <2024-02-02 21:59:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -993,7 +993,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call cell_info(h)
     endif
     write(6,*) ''
-    write(6,'(1x,a,i0)') "Max num of neighbors during MD = ",maxnn
+    write(6,'(1x,a,2(2x,i0))') "Max num of neighbors during MD and nnmax = ",maxnn,nnmax
     write(6,'(1x,a,i0)') "Max num of boundary atoms during MD = ",maxnb
     write(6,*) ''
   endif

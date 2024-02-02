@@ -960,27 +960,30 @@ contains
 !  where alpha is a mergin of the estimate, like 1.2.
 !
     use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf, &
-         iprint,ratio_nnmax_update
+         iprint,ratio_nnmax_update,ntot
     include "mpif.h"
     
-    integer:: ierr,ic,i,nc,nmaxl,nmax,nnmax_estimate,nnmax_prev
+    integer:: ierr,ic,i,inc,nmaxl,nmax,nnmax_estimate,nnmax_prev, &
+         ncell,ncelltot
     integer:: ix,iy,iz
     real(8):: volc,rho
     real(8),parameter:: pi = 3.14159265358979d0
     logical,save:: l1st = .true. 
-    
+
     nmaxl = 0
+    ncell = 0  ! num. of cells that contain at least one atom
     do ix=1,lcx
       do iy=1,lcy
         do iz=1,lcz
           ic = ix*lcyz2 +iy*lcz2 +iz +1
           i = lshd(ic)
-          nc = 0
+          inc = 0
           do while( i.gt.0 )
-            nc = nc +1
+            inc = inc +1
             i = lscl(i)
           enddo ! while (i.gt.0)
-          nmaxl = max(nc,nmaxl)
+          nmaxl = max(inc,nmaxl)
+          if( inc > 0 ) ncell = ncell +1
         enddo
       enddo
     enddo
@@ -988,9 +991,13 @@ contains
     nmax = 0
     call mpi_allreduce(nmaxl,nmax,1,mpi_integer,mpi_max,mpi_md_world, &
          ierr)
+    ncelltot = 0
+    call mpi_allreduce(ncell,ncelltot,1,mpi_integer,mpi_sum,mpi_md_world, &
+         ierr)
 
     volc = vol/(lcx*lcy*lcz)/nxyz
-    rho = dble(nmax)/volc
+!!$    rho = dble(nmax)/volc
+    rho = dble(ntot)/(volc*ncelltot)
     nnmax_estimate = int(4*pi*(rc+rbuf)**3*rho/3) +1
 !!$    print *,'vol,lcx,lcy,lcz=',vol,lcx,lcy,lcz
 !!$    print *,'myid,nmaxl,nmax,volc,rho,nnmax_estimate=', &
@@ -1007,7 +1014,7 @@ contains
         write(6,'(a)') ' Estimation of num of neighbors:'
         write(6,'(a,i5)') '   Max num in link-list cell = ',nmax
         write(6,'(a,f0.1,3x,f6.4)') '   Cell volume and density = ',volc,rho
-        write(6,'(a,2(2x,i0))') '   Max num of neighbors, that incl. margin = ', &
+        write(6,'(a,2(2x,i0))') '   Max num of neighbors, that incl. margin (nnmax) = ', &
              nnmax_estimate, nnmax
         call flush(6)
       else
