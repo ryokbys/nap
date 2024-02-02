@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-10-31 21:13:45 KOBAYASHI Ryo>
+!                     Last-modified: <2024-02-02 14:16:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -844,7 +844,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
           write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
 
-          write(6,'(a,6f10.3)') ' Stress (GPa):', &
+          write(6,'(a,6f10.4)') ' Stress (GPa):', &
                sth(1,1),sth(2,2),sth(3,3), &
                sth(2,3),sth(1,3),sth(1,2)
         endif

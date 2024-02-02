@@ -6,12 +6,12 @@ scheme as materialsproject.org does.
 
 PREPARE mode creates directories and input files (as the same name as INFILE) to be computed. INFILE can be POSCAR or pmdini.
 ANALYZE mode reads the stress values obtained by some code. 
-STRSFILE is the file name of resulting stress information, e.g., strs.pmd in the case of pmd.
+Stress information is read from pmdfin file.
 COMPUTE mode performs MD or MS calculations using pmd as a backend.
 
 Usage:
     elasticity.py prepare [options] INFILE
-    elasticity.py analyze [options] INFILE STRSFILE
+    elasticity.py analyze [options] INFILE
 
 Options:
   -h, --help  Shows this message and exit.
@@ -23,8 +23,6 @@ Options:
   --out4fp-name FNAME
               Filename of the output of Cij for fp.py. [default: data.pmd.Cij]
 """
-from __future__ import print_function
-
 import os,sys
 import numpy as np
 from docopt import docopt
@@ -243,12 +241,13 @@ def params2ctnsr(params):
             ctnsr[j,i] = ctnsr[i,j]
     return ctnsr
 
-def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
+def analyze(infname,dlt1max=0.01,dlt2max=0.06):
 
     #...original system
     nsys0 = nappy.io.read(infname)
     #atoms0 = ase.io.read(infname,format='vasp')
     atoms0 = nsys0.to_ase_atoms()
+    #strs0 = nsys0.get_stress()
 
     #...get deformations
     fmats = get_deformations(dlt1max,dlt2max)
@@ -283,10 +282,16 @@ def analyze(infname,strsfname,dlt1max=0.01,dlt2max=0.06):
     for i in range(len(fmats)):
         dname = _prefix +"{0:02d}".format(i)
         try:
-            with open(dname+'/'+strsfname,'r') as f:
-                data = f.readline().split()
-                strss[i] = np.array([ float(d) for d in data ])
-                print('   {0:>3d}:'.format(i),strss[i])
+            # with open(dname+'/'+strsfname,'r') as f:
+            #     data = f.readline().split()
+            #     strss[i] = np.array([ float(d) for d in data ])
+            #     print('   {0:>3d}:'.format(i),strss[i])
+            nsysi = nappy.io.read(dname+'/pmdfin')
+            strsi = nsysi.get_stress()
+            # Need to be careful about the definition of sign of stress value.
+            # The tensile stress should be positive in order to get appropriate signs of Cij.
+            # So multiplying minus sign here, because the sign of stress in pmdfin is opposite.
+            strss[i] = -strsi
         except Exception as e:
             raise
 
@@ -501,8 +506,8 @@ def main():
         print(' Loading ',_confname,' done\n   ==> ',conf)
         dlt1max = conf['delta1']
         dlt2max = conf['delta2']
-        strsfname = args['STRSFILE']
-        cij = analyze(infname,strsfname,dlt1max=dlt1max,dlt2max=dlt2max)
+        #strsfname = args['STRSFILE']
+        cij = analyze(infname,dlt1max=dlt1max,dlt2max=dlt2max)
         #...Output Cij for fp.py
         if out4fp:
             out4fp_Cij(cij,fname=out4fp_name)

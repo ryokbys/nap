@@ -578,7 +578,7 @@ class NAPSystem(object):
     def set_stress_tensor(self,stnsr):
         if stnsr.shape != (3,3):
             raise TypeError('Stress tensor should be 3x3 array.')
-        self.stnsr = stnsr
+        self.stnsr = copy.copy(stnsr)
         return None
     
     def get_potential_energy(self):
