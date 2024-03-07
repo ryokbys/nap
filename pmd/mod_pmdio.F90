@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-11-06 12:32:22 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-07 12:35:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -199,17 +199,17 @@ contains
   end subroutine write_pmdtot_bin
 !=======================================================================
   subroutine write_dump(ionum,cfname,ntot,hunit,h,tagtot,rtot,vtot, &
-       atot,stot,ekitot,epitot,naux,auxtot)
+       atot,stot,ekitot,epitot,naux,auxtot,istp)
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
     use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder,&
-         iaux_chg,iaux_tei,iaux_clr
+         iaux_chg,iaux_tei,iaux_clr,lcomb_pos
     use util,only: itotOf,iauxof
     use time,only: accum_time
     implicit none
     include "mpif.h"
-    integer,intent(in):: ionum,ntot,naux
+    integer,intent(in):: ionum,ntot,naux,istp
     character(len=*),intent(in) :: cfname
     real(8),intent(in):: hunit,h(3,3,0:1)
     real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
@@ -239,6 +239,7 @@ contains
 !!$      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
       write(cndlmp,'(i0)') ndlmp
       allocate(dlmp(ndim,ntot))
+      if( lcomb_pos ) open(ionum,file=trim(cfname),status='replace')
       l1st = .false.
     endif
 
@@ -296,11 +297,11 @@ contains
       endif
     enddo
 
-    open(ionum,file=trim(cfname),status='replace')
+    if( .not. lcomb_pos ) open(ionum,file=trim(cfname),status='replace')
     write(ionum,'(a)') 'ITEM: TIMESTEP'
-    write(ionum,'(i10)') 0
+    write(ionum,'(3x,i0)') istp
     write(ionum,'(a)') 'ITEM: NUMBER OF ATOMS'
-    write(ionum,'(i10)') ntot
+    write(ionum,'(3x,i0)') ntot
     write(ionum,'(a)') 'ITEM: BOX BOUNDS xy xz yz'
     write(ionum,'(3f15.4)') xlo_bound, xhi_bound, xy
     write(ionum,'(3f15.4)') ylo_bound, yhi_bound, xz
@@ -324,7 +325,7 @@ contains
       write(ionum,'('//trim(cndlmp)//'es11.2e3)') dlmp(4:ndlmp,i)  ! except pos
     enddo
 
-    close(ionum)
+    if( .not. lcomb_pos ) close(ionum)
   end subroutine write_dump
 !=======================================================================
   subroutine pmd2lammps(h,ntot,rtot,rlmp,vtot,vlmp, &

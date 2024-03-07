@@ -94,6 +94,9 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'num_out_pos' ) then
     call read_i1(ionum,npmd)
     return
+  elseif( trim(cname).eq.'out_pos_combined' ) then
+    call read_l1(ionum,lcomb_pos)
+    return
   elseif( trim(cname).eq.'dump_aux_order' ) then
     call read_dumpaux(ionum)
     return

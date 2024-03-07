@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-02-02 21:59:01 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-07 12:35:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -441,8 +441,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
-      call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
-           rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
+      if( lcomb_pos ) then  ! if combined, filename is dump.
+        call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+             rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
+      else  ! otherwise, filename contains timestep
+        call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+             rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
+      endif
     endif
     call accum_time('write_xxx',mpi_wtime() -tmp)
   endif
@@ -920,8 +925,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
-          call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
-               rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
+          if( lcomb_pos ) then
+            call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+                 rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
+          else
+            call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+                 rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
+          endif
         endif
         call accum_time('write_xxx',mpi_wtime() -tmp)
       endif
@@ -930,6 +940,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( lconverged ) exit
 !.....End of velocity-verlet loop    
   enddo
+
+!.....Close out_pos file in the end, if combined out_pos.
+  if( lcomb_pos ) close(20)
 
   if( .not. ltot_updated ) then
     tmp = mpi_wtime()
@@ -1492,8 +1505,13 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
                tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
-        call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
-             rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot)
+        if( lcomb_pos ) then
+          call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+               rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
+        else
+          call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+               rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
+        endif
       endif
       call accum_time('write_xxx',mpi_wtime() -tmp)
     endif

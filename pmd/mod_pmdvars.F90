@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-02-02 19:09:35 KOBAYASHI Ryo>
+!                    Last modified: <2024-03-07 12:27:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -58,6 +58,7 @@ module pmdvars
   integer:: nerg = 1000
   integer:: ifpmd= 2    ! 0:none, 1:pmd, 2:dump (default)
   integer:: npmd = 10
+  logical:: lcomb_pos = .false.
   integer:: ifsort= 1
   real(8):: dt = 1d0
   real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
