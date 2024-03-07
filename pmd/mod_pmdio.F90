@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-07 15:00:17 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-07 15:50:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -94,7 +94,7 @@ contains
 !=======================================================================
   subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
        rtot,vtot,atot,epot,ekin,stnsr,lforce,istp)
-    use pmdvars,only: has_specorder,specorder
+    use pmdvars,only: has_specorder,specorder,lcomb_pos
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
@@ -103,27 +103,47 @@ contains
     real(8),intent(in):: epot,ekin,stnsr(3,3)
     logical,intent(in):: lforce
 
-    integer:: ia,ib,l,i,msp
+    integer:: ia,ib,l,i,msp,num
     real(8):: atmp(3)
+    character(len=128):: cftmp
+    logical:: lopen = .false.
+    logical:: lclose = .false.
+    logical,save:: l1st = .true.
 
-    open(ionum,file=cfname,status='replace')
+    if( l1st ) then
+      inquire(file=trim(cfname), number=num, opened=lopen)
+      if( lcomb_pos .and. .not.lopen ) open(ionum,file=trim(cfname),status='replace')
+      lclose = .false.
+      l1st = .false.
+    endif
+
+    inquire(ionum, name=cftmp, number=num, opened=lopen)
+    if( .not.lcomb_pos ) then
+      open(ionum,file=trim(cfname),status='replace')
+      lclose = .true.
+    else if( lopen .and. trim(cfname).ne.trim(cftmp) ) then ! the unit number is used by other file
+      close(ionum)
+      open(ionum,file=trim(cfname),status='replace')
+      lclose = .true.
+    endif
+!.....Since 240307, there must be at least one comment line at the top of a configuration.
+    write(ionum,'(a)') '#'
+    write(ionum,'(a,2x,i0)') '#  timestep: ',istp
     if( has_specorder ) then
       msp = 0
       do i=1,ntot
         msp = max(msp,int(tagtot(i)))
       enddo
-      write(ionum,'(a)') '#'
-      write(ionum,'(a,2x,i0)') '#  timestep: ',istp
       write(ionum,'(a,9(2x,a))') '#  specorder: ',(trim(specorder(i)),i=1,msp)
-      write(ionum,'(a,es14.6)') '#  potential_energy: ', epot
-      write(ionum,'(a,es14.6)') '#  kinetic_energy:   ', ekin
-      !.....Positive stress as compressive, negative as tensile
-      write(ionum,'(a,6es11.3)') '#  stress:   ',  &
+    endif
+    write(ionum,'(a,es14.6)') '#  potential_energy: ', epot
+    write(ionum,'(a,es14.6)') '#  kinetic_energy:   ', ekin
+!.....Positive stress as compressive, negative as tensile
+    write(ionum,'(a,6es11.3)') '#  stress:   ',  &
            stnsr(1,1), stnsr(2,2), stnsr(3,3), &
            stnsr(3,2), stnsr(1,3), stnsr(1,2)
-      write(ionum,'(a,l1)') '#  forces:  ',lforce
-      write(ionum,'(a)') '#'
-    endif
+    write(ionum,'(a,l1)') '#  forces:  ',lforce
+    write(ionum,'(a)') '#'
     write(ionum,'(es23.14e3)') hunit
 !!$    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
 !!$         ,ib=1,3),l=0,1)
@@ -146,7 +166,7 @@ contains
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif
-    close(ionum)
+    if( lclose ) close(ionum)
     return
   end subroutine write_pmdtot_ascii
 !=======================================================================
@@ -247,6 +267,7 @@ contains
 !!$      if( idumpauxof('vy').gt.0 ) ndlmp = ndlmp -1
 !!$      if( idumpauxof('vz').gt.0 ) ndlmp = ndlmp -1
       write(cndlmp,'(i0)') ndlmp
+      if( allocated(dlmp) .and. size(dlmp).ne.ndim*ntot) deallocate(dlmp)
       allocate(dlmp(ndim,ntot))
       if( lcomb_pos ) open(ionum,file=trim(cfname),status='replace')
       l1st = .false.

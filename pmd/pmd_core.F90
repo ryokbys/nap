@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-07 15:01:25 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-07 15:56:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -437,8 +437,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
              tagtot,rtot,vtot)
       elseif( trim(ciofmt).eq.'ascii' ) then
-        call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
+        if( lcomb_pos ) then
+          call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
+        else
+          call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
+        endif
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       if( lcomb_pos ) then  ! if combined, filename is dump.
@@ -921,8 +926,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
             call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
              tagtot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
-            call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+            if( lcomb_pos ) then
+              call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+            else
+              call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                   tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+            endif
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           if( lcomb_pos ) then
@@ -1495,14 +1505,18 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
       tmp = mpi_wtime()
       if( ifpmd.eq.1 ) then  ! pmd format
-        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
-             then
+        if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
                tagtot,rtot,vtot)
         elseif( trim(ciofmt).eq.'ascii' ) then
           sth(:,:) = stnsr(:,:)*up2gpa
-          call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+          if( lcomb_pos ) then
+            call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+                 tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+          else            
+            call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                 tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+          endif
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
         if( lcomb_pos ) then
