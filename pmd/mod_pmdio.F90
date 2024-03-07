@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-07 12:35:12 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-07 15:00:17 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -74,7 +74,11 @@ contains
       endif
     enddo
     read(ionum,*) hunit
-    read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+!!$    read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
+!.....H-matrix IO format changed since 2024-03-07
+    read(ionum,*) ((h(ia,1,l),ia=1,3),l=0,1)
+    read(ionum,*) ((h(ia,2,l),ia=1,3),l=0,1)
+    read(ionum,*) ((h(ia,3,l),ia=1,3),l=0,1)
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
     read(ionum,*) itmp
     if( itmp.ne.ntot ) then
@@ -89,10 +93,10 @@ contains
   end subroutine read_pmdtot_ascii
 !=======================================================================
   subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot,atot,epot,ekin,stnsr,lforce)
+       rtot,vtot,atot,epot,ekin,stnsr,lforce,istp)
     use pmdvars,only: has_specorder,specorder
     include './params_unit.h'
-    integer,intent(in):: ionum,ntot
+    integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
     real(8),intent(in):: hunit,h(3,3,0:1)
     real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
@@ -109,6 +113,7 @@ contains
         msp = max(msp,int(tagtot(i)))
       enddo
       write(ionum,'(a)') '#'
+      write(ionum,'(a,2x,i0)') '#  timestep: ',istp
       write(ionum,'(a,9(2x,a))') '#  specorder: ',(trim(specorder(i)),i=1,msp)
       write(ionum,'(a,es14.6)') '#  potential_energy: ', epot
       write(ionum,'(a,es14.6)') '#  kinetic_energy:   ', ekin
@@ -120,8 +125,12 @@ contains
       write(ionum,'(a)') '#'
     endif
     write(ionum,'(es23.14e3)') hunit
-    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
-         ,ib=1,3),l=0,1)
+!!$    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
+!!$         ,ib=1,3),l=0,1)
+!.....H-matrix IO format changed since 2024-03-07
+    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,1,l)/hunit,ia=1,3),l=0,1)
+    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,2,l)/hunit,ia=1,3),l=0,1)
+    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,3,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(i10)') ntot
     if( lforce ) then ! write forces in [eV/A]
       do i=1,ntot

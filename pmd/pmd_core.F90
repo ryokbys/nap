@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-07 12:35:41 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-07 15:01:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -438,7 +438,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot)
       elseif( trim(ciofmt).eq.'ascii' ) then
         call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
+             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       if( lcomb_pos ) then  ! if combined, filename is dump.
@@ -922,7 +922,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
             call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
+             tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           if( lcomb_pos ) then
@@ -1502,7 +1502,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         elseif( trim(ciofmt).eq.'ascii' ) then
           sth(:,:) = stnsr(:,:)*up2gpa
           call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.)
+               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
         if( lcomb_pos ) then

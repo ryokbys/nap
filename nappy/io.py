@@ -152,16 +152,17 @@ def read_pmd(fname='pmdini',specorder=None):
                     nsys.alc= float(data[0])
                 # 2nd-4th: cell vectors
                 elif iline == 2:
-                    nsys.a1= np.array([float(x) for x in data])
+                    nsys.a1= np.array([float(x) for i,x in enumerate(data) if i < 3 ])
                 elif iline == 3:
-                    nsys.a2= np.array([float(x) for x in data])
+                    nsys.a2= np.array([float(x) for i,x in enumerate(data) if i < 3 ])
                 elif iline == 4:
-                    nsys.a3= np.array([float(x) for x in data])
+                    nsys.a3= np.array([float(x) for i,x in enumerate(data) if i < 3 ])
+                # File format changed since 2024-03-07
                 # 5th-7th: velocity of cell vectors
-                elif 5 <= iline <= 7:
-                    pass
+                # elif 5 <= iline <= 7:
+                #     pass
                 # 8th: num of atoms
-                elif iline == 8:
+                elif iline == 5:
                     natm = int(data[0])
                     # sids = [ 0 for i in range(natm) ]
                     # poss = [ np.zeros(3) for i in range(natm) ]
@@ -223,14 +224,17 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
     f.write("#\n")
     # lattice constant
     f.write(" {0:15.9f}\n".format(nsys.alc))
-    # cell vectors
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(*nsys.a1))
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(*nsys.a2))
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(*nsys.a3))
-    # velocities of cell vectors
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
-    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
+    # cell vectors and their velocities
+    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}".format(*nsys.a1))
+    f.write(" {0:10.4f} {1:10.4f} {2:10.4f}\n".format(0.0, 0.0, 0.0))
+    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}".format(*nsys.a2))
+    f.write(" {0:10.4f} {1:10.4f} {2:10.4f}\n".format(0.0, 0.0, 0.0))
+    f.write(" {0:19.15f} {1:19.15f} {2:19.15f}".format(*nsys.a3))
+    f.write(" {0:10.4f} {1:10.4f} {2:10.4f}\n".format(0.0, 0.0, 0.0))
+    # # velocities of cell vectors
+    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
+    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
+    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
     # num of atoms
     f.write(" {0:10d}\n".format(len(nsys.atoms)))
     # atom positions

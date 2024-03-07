@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-10-31 21:13:01 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-07 15:03:38 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -313,7 +313,7 @@ program pmd
              tagtot,rtot,vtot)
     elseif( trim(ciofmt).eq.'ascii' ) then
       call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,hmat, &
-             tagtot,rtot,vtot,atot,epot,ekin,stnsr,.true.)
+             tagtot,rtot,vtot,atot,epot,ekin,stnsr,.true.,min(nstp,istp))
     endif
     call accum_time('write_xxx',mpi_wtime()-tmp)
   endif
