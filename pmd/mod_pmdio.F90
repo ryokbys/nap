@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-07 15:50:41 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-08 23:14:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -118,11 +118,13 @@ contains
     endif
 
     inquire(ionum, name=cftmp, number=num, opened=lopen)
+    print *,'name,number,cfname,opened = ',trim(cftmp),num,trim(cfname),lopen
     if( .not.lcomb_pos ) then
       open(ionum,file=trim(cfname),status='replace')
       lclose = .true.
-    else if( lopen .and. trim(cfname).ne.trim(cftmp) ) then ! the unit number is used by other file
-      close(ionum)
+    else if( .not.lopen .or. &
+         (lopen .and. trim(cfname).ne.trim(cftmp)) ) then ! the unit number is used by other file
+      if( lopen ) close(ionum)
       open(ionum,file=trim(cfname),status='replace')
       lclose = .true.
     endif
@@ -157,12 +159,12 @@ contains
         atmp(1)= h(1,1,0)*atot(1,i) +h(1,2,0)*atot(2,i) +h(1,3,0)*atot(3,i)
         atmp(2)= h(2,1,0)*atot(1,i) +h(2,2,0)*atot(2,i) +h(2,3,0)*atot(3,i)
         atmp(3)= h(3,1,0)*atot(1,i) +h(3,2,0)*atot(2,i) +h(3,3,0)*atot(3,i)
-        write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
+        write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atmp(1:3)    ! dt
       enddo
     else
       do i=1,ntot
-        write(ionum,'(7es23.14e3,11es13.4e3)') tagtot(i) &
+        write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif
@@ -607,5 +609,5 @@ contains
 end module pmdio
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
