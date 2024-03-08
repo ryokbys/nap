@@ -101,7 +101,31 @@ def read(fname="pmdini",format=None, specorder=None):
     nsys._reset_atoms_dtypes()
     return nsys
 
-def read_pmd(fname='pmdini',specorder=None):
+def read_pmd(fname:str = 'pmdini',
+             specorder:list = None):
+    """
+    Reader method for pmd format.
+    *pmd* format is like following:
+    ---
+    # some comments
+    # keyword1: value1
+    # keyword2: value2
+    #
+    1.00
+    4.00  0.00  0.00  0.00  0.00  0.00
+    0.00  4.00  0.00  0.00  0.00  0.00
+    0.00  0.00  4.00  0.00  0.00  0.00
+    8
+    1.100000000000001E+000   0.000  0.000  0.000  0.000  0.000  0.000
+    1.100000000000002E+000   0.500  0.000  0.000  0.000  0.000  0.000
+    ...
+    1.100000000000008E+000   0.750  0.750  0.750  0.000  0.000  0.000
+    ---
+    
+    - There must be at least one comment line and after the comment lines, there must not be any comment line until the all the entry finishes.
+    - If there are multiple configurations (timesteps) in one file, they must be separated with comment lines.
+    - There should not be any blank line.
+    """
     global myopen
     forces = False
     nsys = NAPSystem()
@@ -175,7 +199,7 @@ def read_pmd(fname='pmdini',specorder=None):
                     sids = np.zeros((natm))
                 # 9th-: atom positions
                 else:
-                    if incatm > natm:
+                    if incatm >= natm:
                         break
                     fdata = [float(x) for x in data]
                     tag = fdata[0]
