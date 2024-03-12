@@ -116,10 +116,10 @@ def read_pmd(fname:str = 'pmdini',
     0.00  4.00  0.00  0.00  0.00  0.00
     0.00  0.00  4.00  0.00  0.00  0.00
     8
-    1.100000000000001E+000   0.000  0.000  0.000  0.000  0.000  0.000
-    1.100000000000002E+000   0.500  0.000  0.000  0.000  0.000  0.000
+    1.100000000000001   0.000  0.000  0.000  0.000  0.000  0.000
+    1.100000000000002   0.500  0.000  0.000  0.000  0.000  0.000
     ...
-    1.100000000000008E+000   0.750  0.750  0.750  0.000  0.000  0.000
+    1.100000000000008   0.750  0.750  0.750  0.000  0.000  0.000
     ---
     
     - There must be at least one comment line and after the comment lines, there must not be any comment line until the all the entry finishes.
@@ -280,13 +280,13 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
         tag = get_tag(sid,ifmv,i+1)  # assuming ifmv=1
         if frcs is not None:
             fi = frcs[i]
-            f.write(" {0:22.14e}".format(tag)
+            f.write(" {0:18.14f}".format(tag)
                     +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*fi)
                     +"\n")
         else:
-            f.write(" {0:22.14e}".format(tag)
+            f.write(" {0:18.14f}".format(tag)
                     +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
                     +"\n")
