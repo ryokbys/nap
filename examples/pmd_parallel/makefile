@@ -7,8 +7,8 @@ veryclean: clean
 	rm -f out.erg out.pmd.{2,4} pmdfin
 
 test:
-	@mpirun -np 2 ../../pmd/pmd 2>&1 > out.pmd.2
-	@mpirun -np 4 ../../pmd/pmd 2>&1 > out.pmd.4
+	@OMP_NUM_THREADS=1 mpirun -np 2 ../../pmd/pmd 2>&1 > out.pmd.2
+	@OMP_NUM_THREADS=1 mpirun -np 4 ../../pmd/pmd 2>&1 > out.pmd.4
 	@grep Potential out.pmd.REF | tail -n1 > out.REF
 	@grep Potential out.pmd.2 | tail -n1 > out.2
 	@grep Potential out.pmd.4 | tail -n1 > out.4

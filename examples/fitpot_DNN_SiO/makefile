@@ -8,8 +8,9 @@ veryclean: clean
 	rm -f out.fitpot
 
 NP = 2
+NOMP = 1
 run:
-	mpirun --oversubscribe -np $(NP) ~/src/nap/fitpot/fitpot | tee out.fitpot
+	OMP_NUM_THREADS=1 mpirun -np $(NP) ~/src/nap/fitpot/fitpot | tee out.fitpot
 
 test:
 	@/bin/bash ./test_result.sh > /dev/null || (echo " FAIL: examples/fitpot_DNN_SiO" && exit 1)

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-07 15:03:38 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-15 11:14:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -111,6 +111,7 @@ program pmd
 
     call cell_info(hmat)
     call spcs_info(ntot0,tagtot)
+
     write(6,*) ''
     write(6,'(a,i0)') ' Num of MPI processes = ',nprocs
 !.....Read in.pmd after reading the atom configuration file.
@@ -132,6 +133,9 @@ program pmd
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
 
+!.....Num of groups and group IDs from tag
+    call check_tags(ntot0,tagtot,ngrp,iprint)
+
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
       print *,'NOTICE: Since using the two-temperature model (TTM) MD:'
@@ -147,7 +151,7 @@ program pmd
 !.....Set nrmtrans to 0
       print *,'  - Set removal of translation off.'
       nrmtrans = 0
-    endif
+    endif  ! if ctctl==ttm
 
 !.....Some FF requires other FFs
     if( use_force('BMH') ) then
@@ -195,6 +199,7 @@ program pmd
     endif
   endif  ! end of myid.eq.0
 
+  ntot = ntot0
   call bcast_params()
 !.....Initialize random seeds in the function urnd
   if( rseed.lt.0d0 ) then
@@ -529,6 +534,7 @@ subroutine write_initial_setting()
 
   write(6,'(a)') '---------------------------------' &
        //'---------------------------------------'
+  write(6,*) ''
 
 end subroutine write_initial_setting
 !=======================================================================
@@ -553,6 +559,7 @@ subroutine write_inpmd(ionum,cfname)
 10 close(ionum)
   write(6,'(a)') '---------------------------------' &
        //'---------------------------------------'
+  write(6,*) ''
 
 end subroutine write_inpmd
 !=======================================================================
@@ -661,6 +668,7 @@ subroutine bcast_params()
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lrealloc,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(ngrp,1,mpi_integer,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
@@ -833,6 +841,59 @@ subroutine check_ensemble()
   print *,'Ensemble = ',trim(c_ensemble)
 
 end subroutine check_ensemble
+!=======================================================================
+subroutine check_tags(ntot,tagtot,ngrp,iprint)
+!  Check sanity of tags:
+!  - whether the num of groups is too much so that there is no 0 to separate group and total-ID
+!  - the number of group is correct
+!
+  use util,only: ithOf
+  use pmdvars,only: myid_md, mpicomm
+  include "mpif.h"
+  integer,intent(in):: ntot,iprint
+  real(8),intent(in):: tagtot(ntot)
+  integer,intent(out):: ngrp
+
+  integer:: i,k,is,imax(14),ierr,jerr,ith
+  real(8):: ti
+
+  ierr = 0
+  if( myid_md.eq.0 ) then
+
+    imax(:) = -1
+    do i=1,ntot
+      ti = tagtot(i)
+      do k=1,14
+        ith = ithOf(ti,k)
+        imax(k) = max(imax(k),ith)
+      enddo
+    enddo
+
+!.....Check num of digit of ntot
+    ndigtot = 1
+    do k=1,8  ! 1_000_000_000 is the max num of digit for ntot in pmd
+      if( ntot >= 10**k ) ndigtot = k+1
+    end do
+    if( ndigtot >= 10 ) ierr = 1
+
+!.....i-th position of the deepest non-zero digit == num of groups
+!.....  (but not as deep as total-ID)
+    ngrp = 1
+    do k= (14-ndigtot),1,-1
+      if( imax(k).ne.0 ) then
+        ngrp = k
+        exit
+      endif
+    end do
+    if( ngrp + ndigtot .ge. 14 ) ierr = 1
+  endif
+  
+  if( myid_md.eq.0 .and. iprint.gt.0 ) then
+    print '(a,i0)',' Number of groups = ',ngrp
+    print '(a)','   Group #1 is preserved for factor to vector compnent (ifmv).'
+  endif
+  return
+end subroutine check_tags
 !=======================================================================
 subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 ! 

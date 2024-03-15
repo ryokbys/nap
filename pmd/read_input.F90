@@ -462,6 +462,20 @@ subroutine read_i1(ionum,ival)
 
 end subroutine read_i1
 !=======================================================================
+subroutine read_is(ionum,ndata,nrow,ival)
+!
+!  Read several integer parameters
+!
+  integer,intent(in):: ionum,ndata,nrow
+  integer,intent(out):: ival(ndata,nrow)
+
+  do n=1,nrow
+    read(ionum,*) (ival(n,i),i=1,ndata)
+!        write(6,'(1x,100es15.3)') (rval(i,n),i=1,ndata)
+  enddo
+
+end subroutine read_is
+!=======================================================================
 subroutine read_c1(ionum,cval)
 !
 !  Read one word from the line

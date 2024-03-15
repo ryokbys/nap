@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-04-26 18:18:20 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-14 22:40:37 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -71,6 +71,15 @@ contains
     ifmvOf= int(mod(tag*10,10d0))
     return
   end function ifmvOf
+!=======================================================================
+  function ithOf(tag,ith)
+    implicit none
+    real(8),intent(in):: tag
+    integer,intent(in):: ith
+    integer:: ithOf
+    ithOf= int(mod(tag*10d0**ith,10d0))
+    return
+  end function ithOf
 !=======================================================================
   function itotOf(tag)
     implicit none

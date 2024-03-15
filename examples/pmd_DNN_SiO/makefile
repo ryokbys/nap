@@ -7,7 +7,7 @@ veryclean: clean
 	rm -f out.{erg,pmd} {erg,frc,strs}.pmd pmdfin
 
 test:
-	@mpirun -np 1 ../../pmd/pmd 2>&1 > out.pmd
+	@OMP_NUM_THREADS=1 mpirun -np 1 ../../pmd/pmd 2>&1 > out.pmd
 	@grep Potential out.pmd.REF | head -n1 > ./out.REF
 	@grep Potential out.pmd | head -n1 > ./out
 	@diff -q out out.REF > /dev/null || (echo " FAIL: examples/pmd_DNN_SiO" && exit 1)

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-07 15:56:54 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-15 10:19:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -25,7 +25,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use rdcfrc,only: init_rdcfrc, reduce_forces, finalize_rdcfrc
   use structure,only: cna,acna
   use deform,only: init_deform, apply_deform, cdeform
-  use util,only: itotOf, ifmvOf
+  use util,only: itotOf, ifmvOf, ithOf
   use extforce,only: lextfrc,rm_trans_extfrc,add_extfrc
   use clrchg,only: lclrchg,clrchg_force,rm_trans_clrchg
   use localflux,only: lflux,accum_lflux

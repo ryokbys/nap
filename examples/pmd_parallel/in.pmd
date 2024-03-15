@@ -16,7 +16,6 @@ num_out_pmd       10
 force_type        Coulomb Morse
 cutoff_radius     6.0d0
 cutoff_buffer     0.3d0
-flag_coulomb      1
 
 flag_damping      0
 damping_coeff     0.99d0
