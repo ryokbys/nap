@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-14 22:40:37 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-15 22:36:45 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -294,20 +294,22 @@ contains
     integer,intent(in):: ntot
     real(8),intent(in):: tagtot(ntot)
 
-    integer:: ia,ierr
+    integer:: ia,ierr,igrp
 !!$    integer,external:: ifmvOf
 
     if( myid_md.eq.0 ) then
+      igrp = 1  ! ifmv is assigned to group #1
       nfmv = 0
       do ia=1,ntot
-        nfmv = max(nfmv,ifmvOf(tagtot(ia)))
+!!$        nfmv = max(nfmv,ifmvOf(tagtot(ia)))
+        nfmv = max(nfmv,ithOf(tagtot(ia),igrp))
       enddo
       if( iprint.ge.ipl_basic ) then
         print *,''
         print '(a,i0)',' Number of ifmvs = ',nfmv
       endif
     endif
-    call mpi_bcast(nfmv,1,mpi_integer,0,mpi_md_world,ierr)
+!!$    call mpi_bcast(nfmv,1,mpi_integer,0,mpi_md_world,ierr)
     
   end subroutine calc_nfmv
 !=======================================================================

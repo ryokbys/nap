@@ -29,6 +29,7 @@ _entry_to_varname = {
     'converge_num': 'n_conv',
     'initial_temperature': 'tinit',
     'final_temperature': 'tfin',
+    'flag_multi_temp': 'lmultemps', 
     'temperature_control': 'ctctl',
     'temperature_target': 'ttgt',
     'temperature_relax_time': 'trlx',
@@ -73,6 +74,7 @@ _default_params = {
     'initial_temperature': -10.0,
     'final_temperature': -10.0,
     'temperature_control': 'none',
+    'flag_multi_temp': False,
     'temperature_target': [300.0, 100.0, 300.0,
                            300.0, 300.0, 300.0,
                            300.0, 300.0, 300.0],
@@ -129,6 +131,7 @@ _str_keys = [
 ]
 _bool_keys = [
     'allow_reallocation','flag_temp_dist','flag_compute_stress',
+    'flag_multi_temp',
 ]
 
 def get_default():
@@ -181,10 +184,13 @@ def read_inpmd(fname='in.pmd'):
                 inputs[key] = data[1:]
                 mode = None
             elif key == 'temperatuer_target':
-                ifmv = int(data[1])
-                if not 1 <= ifmv <= 9:
-                    ValueError('temperature_target ifmv wrong.')
-                inputs[key][ifmv-1] = float(data[2])
+                if inputs['flag_multi_temp']:
+                    ifmv = int(data[1])
+                    if not 1 <= ifmv <= 9:
+                        ValueError('temperature_target ifmv wrong.')
+                    inputs[key][ifmv-1] = float(data[2])
+                else:
+                    inputs[key][0] = float(data[1])
                 mode = None
             elif key == 'factor_direction':
                 mode = key

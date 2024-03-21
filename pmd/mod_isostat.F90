@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-12-28 17:16:22 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-15 22:29:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -20,9 +20,10 @@ module isostat
 !   2. PhD thesis by David Quigley (2005)
 !-----------------------------------------------------------------------
   use pmdvars,only: tinit,tfin,trlx,nstp,istp,tgmm,ttgt,dt,am,fa2v,tfac, &
-       ndof,ekl,temp,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
-       pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm,lhydrostatic
-  use util,only: ifmvOf
+       ndof,eks,temps,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
+       pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm,lhydrostatic, &
+       ntemps, lmultemps
+  use util,only: ithOf
   use random,only: box_muller
   implicit none
   include "./params_unit.h"
@@ -45,27 +46,27 @@ contains
     implicit none 
     integer,intent(in):: myid,iprint
 
-    integer:: ifmv
+    integer:: itemp
     
     tgmm= 1d0/trlx
-    do ifmv=1,9
-      if( ttgt(ifmv).lt.0d0 ) then
-        tfac(ifmv)= -1d0
+    do itemp=1,ntemps
+      if( ttgt(itemp).lt.0d0 ) then
+        tfac(itemp)= -1d0
       else
 !.....TFAC should have [sqrt(ue/fs**2)] = [ue/Ang/sqrt(ump)] unit
-!            tfac(ifmv)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(ifmv)/dt)
+!            tfac(itemp)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(itemp)/dt)
 !     &           *m2ang/s2fs
-!            tfac(ifmv)= dsqrt(2d0*tgmm*fkb*ttgt(ifmv)/dt)
-        tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
+!            tfac(itemp)= dsqrt(2d0*tgmm*fkb*ttgt(itemp)/dt)
+        tfac(itemp)= dsqrt(2d0*tgmm*ttgt(itemp)/dt *k2ue)
       endif
     enddo
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print *,'Langevin thermostat parameters:'
       print '(a,f10.2)','   Relaxation time = ',trlx
-      do ifmv=1,nfmv
-        print '(a,i3,f10.2,es15.4)','   ifmv,ttgt,tfac = ' &
-             ,ifmv,ttgt(ifmv),tfac(ifmv)
+      do itemp=1,nfmv
+        print '(a,i3,f10.2,es15.4)','   itemp,ttgt,tfac = ' &
+             ,itemp,ttgt(itemp),tfac(itemp)
       enddo
     endif
 
@@ -200,7 +201,7 @@ contains
     real(8),intent(in):: tag(natm),aa(3,natm)
     real(8),intent(inout):: va(3,natm)
 
-    integer:: i,is,ifmv,l
+    integer:: i,is,itemp,l
     real(8):: ami,tmp,eta,bfac,afac,aai(3)
 
 !.....For G-JF algorithm
@@ -216,13 +217,13 @@ contains
     endif
 
     do i=1,natm
-      ifmv = ifmvOf(tag(i))
+      itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
       is = int(tag(i))
-      if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) cycle
+      if( itemp.eq.0 .or. tfac(itemp).lt.0d0 ) cycle
       ami= am(is)
 !.....Here unit of TMP should be [eV/Ang],
 !     whereas TFAC is [eu/Ang/sqrt(ump)], so need to multiply ue2ev
-      tmp= tfac(ifmv)*dsqrt(ami)*ue2ev
+      tmp= tfac(itemp)*dsqrt(ami)*ue2ev
 !!$!.....Here the unit of va*tgmm*ami is [ump*(Ang)/fs**2 = ue/(Ang)],
 !!$!.....where (Ang) is actually scaled to unitless,
 !!$!.....but this should be [eV/Ang], so need to multiply ue2ev.
@@ -249,7 +250,7 @@ contains
     real(8),intent(in):: tag(natm)
     real(8),intent(inout):: va(3,natm)
 
-    integer:: i,is,ifmv
+    integer:: i,is,itemp
     
     tfac(1:9)= 0d0
 !.....if final temperature is assigned,
@@ -257,20 +258,20 @@ contains
     if( tfin.gt.0d0 ) then
       ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
     endif
-    do ifmv=1,9
-      if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-      temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
-      if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-        tfac(ifmv)= dsqrt(1d0 +dt/trlx*100d0 )
+    do itemp=1,ntemps
+      if(ndof(itemp).le.0 .or. ttgt(itemp).lt.0d0 ) cycle
+      temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
+      if( abs(ttgt(itemp)-temps(itemp))/temps(itemp).gt.100d0 ) then
+        tfac(itemp)= dsqrt(1d0 +dt/trlx*100d0 )
       else
-        tfac(ifmv)= dsqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv)) &
-             /temp(ifmv))
+        tfac(itemp)= dsqrt(1d0 +dt/trlx*(ttgt(itemp)-temps(itemp)) &
+             /temps(itemp))
       endif
     enddo
     do i=1,natm
-      ifmv = ifmvOf(tag(i))
-      if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-      va(1:3,i)= va(1:3,i) *tfac(ifmv)
+      itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
+      if( itemp.le.0 .or. ttgt(itemp).lt.0d0 ) cycle
+      va(1:3,i)= va(1:3,i) *tfac(itemp)
     enddo
   end subroutine vel_update_berendsen
 !=======================================================================

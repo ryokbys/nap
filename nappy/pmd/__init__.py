@@ -53,8 +53,12 @@ class PMD:
         """
         if self.nsys == None:
             raise ValueError('nsys must be set beofre calling run().')
-        self.set_params(num_iteration=nstp, time_interval=dt, flag_damping=ifdmp,
-                        damping_coeff=dmp, converge_eps=conveps, converge_num=convnum,
+        self.set_params(num_iteration=nstp,
+                        time_interval=dt,
+                        flag_damping=ifdmp,
+                        damping_coeff=dmp,
+                        converge_eps=conveps,
+                        converge_num=convnum,
                         print_level=iprint)
         # self.params['num_iteration'] = nstp
         # self.params['time_interval'] = dt
@@ -67,7 +71,10 @@ class PMD:
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
         ispcs = self.nsys.atoms.sid.values
+        #...Run pmd by calling fortran-compiled library
+        #print('calling pw.run')
         res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,initialize)
+        #print('out from pw.run')
         self.result = {}
         self.result['rtot'] = res[0]
         self.result['vtot'] = res[1]

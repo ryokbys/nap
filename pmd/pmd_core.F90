@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-15 10:19:04 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-15 22:35:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -52,7 +52,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: epot,ekin,stnsr(3,3)
 
-  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,ierr
+  integer:: i,j,k,l,m,n,ia,ib,is,ifmv,itemp,nave,nspl,i_conv,ierr
   integer:: ihour,imin,isec
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
@@ -76,8 +76,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
-
-  call calc_nfmv(ntot0,tagtot)
 
   if( nstp.le.0 ) then
     cfistp = 'i2'
@@ -200,7 +198,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !.....get_num_dof is called once in a MD run
-  call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+!!$  call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+  call get_num_dof()
 
 !.....Call init_metaD after setting namax and nsp
   if( lmetaD ) then
@@ -256,7 +255,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !-----calc kinetic energy
-  call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
+  call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
        ,vmax,mpi_md_world)
   vmaxold=vmax
 
@@ -379,13 +378,15 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          ,' eV = ',epot0/ntot0,' eV/atom'
     nave= 0
     tave= 0d0
-    do ifmv=1,9
-      if( ndof(ifmv).eq.0 ) cycle
-      temp(ifmv)= ekl(ifmv) /max(ndof(ifmv)-3,3) /fkb *2d0
-      nave= nave +ndof(ifmv)
-      write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv &
-           ,"   = ",temp(ifmv),' K'
-      tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
+    do itemp=1,ntemps
+      if( ndof(itemp).eq.0 ) cycle
+      temps(itemp)= eks(itemp) /max(ndof(itemp)-3,3) /fkb *2d0
+      nave= nave +ndof(itemp)
+      if( lmultemps ) then
+        write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",itemp &
+             ,"   = ",temps(itemp),' K'
+      endif
+      tave= tave +temps(itemp)*max(ndof(itemp)-3,3)
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
@@ -414,7 +415,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
   call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
-  
+
 !!$  print *,'Time at 3 = ',mpi_wtime() -tcpu0
 !.....output initial configuration including epi, eki, and strs
 !      write(cnum(1:4),'(i4.4)') 0
@@ -484,7 +485,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !        open(iotemp,file='out.temperature',status='replace')
 !        write(iotemp,'(a)') '# istp, temperature[0-9]'
 !        ediff(1:9)= 0d0
-!        write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
+!        write(iotemp,'(i10,18es16.7e3)') istp,temps(1:9),ediff(1:9)
 !        call flush(iotemp)
 
 !.....write out tensile forces
@@ -555,11 +556,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Update dt-related values
       if( index(ctctl,'lange').ne.0 ) then
         tgmm = 1d0/trlx
-        do ifmv=1,9
-          if( ttgt(ifmv).lt.0d0 ) then
-            tfac(ifmv)= -1d0
+        do itemp=1,ntemps
+          if( ttgt(itemp).lt.0d0 ) then
+            tfac(itemp)= -1d0
           else
-            tfac(ifmv)= dsqrt(2d0*tgmm*ttgt(ifmv)/dt *k2ue)
+            tfac(itemp)= dsqrt(2d0*tgmm*ttgt(itemp)/dt *k2ue)
           endif
         enddo
       else if( index(ctctl,'ttm').ne.0 ) then
@@ -743,11 +744,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Calc kinetic energy
     vmaxold= vmax
-    call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
+    call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
          ,vmax,mpi_md_world)
 !!$    print *,'Time at 8 = ',mpi_wtime() -tcpu0
 
-!.....Some thermostats come after get_ekin, since they require ekl values
+!.....Some thermostats come after get_ekin, since they require eks values
     if( index(ctctl,'beren').ne.0 ) then
       call vel_update_berendsen(natm,tag,va)
     else if( index(ctctl,'ttm').ne.0 ) then
@@ -768,7 +769,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
       call accum_time('ttm',mpi_wtime()-tmp)
     endif
-    
+
     if( abs(pini-pfin).gt.0.1d0 ) then
       ptgt = ( pini +(pfin-pini)*istp/nstp ) *gpa2up
     endif
@@ -796,11 +797,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       iocnterg=iocnterg+1
       nave= 0
       tave= 0d0
-      do ifmv=1,9
-        if( ndof(ifmv).le.0 ) cycle
-        temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
-        nave= nave +ndof(ifmv)
-        tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
+      do itemp=1,ntemps
+        if( ndof(itemp).le.0 ) cycle
+        temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
+        nave= nave +ndof(itemp)
+        tave= tave +temps(itemp)*max(ndof(itemp)-3,3)
       enddo
       tave= tave/(nave-3)
 
@@ -874,7 +875,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     endif ! energy output
 
     call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
-    
+
 !.....check convergence criteria if it is dumped MD
     if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and. n_conv.gt.0 .and. &
          abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
@@ -924,11 +925,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
             call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot)
+                 tagtot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
             if( lcomb_pos ) then
               call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+                   tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
             else
               call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
                    tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
@@ -992,13 +993,15 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          ,' eV = ',epot/ntot0,' eV/atom'
     nave= 0
     tave= 0d0
-    do ifmv=1,9
-      if( ndof(ifmv).le.0 ) cycle
-      temp(ifmv)= ekl(ifmv) *2d0 /fkb /max(ndof(ifmv)-3,3)
-      nave= nave +ndof(ifmv)
-      write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",ifmv &
-           ,"   = ",temp(ifmv),' K'
-      tave= tave +temp(ifmv)*max(ndof(ifmv)-3,3)
+    do itemp=1,ntemps
+      if( ndof(itemp).le.0 ) cycle
+      temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
+      nave= nave +ndof(itemp)
+      if( lmultemps ) then
+        write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",itemp &
+             ,"   = ",temps(itemp),' K'
+      endif
+      tave= tave +temps(itemp)*max(ndof(itemp)-3,3)
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
@@ -1306,7 +1309,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !
 !.....All the arguments are in pmdvars module
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
-  use util,only: iauxof, calc_nfmv, cell_info
+  use util,only: iauxof, cell_info
   use pmdvars
   use force
   use vector,only: dot
@@ -1352,7 +1355,6 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   ntot = ntot0
 
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
-  call calc_nfmv(ntot0,tagtot)
 
 !-----parallel configuration
   nxyz= nx*ny*nz
@@ -1392,7 +1394,8 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
 !.....get_num_dof is called once in a MD run
-  call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+!!$  call get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world,iprint)
+  call get_num_dof()
 
 !.....Set initial velocity as zero
   va(1:3,1:natm) = 0d0
@@ -1805,35 +1808,30 @@ subroutine ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
   return
 end subroutine ntset
 !=======================================================================
-subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
+subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
      ,vmax,mpi_md_world)
-  use util,only: ifmvOf
+  use util,only: ithOf
   use time,only: accum_time
   implicit none 
   include "mpif.h"
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
   real(8),intent(in):: va(3,namax),h(3,3),fekin(nspmax) &
        ,tag(namax)
-  real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(nspmax)
+  real(8),intent(out):: ekin,eki(3,3,namax),vmax,eks(nspmax)
 !-----locals
-  integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
-  real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(nspmax),tmp
-!!$  integer,external:: ifmvOf
+  integer:: i,ierr,is,ixyz,jxyz,imax,igrp,itemp
+  real(8):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(nspmax),tmp
 
   ekinl=0d0
   eki(1:3,1:3,1:natm)= 0d0
-  ekll(:)= 0d0
+  eksl(:)= 0d0
   vmaxl= 0d0
 
+  igrp = 1  ! temperature category is Group-#1 (same as fmv)
   do i=1,natm
     is= int(tag(i))
-!.....ifmv= int(mod(tag(i)*10,10d0))
-    ifmv = ifmvOf(tag(i))
-    if( ifmv.eq.0 ) cycle
-!!$    x= va(1,i)
-!!$    y= va(2,i)
-!!$    z= va(3,i)
-!!$    v(1:3)= h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z
+    itemp = ithOf(tag(i),igrp)
+    if( itemp.eq.0 ) cycle
 !.....Tensor form eki
     do jxyz=1,3
       do ixyz=1,3
@@ -1843,8 +1841,8 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
     v2= eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
     eki(1:3,1:3,i)=eki(1:3,1:3,i)*fekin(is)
     ekinl=ekinl +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
-!.....ekin of each ifmv
-    ekll(ifmv)= ekll(ifmv) +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
+!.....ekin of each itemp
+    eksl(itemp)= eksl(itemp) +eki(1,1,i) +eki(2,2,i) +eki(3,3,i)
 !.....Find max speed
 !!$    if( v2.gt.vmaxl ) imax=i
     vmaxl=max(vmaxl,v2)
@@ -1856,8 +1854,8 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,ekl &
   ekin= 0d0
   call mpi_allreduce(ekinl,ekin,1,mpi_real8 &
        ,mpi_sum,mpi_md_world,ierr)
-  ekl(:)= 0d0
-  call mpi_allreduce(ekll,ekl,nspmax,mpi_real8 &
+  eks(:)= 0d0
+  call mpi_allreduce(eksl,eks,nspmax,mpi_real8 &
        ,mpi_sum,mpi_md_world,ierr)
   vmax= 0d0
   call mpi_allreduce(vmaxl,vmax,1,mpi_real8 &
@@ -1953,27 +1951,31 @@ subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
 
 end subroutine calc_temp_dist
 !=======================================================================
-subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world &
-     ,iprint)
+subroutine get_num_dof()
+  use pmdvars,only: natm,tag,fmv,nfmv,ndof, &
+       myid_md,mpi_md_world,iprint
   use time,only: accum_time
+  use util,only: ithOf
   implicit none
   include 'mpif.h'
   include "./const.h"
-  integer,intent(in):: natm,myid_md,mpi_md_world,iprint
-!.....TODO: hard coding number 9 should be replaced...
-  real(8),intent(in):: tag(natm),fmv(3,0:9)
-  integer,intent(out):: ndof(9)
+!!$  integer,intent(in):: natm,myid_md,mpi_md_world,iprint
+!!$!.....TODO: hard coding number 9 should be replaced...
+!!$  real(8),intent(in):: tag(natm),fmv(3,0:9)
+!!$  integer,intent(out):: ndof(9)
 
-  integer:: i,l,k,ndofl(9),ierr
+  integer:: i,l,k,ndofl(9),ierr,igrp,ifmv
   real(8):: tmp
   real(8),parameter:: deps= 1d-12
 
+  igrp = 1  ! Group-#1 for multiple-temperature (same as fmv)
   ndofl(1:9)= 0
   do i=1,natm
-    l= int(mod(tag(i)*10,10d0))
+!!$    l= int(mod(tag(i)*10,10d0))
+    ifmv= ithOf(tag(i),igrp)
     do k=1,3
-      if( abs(fmv(k,l)).lt.0.5d0 ) cycle
-      ndofl(l)= ndofl(l) +1
+      if( abs(fmv(k,ifmv)).lt.0.5d0 ) cycle
+      ndofl(ifmv)= ndofl(ifmv) +1
     enddo
   enddo
 
@@ -1983,8 +1985,8 @@ subroutine get_num_dof(natm,tag,fmv,ndof,myid_md,mpi_md_world &
        ,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',mpi_wtime()-tmp)
   if(myid_md.eq.0 .and. iprint.ge.ipl_basic ) &
-       write(6,'(a,9(2x,i0))') &
-       ' Degrees of freedom for each ifmv =',ndof(1:9)
+       write(6,'(/a,9(2x,i0,") ",i0))') &
+       ' Degrees of freedom for each ifmv =',(i,ndof(i),i=1,nfmv)
   return
 end subroutine get_num_dof
 !=======================================================================

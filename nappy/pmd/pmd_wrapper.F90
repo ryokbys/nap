@@ -65,10 +65,10 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 !  Set variables to be stored in pmdvars module that are required 
 !  to call pmd_core.
 !
-  use pmdvars,only: specorder,nspmax,nsp,dt,rbuf,rc1nn,rc,nx,ny,nz,iprint, &
+  use pmdvars,only: specorder,has_specorder,nspmax,nsp,dt,rbuf,rc1nn,rc,iprint, &
        am,nstp,naux,ifpmd,npmd,nerg,cauxarr,ifdmp,dmp,eps_conv,n_conv, &
        cpctl,ptgt,stgt,srlx,lcellfix,nnmax,lrealloc, &
-       ctctl,tinit,tfin,ttgt,trlx,nrmtrans
+       ctctl,tinit,tfin,ttgt,trlx,nrmtrans,nx,ny,nz
   use force
   use element
   implicit none
@@ -121,6 +121,7 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
 !!$    specorder(i) = trim(csp)
 !!$    write(specorder(i),'(3a1)') cspcs(i,1:ls)
   enddo
+  has_specorder = .true.
 
 !.....Set force_list
   if( lf.ne.128 ) then

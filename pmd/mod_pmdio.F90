@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-08 23:14:01 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-15 15:14:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -118,7 +118,7 @@ contains
     endif
 
     inquire(ionum, name=cftmp, number=num, opened=lopen)
-    print *,'name,number,cfname,opened = ',trim(cftmp),num,trim(cfname),lopen
+!!$    print *,'name,number,cfname,opened = ',trim(cftmp),num,trim(cfname),lopen
     if( .not.lcomb_pos ) then
       open(ionum,file=trim(cfname),status='replace')
       lclose = .true.

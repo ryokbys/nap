@@ -149,10 +149,17 @@ subroutine set_variable(ionum,cname)
     call read_c1(ionum,ctctl)
     ctctl = lowcase(ctctl)
     return
+  elseif( trim(cname).eq.'flag_multi_temp' ) then
+    call read_l1(ionum,lmultemps)
+    return
   elseif( trim(cname).eq.'temperature_target' ) then
     backspace(ionum)
-    read(ionum,*) ctmp,itmp,ttgt(itmp)
-!        call read_r1(ionum,ttgt)
+    if( lmultemps ) then
+      read(ionum,*) ctmp,itmp,ttgt(itmp)
+      ntemps = max(ntemps,itmp)
+    else
+      read(ionum,*) ctmp,ttgt(1)  ! single-temperature case
+    endif
     return
   elseif( trim(cname).eq.'temperature_relax_time' ) then
     call read_r1(ionum,trlx)

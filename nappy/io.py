@@ -281,13 +281,13 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
         if frcs is not None:
             fi = frcs[i]
             f.write(" {0:18.14f}".format(tag)
-                    +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
+                    +"  {0:23.14e} {1:23.14e} {2:23.14e}".format(*pi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*fi)
                     +"\n")
         else:
             f.write(" {0:18.14f}".format(tag)
-                    +"  {0:19.15f} {1:19.15f} {2:19.15f}".format(*pi)
+                    +"  {0:23.14e} {1:23.14e} {2:23.14e}".format(*pi)
                     +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
                     +"\n")
     f.close()

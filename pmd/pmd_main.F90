@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-15 11:14:19 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-15 22:40:42 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -23,7 +23,8 @@ program pmd
        write_pmdtot_ascii,get_ntot_ascii,get_ntot_bin
   use force,only: use_force,num_forces,force_list
   use Coulomb, only: cterms, chgopt_method
-  use util, only: itotOf, cell_info, iauxof, make_cdumpauxarr, spcs_info
+  use util, only: itotOf, cell_info, iauxof, make_cdumpauxarr, spcs_info, &
+       calc_nfmv
   use time, only: time_stamp, accum_time, report_time
   use memory, only: accum_mem, report_mem
   use element
@@ -129,6 +130,8 @@ program pmd
     if( ifpmd.eq.2 ) then ! if dump output
       call make_cdumpauxarr()
     endif
+    call calc_nfmv(ntot0,tagtot)
+
     call write_initial_setting()
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
@@ -373,7 +376,7 @@ subroutine write_initial_setting()
   use pdens,only: lpdens,cspc_pdens,npx,npy,npz,orig_pdens,hmat_pdens
   use isostat,only: sratemax
   implicit none 
-  integer:: i
+  integer:: i,k
 
   write(6,*) ''
   write(6,'(a)') '---------------------------------' &
@@ -425,9 +428,13 @@ subroutine write_initial_setting()
     if( tfin.ge.0d0 ) then
       write(6,'(2x,a,5x,f8.2)') 'final_temperature  ',tfin
     else
-      do i=1,9
-        write(6,'(2x,a,i3,f8.2)') 'temperature_target',i,ttgt(i)
-      enddo
+      if( lmultemps ) then
+        do i=1,ntemps
+          write(6,'(2x,a,i3,f8.2)') 'temperature_target',i,ttgt(i)
+        enddo
+      else
+        write(6,'(2x,a,1x,f8.2)') 'temperature_target',ttgt(1)
+      endif
     endif
     write(6,'(2x,a,5x,f0.1)') 'temperature_relax_time',trlx
     if( ltdst ) then
@@ -481,8 +488,8 @@ subroutine write_initial_setting()
   write(6,'(2x,a)') ''
 !.....velocity multiplying factor
   write(6,'(2x,a)') 'factor_direction'
-  do i=0,9
-    write(6,'(5x,i3,3f8.3)') i,fmv(1:3,i)
+  do i=0,nfmv
+    write(6,'(5x,i0,":",3i4)') i,(int(fmv(k,i)),k=1,3)
   enddo
   write(6,'(2x,a)') ''
 !.....Mass
@@ -633,7 +640,9 @@ subroutine bcast_params()
   call mpi_bcast(tinit,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(tfin,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(ctctl,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(ttgt,9,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(ttgt,maxntemps,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(lmultemps,1,mpi_logical,0,mpicomm,ierr)
+  call mpi_bcast(ntemps,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(trlx,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(tlimit,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpicomm,ierr)
@@ -644,6 +653,7 @@ subroutine bcast_params()
   call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(fmv,30,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(nfmv,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(shrst,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(cpctl,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(ptgt,1,mpi_real8,0,mpicomm,ierr)

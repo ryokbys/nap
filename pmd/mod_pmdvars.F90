@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-03-14 17:25:10 KOBAYASHI Ryo>
+!                    Last modified: <2024-03-16 11:05:07 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -19,8 +19,13 @@ module pmdvars
   character(len=20),parameter:: cpmdini = 'pmdini'
   character(len=20),parameter:: cpmdfin = 'pmdfin'
 
-!.....max. num. of species
-  integer,parameter:: nspmax= 9
+!.....Max num of category
+!.....In pmd, any categorical value is limited from 0 to 9
+  integer,parameter:: maxcat = 9
+!.....Max num of species
+  integer,parameter:: nspmax = 9
+!.....Max num of temperatures
+  integer,parameter:: maxntemps = 9
 
 !-----------------------------------------------------------------------
 ! Global variables to be given by input file or wrapper function
@@ -75,11 +80,15 @@ module pmdvars
   integer:: iftctl= 0
   real(8):: tinit= -1d0
   real(8):: tfin = -1d0
-  real(8):: ttgt(9)
+  real(8):: ttgt(maxntemps)
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
   real(8):: trlx = 100d0
   real(8):: tlimit = 1.0d+5
+!.....Multiple temperatures
+  logical:: lmultemps = .false.
+  integer:: ntemps = 1
+  real(8):: tfac(maxntemps),temps(maxntemps),eks(maxntemps)
 !.....Random seed
 !  If positve, use (RSEED+MYID) as the seed for each process
 !  If negative, use the same random seeds for all the parallel process
@@ -175,11 +184,9 @@ module pmdvars
   real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
   real(8):: epot0,vmaxold,vmax,simtime
   real(8):: tgmm,cgmm,cmass
-  real(8):: tfac(nspmax),ediff(nspmax),ediff0(nspmax),temp(nspmax), &
-       ekl(nspmax)
+  real(8):: ediff(nspmax),ediff0(nspmax)
   integer:: ndof(nspmax)
   real(8):: ttgt_lang
-!!$  real(8),allocatable:: tfac(:),ediff(:),ediff0(:),temp(:),ekl(:)
 !!$  integer,allocatable:: ndof(:)
   integer:: nxmlt
 !.....Search time and expiration time
@@ -240,9 +247,9 @@ module pmdvars
   real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
 
 !.....Number of ifmv
-  integer:: nfmv
+  integer:: nfmv = 1
 !.....Number of groups
-  integer:: ngrp
+  integer:: ngrp = 1
 
 !.....Variable time-step
   logical:: lvardt = .false.
