@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-15 15:14:41 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-23 12:01:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -154,13 +154,10 @@ contains
     write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,2,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,3,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(i10)') ntot
-    if( lforce ) then ! write forces in [eV/A]
+    if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
-        atmp(1)= h(1,1,0)*atot(1,i) +h(1,2,0)*atot(2,i) +h(1,3,0)*atot(3,i)
-        atmp(2)= h(2,1,0)*atot(1,i) +h(2,2,0)*atot(2,i) +h(2,3,0)*atot(3,i)
-        atmp(3)= h(3,1,0)*atot(1,i) +h(3,2,0)*atot(2,i) +h(3,3,0)*atot(3,i)
         write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
-             ,rtot(1:3,i) ,vtot(1:3,i) ,atmp(1:3)    ! dt
+             ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3)    ! dt
       enddo
     else
       do i=1,ntot

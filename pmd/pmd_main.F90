@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-15 22:40:42 KOBAYASHI Ryo>
+!                     Last-modified: <2024-03-22 23:55:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -203,7 +203,7 @@ program pmd
   endif  ! end of myid.eq.0
 
   ntot = ntot0
-  call bcast_params()
+  call bcast_params(nprocs)
 !.....Initialize random seeds in the function urnd
   if( rseed.lt.0d0 ) then
     call set_seed(rseed)
@@ -603,7 +603,7 @@ subroutine check_inpmd_consistency(myid)
   
 end subroutine check_inpmd_consistency
 !=======================================================================
-subroutine bcast_params()
+subroutine bcast_params(nprocs)
   use pmdvars
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
@@ -616,9 +616,11 @@ subroutine bcast_params()
   use dspring,only: ldspring
   implicit none
   include 'mpif.h'
-
+  integer,intent(in):: nprocs
   integer:: ierr
 
+!!$  print *,'nprocs, nodes_md, myid_md = ',nprocs, nodes_md, myid_md
+!!$  if( nprocs.eq.1 ) return
   if( myid_md.eq.0 ) write(6,'(/,a)') ' Broadcast data to be shared' &
        //' with all the nodes.'
 !-----Broadcast input parameters to all nodes

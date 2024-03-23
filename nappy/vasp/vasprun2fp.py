@@ -19,7 +19,8 @@ Options:
              Extract all the sequence of MD or relaxation stored in vasprun.xml.
              If the index is specified as a list of indices, this option will be omitted.
   --velocity
-             Compute velocities of atoms at time t from the diference of positions between t and t+dt. [default: False]
+             Compute velocities of atoms at time t from the diference of positions between t and t+dt. 
+             This option is obsolete and it is not available in this version. [default: False]
   --force
              Write forces in pmdini files. [default: False]
 """
@@ -77,8 +78,9 @@ def write_pmdini(nsys,fname="pmdini",velocity=False):
                     +'\n')
     return None
 
-def output_for_fitpot(nsys, dirname='./', specorder=[],
-                      velocity=False, force=False):
+def output_for_fitpot(nsys, dirname='./', fname='pmdini',
+                      specorder=[],
+                      force=False):
     try:
         epot = nsys.get_potential_energy()
     except:
@@ -109,7 +111,7 @@ def output_for_fitpot(nsys, dirname='./', specorder=[],
             f.write(" {0:15.7f}".format(s*_kb2gpa))
         f.write('\n')
     #write_pmdini(nsys,fname=dirname+'/pmdini')
-    nappy.io.write_pmd(nsys, fname=dirname+'/pmdini',
+    nappy.io.write_pmd(nsys, fname=dirname+'/'+fname,
                        potential_energy=epot,
                        stress=strs,
                        forces=force)
@@ -121,6 +123,8 @@ def main():
     specorder= args['--specorder'].split(',')
     sequence = args['--sequence']
     velocity = args['--velocity']
+    if velocity:
+        raise ValueError('velocity option is obsolete and not available in this version.')
     force = args['--force']
 
     if specorder == 'None':
@@ -182,7 +186,6 @@ def main():
             os.system('mkdir -p {0:s}'.format(dirname))
             output_for_fitpot(nsys,dirname=dirname,
                               specorder=specorder,
-                              velocity=velocity,
                               force=force)
             n += 1
     elif sequence or type(index) is slice:  # Whole MD sequence
@@ -194,14 +197,19 @@ def main():
             os.system('mkdir -p {0:s}'.format(dirname))
             output_for_fitpot(nsys,dirname=dirname,
                               specorder=specorder,
-                              velocity=velocity,
                               force=force)
         pass
     else:   # snapshopt
         dirname = './'
-        output_for_fitpot(nsyss[0],dirname=dirname,
+        if index == 0:
+            fname = 'pmdini'
+        elif index == -1:
+            fname = 'pmdfin'
+        else:
+            fname = f'pmd_{index}'
+        output_for_fitpot(nsyss[index],
+                          dirname=dirname, fname=fname,
                           specorder=specorder,
-                          velocity=velocity,
                           force=force)
     return None
 

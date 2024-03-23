@@ -45,7 +45,7 @@ from nappy.atom import get_symbol_from_number, get_number_from_symbol
 from nappy.util import pbc
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "240202"
+__version__ = "240323"
 
 #...constants
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',
@@ -467,6 +467,13 @@ class NAPSystem(object):
     def get_scaled_forces(self):
         return self.atoms[['fx','fy','fz']].to_numpy()
 
+    def set_scaled_forces(self,sfrcs):
+        assert len(sfrcs) == len(self.atoms), 'Array size inconsistent.'
+        if type(sfrcs) == list:
+            sfrcs = np.array(sfrcs)
+        self.atoms[['fx','fy','fz']] = sfrcs
+        return None
+    
     def get_real_forces(self):
         hmat = self.get_hmat()
         frcs = self.get_scaled_forces()
@@ -475,6 +482,17 @@ class NAPSystem(object):
             f = frcs[ia]
             rfrcs[ia,:] = np.dot(hmat,f)
         return rfrcs
+
+    def set_real_forces(self,frcs):
+        assert len(frcs) == len(self.atoms), 'Array size inconsistent.'
+        if type(frcs) == list:
+            frcs = np.array(frcs)
+        sfrcs = np.zeros(frcs.shape)
+        hmati = self.get_hmat_inv()
+        for ia in range(len(self.atoms)):
+            sfrcs[ia,:] = np.dot(hmati, frcs[ia,:])
+        self.atoms[['fx','fy','fz']] = sfrcs
+        return None
 
     def get_tags(self):
         """
@@ -1191,7 +1209,8 @@ class NAPSystem(object):
     def to_ase_atoms(self):
         """
         Convert NAPSystem object to ASE atoms.
-        Note that some information will be abandonned.
+        Note that some information will be abandonned, 
+        for example, forces cannot be stored in ASE atoms object (calculator object can have them, though).
         """
         try:
             from ase import Atoms
@@ -1211,6 +1230,7 @@ class NAPSystem(object):
                       pbc=True)
         vels = [ [vel[0]*a, vel[1]*b, vel[2]*c] for vel in self.atoms[['vx','vy','vz']].values ]
         atoms.set_velocities(vels)
+
         return atoms
 
     def remove_overlapping_atoms(self,criterion=0.01):
