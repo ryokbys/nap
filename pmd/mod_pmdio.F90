@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-23 12:01:59 KOBAYASHI Ryo>
+!                     Last modified: <2024-03-23 15:23:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
   save
@@ -157,7 +157,7 @@ contains
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
         write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
-             ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3)    ! dt
+             ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
