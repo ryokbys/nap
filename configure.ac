@@ -7,7 +7,7 @@ AC_CONFIG_SRCDIR([pmd/parallel_md.F])
 #AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
-AC_PROG_FC(mpiifort mpifrtpx mpifrt openmpif90 mpif90)
+AC_PROG_FC(mpiifx mpiifort mpifrtpx mpifrt openmpif90 mpif90)
 AC_PROG_CPP
 AC_PATH_PROG([PYTHON],[python])
 

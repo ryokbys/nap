@@ -11,15 +11,17 @@ Options:
   -d DR       Width of the bin. [default: 0.1]
   -r,--rmax RMAX
               Cutoff radius of radial distribution. [default: 5.0]
-  --rmin RMIN 
+  --rmin RMIN
               Minimum radius to be considered. [default: 0.0]
   --gsmear=SIGMA
               Width of Gaussian smearing, zero means no smearing. [default: 0]
   --nnmax=NNMAX
               Max num of neighbors when counting neighbors. [default: 100]
-  -o OUT      Name of file to be written in addition to out.rdf if specified. [default: None]
+  -o OUT      Name of file to be written in addition to out.rdf if specified.
+              [default: None]
   --specorder=SPECORDER
-              Order of species separated by comma, like, --specorder=W,H. [default: None]
+              Order of species separated by comma, like, --specorder=W,H.
+              [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --pairs PAIRS
               Pairs to be extracted, available only if out4fp is specified.
@@ -33,11 +35,13 @@ Options:
   --qmax QMAX    Cutoff wavenumber. [default: 20.0]
   --qmin QMIN    Shortest wavenumber. [default: 0.7]
   --scatter-length LENGTHS
-              Scattering lengths of corresponding species. [default: None]
+              Scattering lengths of corresponding species in Angstrom.
+              [default: None]
   --fortran   Try using fortran function for computing RDF.
 """
 
-import os,sys
+import os
+import sys
 from datetime import datetime
 import numpy as np
 import copy
@@ -50,53 +54,55 @@ from nappy.common import get_key
 __author__ = "Ryo KOBAYASHI"
 __version__ = "230107"
 
+
 def norm(vector):
-    norm= 0.0
+    norm = 0.0
     for e in vector:
         norm += e*e
     return np.sqrt(norm)
+
 
 def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
     """
     Compute RDF of specified atom.
     """
-    #...Radial points
-    nr = int(rmax/dr) #+1
+    # Radial points
+    nr = int(rmax/dr)  # +1
     rd = np.array([dr*ir+dr/2 for ir in range(nr)],)
-    
+
     nspcs = len(nsys.specorder)
-    ndri = np.zeros((nspcs+1,nr),dtype=float)
+    ndri = np.zeros((nspcs+1, nr), dtype=float)
     spos = nsys.get_scaled_positions()
     sids = nsys.atoms.sid
     natm = nsys.num_atoms()
     pi = spos[ia]
     hmat = nsys.get_hmat()
-    #...Compute ndr of atom-ia
-    for ja in nsys.neighbors_of(ia,rcut=rmax):
+    # Compute ndr of atom-ia
+    for ja in nsys.neighbors_of(ia, rcut=rmax):
         pj = spos[ja]
         jsid = sids[ja]
-        pij = pj -pi
-        pij = pij -np.round(pij)
-        vij = np.dot(hmat,pij)
-        rij2 = np.dot(vij,vij)
+        pij = pj - pi
+        pij = pij - np.round(pij)
+        vij = np.dot(hmat, pij)
+        rij2 = np.dot(vij, vij)
         rij = np.sqrt(rij2)
         ir = int(rij/dr)
-        ndri[0,ir] += 1.0
-        ndri[jsid,ir] += 1.0
+        ndri[0, ir] += 1.0
+        ndri[jsid, ir] += 1.0
 
-    #...Normalize to get raw RDF(ia)
-    #.....Total RDF(ia)
-    tmp = 4.0 *np.pi *(natm-1) *dr
-    for ir in range(1,nr):
-        r = dr *ir
-        ndri[0,ir] /= tmp*r*r
-    #.....Species-decomposed RDF(ia)
-    natms = [ float(natm) ]
-    for isp in range(1,nspcs+1):
+    # Normalize to get raw RDF(ia)
+    # Total RDF(ia)
+    tmp = 4.0 * np.pi * (natm-1) * dr
+    for ir in range(1, nr):
+        r = dr * ir
+        ndri[0, ir] /= tmp * r * r
+    # Species-decomposed RDF(ia)
+    natms = [float(natm)]
+    for isp in range(1, nspcs+1):
         natms.append(float(nsys.num_atoms(isp)))
     vol = nsys.get_volume()
     isid = sids[ia]
-    tmp0 = 4.0 *np.pi *dr /vol
+    tmp0 = 4.0 * np.pi * dr / vol
     for jsid in range(1,nspcs+1):
         nj = natms[jsid]
         if jsid == isid:
@@ -631,15 +637,16 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
 
 def main():
 
-    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
-    
-    infiles= args['INFILE']
-    dr= float(args['-d'])
-    rmax= float(args['--rmax'])
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
+                  version=__version__)
+
+    infiles = args['INFILE']
+    dr = float(args['-d'])
+    rmax = float(args['--rmax'])
     rmin = float(args['--rmin'])
-    sigma= int(args['--gsmear'])
+    sigma = int(args['--gsmear'])
     nnmax = int(args['--nnmax'])
-    ofname= args['-o']
+    ofname = args['-o']
 
     if nnmax < int(rmax**3):
         newnnmax = int(rmax**3)
@@ -657,7 +664,7 @@ def main():
     if SQ:
         qmax = float(args['--qmax'])
         qmin = float(args['--qmin'])
-        lscatter = [ float(x) for x in args['--scatter-length'].split(',') ]
+        lscatter = [float(x) for x in args['--scatter-length'].split(',')]
         if len(lscatter) != len(specorder):
             raise ValueError('--scatter-length is not set correctly.')
     out4fp = args['--out4fp']
@@ -669,7 +676,7 @@ def main():
         pairs0 = args['--pairs'].split(',')
         pairs = []
         for pair in pairs0:
-            spi,spj = pair.split('-')
+            spi, spj = pair.split('-')
             try:
                 isid = specorder.index(spi)+1
             except:
@@ -693,45 +700,48 @@ def main():
         raise ValueError('--specorder must be set.')
 
     if len(infiles) > 1:
-        infiles.sort(key=get_key,reverse=True)
+        infiles.sort(key=get_key, reverse=True)
     del infiles[:nskip]
     if len(infiles) < 1:
         raise ValueError('No input files to be processed.')
     print(' Number of files to be processed: ',len(infiles))
 
     tiny = 1.0e-8
-    nr= int((rmax-rmin+tiny)/dr) #+1
-    rd,agr= rdf_average(infiles,specorder,dr=dr,rmin=rmin,rmax=rmax,
-                        pairwise=pairwise,nnmax=nnmax,fortran=fortran)
+    nr = int((rmax-rmin+tiny)/dr)  # +1
+    rd, agr = rdf_average(infiles, specorder, dr=dr,
+                          rmin=rmin, rmax=rmax,
+                          pairwise=pairwise, nnmax=nnmax,
+                          fortran=fortran)
 
     if not sigma == 0:
-        #print(' Gaussian smearing...')
-        #...Smearing of total RDF
-        agrt= gsmear(rd,agr[0,0,:],sigma)
-        agr[0,0,:] = agrt[:]
-        #...Smearing of inter-species RDF
-        for isid in range(1,nspcs+1):
-            for jsid in range(isid,nspcs+1):
-                agrt= gsmear(rd,agr[isid,jsid,:],sigma)
-                agr[isid,jsid,:] = agrt[:]
+        # print(' Gaussian smearing...')
+        # Smearing of total RDF
+        agrt = gsmear(rd, agr[0, 0, :], sigma)
+        agr[0, 0, :] = agrt[:]
+        # Smearing of inter-species RDF
+        for isid in range(1, nspcs+1):
+            for jsid in range(isid, nspcs+1):
+                agrt = gsmear(rd, agr[isid, jsid, :], sigma)
+                agr[isid, jsid, :] = agrt[:]
 
     if SQ:
         nsys = nappy.io.read(infiles[0])
-        rho = float(nsys.num_atoms()) /nsys.get_volume()
+        rho = float(nsys.num_atoms()) / nsys.get_volume()
         if nspcs > 1:
-            #...Redfine total RDF as weighted sum of g_{ij}(r) in case of multiple species
-            natms = [ float(nsys.num_atoms()) ]
-            cs = [ 1.0 ] 
-            for ispcs in range(1,nspcs+1):
+            # Redfine total RDF as weighted sum of g_{ij}(r)
+            # in case of multiple species
+            natms = [float(nsys.num_atoms())]
+            cs = [1.0] 
+            for ispcs in range(1, nspcs+1):
                 natms.append(float(nsys.num_atoms(ispcs)))
                 cs.append(natms[ispcs]/natms[0])
             bmean = 0.0
-            for isid in range(1,nspcs+1):
+            for isid in range(1, nspcs+1):
                 bi = lscatter[isid-1]
                 ci = cs[isid]
                 bmean += ci*bi
-            agr[0,0,:] = 0.0
-            for isid in range(1,nspcs+1):
+            agr[0, 0, :] = 0.0
+            for isid in range(1, nspcs+1):
                 bi = lscatter[isid-1]
                 ci = cs[isid]
                 for jsid in range(isid,nspcs+1):
@@ -739,24 +749,27 @@ def main():
                     cj = cs[jsid]
                     wij = ci*cj*bi*bj/bmean
                     if isid == jsid:
-                        agr[0,0,:] += agr[isid,jsid,:] *wij
+                        agr[0, 0, :] += agr[isid, jsid, :] * wij
                     else:
-                        agr[0,0,:] += 2.0*agr[isid,jsid,:] *wij
-        qs,sqs = gr_to_SQ(rd,agr[0,0,:],rho,qmin=0.7,qmax=qmax,nq=200)
+                        agr[0, 0, :] += 2.0*agr[isid, jsid, :] * wij
+        qs, sqs = gr_to_SQ(rd, agr[0, 0, :],
+                           rho, qmin=0.7, qmax=qmax, nq=200)
 
-    #...Regardless ofname, write out.rdf in normal format
-    write_rdf_normal('out.rdf',specorder,nspcs,rd,agr,nr,)
+    # Regardless ofname, write out.rdf in normal format
+    write_rdf_normal('out.rdf', specorder, nspcs, rd, agr, nr,)
     if SQ:
         write_sq_out4fp('out.sq',qs,sqs)
-    #...Format of output (named by ofname) depends on out4fp
+    # Format of output (named by ofname) depends on out4fp
     if ofname is not None:
         if out4fp:
-            write_rdf_out4fp(ofname,specorder,nspcs,agr,nr,rmax,pairs=pairs,rmin=rmin)
+            write_rdf_out4fp(ofname, specorder, nspcs, agr,
+                             nr, rmax, pairs=pairs, rmin=rmin)
         else:
-            write_rdf_normal(ofname,specorder,nspcs,rd,agr,nr,)
+            write_rdf_normal(ofname, specorder, nspcs,
+                             rd, agr, nr,)
 
     if plot:
-        plot_figures(specorder,rd,agr)
+        plot_figures(specorder, rd, agr)
         print('')
         print(' RDF graphes are plotted.')
         if nspcs == 1:
@@ -768,10 +781,12 @@ def main():
         print("   gnuplot> plot 'out.rdf' us 1:2  w l")
         print('')
         if ofname is not None:
-            print(" In addition to out.rdf, {0:s} is also written.".format(ofname))
+            print(" In addition to out.rdf,"
+                  + " {0:s} is also written.".format(ofname))
             print('')
 
     return None
+
 
 if __name__ == "__main__":
 

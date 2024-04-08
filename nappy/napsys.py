@@ -385,7 +385,7 @@ class NAPSystem(object):
         if real:
             return self.get_real_positions()
         return self.get_scaled_positions()
-    
+
     def get_velocities(self,real=False):
         """
         Get velocities of atoms. If real=True, they are multiplied with h-mat.
@@ -668,6 +668,31 @@ class NAPSystem(object):
             return float(nspcs[sid])/vol
         return float(len(self))/vol
 
+    def set_voldata(self, voldata, nvoldiv=None, volorig=None):
+        """
+        Store volumetric data in the system.
+        """
+        try:
+            if len(voldata.shape) == 1:
+                if nvoldiv is None:
+                    raise ValueError('If voldata is 1D array, '
+                                     +'nvoldiv should be provided.')
+                else:
+                    self.nvoldiv = nvoldiv
+                self.voldata = voldata.reshape(nvoldiv)
+            elif len(voldata.shape) == 3:
+                self.nvoldiv = voldata.shape
+                self.voldata = voldata
+        except Exception as e:
+            raise
+
+        if volorig == None:
+            self.vorig = np.zeros(3)
+        else:
+            self.vorig = volorig
+        
+        return None
+    
     def view(self,backend='3Dmol',**options):
         """
         Visualize the system using the given backend.

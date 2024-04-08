@@ -22,8 +22,8 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "240323"
 
 READ_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
-                'cube','CHGCAR','pdb')
-WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',)
+                'cube','CHGCAR','pdb','extxyz')
+WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz')
 
 def write(nsys,fname="pmdini",format=None,**kwargs):
     global myopen, open
@@ -66,7 +66,7 @@ def get_open_func(fname,mode):
     else:
         return open, mode
     
-def read(fname="pmdini",format=None, specorder=None):
+def read(fname="pmdini",format=None, specorder=None, index=None):
     if format in (None, 'None'):
         format= parse_filename(fname, mode='read')
 
@@ -94,7 +94,7 @@ def read(fname="pmdini",format=None, specorder=None):
         print('Since the file format is unknown, try to read the file using ASE.')
         try:
             import ase.io
-            atoms = ase.io.read(fname)
+            atoms = ase.io.read(fname,format=format,index=index)
             nsys = from_ase(atoms)
         except Exception as e:
             print(' Failed to load input file even with ase.')
@@ -188,6 +188,10 @@ def read_pmd(fname:str = 'pmdini',
                 #     pass
                 # 8th: num of atoms
                 elif iline == 5:
+                    if len(data) > 1:
+                        raise Exception('pmd file format seems to be old,'
+                                        +'see the document of following URL for the new format, '
+                                        +'http://ryokbys.web.nitech.ac.jp/contents/nap_docs/pmd-file.html')
                     natm = int(data[0])
                     # sids = [ 0 for i in range(natm) ]
                     # poss = [ np.zeros(3) for i in range(natm) ]
@@ -1020,7 +1024,55 @@ def write_extxyz(fileobj, nsys):
         fileobj.write('\n')
 
     return None
+
+
+def read_extxyz(fileobj, ):
+    """
+    Read a nsys from extxyz format fileobj.
+    Since the extxyz can contain multiple configurations, this method uses
+    fileobj instead of filename.
+    The extxyz format is defined in ASE and is like following:
+    ---
+    8
+    Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:frc:R:3
+    Si        0.00000000      0.00000000      0.00000000    1.6215e-03   -6.4788e-03    2.6939e-05
+    Si        1.36000000      1.36000000      1.36000000   -9.4438e-05   -5.7187e-04   -2.6944e-04
+    Si        2.72000000      2.72000000      0.00000000   -5.9288e-06   -1.4727e-04   -1.7694e-03
+    Si        4.08000000      4.08000000      1.36000000   -1.7164e-03    2.9652e-04    1.2749e-05
+    Si        2.72000000      0.00000000      2.72000000   -2.8725e-04    5.7220e-04    3.1436e-04
+    Si        4.08000000      1.36000000      4.08000000    3.6347e-04    1.3864e-03    3.4175e-03
+    Si        0.00000000      2.72000000      2.72000000   -6.1324e-04    8.9324e-04   -3.3534e-06
+    Si        1.36000000      4.08000000      4.08000000   -5.0683e-05    1.0324e-04    3.8400e-04
+    ---
+    """
+
+    natm = int(fileobj.readline().split()[0])
+
+    comment = fileobj.readline()
+    # Analyze the comment line
     
+    
+    hmat = nsys.get_hmat()
+    fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[0,:]))
+    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[1,:]))
+    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[2,:]))
+    fileobj.write('Properties=species:S:1:pos:R:3:frc:R:3')
+    fileobj.write('\n')
+
+    symbols = nsys.get_symbols()
+    poss = nsys.get_real_positions()
+    frcs = nsys.get_real_forces()
+    for i in range(len(nsys)):
+        si = symbols[i]
+        pi = poss[i]
+        fi = frcs[i]
+        fileobj.write(f'{si:2s}')
+        fileobj.write(f'{pi[0]:16.4f} {pi[1]:16.4f} {pi[2]:16.4f}')
+        fileobj.write(f'{fi[0]:16.3e} {fi[1]:16.3e} {fi[2]:16.3e}')
+        fileobj.write('\n')
+
+    return None
+
     
 def read_CHGCAR(fname='CHGCAR',specorder=None,):
     """

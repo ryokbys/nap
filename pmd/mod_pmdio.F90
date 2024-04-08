@@ -1,7 +1,8 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-23 15:23:33 KOBAYASHI Ryo>
+!                     Last modified: <2024-04-08 13:25:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use util, only: num_data
   implicit none
   save
 
@@ -59,7 +60,7 @@ contains
     real(8),intent(out):: hunit,h(3,3,0:1)
     real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
-    integer:: ia,ib,l,i,itmp
+    integer:: ia,ib,l,i,itmp,num
     character(len=128):: ctmp 
 
     open(ionum,file=trim(cfname),status='old')
@@ -76,9 +77,27 @@ contains
     read(ionum,*) hunit
 !!$    read(ionum,*) (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
 !.....H-matrix IO format changed since 2024-03-07
-    read(ionum,*) ((h(ia,1,l),ia=1,3),l=0,1)
-    read(ionum,*) ((h(ia,2,l),ia=1,3),l=0,1)
-    read(ionum,*) ((h(ia,3,l),ia=1,3),l=0,1)
+!.....thus check the format at the 1st line of H-matrix.
+    read(ionum,'(a)') ctmp
+    num = num_data(trim(ctmp),' ')
+    if( num .ne. 6 ) then
+      print *,' WARNIGN: The pmdini format seems to be old,'
+      print *,'          see the document, http://ryokbys.web.nitech.ac.jp/contents/nap_docs/pmd-file.html'
+      print *,'          and check the pmdini file carefully.'
+!.....Backward compatibility...
+      backspace(ionum)
+      read(ionum,*) (h(ia,1,0),ia=1,3)
+      read(ionum,*) (h(ia,2,0),ia=1,3)
+      read(ionum,*) (h(ia,3,0),ia=1,3)
+      read(ionum,*) (h(ia,1,1),ia=1,3)
+      read(ionum,*) (h(ia,2,1),ia=1,3)
+      read(ionum,*) (h(ia,3,1),ia=1,3)
+    else
+      backspace(ionum)
+      read(ionum,*) ((h(ia,1,l),ia=1,3),l=0,1)
+      read(ionum,*) ((h(ia,2,l),ia=1,3),l=0,1)
+      read(ionum,*) ((h(ia,3,l),ia=1,3),l=0,1)
+    endif
     h(1:3,1:3,0:1)= h(1:3,1:3,0:1)*hunit
     read(ionum,*) itmp
     if( itmp.ne.ntot ) then
@@ -554,13 +573,12 @@ contains
 !  The option words should be put after these comment characters with
 !  one or more spaces between them for example,
 !
-!  specorder: Al Mg Si
+!  "# specorder: Al Mg Si"
 !
 !  Currently available options are:
 !    - "specorder:", Species order. The number of species limited up to 9.
 !
     use pmdvars,only: specorder,has_specorder,iprint,has_forces
-    use util, only: num_data
     include "./const.h"
     character(len=*),intent(in):: cline
 
@@ -581,7 +599,7 @@ contains
       endif
       has_specorder = .true.
     endif
-    
+
   end subroutine parse_option
 !=======================================================================
   subroutine split_pair(strin,str1,str2)

@@ -4,7 +4,7 @@ Compute formation enthalpy from given structures.
 If --erg-xxx option is not specified, pmd will be performed to get energies.
 
 Usage:
-  fenthalpy.py [options]
+  fenthal.py [options]
 
 Options:
   -h, --help   Show this message and exit.
@@ -35,7 +35,7 @@ import numpy as np
 import nappy
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "rev210809"
+__version__ = "240323"
 
 def get_unit_comp(nsys):
     """
@@ -154,6 +154,7 @@ def write_fenth_out4fp(fname,dH,vol):
         cmd = ' '.join(s for s in sys.argv)
         f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         f.write('#  {0:s}\n'.format(cmd))
+        f.write('#  Stored data are dH and vol/atom.\n')
         #...Num of data, weight for the data
         f.write('  {0:6d}  {1:7.3f}\n'.format(2, 1.0))
         f.write('  {0:8.3f}  {1:8.3f}\n'.format(dH,vol))

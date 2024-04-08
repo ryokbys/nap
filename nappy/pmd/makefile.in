@@ -11,7 +11,7 @@ pmddir= ${HOME}/src/nap/pmd
 mpiopts= -I/usr/local/Cellar/open-mpi/4.1.1_2/include -L/usr/local/opt/libevent/lib -L/usr/local/Cellar/open-mpi/4.1.1_2/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
 ompopts=  --f90flags="-fopenmp" -lgomp
 
-compopts= --f90exec=@FC@ --quiet
+compopts= --f77exec=@FC@ --f90exec=@FC@ --quiet
 # compopts= --f90exec=@FC@ --quiet --fcompiler=gnu95
 
 pmd_wrapper: ${obj}
