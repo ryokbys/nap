@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-15 22:35:20 KOBAYASHI Ryo>
+!                     Last-modified: <2024-04-10 16:48:46 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -2770,6 +2770,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
   use time,only: accum_time
   implicit none
   include 'mpif.h'
+  include './const.h'
   integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire &
        ,iprint
   real(8),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire &
@@ -2817,7 +2818,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
     if( num_fire.gt.nmin_fire ) then
       dt = min(dtmax_fire,dt*finc_fire)
       alp_fire = alp_fire *falp_fire
-      if( iprint.ne.0 .and. myid_md.eq.0 ) then
+      if( iprint.ge.ipl_info .and. myid_md.eq.0 ) then
         write(6,'(a,f10.3,f10.5,es12.4)') ' dt,alp_fire,fdotv = ' &
              ,dt,alp_fire,fdotv
       endif
@@ -2827,7 +2828,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
     va(1:3,1:natm) = 0d0
     alp_fire = alp0_fire
     num_fire = 0
-    if( iprint.ne.0 .and. myid_md.eq.0 ) then
+    if( iprint.ge.ipl_info .and. myid_md.eq.0 ) then
       write(6,'(a,f10.3,f10.5,es12.4)') ' dt,alp_fire,fdotv = ' &
            ,dt,alp_fire,fdotv
     endif

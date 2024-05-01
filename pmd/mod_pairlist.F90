@@ -164,10 +164,10 @@ contains
     include "mpif.h"
     logical,intent(in):: l1st
 
-    integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr,ierr_max
+    integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr,ierr_max,ierr_maxg
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,mmax
     real(8):: xi(3),xij(3),rij(3),rij2
-    integer:: nnmax_exceed, nnmax_exl, nnmax_prev
+    integer:: nnmax_prev
 
     call mk_lscl_para()
 
@@ -178,17 +178,19 @@ contains
       call accum_mem('pairlist',4*size(lspr))
     endif
 
-    nnmax_exceed = 0
+    maxnn = nnmax
+    ierr_maxg = 0
 
 10  continue
-    if( nnmax_exceed .gt. 0 ) then
+    if( ierr_maxg .gt. 0 ) then
       nnmax_prev = nnmax
-      nnmax = int(nnmax*ratio_nnmax_update)
+      nnmax = int(maxnn * ratio_nnmax_update)
       if( myid_md.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a,i4,a,i4)') ' Max num of neighbors is updated from ', &
              nnmax_prev,' to ',nnmax
         call flush(6)
       endif
+      ierr_maxg = 0
     endif
     
     if( size(lspr).ne.(nnmax+1)*namax ) then
@@ -214,7 +216,6 @@ contains
 !$acc loop independent private(xi,xij,rij) &
 !$acc      reduction(max:maxnnl,ierr_max) gang worker vector
     do i=1,natm
-      ierr = 0
       lspr(:,i) = 0  ! initialize
       xi(1:3) = ra(1:3,i)
 !-------assign a vector cell index
@@ -240,7 +241,7 @@ contains
             m1=m1x*lcyz2 +m1y*lcz2 +m1z +1
             if(lshd(m1).eq.0) cycle
             j=lshd(m1)
-            do while( j.gt.0 .and. ierr.le.0 )
+            do while( j.gt.0 )
               if( j.eq.i ) then
                 j = lscl(j)
                 cycle
@@ -253,10 +254,10 @@ contains
 
               if( rij2.lt.rc2 ) then
                 lspr(0,i) = lspr(0,i) +1
-                lspr(lspr(0,i),i) = j
-                if( lspr(0,i).eq.nnmax ) then
-                  ierr = 1
-                  ierr_max = ierr
+                if( lspr(0,i).gt.nnmax ) then
+                  ierr_max = 1
+                else
+                  lspr(lspr(0,i),i) = j
                 endif
               endif
 
@@ -273,13 +274,15 @@ contains
 !$omp end do
 !$omp end parallel
 
-    call mpi_allreduce(ierr_max,nnmax_exceed,1,mpi_integer,mpi_max, &
+    call mpi_allreduce(ierr_max,ierr_maxg,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
-    if( nnmax_exceed.gt.0 ) goto 10
-
 !.....Reduce maxnn to node-0
     call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0, &
          mpi_md_world,ierr)
+    if( ierr_maxg.gt.0 ) then
+      goto 10
+    endif
+
 
   end subroutine mk_lspr_para
 !=======================================================================

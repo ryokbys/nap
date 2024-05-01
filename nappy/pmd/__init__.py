@@ -64,6 +64,7 @@ class PMD:
         # self.params['time_interval'] = dt
         self.update_mpivars()
         self.update_params()
+
         rtot = self.nsys.get_scaled_positions()
         vtot = np.zeros(rtot.shape)
         naux = pw.get_naux()
