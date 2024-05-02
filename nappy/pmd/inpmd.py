@@ -104,8 +104,8 @@ _default_params = {
     'zload_type': 'none',
     'final_strain': 0.0,
     'boundary': 'ppp',
-    'max_num_neighbors': 200,
-    'allow_reallocation': False,
+    'max_num_neighbors': 70,
+    'allow_reallocation': True,
 }
 
 _int_keys = [

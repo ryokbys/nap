@@ -242,6 +242,15 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
         for s in nsys.specorder:
             f.write(" {0:<3s}".format(s))
         f.write("\n")
+    if hasattr(nsys, 'epot'):
+        epot = nsys.get_potential_energy()
+        f.write(f'#  potential_energy: {epot:14.6e}\n')
+    if hasattr(nsys, 'stnsr'):
+        stnsr = nsys.get_stress()
+        f.write('#  stress: ')
+        f.write(f' {stnsr[0]:11.3e} {stnsr[1]:11.3e} {stnsr[2]:11.3e}')
+        f.write(f' {stnsr[3]:11.3e} {stnsr[4]:11.3e} {stnsr[5]:11.3e}')
+        f.write('\n')
     for k,v in kwargs.items():
         if type(v) is list or type(v) is np.ndarray:
             f.write(f'#  {k:s}:')

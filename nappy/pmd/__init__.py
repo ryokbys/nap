@@ -162,7 +162,7 @@ class PMD:
         npmd = self.param2var('num_out_pmd',0)
         nerg = self.param2var('num_out_energy',100)
         nnmax = self.param2var('max_num_neighbors',200)
-        lrealloc = self.param2var('allow_reallocation',False)
+        lrealloc = self.param2var('allow_reallocation',True)
 
         # if 'Coulomb' in self.params['force_type']:
         #     naux = max(naux,2)

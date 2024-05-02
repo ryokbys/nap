@@ -35,13 +35,13 @@ contains
     real(8),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
-      if( myid.eq.0 ) write(6,'(a)') ' use force_Ito3_Whe'
+      if( myid.eq.0 .and. iprint.gt.0 ) write(6,'(a)') ' use force_Ito3_Whe'
       if( allocated(rho) ) deallocate(rho,sqrho)
       allocate(rho(namax),sqrho(namax))
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
 !.....check cutoff radius
-      if( myid.eq.0 ) then
+      if( myid.eq.0 .and. iprint.gt.0 ) then
         write(6,'(a,es12.4)') ' rc of input    =',rc
         write(6,'(a,es12.4)') ' rc of this pot =',rc_pot
       endif
@@ -468,5 +468,5 @@ contains
 end module Ito3_WHe
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:
