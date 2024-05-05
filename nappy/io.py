@@ -1413,7 +1413,7 @@ def get_PDB_txt(nsys,**kwargs):
 
     return txt
 
-def from_ase(atoms,specorder=None):
+def from_ase(atoms, specorder=None, get_forces=True):
     """
     Convert ASE Atoms object to NAPSystem object.
     """
@@ -1445,10 +1445,12 @@ def from_ase(atoms,specorder=None):
         vels = np.zeros((natm,3))
     else:
         vels = np.array(vels)
-    try:
-        frcs = atoms.get_forces()
-    except:
-        frcs = np.zeros((natm,3))
+    frcs = np.zeros((natm,3))
+    if get_forces:
+        try:
+            frcs = atoms.get_forces()
+        except:
+            pass
 
     #...Create arrays to be installed into nsys.atoms
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]

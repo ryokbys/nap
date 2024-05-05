@@ -1,8 +1,9 @@
 """
 ASE interface to pmd.
-"""
-from __future__ import print_function
 
+Changes:
+  <2024.05.04 RK>  Changed to call pmd via f2py and dynamic library instead of via subprocess.
+"""
 import os
 import subprocess
 import numpy as np
@@ -12,15 +13,30 @@ import nappy
 from nappy.interface.ase.pmdio import get_fmvs
 from nappy.napsys import NAPSystem
 
+try:
+    import nappy.pmd.pmd_wrapper as pw
+except:
+    pass
+
 __author__  = "Ryo KOBAYASHI"
-__version__ = "160605"
+__version__ = "240504"
 __LICENSE__ = "MIT"
 
 CALC_END_MARK = "Job finished "
 some_changes = ['positions', 'numbers', 'cell',]
 
+def str2char(string,nlen):
+    slen = len(string)
+    if slen > nlen:
+        raise ValueError('slen > nlen !')
+    c = np.empty(nlen,dtype='c')
+    c[:] = ' '
+    c[0:slen] = [ string[i] for i in range(slen) ]
+    c[slen:] = [ ' ' for i in range(nlen-slen) ]
+    return c
 
-class PMD(FileIOCalculator):
+
+class PMD_ASE_Calculator(Calculator):
     """
     Class for PMD calculation for ASE.
 
@@ -76,7 +92,7 @@ class PMD(FileIOCalculator):
         'boundary': 'ppp',
     }
 
-    def __init__(self, restart=None, ignore_bad_restart_file=False,
+    def __init__(self, restart=None,
                  label='pmd', atoms=None, 
                  command='pmd > out.pmd',
                  dimension=(True,True,True),
@@ -104,10 +120,11 @@ class PMD(FileIOCalculator):
 
         """
 
-        Calculator.__init__(self, restart, ignore_bad_restart_file,
-                            label, atoms, **kwargs)
+        Calculator.__init__(self, restart=restart,
+                            label=label, atoms=atoms,
+                            directory='.', **kwargs)
 
-        if label not in ['pmd']:
+        if label != 'pmd':
             raise RuntimeError('label must be pmd.')
 
         if self.parameters['force_type'] is None:
@@ -120,7 +137,6 @@ class PMD(FileIOCalculator):
         else:
             self.command = command +' > out.'+self.label
 
-        self.specorder= specorder
         self.dimension = dimension
 
     def set(self, **kwargs):
@@ -131,19 +147,36 @@ class PMD(FileIOCalculator):
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=some_changes):
         Calculator.calculate(self, atoms, properties, system_changes)
-        self.write_input(self.atoms, properties, system_changes)
+        # # Write in.pmd to be read from pmd executable
+        # self.write_input(self.atoms, properties, system_changes)
 
-        olddir = os.getcwd()
-        try:
-            os.chdir(self.directory)
-            errorcode = subprocess.call(self.command, shell=True)
-        finally:
-            os.chdir(olddir)
+        # olddir = os.getcwd()
+        # try:
+        #     os.chdir(self.directory)
+        #     errorcode = subprocess.call(self.command, shell=True)
+        # finally:
+        #     os.chdir(olddir)
 
-        if errorcode:
-            raise RuntimeError('%s returned an error: %d' %
-                               (self.name, errorcode))
-        self.read_results()
+        # if errorcode:
+        #     raise RuntimeError('%s returned an error: %d' %
+        #                        (self.name, errorcode))
+        # self.read_results()
+        
+        #...The code below is for calling pmd via f2py and dynamic library
+        if atoms is not None:
+            self.nsys = nappy.io.from_ase(atoms, get_forces=False)
+
+        #...Call pmd via f2py and dynamic library
+        pmd = nappy.pmd.PMD(self.nsys)
+        pmd.set_params(force_type = self.parameters['force_type'],
+                       cutoff_radius = self.parameters['cutoff_radius'],)
+        pmd.run(nstp=0, iprint=0)
+
+        self.results['energy'] = pmd.get_potential_energy()
+        self.results['forces'] = pmd.get_forces().T
+        self.results['stresses'] = pmd.get_stress()
+        self.results['stress'] = pmd.get_stress().sum() /3
+        return None
 
     def relax(self, atoms=None, properties=['energy'],
               system_changes=some_changes,
@@ -293,9 +326,9 @@ def get_input_txt(params,fmvs):
            'temperature_relax_time','flag_temp_dist','',
            'factor_direction','',
            'stress_control','pressure_target','stress_target',
-           'stress_relax_time','flag_compute_stress','',
+           'stress_relax_time','',
            'overlay','overlay_type','',
-           'zload_type','final_strain','',
+           'final_strain','',
            'boundary']
 
     int_keys=['num_nodes_x','num_nodes_y','num_nodes_z','num_omp_threads',
@@ -310,7 +343,7 @@ def get_input_txt(params,fmvs):
                 'converge_eps','final_strain']
     str_keys=['io_format','force_type','temperature_control',
               'stress_control','flag_temp_dist',
-              'flag_compute_stress','zload_type','boundary',
+              'boundary',
               'overlay_type']
 
     for key in order:
@@ -332,7 +365,9 @@ def get_input_txt(params,fmvs):
         elif key == 'temperature_target':
             vals = params[key]
             for i,v in enumerate(vals):
-                txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
+                #...Format of temperature target has been changed...
+                # txt += '{0:25s} {1:2d} {2:6.1f}\n'.format(key,i+1,v)
+                txt += f'{key:25s} {v:6.1f}\n'
         elif key == 'factor_direction':
             # vals = params[key]
             vals= fmvs

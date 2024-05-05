@@ -134,6 +134,11 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
     force_list(i) = trim(c128)
   end do
 
+  rc1nn = 3d0
+  rbuf = rbuf0
+!.....RC should be set before calling init_force
+  rc = rc0
+
 !.....It is required to call init_force and read some in.params.XXX to define aux array
   call init_force(.true.)
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
@@ -154,9 +159,6 @@ subroutine set_pmdvars(nsp0,ns,ls,cspcs,nf,lf,cfrcs,rc0,rbuf0, &
     endif
   enddo
   dt = dt0
-  rbuf = rbuf0
-  rc1nn = 3d0
-  rc = rc0
   nx = 1
   ny = 1
   nz = 1

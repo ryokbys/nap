@@ -74,7 +74,10 @@ class PMD:
         ispcs = self.nsys.atoms.sid.values
         #...Run pmd by calling fortran-compiled library
         #print('calling pw.run')
-        res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,initialize)
+        try:
+            res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,initialize)
+        except:
+            raise
         #print('out from pw.run')
         self.result = {}
         self.result['rtot'] = res[0]
@@ -258,6 +261,13 @@ class PMD:
         if not hasattr(self,'result'):
             return None
         return self.result['stnsr']
+
+    def get_stress(self):
+        if not hasattr(self,'result'):
+            return None
+        stnsr = self.result['stnsr'] 
+        return np.array([stnsr[0,0], stnsr[1,1], stnsr[2,2],
+                         stnsr[1,2], stnsr[0,2], stnsr[0,1]])
 
     def get_forces(self):
         if not hasattr(self,'result'):

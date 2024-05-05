@@ -171,7 +171,7 @@ contains
 
     call mk_lscl_para()
 
-    call set_nnmax()
+    call set_nnmax(l1st)
 
     if( .not.allocated(lspr) ) then
       allocate(lspr(0:nnmax,namax))
@@ -954,7 +954,7 @@ contains
     return
   end subroutine sort_lspr
 !=======================================================================
-  subroutine set_nnmax()
+  subroutine set_nnmax(l1st)
 !
 !  Estimate and set nnmax from lscl. Thus this must be called after 
 !  lscl and lshd are computed.
@@ -965,13 +965,14 @@ contains
     use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf, &
          iprint,ratio_nnmax_update,ntot
     include "mpif.h"
+    logical,intent(in):: l1st
     
     integer:: ierr,ic,i,inc,nmaxl,nmax,nnmax_estimate,nnmax_prev, &
          ncell,ncelltot
     integer:: ix,iy,iz
     real(8):: volc,rho
     real(8),parameter:: pi = 3.14159265358979d0
-    logical,save:: l1st = .true. 
+!!$    logical,save:: l1st = .true. 
 
     nmaxl = 0
     ncell = 0  ! num. of cells that contain at least one atom
@@ -1026,7 +1027,7 @@ contains
         call flush(6)
       endif
     endif
-    l1st = .false.
+!!$    l1st = .false.
     return
   end subroutine set_nnmax
 !=======================================================================

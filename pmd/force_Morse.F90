@@ -1,6 +1,6 @@
 module Morse
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-12-18 16:13:18 KOBAYASHI Ryo>
+!                     Last modified: <2024-05-04 22:43:08 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Morse pontential.
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)

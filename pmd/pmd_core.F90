@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-04-10 16:48:46 KOBAYASHI Ryo>
+!                     Last-modified: <2024-05-04 22:00:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -164,7 +164,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 !.....perform space decomposition after reading atomic configuration
   tmp = mpi_wtime()
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
   call accum_time('space_decomp',mpi_wtime()-tmp)
 !.....Some conversions
   do i=1,natm
@@ -1092,7 +1092,7 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
 
 !.....Some conversions
   nsp= 0
@@ -1205,7 +1205,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
   call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
 
 !.....Some conversions
   nsp= 0
@@ -1379,7 +1379,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....perform space decomposition after reading atomic configuration
   tmp = mpi_wtime()
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
   call accum_time('space_decomp',mpi_wtime()-tmp)
 !.....Some conversions
   do i=1,natm
@@ -2839,7 +2839,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
 !     &     ,ierr)
 end subroutine vfire
 !=======================================================================
-subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
+subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
 !
 !  Decompose the system and scatter atoms to every process.
 !
@@ -2851,6 +2851,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
   real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
   real(8),intent(in):: vtot(3,ntot0)
   real(8),intent(in):: auxtot(naux,ntot0)
+  logical,intent(in):: l1st
 !!$  real(8),intent(in):: hunit,h(3,3,0:1)
 !!$  real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
 !!$  integer,intent(in):: ntot0,naux
@@ -2862,7 +2863,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
   integer:: myxt,myyt,myzt,nmin
   real(8):: sxogt,syogt,szogt
   real(8):: t0
-  logical,save:: l1st = .true.
+!!$  logical,save:: l1st = .true.
 
   t0 = mpi_wtime()
 
@@ -2914,7 +2915,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot)
       call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,nbmax,boundary)
       namax = namax +nbmax
       if( iprint.ne.0 .and. l1st ) then
-        l1st = .false.
+!!$        l1st = .false.
         print *,''
         print '(a)', ' space_decomp:'
         print '(a,2f6.3)','   rcut, rbuf = ',rc,rbuf
