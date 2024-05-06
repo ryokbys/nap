@@ -16,8 +16,6 @@ Options:
              Threshold of energy/atom that determines high energy samples.
              [default: 1.0]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 from datetime import datetime

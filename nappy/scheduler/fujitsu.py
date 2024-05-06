@@ -6,8 +6,6 @@ is a part of the "Technical Computing Suite (TCS)", this module was named as fuj
 The schedulers used in FX10 and K computer are supposed to be the same as this,
 but it has not been tested for those two systems.
 """
-from __future__ import division
-
 import re
 from logging import getLogger
 

@@ -12,8 +12,6 @@ Options:
     -x=<x>      Position of x data (start from 1) [default: 1]
     -y=<y>      Position of y data (start from 1) [default: 1]
 """
-from __future__ import print_function
-
 import os,sys,math
 import numpy as np
 from docopt import docopt

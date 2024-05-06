@@ -4,8 +4,6 @@ Make in.const.NN and in.params.NN to be used in NN potential.
 And the file storing combination information, 
 in.comb.NN, is also written.
 """
-from __future__ import print_function
-
 import random,math
 
 #=========================================================== Constants

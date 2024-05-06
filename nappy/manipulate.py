@@ -10,8 +10,6 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
 """
-from __future__ import print_function
-
 from docopt import docopt
 import numpy as np
 import copy

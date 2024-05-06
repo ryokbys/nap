@@ -24,8 +24,6 @@ Options:
   --force
              Write forces in pmdini files. [default: False]
 """
-from __future__ import print_function
-
 import os
 from ase.io import read,write
 from docopt import docopt

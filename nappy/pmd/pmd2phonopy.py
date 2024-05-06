@@ -15,8 +15,6 @@ Options:
                 Name of the executable. [default: pmd]
     -p, --plot  Show band graph with phonopy.
 """
-from __future__ import print_function
-
 import os,sys,math,copy,re
 from docopt import docopt
 import numpy as np

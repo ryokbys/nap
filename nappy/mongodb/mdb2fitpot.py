@@ -14,8 +14,6 @@ Options:
     -o, --offset=<offnset>
                  Offset number of 5-digit directory name. [default: 0]
 """
-from __future__ import print_function
-
 __author__    = "Ryo KOBAYASHI"
 __email__     = "ryo.kbys@gmail.com"
 __copyright__ = "Copyright 2015, Ryo KOBAYASHI"

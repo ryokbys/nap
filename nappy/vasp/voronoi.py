@@ -9,8 +9,6 @@ USAGE:
 INPUT: (these files must be in the working directory)
     - POSCAR (for the cell information)
 """
-from __future__ import print_function
-
 import os,optparse
 from atom_system import AtomSystem
 

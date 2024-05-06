@@ -11,7 +11,6 @@ Options:
   -h, --help  Show this message and exit.
   --every N   Extract every N step. [default: 1]
 """
-from __future__ import print_function
 
 import numpy as np
 from docopt import docopt

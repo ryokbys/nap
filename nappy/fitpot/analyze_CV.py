@@ -13,8 +13,6 @@ Options:
   --threshold THRESHOLD
               Threshold for the outlier data. [default: 1.0]
 """
-from __future__ import print_function
-
 from docopt import docopt
 import numpy as np
 from nappy.fitpot.extract_best import extract_best

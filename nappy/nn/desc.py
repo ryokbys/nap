@@ -10,8 +10,6 @@ Options:
   -i IFNAME   Input file name. [default: in.params.desc]
   -o OFNAME   Output file name. [default: in.params.desc]
 """
-from __future__ import print_function
-
 from docopt import docopt
 
 __author__ = "RYO KOBAYASHI"

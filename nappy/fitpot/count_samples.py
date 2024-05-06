@@ -9,8 +9,6 @@ Options:
   -h,--help  Show this message and exit.
 
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 from glob import glob

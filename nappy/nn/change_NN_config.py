@@ -3,8 +3,6 @@
 Change NN configuration, such as the number of layers and
 the number of nodes in a layer.
 """
-from __future__ import print_function
-
 import sys,optparse,random
 import NN_io
 

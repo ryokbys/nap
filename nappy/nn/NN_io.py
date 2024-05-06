@@ -2,8 +2,6 @@
 """
 NN_io includes some functions related to input/output of NN potential.
 """
-from __future__ import print_function
-
 def read_const(fname):
     """
     Read in.const.NN file.

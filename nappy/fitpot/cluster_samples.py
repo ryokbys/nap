@@ -13,8 +13,6 @@ Options
     -l, --load=JSON
                 Load `Y` from a given JSON file. [default: None]
 """
-from __future__ import print_function
-
 import os,sys
 import numpy as np
 import scipy.cluster.hierarchy as sch

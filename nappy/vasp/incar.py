@@ -2,8 +2,6 @@
 """
 Utility functions related to INCAR file.
 """
-from __future__ import print_function
-
 _keywords = (
     'SYSTEM',
     'ISTART', 'ICHARG','PREC','ALGO','ISPIN',

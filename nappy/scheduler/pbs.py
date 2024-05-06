@@ -2,7 +2,6 @@
 """
 Functions for torque/pbs scheduler.
 """
-from __future__ import division
 import re
 
 __author__  = "Ryo KOBAYASHI"

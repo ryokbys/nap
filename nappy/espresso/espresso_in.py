@@ -11,8 +11,6 @@ Options:
               Specify the order of species needed to convert to pos. [default: Al,Mg,Si]
 
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

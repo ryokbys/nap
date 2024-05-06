@@ -8,8 +8,6 @@ This utility assumes that the cell is fixed during the simulation.
 
 Staggered measuring of MSD for for the statistical purpose.
 """
-from __future__ import print_function
-
 import os,sys,glob,time
 import numpy as np
 import optparse

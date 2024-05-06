@@ -17,8 +17,6 @@ Options:
   --specorder SPECORDER
               Species order separated by comma. [default: None]
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 import numpy as np

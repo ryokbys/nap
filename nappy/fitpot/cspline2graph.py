@@ -12,8 +12,6 @@ Options:
   --ylim YLIM
               Limits of y range. [default: -4.0,4.0]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

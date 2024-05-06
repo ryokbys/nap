@@ -12,8 +12,6 @@ Options:
   -t THRESHOLD
              Threshold value multiplied to max edge for omitting criterion of edge. [default: 0.01]
 """
-from __future__ import print_function
-
 import math
 import numpy as np
 import networkx as nx

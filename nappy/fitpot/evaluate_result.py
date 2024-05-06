@@ -12,8 +12,6 @@ Options:
   -w,--width=WIDTH
              Width of the bin in histogram in eV. [default: 0.0005]
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 import numpy as np

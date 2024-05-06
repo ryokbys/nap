@@ -14,8 +14,6 @@ Options:
   --prefix PREFIX
               Prefix for output files. [default: data.pmd]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

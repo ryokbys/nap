@@ -15,8 +15,6 @@ Options:
   --specorder SPECORDER
               Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 

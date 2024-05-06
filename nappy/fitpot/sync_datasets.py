@@ -9,8 +9,6 @@ Options:
   -h, --help  Show this message and exit.
   --dry       Dry run.
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 import glob

@@ -15,8 +15,6 @@ Options:
   --num-displace=NUM_DISPLACE
               Number of displacements per deformation. [default: 2]
 """
-from __future__ import print_function
-
 from docopt import docopt
 import numpy as np
 import random

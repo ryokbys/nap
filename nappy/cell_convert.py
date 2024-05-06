@@ -15,8 +15,6 @@ Options:
   --ax2 AX2  Factors to be multiplied to a1,a2,a3, comma separated. [default: 0.0,1.0,0.0]
   --ax3 AX3  Factors to be multiplied to a1,a2,a3, comma separated. [default: 0.0,0.0,1.0]
 """
-from __future__ import print_function
-
 import os,sys,copy
 from docopt import docopt
 import numpy as np

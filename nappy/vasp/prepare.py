@@ -46,8 +46,6 @@ Options:
               Ratio of extra number of bands multiplied to the estimated number of bands.
               [default: 1.0]
 """
-from __future__ import print_function
-
 import os
 import math
 from docopt import docopt

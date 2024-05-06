@@ -31,8 +31,6 @@ Options:
               Path to the template script in which some keywords are replaced by the scheduler.
               [default: None]
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 from subprocess import Popen,PIPE

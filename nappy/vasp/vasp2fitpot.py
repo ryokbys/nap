@@ -23,8 +23,6 @@ Options:
     --idoffset=I
                  offset of species ID converted from vasprun.xml to pos. [default: 1]
 """
-from __future__ import print_function
-
 __author__    = "Ryo KOBAYASHI"
 __email__     = "ryo.kbys@gmail.com"
 __copyright__ = "Copyright 2015, Ryo KOBAYASHI"

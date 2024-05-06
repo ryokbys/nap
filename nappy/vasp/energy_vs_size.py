@@ -20,8 +20,6 @@ Options:
               and bulk modulus.
   --cmd=CMD   VASP execution command. [default: \"vasp > out.vasp\"]
 """
-from __future__ import print_function
-
 import sys,os,copy
 import subprocess
 from docopt import docopt

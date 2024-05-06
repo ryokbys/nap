@@ -16,8 +16,6 @@ Options:
   --mdexec=MDEXEC
               Path to *pmd*. [default: ~/src/nap/pmd/pmd]
 """
-from __future__ import print_function
-
 import sys,os
 import subprocess
 import numpy as np

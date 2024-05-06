@@ -20,8 +20,6 @@ Options:
   --specorder SPECORDER
              Species order. [default: Si]
 """
-from __future__ import print_function
-
 import sys
 import numpy as np
 from docopt import docopt

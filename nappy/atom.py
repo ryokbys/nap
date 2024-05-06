@@ -10,10 +10,7 @@ Options:
     -h, --help  Show this help message and exit.
 
 """
-from __future__ import print_function
-
 import os,sys
-import numpy as np
 from docopt import docopt
 
 # sys.path.append(os.path.dirname(__file__))
@@ -44,6 +41,7 @@ class Atom(object):
     """
 
     def __init__(self,pos=[0.,0.,0.],sid=1,symbol=None):
+        import numpy as np
         self.pos= np.array(pos)
         self.vel= np.zeros((3,))
         self.frc= np.zeros((3,))

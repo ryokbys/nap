@@ -9,8 +9,6 @@ Options:
   -h, --help    Show this message and exit.
   --skip NSKIP  Skip first NSKIP steps from the statistics. [default: 0]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

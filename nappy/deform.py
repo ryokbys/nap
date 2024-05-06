@@ -14,8 +14,6 @@ Options:
   --factor=FACTOR
               Strain factor to be applied. [default: 0.95]
 """
-from __future__ import print_function
-
 import os,sys,copy
 import numpy as np
 from docopt import docopt

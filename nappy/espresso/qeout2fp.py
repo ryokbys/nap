@@ -15,8 +15,6 @@ Options:
               Convert a snapshot of INDEX. [default: -1]
 
 """
-from __future__ import print_function
-
 import os,sys
 from glob import glob
 from docopt import docopt

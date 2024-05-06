@@ -25,8 +25,6 @@ Options:
   --random-seed SEED
               Random seed for reproducibility, if negative current time in second is applied. [default: -1]
 """
-from __future__ import print_function
-
 import os
 import sys
 import shutil

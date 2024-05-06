@@ -27,8 +27,6 @@ Options:
   --bvsx      Flag for BVSx fitting, which includes angular parameters
               in addition to BVS fitting.
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 

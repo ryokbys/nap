@@ -10,8 +10,6 @@ Options:
   --specorder=SPECORDER
              Set species order. [default: None]
 """
-from __future__ import print_function
-
 from docopt import docopt
 import numpy as np
 

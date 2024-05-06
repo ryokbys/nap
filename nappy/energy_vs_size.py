@@ -19,8 +19,6 @@ Options:
   --mdexec=MDEXEC
               Path to *pmd*. [default: pmd]
 """
-from __future__ import print_function
-
 import sys
 import os
 import subprocess

@@ -8,11 +8,8 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
-import numpy as np
 
 __author__ = "RYO KOBAYASHI"
 __version__ = ""
@@ -63,6 +60,7 @@ def get_axis_and_angle(v,u):
     """
     Get rotation axis and angle between given two vectors v and u.
     """
+    import numpy as np
     lv = np.linalg.norm(v)
     lu = np.linalg.norm(u)
     cs = np.dot(v,u)/lv/lu
@@ -78,6 +76,7 @@ def rotate(vector,axis,ang):
     Rotate the given *vector* around the *axis* by *ang*.
     *axis* should be normalized vector.
     """
+    import numpy as np
     rmat = np.zeros((3,3),dtype=float)
     nx,ny,nz = axis[:]
     rmat[0,:] = [ 0., -nz, ny]

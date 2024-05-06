@@ -33,12 +33,9 @@ Options:
               If it is set and the output format accepts, charges are written.
               [default: None]
 """
-from __future__ import division
-
 import copy
-import numpy as np
 from docopt import docopt
-import pandas as pd
+import numpy as np
 
 import nappy
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
@@ -66,7 +63,6 @@ class NAPSystem(object):
     NAPSystem class that contains cell information and atoms, and provides some functionalities.
     Atom information is stored as a pandas DataFrame object.
     """
-
     def __init__(self, fname=None, format=None, specorder=[], ase_atoms=None):
         self.alc = 1.0
         self.a1 = np.zeros(3)
@@ -105,6 +101,7 @@ class NAPSystem(object):
         return len(self.atoms)
 
     def init_atoms(self):
+        import pandas as pd
         self.atoms = pd.DataFrame(columns=DEFAULT_LABELS)
         return None
 
@@ -277,6 +274,7 @@ class NAPSystem(object):
         Add atoms of given symbols, positions, velocities and forces.
         Positions, velocities and forces are assumed to be scaled in lattice vectors.
         """
+        import pandas as pd
         if not self.specorder:
             self.specorder = []
         if type(symbols) not in (list, np.ndarray):
@@ -1032,6 +1030,7 @@ class NAPSystem(object):
         Multiply the system by given n1o,n2o,n3o and replace the system 
         with multiplied one.
         """
+        import pandas as pd
         #...Convert to int
         n1 = int(n1o)
         n2 = int(n2o)
@@ -1114,6 +1113,7 @@ class NAPSystem(object):
         Divide lattice vectors by (d1,d2,d3).
         Atoms whose scaled positions are greater than ds[#] are to be removed.
         """
+        import pandas as pd
         if len(ds) != 3:
             raise ValueError('len(ds) != 3.')
 
@@ -1340,6 +1340,7 @@ def analyze(nsys):
 
 def main():
     import os,sys
+    import nappy.io
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
 
     infmt= args['--in-format']
@@ -1359,7 +1360,6 @@ def main():
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    import nappy.io
     nsys = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
 
     nsys.shift_atoms(*shift)

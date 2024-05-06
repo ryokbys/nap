@@ -8,8 +8,6 @@ Options:
   -h,--help  Show this message and exit.
 
 """
-from __future__ import print_function
-
 import os,sys
 from glob import glob
 from docopt import docopt

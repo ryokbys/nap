@@ -15,8 +15,6 @@ Options:
               Number of nodes in hidden layers. [default: 10]
   -m MAX      Max value of the weights that are randomly determined. [default: 1.0e+10]
 """
-from __future__ import print_function
-
 from docopt import docopt
 import random
 import nappy.nn.desc as desc

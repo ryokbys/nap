@@ -15,8 +15,6 @@ Options:
               Chemical energy of species.
               [default: -3.5469,-1.5055,-4.6169]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 from ase.io import read

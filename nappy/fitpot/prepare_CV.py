@@ -13,8 +13,6 @@ Options:
   -b BATCH    Batch file name to be copied to each CV directory. [default: batch.fitpot.sh]
   -p PREFIX   Prefix to be added to the batch title. [default: ]
 """
-from __future__ import print_function
-
 import random
 
 __author__ = "RYO KOBAYASHI"

@@ -14,8 +14,6 @@ Options:
   --bvs       Specify BVS parameter set. This sets pairs as 1-1,1-2,...,1-nspeics.
   -i          Inverse conversion, that is in.params.Morse to in.vars.fitpot.
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 

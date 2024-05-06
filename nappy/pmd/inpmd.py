@@ -1,8 +1,6 @@
 """
 Module for handling in.pmd file and related information.
 """
-from __future__ import print_function
-
 import copy
 
 _entry_to_varname = {

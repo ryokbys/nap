@@ -22,8 +22,6 @@ Options:
   --angle-range=ANGLE_RANGE
               Range of angle for grains to be distributed within. [default: 180.0]
 """
-from __future__ import print_function
-
 from docopt import docopt
 import numpy as np
 from random import random

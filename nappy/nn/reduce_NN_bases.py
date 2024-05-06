@@ -11,8 +11,6 @@ OUTPUT:
   * in.const.NN.new
   * in.params.NN.new
 """
-from __future__ import print_function
-
 import optparse
 import NN_io
 

@@ -10,8 +10,6 @@ Options:
   --prefix PREFIX
               Prefix to be removed from given dirname. [default: ]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

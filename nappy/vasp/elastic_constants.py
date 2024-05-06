@@ -15,8 +15,6 @@ Options:
   -p          Plot a graph on the screen.
   --cmd=CMD   VASP execution command. [default: \"~/bin/vasp > out.vasp\"]
 """
-from __future__ import print_function
-
 import sys,os,commands
 import numpy as np
 from docopt import docopt

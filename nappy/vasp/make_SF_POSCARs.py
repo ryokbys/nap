@@ -17,8 +17,6 @@ options:
                  maximum of the range to be shfited [default: 1.0]
     --ndiv=<n>   number of division in each direction [default: 10]
 """
-from __future__ import print_function
-
 __author__ = "Ryo KOBAYASHI"
 __version__ = "0.1"
 

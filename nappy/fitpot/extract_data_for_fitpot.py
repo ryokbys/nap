@@ -14,8 +14,6 @@ options:
     --offset=<nof>  offset number of directory name [default: 0]
     
 """
-from __future__ import print_function
-
 import os,shutil
 import commands
 from docopt import docopt

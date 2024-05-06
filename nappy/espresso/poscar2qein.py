@@ -27,8 +27,6 @@ Options:
               which is appended to $HOME environmental variable.
               [default: /local/espresso/SSSP_acc_PBESOL/]
 """
-from __future__ import print_function
-
 import os,sys
 import glob
 from docopt import docopt

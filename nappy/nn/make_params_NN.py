@@ -12,8 +12,6 @@ Usage:
 Options:
   -h, --help  Show this help message and exit.
 """
-from __future__ import print_function
-
 import sys
 from docopt import docopt
 import random,math

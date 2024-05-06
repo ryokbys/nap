@@ -23,8 +23,6 @@ Options:
   --spc SPC
               Migrating species. [default: None]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

@@ -10,8 +10,6 @@ Options:
   -t THRESHOLD  Threshold energy value (eV/atom) over which
                 data will be removed. [default: 1.0]
 """
-from __future__ import print_function
-
 import os
 from docopt import docopt
 

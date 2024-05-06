@@ -15,8 +15,6 @@ Options:
               Extract sample names whose energy difference from the minimum amoung data
               is larger than ELIM. [default: none]
 """
-from __future__ import print_function
-
 import os,sys
 from docopt import docopt
 import numpy as np

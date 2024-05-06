@@ -11,8 +11,6 @@ Options:
   -o OFNAME   Output file name. [default: in.params.linreg]
   -m MAX      Max value of the weights that are randomly determined. [default: 1.0e+10]
 """
-from __future__ import print_function
-
 import numpy as np
 from docopt import docopt
 import random
