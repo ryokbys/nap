@@ -276,8 +276,7 @@ contains
 
     call mpi_allreduce(ierr_max,ierr_maxg,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
-!.....Reduce maxnn to node-0
-    call mpi_reduce(maxnnl,maxnn,1,mpi_integer,mpi_max,0, &
+    call mpi_allreduce(maxnnl,maxnn,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
     if( ierr_maxg.gt.0 ) then
       goto 10

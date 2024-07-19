@@ -34,8 +34,7 @@ mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
 	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o mod_element.o \
 	mod_extforce.o mod_colorcharge.o mod_localflux.o mod_pdens.o mod_time.o \
-	mod_pairlist.o mod_memory.o mod_random.o mod_isostat.o mod_dspring.o \
-	mod_distfunc.o
+	mod_pairlist.o mod_memory.o mod_random.o mod_isostat.o mod_distfunc.o mod_group.o
 args= iargc.o getarg.o
 
 force_common= force_common.o
@@ -48,7 +47,7 @@ forces= force_Ramas_FeH.o force_RK_FeH.o force_RK_WHe.o \
 	force_Morse.o force_Coulomb.o force_EAM.o force_Buckingham.o \
 	force_Bonny_WRe.o force_ZBL.o force_cspline.o force_Tersoff.o \
 	force_Abell.o force_BMH.o force_dipole.o force_fpc.o force_angular.o \
-	force_RFMEAM.o force_Pellenq.o force_repel.o
+	force_RFMEAM.o force_Pellenq.o force_repel.o force_dspring.o
 params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_EDIP_Si.h \
 	params_Brenner.h params_Lu_WHe.h params_Branicio_AlN.h \
@@ -151,6 +150,7 @@ force_Abell.o: ${mods}
 force_fpc.o: ${mods}
 force_Morse.o: ${mods} force_Coulomb.o
 force_angular.o: ${mods}
+force_dspring: mod_pmdvars.o mod_util.o descriptor.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_structure.o mod_util.o
 mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o mod_random.o
@@ -158,5 +158,5 @@ mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
 mod_pairlist.o: mod_memory.o mod_pmdvars.o
 mod_util.o: mod_pmdvars.o mod_vector.o
 mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
-mod_dspring: mod_pmdvars.o mod_util.o descriptor.o
+mod_group.o: mod_pmdvars.o mod_util.o
 descriptor.o: mod_pmdvars.o mod_util.o mod_memory.o

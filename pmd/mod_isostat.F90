@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-15 22:29:04 KOBAYASHI Ryo>
+!                     Last modified: <2024-06-25 18:22:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -219,7 +219,8 @@ contains
     do i=1,natm
       itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
       is = int(tag(i))
-      if( itemp.eq.0 .or. tfac(itemp).lt.0d0 ) cycle
+      if( itemp.eq.0 ) cycle
+      if( tfac(itemp).lt.0d0 ) cycle
       ami= am(is)
 !.....Here unit of TMP should be [eV/Ang],
 !     whereas TFAC is [eu/Ang/sqrt(ump)], so need to multiply ue2ev

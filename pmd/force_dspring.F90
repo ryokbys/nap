@@ -1,6 +1,6 @@
 module dspring
 !-----------------------------------------------------------------------
-!                     Last-modified: <2023-01-18 14:14:36 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-13 19:19:57 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Spring force in descriptor space.
 !  Originally for the purpose of restricting structure, at 2021-05-17, by R.K.
@@ -20,10 +20,12 @@ module dspring
   logical:: initialized = .false.
 
   integer:: ndim_desc = -1
-  integer:: ifmvdsp = -1
+  integer:: giddsp = -1
   real(8):: scnst = 1.0d0
-  real(8),allocatable:: desctgt(:,:),dspfrc(:,:),dspstrs(:,:,:)
-  real(8):: descstd(nspmax),epotdsp
+  real(8):: gcoef = 0.1d0
+  real(8):: gsgm  = 1.0d0
+  real(8),allocatable:: desctgt(:,:),descpca(:,:), dspfrc(:,:),dspstrs(:,:,:)
+  real(8):: edsp
   logical:: ldspc(nspmax)
 
 contains
@@ -49,7 +51,7 @@ contains
     if( myid.eq.0 ) then
       if( iprint.ge.ipl_basic ) then
         print '(a,i6)','   Descriptor dimension = ',ndim_desc
-        print '(a,i6)','   Group of ifmv        = ',ifmvdsp
+        print '(a,i6)','   Group ID for dspring = ',giddsp
         print '(a,es11.3)','   Spring constant      = ',scnst
       endif
     endif
@@ -64,24 +66,24 @@ contains
 !    - dimension of the descriptor that must be consistent with in.params.desc
 !    - spring constant
 !    - target descriptor values of the reference structure
-!    - normalization factors to divide the descriptors before
-!      they are used in the spring force
-!    - to which group of atoms the forces exert on (specified by ifmv)
+!    - PCA 1st coefficients of descriptor components
+!    - to which group of atoms the forces exert on (specified by gid)
 !
 !  The format of in.dspring is like the following:
 !-----------------------------------------------------------------------
 !  !  Comment line if begins with ! or #
 !  !
-!  group_ifmv     2
+!  group_id  1
 !  spring_constant    1.0   (common for all the descriptors)
-!  desc_std   0.0405  0.0222  0.0171
+!  ! gauss_coef         1.0   (common for all the descriptors)
+!  ! gauss_sigma        1.0   (common for all the descriptors)
 !  desc_dimension     55
-!  !  isf  tgt(1)    tgt(2)   tgt(3)
-!     1    0.1245    0.1234   0.2234
-!     2    0.1245    0.1234   0.2234
-!     3    0.1245    0.1234   0.2234
+!  !  isf  tgt(1)  pca(1)   tgt(2)  pca(2) ... (# of species)
+!     1    0.1245  0.345    0.1234  0.987
+!     2    0.1452  0.456    0.2345  0.876
+!     3    0.1542  0.567    0.3456  0.765
 !     ....
-!     55   0.1245    0.1234   0.2234
+!     55   0.1245  1.234    0.1234  1.234
 !-----------------------------------------------------------------------
 !
     use util, only: num_data
@@ -107,23 +109,28 @@ contains
           if( trim(c1st).eq.'spring_constant' ) then
             backspace(ionum)
             read(ionum,*) c1st, scnst
-          else if( trim(c1st).eq.'group_ifmv' ) then
+          else if( trim(c1st).eq.'group_id' ) then
             backspace(ionum)
-            read(ionum,*) c1st, ifmvdsp
-          else if( trim(c1st).eq.'desc_std' ) then
+            read(ionum,*) c1st, giddsp
+          else if( trim(c1st).eq.'gauss_coef' ) then
             backspace(ionum)
-            read(ionum,*) c1st, (descstd(isp),isp=1,nsp)
+            read(ionum,*) c1st, gcoef
+          else if( trim(c1st).eq.'gauss_sigma' ) then
+            backspace(ionum)
+            read(ionum,*) c1st, gsgm
           else if( trim(c1st).eq.'desc_dimension' ) then
             backspace(ionum)
             read(ionum,*) c1st, ndim_desc
-            allocate(desctmp(ndim_desc),desctgt(ndim_desc,nspmax))
+            if( allocated(desctgt) ) deallocate(desctgt,descpca)
+            allocate(desctmp(ndim_desc),desctgt(ndim_desc,nspmax), &
+                 descpca(ndim_desc,nspmax))
             cmode = 'read_descs'
           else
             print *,'There is no such dspring keyword: ', trim(c1st)
           endif
         else if( trim(cmode).eq.'read_descs' ) then
           backspace(ionum)
-          read(ionum,*) idesc, (desctgt(idesc,isp),isp=1,nsp)
+          read(ionum,*) idesc, (desctgt(idesc,isp),descpca(idesc,isp),isp=1,nsp)
           if( idesc.gt.ndim_desc ) then
             print *,'ERROR: desc-ID exceeds the descriptor dimension.'
             stop 1
@@ -134,29 +141,25 @@ contains
 10    close(ionum)
     endif
 
-!.....Normalize desctgt by dividing by descnrm
-    do isp=1,3
-      do isf=1,ndim_desc
-        desctgt(isf,isp) = desctgt(isf,isp) / descstd(isp)
-      enddo
-    enddo
-
 !.....Broadcast some parameters
     call mpi_barrier(mpi_world,ierr)
     call mpi_bcast(ndim_desc,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(scnst,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(ifmvdsp,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(giddsp,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ldspc,nspmax,mpi_logical,0,mpi_world,ierr)
-    if( myid.ne.0 ) allocate(desctgt(ndim_desc,nspmax))
+    if( myid.ne.0) then
+      if( allocated(desctgt) ) deallocate(desctgt, descpca)
+      allocate(desctgt(ndim_desc,nspmax), descpca(ndim_desc,nspmax))
+    endif
     call mpi_bcast(desctgt,ndim_desc*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(descstd,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(descpca,ndim_desc*nspmax,mpi_real8,0,mpi_world,ierr)
 
     if( allocated(desctmp) ) deallocate(desctmp)
     return
   end subroutine read_dspring_params
 !=======================================================================
   subroutine force_dspring(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
-       aa,edsp,nb,nbmax,lsb,nex,lsrc, &
+       aa,epot,edspi,strs,nb,nbmax,lsb,nex,lsrc, &
        myparity,nn,myid,mpi_world,iprint,l1st)
 !
 !  Write the code of spring force in the descriptor space,
@@ -164,16 +167,16 @@ contains
 !  Note that aa should be normalized by h-matrix.
 !
     use descriptor,only: gsfi,dgsfi,calc_desci,pre_desci,make_gsf_arrays,nsf
-    use util,only: ifmvOf
+    use util,only: igvarOf
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          myid,mpi_world,iprint,nn(6),nex(3), &
          nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
     real(8),intent(in):: rcin,tag(namax),h(3,3),hi(3,3),ra(3,namax)
-    real(8),intent(inout):: aa(3,namax),edsp(namax)
+    real(8),intent(inout):: aa(3,namax),edspi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
 
-    integer:: ia,ifmv,isf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
-    real(8):: tmp,at(3),ave_aa,ave_dsp,dsq, &
+    integer:: ia,igv,isf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
+    real(8):: tmp,at(3),ave_aa,ave_dsp,dsq,dpca1,pca1,aexp, &
          xi(3),xj(3),xij(3),rij(3),dij,sij
 
     if( .not.allocated(dspfrc) ) then
@@ -187,24 +190,30 @@ contains
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr,myid,mpi_world,iprint)
 
-    epotdsp = 0d0
-    edsp(:) = 0d0
+    edsp = 0d0
+    edspi(:) = 0d0
     dspfrc(:,:) = 0d0
     dspstrs(:,:,:) = 0d0
     do ia=1,natm
-      ifmv = ifmvOf(tag(ia))
-      if( ifmv.ne.ifmvdsp ) cycle  ! only specified atoms pass here
+      igv = igvarOf(tag(ia),giddsp)
+      if( igv.eq.0 ) cycle  ! dspring works only on atoms of igv > 0 
       isp = int(tag(ia))
       if( .not. ldspc(isp) ) cycle  ! only specified species pass here
       call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
-      dsq = 0d0
       xi(1:3) = ra(1:3,ia)
+      dpca1 = 0d0
+      pca1 = 0d0
+      do isf=1,nsf
+        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf,isp)) * descpca(isf,isp)
+        pca1 = pca1 + gsfi(isf) * descpca(isf,isp)
+      enddo
+      dsq = dpca1**2
+      aexp = -gcoef * exp(-dsq /2 /gsgm**2)
       do isf=1,nsf
 !.....Normalize gsfi with stddev of desc vector of species.
-        gsfi(isf) = gsfi(isf) / descstd(isp)
-        dsq = dsq +(gsfi(isf)-desctgt(isf,isp))**2
-!.....Since dgsfi is not normalized, normalize the prefactor here instead.
-        tmp = scnst*(gsfi(isf)-desctgt(isf,isp)) /descstd(isp)
+!        gsfi(isf) = gsfi(isf) / descstd(isp)
+!!$        tmp = scnst*dpca1 * descpca(isf,isp)
+        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf,isp)
 !.....Compute spring forces
         do jj=1,lspr(0,ia)
           ja = lspr(jj,ia)
@@ -221,24 +230,41 @@ contains
               dspstrs(ixyz,jxyz,ja) = dspstrs(ixyz,jxyz,ja) +sij
               dspstrs(ixyz,jxyz,ia) = dspstrs(ixyz,jxyz,ia) +sij
             enddo
-          enddo
-        enddo
+          enddo ! ixyz
+        enddo ! jj
         dspfrc(1:3,ia) = dspfrc(1:3,ia) -dgsfi(1:3,isf,0)*tmp
-      enddo
-      edsp(ia) = edsp(ia) +0.5d0 *scnst *dsq
-      epotdsp = epotdsp +0.5d0 *scnst *dsq
-    enddo
+      enddo ! isf
+!!$      edspi(ia) = edspi(ia) +0.5d0 *scnst *dsq
+      edspi(ia) = edspi(ia) + pca1
+!!$      edsp = edsp +0.5d0 *scnst *dsq
+      edsp = edsp +aexp
+    enddo ! ia
 
 !.....Send back forces on immigrants to the neighboring nodes
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,dspfrc,3)
-!.....Normalize forces by h-matrix
-    do i=1,natm
-      at(1:3)= dspfrc(1:3,i)
-      dspfrc(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-    enddo
+!!$!.....Normalize forces by h-matrix
+!!$    do i=1,natm
+!!$      at(1:3)= dspfrc(1:3,i)
+!!$      dspfrc(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!!$    enddo
+    if( iprint.ge.ipl_debug .and. myid.eq.0 ) then
+      print '(a,es12.3)','edsp = ',edsp
+      do i=1,10
+        print '(i6, 6(2x, es12.3))', i, dspfrc(1:3,i), aa(1:3,i)
+      enddo
+    endif
 !.....Add dspring forces to the original forces    
     aa(1:3,1:natm) = aa(1:3,1:natm) +dspfrc(1:3,1:natm)
+!.....Gather epot
+    tmp = edsp
+    call mpi_allreduce(tmp,edsp,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    epot = epot + edsp
+!.....Send back stresses
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,dspstrs,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +dspstrs(1:3,1:3,1:natm)*0.5d0
+
     return
   end subroutine force_dspring
 !=======================================================================
@@ -270,9 +296,9 @@ contains
     real(8):: tmp
     
 !.....Gather energy
-    tmp = epotdsp
-    call mpi_allreduce(tmp,epotdsp,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot = epot +epotdsp
+    tmp = edsp
+    call mpi_allreduce(tmp,edsp,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    epot = epot +edsp
     return
   end subroutine add_dspring_epot
 !=======================================================================
@@ -282,7 +308,7 @@ contains
 !
     integer,intent(in):: myid
 
-    deallocate(desctgt)
+    deallocate(desctgt,descpca)
   end subroutine final_dspring
 !=======================================================================
 end module dspring

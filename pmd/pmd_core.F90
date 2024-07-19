@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-05-04 22:00:54 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-13 11:34:48 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -38,7 +38,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        cell_update_langevin, cvel_update_langevin, setup_cell_berendsen, &
        setup_cell_langevin
   use descriptor,only: write_desc,lout_desc
-  use dspring, only: ldspring, init_dspring, final_dspring, force_dspring
+  use group,only: grouping
+!!$  use dspring, only: ldspring, init_dspring, final_dspring, force_dspring, &
+!!$       add_dspring_epot
 
   implicit none
   include "mpif.h"
@@ -76,6 +78,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
+
+  istp= 0
+  simtime = 0d0
+  rbufres = rbuf
 
   if( nstp.le.0 ) then
     cfistp = 'i2'
@@ -171,6 +177,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
   enddo
 
+!.....Grouping
+  call grouping(namax,natm,h,tag,ra,sorg,istp,myid_md,mpi_md_world,iprint)
+  
 #ifdef __FITPOT__
 !.....check whether order of atoms and total-id of atoms match
   do ia=1,natm
@@ -309,7 +318,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          myid_md,mpi_md_world,iprint)
   endif
 
-  if( ldspring ) call init_dspring(myid_md,mpi_md_world,iprint)
+!!$  if( ldspring ) call init_dspring(myid_md,mpi_md_world,iprint)
 
 !!$  print *,'Time at 2 = ',mpi_wtime() -tcpu0
 !.....Calc forces
@@ -327,10 +336,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   epot= epot0
   epotp = 0d0
 
-!.....Descriptor spring
-  if( ldspring ) call force_dspring(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
-       aa,aux(iaux_edsp,:), &
-       nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world,iprint,.true.)
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
     call cna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
@@ -365,17 +370,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call cvel_update_langevin(stnsr,h,mpi_md_world,2)
   endif
 
-  istp= 0
-  simtime = 0d0
-  rbufres = rbuf
-
   if(myid_md.eq.0 .and. iprint.ne.0 ) then
     write(6,*) ''
     write(6,'(1x,a)') "Initial values:"
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Kinetic energy  = ",ekin &
          ,' eV = ',ekin/ntot0,' eV/atom'
-    write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot0 &
-         ,' eV = ',epot0/ntot0,' eV/atom'
+    write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot &
+         ,' eV = ',epot/ntot0,' eV/atom'
     nave= 0
     tave= 0d0
     do itemp=1,ntemps
@@ -473,7 +474,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       if( tave.gt.10000d0) cftave = 'es12.4'
       write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
            //','//cftave//',2es16.7e3)') istp &
-           ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
+           ,simtime,ekin+epot,ekin,epot,tave,vol,prss
       call flush(ioerg)
 !.....Write stress components
       open(iostrs,file="out.strs",status='replace')
@@ -619,6 +620,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( chgopt_method(1:4).eq.'xlag' ) &
          call update_auxq(aux(iaux_q,:),aux(iaux_vq,:))
 
+!.....Grouping    
+    call grouping(namax,natm,h,tag,ra,sorg,istp,myid_md,mpi_md_world,iprint)
+
     if( trim(czload_type).eq.'atoms' ) then
       call zload_atoms(natm,ra,tag,nstp,strfin,strnow &
            ,sorg,myid_md,mpi_md_world)
@@ -695,10 +699,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
     lstrs = lstrs0
-!.....Descriptor spring
-    if( ldspring ) call force_dspring(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
-         aa,aux(iaux_edsp,:), &
-         nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world,iprint,.false.)
+!!$!.....Descriptor spring
+!!$    if( ldspring ) then
+!!$      call force_dspring(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
+!!$           aa,aux(iaux_edsp,:), &
+!!$           nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world, &
+!!$           iprint,.false.)
+!!$      call add_dspring_epot(epot, mpi_md_world)
+!!$    endif
 !.....Structure analysis
     if( trim(cstruct).eq.'CNA' &
          .and. mod(istp,istruct).eq.0 ) then
@@ -1038,7 +1046,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call finalize_rdcfrc()
   endif
 
-  if( ldspring ) call final_dspring(myid_md)
+!!$  if( ldspring ) call final_dspring(myid_md)
 
 !.....deallocate all the arrays allocated in pmd_core
   if( ltdst ) then
@@ -3573,11 +3581,11 @@ end subroutine sanity_check
 subroutine set_cauxarr()
   use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
        iaux_clr, ctctl, iaux_edsp
-  use force,only: set_use_charge, set_use_elec_temp, &
+  use force,only: set_use_charge, set_use_elec_temp, use_force, &
        luse_charge, luse_elec_temp
   use Coulomb,only: chgopt_method
   use clrchg,only: lclrchg
-  use dspring,only: ldspring
+!!$  use dspring,only: ldspring
 
   integer:: inc
 
@@ -3596,7 +3604,7 @@ subroutine set_cauxarr()
   if( lclrchg ) then
     naux = naux +1
   endif
-  if( ldspring ) then
+  if( use_force('dspring') ) then
     naux = naux +1
   endif
   if( allocated(cauxarr) ) then
@@ -3627,7 +3635,7 @@ subroutine set_cauxarr()
     cauxarr(inc) = 'clr'
     iaux_clr = inc
   endif
-  if( ldspring ) then
+  if( use_force('dspring') ) then
     inc = inc +1
     cauxarr(inc) = 'edsp'
     iaux_edsp = inc

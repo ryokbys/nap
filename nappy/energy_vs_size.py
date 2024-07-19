@@ -3,8 +3,7 @@
 Calculate the cohesive energy as a function of lattice constant,
 by altering the lattice constant in pmdini file.
 
-And if possible, calculate equilibrium lattice size and
-bulk modulus, too.
+And if possible, calculate equilibrium lattice size and bulk modulus, too.
 
 MIN and MAX values correspond to the original value in *pmdini* file.
 So check the value at the 2nd line in *pmdini* file and usually MIN and MAX
@@ -41,14 +40,12 @@ def read_pmd(fname="pmdini"):
         if( nl==1 ):
             al= float(line.split()[0])
         elif( nl==2 ):
-            hmat[0]= [ float(x) for x in line.split() ]
+            hmat[0]= [ float(x) for i,x in enumerate(line.split()) if i < 3 ]
         elif( nl==3 ):
-            hmat[1]= [ float(x) for x in line.split() ]
+            hmat[1]= [ float(x) for i,x in enumerate(line.split()) if i < 3 ]
         elif( nl==4 ):
-            hmat[2]= [ float(x) for x in line.split() ]
-        elif( nl in (5,6,7) ):
-            continue
-        elif( nl==8 ):
+            hmat[2]= [ float(x) for i,x in enumerate(line.split()) if i < 3 ]
+        elif( nl==5 ):
             natm= int(line.split()[0])
         else:
             break

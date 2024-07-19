@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-03-15 22:36:45 KOBAYASHI Ryo>
+!                     Last modified: <2024-07-13 12:01:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -82,15 +82,48 @@ contains
   end function ithOf
 !=======================================================================
   function itotOf(tag)
+!
+!  Get total-ID of an atom of the given TAG.
+!  Assuming that 1st 5 floating-number digits are for ifmv and igroup,
+!  and the last 9 floating-number digits are for the total-ID.
+!  For example, in the following tag,
+!     1.20000000001234
+!            ^^^^^^^^^ <-- these digits are for the total-ID,
+!  and the other digits are reserved for species, ifmv, and igroups.
+!
     implicit none
     real(8),intent(in):: tag
     integer:: itotOf
     real(8):: tmp
 
-    tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
-    itotOf= nint(tmp*1d+14)
+!!$    tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
+!!$    itotOf= nint(tmp*1d+14)
+    tmp = tag*1d+5
+    tmp = tmp -int(tmp)
+    itotOf = nint(tmp*1d+9)
     return
   end function itotOf
+!=======================================================================
+  function igvarOf(tag,gid)
+!
+!  Get the value of a given group-ID (GID) from 2nd-5th digits of 
+!  floating-number, e.g.,
+!     1.21234000001234
+!        ^^^^   <------ these are groups
+!  And, 1st-4th groups correspond to 2nd-5th digits, respectively.
+!  Thus, the max number of groups in this implementation is 4.
+!
+    real(8),intent(in):: tag
+    integer,intent(in):: gid
+    integer:: igvarOf
+
+    if( gid.lt.1 .or. gid.gt.4 ) then
+      print *,'ERROR: gid must be 1<=(gid)<=4, but gid=',gid
+      stop
+    endif
+    igvarOf = ithOf(tag,gid+1)
+    return
+  end function igvarOf
 !=======================================================================
   function iauxof(cauxname)
     use pmdvars,only: cauxarr
@@ -154,6 +187,19 @@ contains
     endif
 
   end subroutine replaceTag
+!=======================================================================
+  subroutine replace_igvar(tagi,gid,igvar)
+!
+!  Replace the current group variable of the given GID with the given IGVAR.
+!
+    real(8),intent(inout):: tagi
+    integer,intent(in):: gid,igvar
+    integer:: igvar0
+    
+    igvar0 = ithOf(tagi,gid+1)
+    tagi = tagi +(igvar -igvar0) *10d0**(-(gid+1))
+    return
+  end subroutine replace_igvar
 !=======================================================================
   subroutine cell_info(h)
     use vector,only: dot

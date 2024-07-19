@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-03-16 11:05:07 KOBAYASHI Ryo>
+!                    Last modified: <2024-07-09 15:42:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -248,8 +248,9 @@ module pmdvars
 
 !.....Number of ifmv
   integer:: nfmv = 1
-!.....Number of groups
-  integer:: ngrp = 1
+!.....Number of groups (1-4), but each group takes the value (0-9)
+  integer,parameter:: max_group = 4
+!  integer:: ngrp = 1
 
 !.....Variable time-step
   logical:: lvardt = .false.

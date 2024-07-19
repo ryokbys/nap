@@ -9,7 +9,7 @@ subroutine get_force(l1st,epot,stnsr)
        h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr, &
        sorg,mpi_md_world,myid_md,epi,specorder,lstrs, &
        iprint,lvc,lcell_updated,boundary, &
-       iaux_chg, iaux_tei, iaux_q, iaux_vq
+       iaux_chg, iaux_tei, iaux_q, iaux_vq, iaux_edsp
   use util,only: iauxof
   use RK_FeH,only:force_RK_FeH
   use Ramas_FeH,only:force_Ramas_FeH,force_Ackland_Fe
@@ -46,6 +46,7 @@ subroutine get_force(l1st,epot,stnsr)
   use RFMEAM,only: force_RFMEAM
   use Pellenq,only: force_Pellenq
   use repel,only: force_repel
+  use dspring, only: force_dspring
   use time, only: accum_time
   implicit none
   include "mpif.h"
@@ -440,6 +441,12 @@ subroutine get_force(l1st,epot,stnsr)
     call accum_time('force_Coulomb',mpi_wtime() -tmp)
   endif
 
+  if( use_force('dspring') ) then
+    call force_dspring(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
+         aa,epot,aux(iaux_edsp,:),strs, &
+         nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world,iprint,l1st)
+  endif
+
 !!$!.....convert forces from hmat-coordinates to Cartesian coordinates
 !!$  do i=1,natm
 !!$    at(1:3)= aa(1:3,i)
@@ -467,8 +474,8 @@ subroutine init_force(linit)
   use ZBL, only: read_params_ZBL, init_ZBL
   use LJ, only: read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
-  use descriptor, only: read_params_desc,init_desc,lprmset_desc
-  use dspring, only: ldspring
+  use descriptor, only: read_params_desc,init_desc,lprmset_desc,lout_desc
+!!$  use dspring, only: ldspring
 !!$  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
   use DNN, only: read_params_DNN,lprmset_DNN,update_params_DNN
   use tersoff,only: init_tersoff
@@ -480,6 +487,7 @@ subroutine init_force(linit)
   use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   use Pellenq,only: read_params_Pellenq, lprmset_Pellenq
   use repel,only: read_params_repel, lprmset_repel
+  use dspring, only: init_dspring
   implicit none
   include "./const.h"
   
@@ -591,7 +599,8 @@ subroutine init_force(linit)
   endif
   
 !.....Need to set descriptors before NN or linreg
-  if( use_force('DNN') .or. use_force('linreg') .or. ldspring ) then
+  if( use_force('DNN') .or. use_force('linreg') &
+       .or. lout_desc .or. use_force('dspring') ) then
 !.....If descs are already set, no need to read descs from file.
 !.....This happens when descs are set from fitpot and re-used for all the samples.
     if( .not.lprmset_desc ) then
@@ -655,6 +664,10 @@ subroutine init_force(linit)
       if( myid_md.eq.0 .and. iprint.ge.ipl_debug ) print*,'read_params_angular...'
       call read_params_angular(myid_md,mpi_md_world,iprint,specorder)
     endif
+  endif
+
+  if( use_force('dspring') ) then
+    call init_dspring(myid_md,mpi_md_world,iprint)
   endif
 
 

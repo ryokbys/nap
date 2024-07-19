@@ -47,6 +47,7 @@ subroutine set_variable(ionum,cname)
   use descriptor,only: lout_desc
   use isostat,only: sratemax
   use dspring,only: ldspring
+  use group,only: register_group
 #ifdef __WALL__
   use wall
 #endif
@@ -397,7 +398,12 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'desc_spring') then
     call read_l1(ionum,ldspring)
     return
-    
+!.....Grouping
+  elseif( trim(cname).eq.'group' ) then
+    backspace(ionum)
+    read(ionum,'(a)') ctmp
+    call register_group(ctmp)
+    return
 #ifdef __WALL__
   elseif( trim(cname).eq.'wall_pos_top' ) then
     call read_r1(ionum,wtop)

@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-03-22 23:55:01 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-12 19:45:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -32,7 +32,7 @@ program pmd
   use clrchg,only: lclrchg,init_clrchg
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
-  use dspring,only: ldspring
+  use group,only: init_group
 !$  use omp_lib
   implicit none
   include "mpif.h"
@@ -69,6 +69,7 @@ program pmd
   t0 = mpi_wtime()
 
   call init_element()
+  call init_group()
 
 !.....Set fmv as default value before reading 'in.pmd'
 !!$  call set_fmv(fmv)
@@ -92,6 +93,12 @@ program pmd
     else
       write(6,*) 'Error: io_format must be either ascii, ' &
            //'bin or binary.'
+      stop
+    endif
+!.....Check num of atoms.
+!.....Currently this program is limited to handle up to 999_999_999 atoms.
+    if( ntot0.gt.999999999 ) then
+      print *,'ERROR: Number of atoms exceeds the limit 999999999, ntot0=',ntot0
       stop
     endif
 !.....Memory assessment
@@ -137,7 +144,7 @@ program pmd
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
 
 !.....Num of groups and group IDs from tag
-    call check_tags(ntot0,tagtot,ngrp,iprint)
+    call check_tags(ntot0,tagtot,iprint)
 
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
@@ -176,8 +183,7 @@ program pmd
 
 !.....Check whether localflux is used with color charge NEMD
     if( lflux .and. .not. lclrchg ) then
-      print *,'ERROR: local flux must be used with color-charge NEMD !'
-      stop
+      stop 'ERROR: local flux must be used with color-charge NEMD !'
     endif
     if( lflux .or. lpdens ) then
 !.....Set cutoff_buffer to zero, since it can affect local flux results
@@ -302,7 +308,7 @@ program pmd
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,hmat,lclrchg &
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
-  if( ldspring ) auxtot(iaux_edsp,:) = 0d0
+  if( use_force('dspring') ) auxtot(iaux_edsp,:) = 0d0
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -613,7 +619,7 @@ subroutine bcast_params(nprocs)
   use deform,only: cdeform,trlx_deform,dhmat
   use descriptor,only: lout_desc
   use isostat,only: sratemax
-  use dspring,only: ldspring
+  use group, only: bcast_group
   implicit none
   include 'mpif.h'
   integer,intent(in):: nprocs
@@ -680,15 +686,12 @@ subroutine bcast_params(nprocs)
   call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lrealloc,1,mpi_logical,0,mpicomm,ierr)
-  call mpi_bcast(ngrp,1,mpi_integer,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
   call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
 !.....Descriptor
   call mpi_bcast(lout_desc,1,mpi_logical,0,mpicomm,ierr)
-!.....Descriptor spring
-  call mpi_bcast(ldspring,1,mpi_logical,0,mpicomm,ierr)
 !.....Charge related
   call mpi_bcast(chgfix,20,mpi_character,0,mpicomm,ierr)
 !.....Force-fields
@@ -755,6 +758,8 @@ subroutine bcast_params(nprocs)
 !.....Structure analysis
   call mpi_bcast(cstruct,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(istruct,1,mpi_integer,0,mpicomm,ierr)
+
+  call bcast_group(mpicomm)
 
 end subroutine bcast_params
 !=======================================================================
@@ -854,56 +859,30 @@ subroutine check_ensemble()
 
 end subroutine check_ensemble
 !=======================================================================
-subroutine check_tags(ntot,tagtot,ngrp,iprint)
-!  Check sanity of tags:
-!  - whether the num of groups is too much so that there is no 0 to separate group and total-ID
-!  - the number of group is correct
+subroutine check_tags(ntot,tagtot,iprint)
 !
-  use util,only: ithOf
+!  Check sanity of tags:
+!  - whether the num of atoms is consistent with itotOf(tag)
+!
+  use util,only: ithOf, itotOf
   use pmdvars,only: myid_md, mpicomm
   include "mpif.h"
   integer,intent(in):: ntot,iprint
   real(8),intent(in):: tagtot(ntot)
-  integer,intent(out):: ngrp
 
-  integer:: i,k,is,imax(14),ierr,jerr,ith
-  real(8):: ti
+  integer:: i,itotmax
 
   ierr = 0
-  if( myid_md.eq.0 ) then
-
-    imax(:) = -1
-    do i=1,ntot
-      ti = tagtot(i)
-      do k=1,14
-        ith = ithOf(ti,k)
-        imax(k) = max(imax(k),ith)
-      enddo
-    enddo
-
-!.....Check num of digit of ntot
-    ndigtot = 1
-    do k=1,8  ! 1_000_000_000 is the max num of digit for ntot in pmd
-      if( ntot >= 10**k ) ndigtot = k+1
-    end do
-    if( ndigtot >= 10 ) ierr = 1
-
-!.....i-th position of the deepest non-zero digit == num of groups
-!.....  (but not as deep as total-ID)
-    ngrp = 1
-    do k= (14-ndigtot),1,-1
-      if( imax(k).ne.0 ) then
-        ngrp = k
-        exit
-      endif
-    end do
-    if( ngrp + ndigtot .ge. 14 ) ierr = 1
+  itotmax = 0
+  do i=1,ntot
+    itotmax = max(itotOf(tagtot(i)), itotmax)
+  enddo
+  if( itotmax.gt.ntot ) then
+    print *, 'ERROR: max itotOf(tag) exceeds the number of atoms. '
+    print *, '       ntot,itotmax=',ntot,itotmax
+    stop
   endif
   
-  if( myid_md.eq.0 .and. iprint.gt.0 ) then
-    print '(a,i0)',' Number of groups = ',ngrp
-    print '(a)','   Group #1 is preserved for factor to vector compnent (ifmv).'
-  endif
   return
 end subroutine check_tags
 !=======================================================================
