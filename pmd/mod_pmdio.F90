@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-06-13 22:51:34 KOBAYASHI Ryo>
+!                     Last modified: <2024-07-26 10:41:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use util, only: num_data
   implicit none
@@ -251,7 +251,7 @@ contains
 !     Write atomic configuration in LAMMPS-dump format file.
 !
     use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder,&
-         iaux_chg,iaux_tei,iaux_clr,iaux_edsp,lcomb_pos
+         iaux_chg,iaux_tei,iaux_clr,iaux_edesc,lcomb_pos
     use util,only: itotOf,iauxof
     use time,only: accum_time
     implicit none
@@ -342,8 +342,8 @@ contains
         dlmp(idlmp,:) = auxtot(iaux_tei,:)
       else if( trim(caux).eq.'clr' ) then
         dlmp(idlmp,:) = auxtot(iaux_clr,:)
-      else if( trim(caux).eq.'edsp' ) then
-        dlmp(idlmp,:) = auxtot(iaux_edsp,:)
+      else if( trim(caux).eq.'edesc' ) then
+        dlmp(idlmp,:) = auxtot(iaux_edesc,:)
       endif
     enddo
 

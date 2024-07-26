@@ -1,6 +1,6 @@
 module group
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-07-12 19:45:30 KOBAYASHI Ryo>
+!                     Last modified: <2024-07-25 11:14:34 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Module for grouping atoms.
 !-----------------------------------------------------------------------
@@ -156,7 +156,7 @@ contains
 
     do gid=1,4
       if( gtiming(gid).eq.0 ) cycle
-      if( gtiming(gid).lt.0 .and. abs(gtiming(gid)).ne.istp ) cycle
+      if( gtiming(gid).lt.0 .and. istp.gt.0 ) cycle
       if( gtiming(gid).gt.1 .and. mod(istp,gtiming(gid)).ne.1 ) cycle
       gti = gtype(gid)
       if( gti.eq.1 ) then  ! species grouping

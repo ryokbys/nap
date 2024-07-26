@@ -1,8 +1,8 @@
-module dspring
+module fdesc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-13 19:19:57 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-26 10:36:37 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
-!  Spring force in descriptor space.
+!  Potential in descriptor space.
 !  Originally for the purpose of restricting structure, at 2021-05-17, by R.K.
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax, nsp
@@ -13,26 +13,27 @@ module dspring
   save
 
   character(len=128):: paramsdir = '.'
-  character(len=128),parameter:: cfname = 'in.dspring'
+  character(len=128),parameter:: cfname = 'in.fdesc'
   integer,parameter:: ionum = 68
 
-  logical:: ldspring = .false.  ! Flag to use dspring.
+  logical:: lfdesc = .false.  ! Flag to use fdesc.
   logical:: initialized = .false.
+  logical:: pc1_as_edesc = .false.  ! pc1 value at edesci
 
   integer:: ndim_desc = -1
-  integer:: giddsp = -1
+  integer:: giddesc = -1
   real(8):: scnst = 1.0d0
   real(8):: gcoef = 0.1d0
   real(8):: gsgm  = 1.0d0
-  real(8),allocatable:: desctgt(:,:),descpca(:,:), dspfrc(:,:),dspstrs(:,:,:)
-  real(8):: edsp
-  logical:: ldspc(nspmax)
+  real(8),allocatable:: desctgt(:),descpca(:), descfrc(:,:),descstrs(:,:,:)
+  real(8):: edesc
+!  logical:: ldspc(nspmax)
 
 contains
 !=======================================================================
-  subroutine init_dspring(myid,mpi_world,iprint)
+  subroutine init_fdesc(myid,mpi_world,iprint)
 !
-!  Initialize dspring module.
+!  Initialize fdesc module.
 !
     integer,intent(in):: myid,mpi_world,iprint
     
@@ -45,31 +46,33 @@ contains
       print '(a)',' Desc-spring ON:'
     endif
 
-    call read_dspring_params(myid,mpi_world,iprint)
+    call read_fdesc_params(myid,mpi_world,iprint)
 
 !...Write out some information for users
     if( myid.eq.0 ) then
       if( iprint.ge.ipl_basic ) then
         print '(a,i6)','   Descriptor dimension = ',ndim_desc
-        print '(a,i6)','   Group ID for dspring = ',giddsp
-        print '(a,es11.3)','   Spring constant      = ',scnst
+        print '(a,i6)','   Group ID for fdesc   = ',giddesc
+!        print '(a,es11.3)','   Spring constant      = ',scnst
+        print '(a,f7.3)','   Gaussian coeff.      = ',gcoef
+        print '(a,f7.3)','   Gaussian sigma       = ',gsgm
       endif
     endif
 
     initialized = .true.
     return
-  end subroutine init_dspring
+  end subroutine init_fdesc
 !=======================================================================
-  subroutine read_dspring_params(myid,mpi_world,iprint)
+  subroutine read_fdesc_params(myid,mpi_world,iprint)
 !
-!  Read some info from in.dspring:
+!  Read some info from in.fdesc:
 !    - dimension of the descriptor that must be consistent with in.params.desc
 !    - spring constant
 !    - target descriptor values of the reference structure
 !    - PCA 1st coefficients of descriptor components
 !    - to which group of atoms the forces exert on (specified by gid)
 !
-!  The format of in.dspring is like the following:
+!  The format of in.fdesc is like the following:
 !-----------------------------------------------------------------------
 !  !  Comment line if begins with ! or #
 !  !
@@ -78,12 +81,12 @@ contains
 !  ! gauss_coef         1.0   (common for all the descriptors)
 !  ! gauss_sigma        1.0   (common for all the descriptors)
 !  desc_dimension     55
-!  !  isf  tgt(1)  pca(1)   tgt(2)  pca(2) ... (# of species)
-!     1    0.1245  0.345    0.1234  0.987
-!     2    0.1452  0.456    0.2345  0.876
-!     3    0.1542  0.567    0.3456  0.765
+!  !  isf  desctgt  descpca
+!     1    0.1245   0.345  
+!     2    0.1452   0.456  
+!     3    0.1542   0.567  
 !     ....
-!     55   0.1245  1.234    0.1234  1.234
+!     55   0.1245   1.234  
 !-----------------------------------------------------------------------
 !
     use util, only: num_data
@@ -95,7 +98,7 @@ contains
     real(8),allocatable:: desctmp(:)
 
     if( myid.eq.0 ) then ! only at master, node-0.
-      ldspc(:) = .true.
+!      ldspc(:) = .true.
       open(ionum,file=trim(cfname),status='old')
       cmode = 'none'
       do while(.true.)
@@ -111,26 +114,29 @@ contains
             read(ionum,*) c1st, scnst
           else if( trim(c1st).eq.'group_id' ) then
             backspace(ionum)
-            read(ionum,*) c1st, giddsp
+            read(ionum,*) c1st, giddesc
           else if( trim(c1st).eq.'gauss_coef' ) then
             backspace(ionum)
             read(ionum,*) c1st, gcoef
           else if( trim(c1st).eq.'gauss_sigma' ) then
             backspace(ionum)
             read(ionum,*) c1st, gsgm
+          else if( trim(c1st).eq.'pc1_as_edesc' ) then
+            backspace(ionum)
+            read(ionum,*) c1st, pc1_as_edesc
           else if( trim(c1st).eq.'desc_dimension' ) then
             backspace(ionum)
             read(ionum,*) c1st, ndim_desc
             if( allocated(desctgt) ) deallocate(desctgt,descpca)
-            allocate(desctmp(ndim_desc),desctgt(ndim_desc,nspmax), &
-                 descpca(ndim_desc,nspmax))
+            allocate(desctmp(ndim_desc),desctgt(ndim_desc), &
+                 descpca(ndim_desc))
             cmode = 'read_descs'
           else
-            print *,'There is no such dspring keyword: ', trim(c1st)
+            print *,'There is no such fdesc keyword: ', trim(c1st)
           endif
         else if( trim(cmode).eq.'read_descs' ) then
           backspace(ionum)
-          read(ionum,*) idesc, (desctgt(idesc,isp),descpca(idesc,isp),isp=1,nsp)
+          read(ionum,*) idesc, desctgt(idesc), descpca(idesc)
           if( idesc.gt.ndim_desc ) then
             print *,'ERROR: desc-ID exceeds the descriptor dimension.'
             stop 1
@@ -145,21 +151,22 @@ contains
     call mpi_barrier(mpi_world,ierr)
     call mpi_bcast(ndim_desc,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(scnst,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(giddsp,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(ldspc,nspmax,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(giddesc,1,mpi_integer,0,mpi_world,ierr)
+    call mpi_bcast(pc1_as_edesc,1,mpi_logical,0,mpi_world,ierr)
+!    call mpi_bcast(ldspc,nspmax,mpi_logical,0,mpi_world,ierr)
     if( myid.ne.0) then
       if( allocated(desctgt) ) deallocate(desctgt, descpca)
-      allocate(desctgt(ndim_desc,nspmax), descpca(ndim_desc,nspmax))
+      allocate(desctgt(ndim_desc), descpca(ndim_desc))
     endif
-    call mpi_bcast(desctgt,ndim_desc*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(descpca,ndim_desc*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(desctgt,ndim_desc,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(descpca,ndim_desc,mpi_real8,0,mpi_world,ierr)
 
     if( allocated(desctmp) ) deallocate(desctmp)
     return
-  end subroutine read_dspring_params
+  end subroutine read_fdesc_params
 !=======================================================================
-  subroutine force_dspring(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
-       aa,epot,edspi,strs,nb,nbmax,lsb,nex,lsrc, &
+  subroutine force_desc(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
+       aa,epot,edesci,strs,nb,nbmax,lsb,nex,lsrc, &
        myparity,nn,myid,mpi_world,iprint,l1st)
 !
 !  Write the code of spring force in the descriptor space,
@@ -172,54 +179,52 @@ contains
          myid,mpi_world,iprint,nn(6),nex(3), &
          nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
     real(8),intent(in):: rcin,tag(namax),h(3,3),hi(3,3),ra(3,namax)
-    real(8),intent(inout):: aa(3,namax),edspi(namax),epot,strs(3,3,namax)
+    real(8),intent(inout):: aa(3,namax),edesci(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
 
     integer:: ia,igv,isf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
     real(8):: tmp,at(3),ave_aa,ave_dsp,dsq,dpca1,pca1,aexp, &
          xi(3),xj(3),xij(3),rij(3),dij,sij
 
-    if( .not.allocated(dspfrc) ) then
-      allocate(dspfrc(3,namax),dspstrs(3,3,namax))
-    else if( size(dspfrc).lt.3*namax ) then
-      deallocate(dspfrc,dspstrs)
-      allocate(dspfrc(3,namax),dspstrs(3,3,namax))
+    if( .not.allocated(descfrc) ) then
+      allocate(descfrc(3,namax),descstrs(3,3,namax))
+    else if( size(descfrc).lt.3*namax ) then
+      deallocate(descfrc,descstrs)
+      allocate(descfrc(3,namax),descstrs(3,3,namax))
     endif
     
 !.....Compute descriptor values of atoms
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr,myid,mpi_world,iprint)
 
-    edsp = 0d0
-    edspi(:) = 0d0
-    dspfrc(:,:) = 0d0
-    dspstrs(:,:,:) = 0d0
+    edesc = 0d0
+    edesci(:) = 0d0
+    descfrc(:,:) = 0d0
+    descstrs(:,:,:) = 0d0
     do ia=1,natm
-      igv = igvarOf(tag(ia),giddsp)
-      if( igv.eq.0 ) cycle  ! dspring works only on atoms of igv > 0 
+      igv = igvarOf(tag(ia),giddesc)
+      if( igv.eq.0 ) cycle  ! fdesc works only on atoms of igv > 0 
       isp = int(tag(ia))
-      if( .not. ldspc(isp) ) cycle  ! only specified species pass here
+!      if( .not. ldspc(isp) ) cycle  ! only specified species pass here
       call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
       xi(1:3) = ra(1:3,ia)
       dpca1 = 0d0
       pca1 = 0d0
       do isf=1,nsf
-        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf,isp)) * descpca(isf,isp)
-        pca1 = pca1 + gsfi(isf) * descpca(isf,isp)
+        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf)) * descpca(isf)
+        pca1 = pca1 + gsfi(isf) * descpca(isf)
       enddo
       dsq = dpca1**2
       aexp = -gcoef * exp(-dsq /2 /gsgm**2)
       do isf=1,nsf
-!.....Normalize gsfi with stddev of desc vector of species.
-!        gsfi(isf) = gsfi(isf) / descstd(isp)
-!!$        tmp = scnst*dpca1 * descpca(isf,isp)
-        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf,isp)
+!!$        tmp = scnst*dpca1 * descpca(isf)
+        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf)
 !.....Compute spring forces
         do jj=1,lspr(0,ia)
           ja = lspr(jj,ia)
-!.....dspring force
-          dspfrc(1:3,ja) = dspfrc(1:3,ja) -dgsfi(1:3,isf,jj)*tmp
-!.....dspring stress
+!.....desc force
+          descfrc(1:3,ja) = descfrc(1:3,ja) -dgsfi(1:3,isf,jj)*tmp
+!.....desc stress
           xj(1:3) = ra(1:3,ja)
           xij(1:3) = xj(1:3) -xi(1:3)
           rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -227,67 +232,70 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               sij = -dgsfi(jxyz,isf,jj)*tmp*rij(ixyz)
-              dspstrs(ixyz,jxyz,ja) = dspstrs(ixyz,jxyz,ja) +sij
-              dspstrs(ixyz,jxyz,ia) = dspstrs(ixyz,jxyz,ia) +sij
+              descstrs(ixyz,jxyz,ja) = descstrs(ixyz,jxyz,ja) +sij
+              descstrs(ixyz,jxyz,ia) = descstrs(ixyz,jxyz,ia) +sij
             enddo
           enddo ! ixyz
         enddo ! jj
-        dspfrc(1:3,ia) = dspfrc(1:3,ia) -dgsfi(1:3,isf,0)*tmp
+        descfrc(1:3,ia) = descfrc(1:3,ia) -dgsfi(1:3,isf,0)*tmp
       enddo ! isf
-!!$      edspi(ia) = edspi(ia) +0.5d0 *scnst *dsq
-      edspi(ia) = edspi(ia) + pca1
-!!$      edsp = edsp +0.5d0 *scnst *dsq
-      edsp = edsp +aexp
+      if( pc1_as_edesc ) then
+        edesci(ia) = edesci(ia) + dpca1
+      else
+        edesci(ia) = edesci(ia) + aexp
+      endif
+!!$      edesc = edesc +0.5d0 *scnst *dsq
+      edesc = edesc +aexp
     enddo ! ia
 
 !.....Send back forces on immigrants to the neighboring nodes
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,dspfrc,3)
+         ,nn,mpi_world,descfrc,3)
 !!$!.....Normalize forces by h-matrix
 !!$    do i=1,natm
-!!$      at(1:3)= dspfrc(1:3,i)
-!!$      dspfrc(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
+!!$      at(1:3)= descfrc(1:3,i)
+!!$      descfrc(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
 !!$    enddo
     if( iprint.ge.ipl_debug .and. myid.eq.0 ) then
-      print '(a,es12.3)','edsp = ',edsp
+      print '(a,es12.3)','edesc = ',edesc
       do i=1,10
-        print '(i6, 6(2x, es12.3))', i, dspfrc(1:3,i), aa(1:3,i)
+        print '(i6, 6(2x, es12.3))', i, descfrc(1:3,i), aa(1:3,i)
       enddo
     endif
-!.....Add dspring forces to the original forces    
-    aa(1:3,1:natm) = aa(1:3,1:natm) +dspfrc(1:3,1:natm)
+!.....Add desc forces to the original forces
+    aa(1:3,1:natm) = aa(1:3,1:natm) +descfrc(1:3,1:natm)
 !.....Gather epot
-    tmp = edsp
-    call mpi_allreduce(tmp,edsp,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot = epot + edsp
+    tmp = edesc
+    call mpi_allreduce(tmp,edesc,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    epot = epot + edesc
 !.....Send back stresses
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,dspstrs,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +dspstrs(1:3,1:3,1:natm)*0.5d0
+         ,nn,mpi_world,descstrs,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5d0
 
     return
-  end subroutine force_dspring
+  end subroutine force_desc
 !=======================================================================
-  subroutine add_dspring_strs(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+  subroutine add_fdesc_strs(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
        ,nn,mpi_world,strs)
 !
-!  Add dspring stress per atom to the total stress per atom.
-!  It requires that force_dspring is called beforehand and stress are computed already.
+!  Add desc stress per atom to the total stress per atom.
+!  It requires that force_desc is called beforehand and stress are computed already.
 !
     integer,intent(in):: namax,natm,nbmax,nb,myparity(3),nn(6),nex(3), &
          lsb(0:nbmax,6),lsrc(6),mpi_world
     real(8),intent(inout):: strs(3,3,namax)
     
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,dspstrs,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +dspstrs(1:3,1:3,1:natm)*0.5d0
+         ,nn,mpi_world,descstrs,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5d0
     return
-  end subroutine add_dspring_strs
+  end subroutine add_fdesc_strs
 !=======================================================================
-  subroutine add_dspring_epot(epot,mpi_world)
+  subroutine add_fdesc_epot(epot,mpi_world)
 !
-!  Add dspring epot to that of the system.
-!  It requires that force_dspring is called beforehand.
+!  Add desc epot to that of the system.
+!  It requires that force_desc is called beforehand.
 !
     real(8),intent(inout):: epot
     integer,intent(in):: mpi_world
@@ -296,22 +304,22 @@ contains
     real(8):: tmp
     
 !.....Gather energy
-    tmp = edsp
-    call mpi_allreduce(tmp,edsp,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot = epot +edsp
+    tmp = edesc
+    call mpi_allreduce(tmp,edesc,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    epot = epot +edesc
     return
-  end subroutine add_dspring_epot
+  end subroutine add_fdesc_epot
 !=======================================================================
-  subroutine final_dspring(myid)
+  subroutine final_fdesc(myid)
 !
-!  Finalize dspring if needed.
+!  Finalize fdesc if needed.
 !
     integer,intent(in):: myid
 
     deallocate(desctgt,descpca)
-  end subroutine final_dspring
+  end subroutine final_fdesc
 !=======================================================================
-end module dspring
+end module fdesc
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

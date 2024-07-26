@@ -1,6 +1,6 @@
 module isostat
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-06-25 18:22:00 KOBAYASHI Ryo>
+!                     Last modified: <2024-07-25 22:30:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Isothermal and/or isobaric ensemble.
 ! Note that some variables used in this module are defined in pmdvars not here.
@@ -281,8 +281,6 @@ contains
 !  Calc. deviation of h-matrix used in isobaric MD
 !  using given stress tensor stgt.
 !
-!!$    use pmdvars,only: cpctl,strs,eki,sgm,dt,srlx,stbeta,vol, &
-!!$         stgt,ptgt,natm
     implicit none
     include "mpif.h"
     integer,intent(in):: mpi_md_world

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-13 11:34:48 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-26 10:41:11 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -39,8 +39,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        setup_cell_langevin
   use descriptor,only: write_desc,lout_desc
   use group,only: grouping
-!!$  use dspring, only: ldspring, init_dspring, final_dspring, force_dspring, &
-!!$       add_dspring_epot
 
   implicit none
   include "mpif.h"
@@ -317,8 +315,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call write_desc(namax,natm,nnmax,lspr,h,tag,ra,rc, &
          myid_md,mpi_md_world,iprint)
   endif
-
-!!$  if( ldspring ) call init_dspring(myid_md,mpi_md_world,iprint)
 
 !!$  print *,'Time at 2 = ',mpi_wtime() -tcpu0
 !.....Calc forces
@@ -699,14 +695,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call accum_time('get_force',mpi_wtime()-tmp)
     lcell_updated = .false.
     lstrs = lstrs0
-!!$!.....Descriptor spring
-!!$    if( ldspring ) then
-!!$      call force_dspring(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
-!!$           aa,aux(iaux_edsp,:), &
-!!$           nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world, &
-!!$           iprint,.false.)
-!!$      call add_dspring_epot(epot, mpi_md_world)
-!!$    endif
 !.....Structure analysis
     if( trim(cstruct).eq.'CNA' &
          .and. mod(istp,istruct).eq.0 ) then
@@ -3580,7 +3568,7 @@ end subroutine sanity_check
 !=======================================================================
 subroutine set_cauxarr()
   use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
-       iaux_clr, ctctl, iaux_edsp
+       iaux_clr, ctctl, iaux_edesc
   use force,only: set_use_charge, set_use_elec_temp, use_force, &
        luse_charge, luse_elec_temp
   use Coulomb,only: chgopt_method
@@ -3604,7 +3592,7 @@ subroutine set_cauxarr()
   if( lclrchg ) then
     naux = naux +1
   endif
-  if( use_force('dspring') ) then
+  if( use_force('desc') ) then
     naux = naux +1
   endif
   if( allocated(cauxarr) ) then
@@ -3635,10 +3623,10 @@ subroutine set_cauxarr()
     cauxarr(inc) = 'clr'
     iaux_clr = inc
   endif
-  if( use_force('dspring') ) then
+  if( use_force('desc') ) then
     inc = inc +1
-    cauxarr(inc) = 'edsp'
-    iaux_edsp = inc
+    cauxarr(inc) = 'edesc'
+    iaux_edesc = inc
   endif
   
 end subroutine set_cauxarr

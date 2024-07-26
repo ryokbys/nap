@@ -46,7 +46,7 @@ subroutine set_variable(ionum,cname)
   use deform,only: cdeform, trlx_deform, dhmat
   use descriptor,only: lout_desc
   use isostat,only: sratemax
-  use dspring,only: ldspring
+  use fdesc,only: lfdesc
   use group,only: register_group
 #ifdef __WALL__
   use wall
@@ -208,6 +208,7 @@ subroutine set_variable(ionum,cname)
     stgt(1,1) = ptgt
     stgt(2,2) = ptgt
     stgt(3,3) = ptgt
+    lhydrostatic = .true.
     return
   elseif( trim(cname).eq.'initial_pressure_target' ) then
     call read_r1(ionum,pini)
@@ -394,9 +395,6 @@ subroutine set_variable(ionum,cname)
 !.....Descriptor
   elseif( trim(cname).eq.'write_desc' ) then
     call read_l1(ionum,lout_desc)
-    return
-  elseif( trim(cname).eq.'desc_spring') then
-    call read_l1(ionum,ldspring)
     return
 !.....Grouping
   elseif( trim(cname).eq.'group' ) then

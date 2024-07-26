@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-06-14 14:01:34 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-26 10:37:10 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   implicit none
@@ -70,7 +70,7 @@ contains
     force_index_list(32) =  "Tersoff"
     force_index_list(33) =  "angular"
     force_index_list(34) =  "DNN"
-    force_index_list(35) =  "dspring"
+    force_index_list(35) =  "desc"
 
     luse_force(:) = .false.
 

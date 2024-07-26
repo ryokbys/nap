@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-07-09 15:42:03 KOBAYASHI Ryo>
+!                    Last modified: <2024-07-26 10:41:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -154,7 +154,7 @@ module pmdvars
 !.....Auxiliary data
   character(len=6),allocatable:: cauxarr(:)
 !.....Indices of aux array
-  integer:: iaux_chg,iaux_q,iaux_vq,iaux_tei,iaux_clr,iaux_edsp
+  integer:: iaux_chg,iaux_q,iaux_vq,iaux_tei,iaux_clr,iaux_edesc
 
 !.....mass
   real(8):: am(1:nspmax)= 12.0d0
