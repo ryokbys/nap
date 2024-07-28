@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-26 16:59:29 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-28 11:47:36 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -308,7 +308,7 @@ program pmd
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,hmat,lclrchg &
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
-  if( use_force('desc') ) auxtot(iaux_edesc,:) = 0d0
+  if( use_force('fdesc') ) auxtot(iaux_edesc,:) = 0d0
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then

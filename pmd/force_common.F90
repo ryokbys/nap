@@ -46,7 +46,7 @@ subroutine get_force(l1st,epot,stnsr)
   use RFMEAM,only: force_RFMEAM
   use Pellenq,only: force_Pellenq
   use repel,only: force_repel
-  use fdesc, only: force_desc
+  use fdesc, only: force_fdesc
   use time, only: accum_time
   implicit none
   include "mpif.h"
@@ -441,8 +441,8 @@ subroutine get_force(l1st,epot,stnsr)
     call accum_time('force_Coulomb',mpi_wtime() -tmp)
   endif
 
-  if( use_force('desc') ) then
-    call force_desc(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
+  if( use_force('fdesc') ) then
+    call force_fdesc(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
          aa,epot,aux(iaux_edesc,:),strs, &
          nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world,iprint,l1st)
   endif
@@ -599,7 +599,7 @@ subroutine init_force(linit)
   
 !.....Need to set descriptors before NN or linreg
   if( use_force('DNN') .or. use_force('linreg') &
-       .or. lout_desc .or. use_force('desc') ) then
+       .or. lout_desc .or. use_force('fdesc') ) then
 !.....If descs are already set, no need to read descs from file.
 !.....This happens when descs are set from fitpot and re-used for all the samples.
     if( .not.lprmset_desc ) then
@@ -665,7 +665,7 @@ subroutine init_force(linit)
     endif
   endif
 
-  if( use_force('desc') ) then
+  if( use_force('fdesc') ) then
     call init_fdesc(myid_md,mpi_md_world,iprint)
   endif
 

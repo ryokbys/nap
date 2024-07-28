@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-26 17:00:17 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-28 11:48:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -3592,7 +3592,7 @@ subroutine set_cauxarr()
   if( lclrchg ) then
     naux = naux +1
   endif
-  if( use_force('desc') ) then
+  if( use_force('fdesc') ) then
     naux = naux +1
   endif
   if( allocated(cauxarr) ) then
@@ -3623,7 +3623,7 @@ subroutine set_cauxarr()
     cauxarr(inc) = 'clr'
     iaux_clr = inc
   endif
-  if( use_force('desc') ) then
+  if( use_force('fdesc') ) then
     inc = inc +1
     cauxarr(inc) = 'edesc'
     iaux_edesc = inc

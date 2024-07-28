@@ -1,6 +1,6 @@
 module fdesc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-26 10:36:37 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-28 11:51:17 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Potential in descriptor space.
 !  Originally for the purpose of restricting structure, at 2021-05-17, by R.K.
@@ -165,12 +165,11 @@ contains
     return
   end subroutine read_fdesc_params
 !=======================================================================
-  subroutine force_desc(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
+  subroutine force_fdesc(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
        aa,epot,edesci,strs,nb,nbmax,lsb,nex,lsrc, &
        myparity,nn,myid,mpi_world,iprint,l1st)
 !
-!  Write the code of spring force in the descriptor space,
-!  and add them to the variable, aa.
+!  Force according to the descriptor difference.
 !  Note that aa should be normalized by h-matrix.
 !
     use descriptor,only: gsfi,dgsfi,calc_desci,pre_desci,make_gsf_arrays,nsf
@@ -274,13 +273,13 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5d0
 
     return
-  end subroutine force_desc
+  end subroutine force_fdesc
 !=======================================================================
   subroutine add_fdesc_strs(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
        ,nn,mpi_world,strs)
 !
 !  Add desc stress per atom to the total stress per atom.
-!  It requires that force_desc is called beforehand and stress are computed already.
+!  It requires that force_fdesc is called beforehand and stress are computed already.
 !
     integer,intent(in):: namax,natm,nbmax,nb,myparity(3),nn(6),nex(3), &
          lsb(0:nbmax,6),lsrc(6),mpi_world
@@ -295,7 +294,7 @@ contains
   subroutine add_fdesc_epot(epot,mpi_world)
 !
 !  Add desc epot to that of the system.
-!  It requires that force_desc is called beforehand.
+!  It requires that force_fdesc is called beforehand.
 !
     real(8),intent(inout):: epot
     integer,intent(in):: mpi_world
