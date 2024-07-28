@@ -37,7 +37,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
     #     wmode = 'wt'
 
     if format == 'pmd':
-        write_pmd(nsys,fname,)
+        write_pmd(nsys,fname,**kwargs)
     elif format == 'POSCAR':
         write_POSCAR(nsys,fname,)
     elif format == 'dump':
@@ -1715,6 +1715,36 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
         del nsyss[-1]
 
     return nsyss
+
+
+def write_fitpot_sample(nsys, dirname):
+    """
+    Write out information of the given NSYS in the format of fitpot sample directory,
+    into DIRNAME directory.
+    """
+    os.system(f'mkdir -p {dirname}')
+    natm = len(nsys)
+    epot = nsys.get_potential_energy()
+    frcs = nsys.get_forces()
+    strs = nsys.get_stress()
+    
+    write(nsys, fname=dirname+'/pos', format='pmd', forces=True)
+
+    with open(dirname+'/erg.ref', 'w') as f:
+        f.write(f'  {epot:17.7f}\n')
+
+    with open(dirname+'/frc.ref', 'w') as f:
+        f.write(f'  {natm:d}\n')
+        for i in range(natm):
+            fi = frcs[i,:]
+            f.write(f'  {fi[0]:15.7e}  {fi[1]:15.7e}  {fi[2]:15.7e}\n')
+
+    with open(dirname+'/strs.ref', 'w') as f:
+        f.write(f'  {strs[0]:12.4e}  {strs[1]:12.4e}  {strs[2]:12.4e}'
+                +f'  {strs[3]:12.4e}  {strs[4]:12.4e}  {strs[5]:12.4e}\n')
+
+    return None
+
 
 if __name__ == "__main__":
 

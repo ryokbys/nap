@@ -12,6 +12,7 @@ module variables
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
   character(len=128):: csmplist= ''
+  character(len=128):: csmplftype= 'dir'  ! (dir|file)
   integer:: nprcs= 1
   real(8):: epse= 1d-4
   real(8):: epsf= 1d-4

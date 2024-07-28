@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-26 10:41:11 KOBAYASHI Ryo>
+!                     Last-modified: <2024-07-26 17:00:17 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -437,10 +437,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       elseif( trim(ciofmt).eq.'ascii' ) then
         if( lcomb_pos ) then
           call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
+               tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,0)
         else
           call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,0)
+               tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,0)
         endif
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
@@ -925,10 +925,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           elseif( trim(ciofmt).eq.'ascii' ) then
             if( lcomb_pos ) then
               call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
-                   tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+                   tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
             else
               call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                   tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+                   tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
             endif
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
@@ -1511,10 +1511,10 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           sth(:,:) = stnsr(:,:)*up2gpa
           if( lcomb_pos ) then
             call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
-                 tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+                 tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
           else            
             call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                 tagtot,rtot,vtot,atot,epot,ekin,sth,.false.,istp)
+                 tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
           endif
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format

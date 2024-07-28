@@ -330,8 +330,8 @@ contains
     if( lupdate_gsf ) then
       if( lcheby ) then
         call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
-      else ! default
-        call desci_default(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+      else ! Behler-Parrinello Symmetry Functions
+        call desci_bpsf(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
       endif
       if( lfitpot ) then
         if( .not. allocated(gsf) .or. .not. allocated(dgsf) &
@@ -710,9 +710,9 @@ contains
     return
   end subroutine calc_desc_default
 !=======================================================================
-  subroutine desci_default(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+  subroutine desci_bpsf(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
 !
-!  Evaluate descriptors (symmetry functions) of an atom-i only
+!  Evaluate Behler-Parrinello symmetry functions (BPSF) of an atom-i only
 !  and their derivatives wrt positions for multi-species system.
 !
 !  - Cutoff radii are set in each symmetry functions.
@@ -1000,7 +1000,7 @@ contains
     enddo ! jj=1,...
 
     return
-  end subroutine desci_default
+  end subroutine desci_bpsf
 !=======================================================================
   subroutine calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)

@@ -55,6 +55,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'sample_list' ) then
     call read_c1(ionum,csmplist)
     return
+  elseif( trim(cname).eq.'sample_file_type' ) then
+    call read_c1(ionum,csmplftype)
+    return
   elseif( trim(cname).eq.'max_num_neighbors' ) then
     call read_i1(ionum,nnmax)
     return

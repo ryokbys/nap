@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-07-26 10:41:05 KOBAYASHI Ryo>
+!                    Last modified: <2024-07-26 16:57:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -62,6 +62,7 @@ module pmdvars
   integer:: minstp = 0
   integer:: nerg = 1000
   integer:: ifpmd= 2    ! 0:none, 1:pmd, 2:dump (default)
+  logical:: loutforce = .false.
   integer:: npmd = 10
   logical:: lcomb_pos = .false.
   integer:: ifsort= 1

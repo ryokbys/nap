@@ -91,6 +91,9 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'flag_out_pos' ) then
     call read_i1(ionum,ifpmd)
     return
+  elseif( trim(cname).eq.'flag_write_force' ) then
+    call read_l1(ionum, loutforce)
+    return
   elseif( trim(cname).eq.'num_out_pmd' .or. &
        trim(cname).eq.'num_out_pos' ) then
     call read_i1(ionum,npmd)
