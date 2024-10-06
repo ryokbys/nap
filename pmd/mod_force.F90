@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-28 11:47:09 KOBAYASHI Ryo>
+!                     Last-modified: <2024-09-28 11:27:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   implicit none
@@ -13,7 +13,7 @@ module force
        ol_type, ol_force, ol_ranges, ol_alphas, ol_dalphas, ol_pair
   
 !.....Force index list
-  integer,parameter:: N_FORCES = 35
+  integer,parameter:: N_FORCES = 36
   character(len=128):: force_index_list(N_FORCES)
 
   integer:: num_forces = -1
@@ -71,6 +71,7 @@ contains
     force_index_list(33) =  "angular"
     force_index_list(34) =  "DNN"
     force_index_list(35) =  "fdesc"
+    force_index_list(36) =  "fdesc"
 
     luse_force(:) = .false.
 
@@ -121,7 +122,7 @@ contains
 
     if( myid.eq.0 ) then
       print *,''
-      write(6,'(a)',advance='no') ' Use the following force-fields:'
+      write(6,'(a)',advance='no') ' Force-fields:'
       do i=1,num_forces
         write(6,'(2x,a)',advance='no') trim(force_list(i))
       enddo

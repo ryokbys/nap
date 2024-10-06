@@ -106,6 +106,7 @@ contains
     ncnst_type(103) = 1 ! cos(cos(thijk))
     ncnst_type(104) = 1 ! sin(cos(thijk))
     ncnst_type(105) = 2 ! exp(-eta*(cos(thijk)-rs)**2)
+    ncnst_type(106) = 1 ! angular6 (no exp term in angular1)
     ncomb_type(1:100) = 2    ! pair
     ncomb_type(101:200) = 3  ! triplet
 
@@ -698,6 +699,42 @@ contains
               igsf(isf,0,ia) = 1
               igsf(isf,jj,ia) = 1
               igsf(isf,kk,ia) = 1
+!.....iyp==106:  (lmd +cos(thijk))^2/(lmd+1)^2 *fcij*fcik
+!.....   for force_fdesc with less dependent on bond length,
+!.....   but rather on bond angles.
+            else if( ityp.eq.106 ) then
+!.....fcij's should be computed after rcs is determined
+              call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+              call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+              almbd= desci%prms(1)
+              t2= (abs(almbd)+1d0)**2
+              driki(1:3)= -rik(1:3)/dik
+              drikk(1:3)= -driki(1:3)
+!.....function value
+              t1= (almbd +cs)**2
+!!$              eta3 = 0.5d0 /rcut**2
+!!$              texp = exp(-eta3*(dij2+dik2))
+              tmp = t1/t2 !*texp
+              gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
+              gijk = gijk +tmp*fcij*fcik
+!.....derivative
+!!$              dgdij= dfcij *fcik *tmp &
+!!$                   +tmp *(-2d0*eta3*dij) *fcij*fcik 
+!!$              dgdik= fcij *dfcik *tmp &
+!!$                   +tmp *(-2d0*eta3*dik) *fcij*fcik 
+              dgdij= dfcij *fcik *tmp
+              dgdik= fcij *dfcik *tmp
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
+                   +dgdij*driji(1:3) +dgdik*driki(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
+              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik !*texp 
+              dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
+              dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
+              dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
+              igsf(isf,0,ia) = 1
+              igsf(isf,jj,ia) = 1
+              igsf(isf,kk,ia) = 1
             endif
 
           enddo ! isf=1,...
@@ -986,6 +1023,42 @@ contains
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgdij*drijj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgdik*drikk(1:3)
             dgcs= -2d0*eta*(cs-rs)*tmp *fcij*fcik
+            dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
+            dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
+            dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)
+            igsfi(isf,0) = 1
+            igsfi(isf,jj) = 1
+            igsfi(isf,kk) = 1
+!.....iyp==106:  (lmd +cos(thijk))^2/(lmd+1)^2 *fcij*fcik
+!.....   for force_fdesc with less dependent on bond length,
+!.....   but rather on bond angles.
+          else if( ityp.eq.106 ) then
+!.....fcij's should be computed after rcs is determined
+            call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
+            call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
+            almbd= desci%prms(1)
+            t2= (abs(almbd)+1d0)**2
+            driki(1:3)= -rik(1:3)/dik
+            drikk(1:3)= -driki(1:3)
+!.....function value
+            t1= (almbd +cs)**2
+!!$            eta3 = 0.5d0 /rcut**2
+!!$            texp = exp(-eta3*(dij2+dik2))
+            tmp = t1/t2 !*texp
+            gsfi(isf)= gsfi(isf) +tmp*fcij*fcik
+            gijk = gijk +tmp*fcij*fcik
+!.....derivative
+!!$            dgdij= dfcij *fcik *tmp &
+!!$                 +tmp *(-2d0*eta3*dij) *fcij*fcik 
+!!$            dgdik= fcij *dfcik *tmp &
+!!$                 +tmp *(-2d0*eta3*dik) *fcij*fcik 
+            dgdij= dfcij *fcik *tmp
+            dgdik= fcij *dfcik *tmp
+            dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) &
+                 +dgdij*driji(1:3) +dgdik*driki(1:3)
+            dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgdij*drijj(1:3)
+            dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgdik*drikk(1:3)
+            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik !*texp 
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)

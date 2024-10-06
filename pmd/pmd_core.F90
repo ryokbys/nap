@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-28 11:48:15 KOBAYASHI Ryo>
+!                     Last-modified: <2024-10-05 14:42:10 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -572,6 +572,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       is = int(tag(i))
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
     enddo
+    
     if( chgopt_method(1:4).eq.'xlag' ) call update_vauxq(aux(iaux_vq,:))
     if( index(cpctl,'lange').ne.0 ) call cvel_update_langevin(stnsr,h,mpi_md_world,1)
 

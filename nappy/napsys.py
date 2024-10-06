@@ -420,7 +420,7 @@ class NAPSystem(object):
         return None
 
     def get_scaled_positions(self):
-        return self.atoms[['x','y','z']].to_numpy()
+        return self.atoms[['x','y','z']].to_numpy(dtype=float)
 
     def set_scaled_positions(self,sposs):
         if len(sposs) != len(self.atoms):
@@ -431,7 +431,7 @@ class NAPSystem(object):
         return None
 
     def get_scaled_velocities(self):
-        return self.atoms[['vx','vy','vz']].to_numpy()
+        return self.atoms[['vx','vy','vz']].to_numpy(dtype=float)
 
     def get_real_velocities(self):
         hmat = self.get_hmat()
@@ -463,7 +463,7 @@ class NAPSystem(object):
         return None
 
     def get_scaled_forces(self):
-        return self.atoms[['fx','fy','fz']].to_numpy()
+        return self.atoms[['fx','fy','fz']].to_numpy(dtype=float)
 
     def set_scaled_forces(self,sfrcs):
         assert len(sfrcs) == len(self.atoms), 'Array size inconsistent.'
@@ -750,9 +750,9 @@ class NAPSystem(object):
             raise ValueError('ia > natms, ia,natms = ',ia,natm)
         if ja > natm:
             raise ValueError('ja > natms, ja,natms = ',ja,natm)
-        xi = self.atoms.loc[ia,['x','y','z']].to_numpy()
-        xj = self.atoms.loc[ja,['x','y','z']].to_numpy()
-        xij = xj-xi -np.round(xj-xi)
+        xi = self.atoms.loc[ia,['x','y','z']].to_numpy(dtype=float)
+        xj = self.atoms.loc[ja,['x','y','z']].to_numpy(dtype=float)
+        xij = xj-xi -np.rint(xj-xi)
         hmat = self.get_hmat()
         rij = np.dot(hmat,xij)
         rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
@@ -769,9 +769,9 @@ class NAPSystem(object):
             raise ValueError('j > natms, j,natms = ',j,natm)
         if k > natm:
             raise ValueError('k > natms, k,natms = ',k,natm)
-        xi = self.atoms.loc[i,['x','y','z']].to_numpy()
-        xj = self.atoms.loc[j,['x','y','z']].to_numpy()
-        xk = self.atoms.loc[k,['x','y','z']].to_numpy()
+        xi = self.atoms.loc[i,['x','y','z']].to_numpy(dtype=float)
+        xj = self.atoms.loc[j,['x','y','z']].to_numpy(dtype=float)
+        xk = self.atoms.loc[k,['x','y','z']].to_numpy(dtype=float)
         xij = xj-xi -np.round(xj-xi)
         xik = xk-xi -np.round(xk-xi)
         hmat = self.get_hmat()
@@ -1074,8 +1074,8 @@ class NAPSystem(object):
             newauxs[auxname] = []
         inc = 0
         poss = self.get_scaled_positions()
-        vels = self.atoms[['vx','vy','vz']].to_numpy()
-        frcs = self.atoms[['fx','fy','fz']].to_numpy()
+        vels = self.atoms[['vx','vy','vz']].to_numpy(dtype=float)
+        frcs = self.atoms[['fx','fy','fz']].to_numpy(dtype=float)
         for i1 in range(n1m,n1):
             for i2 in range(n2m,n2):
                 for i3 in range(n3m,n3):
@@ -1156,8 +1156,8 @@ class NAPSystem(object):
             newauxs[auxname] = []
         inc = 0
         poss = self.get_scaled_positions()
-        vels = self.atoms[['vx','vy','vz']].to_numpy()
-        frcs = self.atoms[['fx','fy','fz']].to_numpy()
+        vels = self.atoms[['vx','vy','vz']].to_numpy(dtype=float)
+        frcs = self.atoms[['fx','fy','fz']].to_numpy(dtype=float)
         for ia in range(len(self.atoms)):
             pi = poss[ia]
             survive = True

@@ -19,11 +19,11 @@ from nappy.util import get_tag, decode_tag, pbc, \
     scaled_to_cartesian, cartesian_to_scaled
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "240323"
+__version__ = "240903"
 
 READ_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
                 'cube','CHGCAR','pdb','extxyz')
-WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz')
+WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz', 'pdb')
 
 def write(nsys,fname="pmdini",format=None,**kwargs):
     global myopen, open
@@ -53,8 +53,11 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
         write_cube(nsys,fname,**kwargs)
     elif format in ('pdb','PDB'):
         import ase.io
-        ase.io.write(filename=fname,images=nsys.to_ase_atoms,
+        ase.io.write(filename=fname,images=nsys.to_ase_atoms(),
                      format='proteindatabank')
+    elif format in ('extxyz'):
+        with open(fname,'w') as f:
+            write_extxyz(f,nsys)
     else:
         raise IOError('Cannot write out in the given format: '+format)
 
@@ -90,6 +93,8 @@ def read(fname="pmdini",format=None, specorder=None, index=None):
         nsys = read_lammps_data(fname,specorder=specorder)
     elif format == 'cube':
         nsys = read_cube(fname,specorder=specorder)
+    elif format == 'extxyz':
+        nsys = read_extxyz(fname,specorder=specorder)
     else:
         print('Since the file format is unknown, try to read the file using ASE.')
         try:
@@ -1035,11 +1040,11 @@ def write_extxyz(fileobj, nsys):
     return None
 
 
-def read_extxyz(fileobj, ):
+def read_extxyz(fname, specorder=None):
     """
-    Read a nsys from extxyz format fileobj.
-    Since the extxyz can contain multiple configurations, this method uses
-    fileobj instead of filename.
+    Read an extxyz format using ASE package.
+    NOTE: extxyz file could contain multiple structures.
+    
     The extxyz format is defined in ASE and is like following:
     ---
     8
@@ -1055,33 +1060,21 @@ def read_extxyz(fileobj, ):
     ---
     """
 
-    natm = int(fileobj.readline().split()[0])
+    try:
+        import ase.io
+        atoms = ase.io.read(fname,format='extxyz',index=0)
+        nsys = from_ase(atoms)
+    except Exception as e:
+        print(' Failed to load input file even with ase.')
+        raise
 
-    comment = fileobj.readline()
-    # Analyze the comment line
-    
-    
-    hmat = nsys.get_hmat()
-    fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[0,:]))
-    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[1,:]))
-    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[2,:]))
-    fileobj.write('Properties=species:S:1:pos:R:3:frc:R:3')
-    fileobj.write('\n')
+    if specorder != None:
+        nsys.specorder != specorder
+        print(' specorder given     = ',specorder)
+        print(' specorder from file = ',nsys.specorder)
+        raise ValueError('Specorder specifically given and obtained from the file do not match!')
 
-    symbols = nsys.get_symbols()
-    poss = nsys.get_real_positions()
-    frcs = nsys.get_real_forces()
-    for i in range(len(nsys)):
-        si = symbols[i]
-        pi = poss[i]
-        fi = frcs[i]
-        fileobj.write(f'{si:2s}')
-        fileobj.write(f'{pi[0]:16.4f} {pi[1]:16.4f} {pi[2]:16.4f}')
-        fileobj.write(f'{fi[0]:16.3e} {fi[1]:16.3e} {fi[2]:16.3e}')
-        fileobj.write('\n')
-
-    return None
-
+    return nsys
     
 def read_CHGCAR(fname='CHGCAR',specorder=None,):
     """
@@ -1279,6 +1272,7 @@ def write_cube(nsys, fname='cube', origin=[0.,0.,0.]):
     with myopen(fname,mode) as f:
         f.write(txt)
     return None
+
 
 def get_cube_txt(nsys,origin=[0.,0.,0.]):
     """

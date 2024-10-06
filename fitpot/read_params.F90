@@ -299,6 +299,7 @@ subroutine read_params_desc()
   ncnst_type(103) = 1 ! cos(cos(thijk))
   ncnst_type(104) = 1 ! sin(cos(thijk))
   ncnst_type(105) = 2 ! exp(-eta*(cos(thijk)-rs)**2)
+  ncnst_type(106) = 1 ! angular6 (no exp term in angular1)
   ncomb_type(1:100) = 2    ! pair
   ncomb_type(101:200) = 3  ! triplet
 

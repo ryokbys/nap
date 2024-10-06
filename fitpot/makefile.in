@@ -55,7 +55,7 @@ define cd_test
 
 endef
 
-test:
+test: fitpot
 	@$(foreach x,$(wildcard $(fitpot_examples)),$(call cd_test, ${x}))
 
 

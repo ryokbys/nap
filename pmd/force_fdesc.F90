@@ -1,6 +1,6 @@
 module fdesc
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-28 11:51:17 KOBAYASHI Ryo>
+!                     Last-modified: <2024-08-23 16:13:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Potential in descriptor space.
 !  Originally for the purpose of restricting structure, at 2021-05-17, by R.K.
@@ -18,14 +18,17 @@ module fdesc
 
   logical:: lfdesc = .false.  ! Flag to use fdesc.
   logical:: initialized = .false.
-  logical:: pc1_as_edesc = .false.  ! pc1 value at edesci
+!!$  logical:: pc1_as_edesc = .false.  ! pc1 value at edesci
+! edesc_type: 0) energy, 1) dsq
+  integer:: edesc_type  = 0 
 
   integer:: ndim_desc = -1
   integer:: giddesc = -1
   real(8):: scnst = 1.0d0
   real(8):: gcoef = 0.1d0
   real(8):: gsgm  = 1.0d0
-  real(8),allocatable:: desctgt(:),descpca(:), descfrc(:,:),descstrs(:,:,:)
+  real(8),allocatable:: desctgt(:), descov(:,:), descacc(:,:), &
+       descpca(:), descfrc(:,:),descstrs(:,:,:)
   real(8):: edesc
 !  logical:: ldspc(nspmax)
 
@@ -56,6 +59,7 @@ contains
 !        print '(a,es11.3)','   Spring constant      = ',scnst
         print '(a,f7.3)','   Gaussian coeff.      = ',gcoef
         print '(a,f7.3)','   Gaussian sigma       = ',gsgm
+        print '(a,i3)',  '   edesc type           = ',edesc_type
       endif
     endif
 
@@ -81,18 +85,18 @@ contains
 !  ! gauss_coef         1.0   (common for all the descriptors)
 !  ! gauss_sigma        1.0   (common for all the descriptors)
 !  desc_dimension     55
-!  !  isf  desctgt  descpca
-!     1    0.1245   0.345  
-!     2    0.1452   0.456  
-!     3    0.1542   0.567  
+!  !  desctgt: (desctgt(i),i=1,ndim)
+!     0.123  0.234  2.345  3.212  0.432 ...
+!  !  descov: ((descov(i,j),j=1,ndim),i=1,ndim)  ! nsf entries per line, nsf lines
+!     0.123  0.234  0.345  ...
 !     ....
-!     55   0.1245   1.234  
+!     0.987  0.876  0.765 ...
 !-----------------------------------------------------------------------
 !
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     
-    integer:: nentry,isp,ierr,isf,idesc
+    integer:: nentry,isp,ierr,isf,jsf,idesc
     real(8):: tmp
     character:: cline*128, c1st*128, csp*3, cmode*128
     real(8),allocatable:: desctmp(:)
@@ -121,26 +125,30 @@ contains
           else if( trim(c1st).eq.'gauss_sigma' ) then
             backspace(ionum)
             read(ionum,*) c1st, gsgm
-          else if( trim(c1st).eq.'pc1_as_edesc' ) then
+          else if( trim(c1st).eq.'edesc_type' ) then
             backspace(ionum)
-            read(ionum,*) c1st, pc1_as_edesc
+            read(ionum,*) c1st, edesc_type
           else if( trim(c1st).eq.'desc_dimension' ) then
             backspace(ionum)
             read(ionum,*) c1st, ndim_desc
-            if( allocated(desctgt) ) deallocate(desctgt,descpca)
+            if( allocated(desctgt) ) deallocate(desctgt,descov,descacc)
             allocate(desctmp(ndim_desc),desctgt(ndim_desc), &
-                 descpca(ndim_desc))
+                 descov(ndim_desc,ndim_desc), descacc(ndim_desc,ndim_desc))
             cmode = 'read_descs'
           else
             print *,'There is no such fdesc keyword: ', trim(c1st)
           endif
         else if( trim(cmode).eq.'read_descs' ) then
           backspace(ionum)
-          read(ionum,*) idesc, desctgt(idesc), descpca(idesc)
-          if( idesc.gt.ndim_desc ) then
-            print *,'ERROR: desc-ID exceeds the descriptor dimension.'
-            stop 1
-          endif
+!.....Read target descriptor values
+          read(ionum,*) (desctgt(isf),isf=1,ndim_desc)
+!.....Read covariance matrix of the descriptor
+          read(ionum,*) ((descov(isf,jsf),jsf=1,ndim_desc),isf=1,ndim_desc)
+!!$          read(ionum,*) idesc, desctgt(idesc), descpca(idesc)
+!!$          if( idesc.gt.ndim_desc ) then
+!!$            print *,'ERROR: desc-ID exceeds the descriptor dimension.'
+!!$            stop 1
+!!$          endif
         endif
       enddo
 !!$      read(ionum,*) tmp
@@ -152,14 +160,18 @@ contains
     call mpi_bcast(ndim_desc,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(scnst,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(giddesc,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(pc1_as_edesc,1,mpi_logical,0,mpi_world,ierr)
+    call mpi_bcast(edesc_type,1,mpi_integer,0,mpi_world,ierr)
 !    call mpi_bcast(ldspc,nspmax,mpi_logical,0,mpi_world,ierr)
     if( myid.ne.0) then
-      if( allocated(desctgt) ) deallocate(desctgt, descpca)
-      allocate(desctgt(ndim_desc), descpca(ndim_desc))
+      if( allocated(desctgt) ) deallocate(desctgt, descov, descacc)
+      allocate(desctgt(ndim_desc), descov(ndim_desc,ndim_desc), &
+           descacc(ndim_desc,ndim_desc))
     endif
     call mpi_bcast(desctgt,ndim_desc,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(descpca,ndim_desc,mpi_real8,0,mpi_world,ierr)
+!!$    call mpi_bcast(descpca,ndim_desc,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(descov,ndim_desc**2,mpi_real8,0,mpi_world,ierr)
+!.....Calculate descacc by inverting descov
+    call ludc_inv(ndim_desc, descov, descacc)
 
     if( allocated(desctmp) ) deallocate(desctmp)
     return
@@ -181,9 +193,10 @@ contains
     real(8),intent(inout):: aa(3,namax),edesci(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
 
-    integer:: ia,igv,isf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
+    integer:: ia,igv,isf,jsf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
     real(8):: tmp,at(3),ave_aa,ave_dsp,dsq,dpca1,pca1,aexp, &
-         xi(3),xj(3),xij(3),rij(3),dij,sij
+         xi(3),xj(3),xij(3),rij(3),dij,sij,esp
+    real(8):: dxmah(nsf)
 
     if( .not.allocated(descfrc) ) then
       allocate(descfrc(3,namax),descstrs(3,3,namax))
@@ -204,20 +217,28 @@ contains
       igv = igvarOf(tag(ia),giddesc)
       if( igv.eq.0 ) cycle  ! fdesc works only on atoms of igv > 0 
       isp = int(tag(ia))
-!      if( .not. ldspc(isp) ) cycle  ! only specified species pass here
+!!$      if( .not. ldspc(isp) ) cycle  ! only specified species pass here
       call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
       xi(1:3) = ra(1:3,ia)
-      dpca1 = 0d0
-      pca1 = 0d0
+!!$      dpca1 = 0d0
+!!$      pca1 = 0d0
+      dsq = 0d0
+      dxmah(:) = 0d0
       do isf=1,nsf
-        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf)) * descpca(isf)
-        pca1 = pca1 + gsfi(isf) * descpca(isf)
+!!$        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf)) * descpca(isf)
+!!$        pca1 = pca1 + gsfi(isf) * descpca(isf)
+        do jsf=1,nsf
+          dxmah(isf) = dxmah(isf) +descacc(jsf,isf) *(gsfi(jsf)-desctgt(jsf))
+          dsq = dsq +(gsfi(isf)-desctgt(isf))*descacc(jsf,isf)*(gsfi(jsf)-desctgt(jsf))
+        enddo
       enddo
-      dsq = dpca1**2
-      aexp = -gcoef * exp(-dsq /2 /gsgm**2)
+!!$      dsq = dpca1**2
+!!$      aexp = -gcoef * exp(-dsq /2 /gsgm**2)
+      esp = 0.5d0 *scnst *dsq
       do isf=1,nsf
 !!$        tmp = scnst*dpca1 * descpca(isf)
-        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf)
+!!$        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf)
+        tmp = scnst *dxmah(isf)
 !.....Compute spring forces
         do jj=1,lspr(0,ia)
           ja = lspr(jj,ia)
@@ -238,13 +259,14 @@ contains
         enddo ! jj
         descfrc(1:3,ia) = descfrc(1:3,ia) -dgsfi(1:3,isf,0)*tmp
       enddo ! isf
-      if( pc1_as_edesc ) then
-        edesci(ia) = edesci(ia) + dpca1
+      if( edesc_type.eq.1 ) then  ! sqrt(dsq) value
+        edesci(ia) = edesci(ia) + sqrt(dsq)
       else
-        edesci(ia) = edesci(ia) + aexp
+        edesci(ia) = edesci(ia) + esp
       endif
 !!$      edesc = edesc +0.5d0 *scnst *dsq
-      edesc = edesc +aexp
+!!$      edesc = edesc +aexp
+      edesc = edesc +esp
     enddo ! ia
 
 !.....Send back forces on immigrants to the neighboring nodes
@@ -255,12 +277,12 @@ contains
 !!$      at(1:3)= descfrc(1:3,i)
 !!$      descfrc(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
 !!$    enddo
-    if( iprint.ge.ipl_debug .and. myid.eq.0 ) then
-      print '(a,es12.3)','edesc = ',edesc
-      do i=1,10
-        print '(i6, 6(2x, es12.3))', i, descfrc(1:3,i), aa(1:3,i)
-      enddo
-    endif
+!!$    if( iprint.ge.ipl_debug .and. myid.eq.0 ) then
+!!$      print '(a,es12.3)','edesc = ',edesc
+!!$      do i=1,10
+!!$        print '(i6, 6(2x, es12.3))', i, descfrc(1:3,i), aa(1:3,i)
+!!$      enddo
+!!$    endif
 !.....Add desc forces to the original forces
     aa(1:3,1:natm) = aa(1:3,1:natm) +descfrc(1:3,1:natm)
 !.....Gather epot

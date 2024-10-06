@@ -18,7 +18,7 @@ import random,math
 import json
 
 _descfname = 'in.params.desc'
-_paramfname = 'in.params.NN2'
+_paramfname = 'in.params.'
 _logfname = 'log.make_params_NN'
 
 #...initial range of parameters
@@ -26,7 +26,8 @@ _pmin = -20.0
 _pmax =  20.0
 
 _type_avail = ('Gaussian','cosine','polynomial','Morse','angular',
-               'angular1','angular2','angular3','angular4','angular5')
+               'angular1','angular2','angular3','angular4','angular5',
+               'angular6')
 _type_2body = ('Gaussian','cosine','polynomial','Morse',)
 _type_3body = ('angular','angular1','angular2','angular3','angular4','angular5')
 _type2num = {
@@ -40,6 +41,7 @@ _type2num = {
     'angular3': 103,
     'angular4': 104,
     'angular5': 105,
+    'angular6': 106,
 }
 _nparam_type = {
     'Gaussian': 2,
@@ -52,6 +54,7 @@ _nparam_type = {
     'angular3': 2,
     'angular4': 2,
     'angular5': 3,
+    'angular6': 3,
 }
 
 def _num2type(num):
@@ -275,7 +278,7 @@ def get_nsf3(triplets):
         nsf3 += len(triplet.sfparams)
     return nsf3
     
-def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
+def create_param_files(inputs,nsf2,pairs,nsf3,triplets,frctype='NN2'):
 
     # print('inputs = ',inputs)
     nl = inputs['nl']
@@ -339,7 +342,7 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                 cspi,cspj,cspk = triple.get_csps()
                 for isf,sf in enumerate(triple.sfparams):
                     t = sf[0]
-                    if t in ('angular','angular1'):
+                    if t in ('angular','angular1','angular6'):
                         a = sf[1]
                         ang = -math.cos(a/180*math.pi)
                         f.write(' {0:3d} '.format(_type2num[t]) \
@@ -370,17 +373,27 @@ def create_param_files(inputs,nsf2,pairs,nsf3,triplets):
                                 +' {0:10.4f} {1:10.4f}\n'.format(eta,rs))
         f.close()
 
-    with open(_paramfname,'w') as g:
-        if nl == 1:
-            nc= nhl[0]*nhl[1] +nhl[1]
-            g.write(' {0:4d} {1:6d} {2:4d}\n'.format(nl,nsf,nhl[1]))
-        elif nl == 2:
-            nc= nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
-            g.write(' {0:4d} {1:4d} {2:3d} {3:3d}\n'.format(nl,nsf,nhl[1],nhl[2]))
-        for ic in range(nc):
-            g.write(' {0:10.6f}'.format(random.uniform(_pmin,_pmax)))
-            g.write(' {0:10.4f} {1:10.4f}\n'.format(_pmin,_pmax))
-        g.close()
+    if frctype == 'NN2':
+        with open(_paramfname+frctype,'w') as g:
+            if nl == 1:
+                nc= nhl[0]*nhl[1] +nhl[1]
+                g.write(' {0:4d} {1:6d} {2:4d}\n'.format(nl,nsf,nhl[1]))
+            elif nl == 2:
+                nc= nhl[0]*nhl[1] +nhl[1]*nhl[2] +nhl[2]
+                g.write(' {0:4d} {1:4d} {2:3d} {3:3d}\n'.format(nl,nsf,nhl[1],nhl[2]))
+            for ic in range(nc):
+                g.write(' {0:10.6f}'.format(random.uniform(_pmin,_pmax)))
+                g.write(' {0:10.4f} {1:10.4f}\n'.format(_pmin,_pmax))
+            g.close()
+    elif frctype == 'linreg':
+        with open(_paramfname+frctype,'w') as g:
+            nc = nhl[0]
+            g.write(f' {nc:d}\n')
+            for ic in range(nc):
+                g.write(' {0:10.6f}\n'.format(random.uniform(_pmin,_pmax)))
+            g.close()
+    else:
+        raise NotImplementedError(f'No such frctype: {frctype}')
 
     return
 

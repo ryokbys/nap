@@ -1,6 +1,6 @@
 module group
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-07-25 11:14:34 KOBAYASHI Ryo>
+!                     Last modified: <2024-07-28 14:30:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Module for grouping atoms.
 !-----------------------------------------------------------------------
@@ -102,7 +102,9 @@ contains
       do i=1,npair
         ispc(igrp,itmp(i,1)) = itmp(i,2)
       enddo
-      gtiming(igrp) = -1  ! only at the 1st time
+!.....If gtiming==0, set -1 (only at 1st time),
+!.....otherwise keep the value as is.
+      if( gtiming(igrp).eq.0 ) gtiming(igrp) = -1
       deallocate(itmp)
     else if( trim(cgname).eq.'sphere' ) then
 ! e.g.) group  1  sphere  20.0  0.5  0.5  0.5  1  2
@@ -121,6 +123,7 @@ contains
       sph_org(igrp,1:3) = (/ orgx, orgy, orgz /)
       sph_rad2(igrp) = rad**2
       isph(igrp,1:2) = (/ kin, kout /)
+!.....In any case, set gtiming to 1.
       gtiming(igrp) = 1
     else
       print *,'WARNING: no such group name: '//trim(cgname)
