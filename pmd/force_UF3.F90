@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-10-06 00:43:51 KOBAYASHI Ryo>
+!                     Last modified: <2024-10-11 10:56:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -171,12 +171,12 @@ contains
             backspace(ioprms)
             i2b = i2b +1
             call read_2b(prm2s(i2b),i2b)
-            if( iprint >= ipl_debug ) call print_2b(prm2s(i2b))
+            if( iprint >= ipl_basic ) call print_2b(prm2s(i2b))
           else if( cb == '3B' ) then
             backspace(ioprms)
             i3b = i3b +1
             call read_3b(prm3s(i3b),i3b)
-            if( iprint >= ipl_debug ) call print_3b(prm3s(i3b))
+            if( iprint >= ipl_basic ) call print_3b(prm3s(i3b))
           endif
         endif
 !        if( ierr /= 0 ) cycle

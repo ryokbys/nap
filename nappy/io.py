@@ -1019,10 +1019,12 @@ def write_extxyz(fileobj, nsys):
 
     fileobj.write('{0:d}\n'.format(len(nsys)))
     hmat = nsys.get_hmat()
+    epot = nsys.get_potential_energy()
     fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[0,:]))
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[1,:]))
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[2,:]))
-    fileobj.write('Properties=species:S:1:pos:R:3:frc:R:3')
+    fileobj.write('Properties=species:S:1:pos:R:3:forces:R:3 ')
+    fileobj.write(f'energy={epot} ')
     fileobj.write('\n')
 
     symbols = nsys.get_symbols()
@@ -1439,9 +1441,11 @@ def from_ase(atoms, specorder=None, get_forces=True):
         vels = np.zeros((natm,3))
     else:
         vels = np.array(vels)
+    epot = None
     frcs = np.zeros((natm,3))
     if get_forces:
         try:
+            epot = atoms.get_potential_energy()
             frcs = atoms.get_forces()
         except:
             pass
@@ -1450,20 +1454,13 @@ def from_ase(atoms, specorder=None, get_forces=True):
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]
     nsys.atoms.sid = sids
 
-
     nsys.atoms['x'] = poss[:,0]
     nsys.atoms['y'] = poss[:,1]
     nsys.atoms['z'] = poss[:,2]
     nsys.set_real_velocities(vels)
-    # for i in range(len(vels)):
-    #     vels[i] = np.dot(celli,vels[i])
-    # nsys.atoms['vx']= vels[:,0]
-    # nsys.atoms['vy']= vels[:,1]
-    # nsys.atoms['vz']= vels[:,2]
     nsys.set_real_forces(frcs)
-    # nsys.atoms['fx']= frcs[:,0]
-    # nsys.atoms['fy']= frcs[:,1]
-    # nsys.atoms['fz']= frcs[:,2]
+    if epot is not None:
+        nsys.set_potential_energy(epot)
 
     return nsys
 

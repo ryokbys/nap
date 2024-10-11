@@ -46,6 +46,7 @@ from datetime import datetime
 import numpy as np
 import copy
 from docopt import docopt
+from typing import List
 
 import nappy
 from nappy.gaussian_smear import gsmear
@@ -635,6 +636,39 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     plt.show()
     return None
 
+def gen_plot_rdf(datafname: str,
+                 specorder: List[str],
+                 rd: List[float],
+                 gpfname: str = None) -> str:
+    """Generate plot_rdf.gp file from pair data.
+    """
+    n=2
+    num_pair_dict = {}
+    nsp = len(specorder)
+    for isid in range(1,nsp+1):
+        si = specorder[isid-1]
+        for jsid in range(isid,nsp+1):
+            sj = specorder[jsid-1]
+            n += 1
+            num_pair_dict[n] = (si,sj)
+    datestr = datetime.now().strftime('%y%m%d')
+    if gpfname is None:
+        gpfname = f'plot_rdf_{datestr}.gp'
+    with open(gpfname, 'w') as f:
+        f.write("set xl 'Distance (Ang.)'\n")
+        f.write("set yl 'RDF'\n")
+        f.write(f"set xr [{rd[0]:.1f}:{rd[-1]:.1f}]\n")
+        for m in range(2,max(num_pair_dict.keys())+1):
+            if m == 2:
+                f.write(f"p '{datafname}' ")
+                f.write(f"us 1:{m} w l lt {m-1} lw 2 t 'Total'")
+            else:
+                f.write(f", '' ")
+                si,sj = num_pair_dict[m]
+                f.write(f"us 1:{m} w l lt {m-1} lw 2 t '{si}-{sj}'")
+        f.write('\n')
+    return gpfname
+
 def main():
 
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
@@ -757,6 +791,7 @@ def main():
 
     # Regardless ofname, write out.rdf in normal format
     write_rdf_normal('out.rdf', specorder, nspcs, rd, agr, nr,)
+    gpfname = gen_plot_rdf('out.rdf', specorder, rd)
     if SQ:
         write_sq_out4fp('out.sq',qs,sqs)
     # Format of output (named by ofname) depends on out4fp
@@ -767,6 +802,7 @@ def main():
         else:
             write_rdf_normal(ofname, specorder, nspcs,
                              rd, agr, nr,)
+            gpfname = gen_plot_rdf(ofname, specorder, rd)
 
     if plot:
         plot_figures(specorder, rd, agr)
@@ -779,6 +815,8 @@ def main():
     else:
         print(' Check out.rdf with gnuplot, like')
         print("   gnuplot> plot 'out.rdf' us 1:2  w l")
+        print('   or')
+        print(f"   gnuplot> load '{gpfname}'")
         print('')
         if ofname is not None:
             print(" In addition to out.rdf,"
