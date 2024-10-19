@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-10-11 10:56:14 KOBAYASHI Ryo>
+!                     Last modified: <2024-10-19 10:46:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -51,6 +51,7 @@ module UF3
   type(prm2),allocatable:: prm2s(:)
   type(prm3),allocatable:: prm3s(:)
   logical:: has_trios = .false.
+  real(8):: rcmax = 0.0d0
   
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
@@ -216,6 +217,7 @@ contains
     jsp = csp2isp(ps%csj)
     interact2(isp,jsp) = i2b
     interact2(jsp,isp) = i2b
+    rcmax = max(ps%rc,rcmax)
   end subroutine read_2b
 !=======================================================================
   subroutine read_3b(ps,i3b)
@@ -253,6 +255,8 @@ contains
     ksp = csp2isp(ps%csk)
     interact3(isp,jsp,ksp) = i3b
     interact3(isp,ksp,jsp) = i3b
+    rcmax = max(ps%rcij,rcmax)
+    rcmax = max(ps%rcik,rcmax)
   end subroutine read_3b
 !=======================================================================
   subroutine bcast_uf3_params(mpi_world,myid)
@@ -337,12 +341,13 @@ contains
 
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
-         nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,bij,dbij,&
+         nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
+         ixyz,jxyz
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij,dbij,&
          bij3(4),dbij3(4),bik3,dbik3,bjk3,dbjk3,c2t,c3t
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
-         drjkk(3)
+         drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
     real(8),save,allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
     real(8),save:: rcin2
 
@@ -352,6 +357,14 @@ contains
     if( l1st ) then
       if( allocated(aal2) ) deallocate(aal2,strsl)
       allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
+      if( rcin < rcmax ) then
+        if( myid == 0 ) then
+          write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
+          write(6,'(1x,a,f0.3)') "  rc should be longer than ", rcmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
       rcin2 = rcin*rcin
     endif
 
@@ -396,8 +409,18 @@ contains
 !!$          epotl2 = epotl2 + tmp + tmp
 !.....Forces
           dbij = db_spl(n,3,dij,p2%knots,p2%nknot)
-          aal2(1:3,ia) = aal2(1:3,ia) +drijj(1:3)*dbij*c2t
-          aal2(1:3,ja) = aal2(1:3,ja) -drijj(1:3)*dbij*c2t
+          tmp2 = dbij*c2t
+          aal2(1:3,ia) = aal2(1:3,ia) +drijj(1:3)*tmp2
+          aal2(1:3,ja) = aal2(1:3,ja) -drijj(1:3)*tmp2
+!.....Stresses
+          do ixyz=1,3
+            do jxyz=1,3
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+              strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+            enddo
+          enddo
         enddo
       enddo
 
@@ -471,15 +494,27 @@ contains
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
 !.....Force
-                    aal3(1:3,ia)= aal3(1:3,ia) &
-                         +c3t*(dbij3(l)*bik3*bjk3*drijj(1:3) &
-                         +bij3(l)*dbik3*bjk3*drikk(1:3))
-                    aal3(1:3,ja)= aal3(1:3,ja) &
-                         +c3t*(dbij3(l)*bik3*bjk3*(-drijj(1:3)) &
-                         +bij3(l)*bik3*dbjk3*drjkk(1:3))
-                    aal3(1:3,ka)= aal3(1:3,ka) &
-                         +c3t*(bij3(l)*dbik3*bjk3*(-drikk(1:3)) &
-                         +bij3(l)*bik3*dbjk3*(-drjkk(1:3)))
+                    tmpij(1:3) = dbij3(l)*bik3*bjk3*drijj(1:3)
+                    tmpik(1:3) = bij3(l)*dbik3*bjk3*drikk(1:3)
+                    tmpjk(1:3) = bij3(l)*bik3*dbjk3*drjkk(1:3)
+!!$                    tmpj(1:3) = c3t*(dbij3(l)*bik3*bjk3*(-drijj(1:3)) &
+!!$                         +)
+!!$                    tmpk(1:3) = c3t*(bij3(l)*dbik3*bjk3*(-drikk(1:3)) &
+!!$                         +bij3(l)*bik3*dbjk3*(-drjkk(1:3)))
+                    aal3(1:3,ia)= aal3(1:3,ia) +c3t*(tmpij(1:3) +tmpik(1:3))
+                    aal3(1:3,ja)= aal3(1:3,ja) +c3t*(-tmpij(1:3) +tmpjk(1:3))
+                    aal3(1:3,ka)= aal3(1:3,ka) +c3t*(-tmpik(1:3) -tmpjk(1:3))
+!.....Stresses
+                    do jxyz=1,3
+                      do ixyz=1,3
+                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
+                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
+                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
+                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
+                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                      enddo
+                    enddo
                   enddo ! nij
                 enddo ! njk
               enddo ! nik
@@ -498,7 +533,7 @@ contains
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
     epot2 = 0d0

@@ -108,7 +108,7 @@ def erg_vs_size(fname,al_min,al_max,niter,mdexec):
         replace_1st_line(al,fname)
         #os.system('rm -f out.pmd')
         #os.system(mdexec +' 2>&1 > out.pmd')
-        pmdout = subprocess.check_output(mdexec)
+        pmdout = subprocess.check_output(mdexec, shell=True)
         with open('out.pmd','w') as f:
             f.write(pmdout.decode('utf-8'))
         cmdstr = "grep 'Potential energy' out.pmd | tail -n1 | awk '{print $3}'"
@@ -140,7 +140,11 @@ def main():
     al_min = float(args['MIN'])
     al_max = float(args['MAX'])
 
-    als,vols,ergs,prss,al_orig,hmat,natm = erg_vs_size(_infname,al_min,al_max,niter,mdexec)
+    als,vols,ergs,prss,al_orig,hmat,natm = erg_vs_size(_infname,
+                                                       al_min,
+                                                       al_max,
+                                                       niter,
+                                                       mdexec)
 
     logfile= open('log.energy_vs_size','w')
     outfile1= open('out.energy_vs_size','w')
