@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-10-19 10:46:29 KOBAYASHI Ryo>
+!                     Last modified: <2024-10-23 14:07:17 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -55,6 +55,8 @@ module UF3
   
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
+!.....Cutoffs
+  real(8):: rc2_3b(nspmax,nspmax)
   
 !.....constants
   integer:: nelem,nexp,nsp
@@ -257,6 +259,10 @@ contains
     interact3(isp,ksp,jsp) = i3b
     rcmax = max(ps%rcij,rcmax)
     rcmax = max(ps%rcik,rcmax)
+    rc2_3b(isp,jsp) = max(ps%rcij2, rc2_3b(isp,jsp))
+    rc2_3b(isp,ksp) = max(ps%rcik2, rc2_3b(isp,ksp))
+    rc2_3b(jsp,isp) = rc2_3b(isp,jsp)
+    rc2_3b(ksp,isp) = rc2_3b(isp,ksp)
   end subroutine read_3b
 !=======================================================================
   subroutine bcast_uf3_params(mpi_world,myid)
@@ -327,6 +333,12 @@ contains
   subroutine force_uf3(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
+!
+!  UF3 implementation without using recursive function of b-spline.
+!  
+!  TODO: More efficient B-spline implementation is available (see, lammps src/ML-UF3/pair_uf3.cpp).
+!        But that is a bit complicated, use simple b_spl() routine for now.
+!
     use util, only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -342,9 +354,262 @@ contains
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
          nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
-         ixyz,jxyz
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij,dbij,&
-         bij3(4),dbij3(4),bik3,dbik3,bjk3,dbjk3,c2t,c3t
+         ixyz,jxyz,lij,lik,ljk
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
+         c2t,c3t
+    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+         rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
+         drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
+    real(8),save,allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
+    real(8),save:: rcin2
+    integer,save,allocatable:: ls3b(:)
+
+    type(prm2):: p2
+    type(prm3):: p3
+
+    if( l1st ) then
+      if( allocated(aal2) ) deallocate(aal2,aal3,strsl,ls3b)
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+      if( rcin < rcmax ) then
+        if( myid == 0 ) then
+          write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
+          write(6,'(1x,a,f0.3)') "  rc should be longer than ", rcmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+      rcin2 = rcin*rcin
+    endif
+
+    if( size(aal2) < 3*namax ) then
+      deallocate(aal2,aal3,strsl)
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
+    endif
+
+    if( size(ls3b) < nnmax+1 ) then
+      deallocate(ls3b)
+      allocate(ls3b(0:nnmax))
+    endif
+
+    aal2(:,:) = 0d0
+    aal3(:,:) = 0d0
+    strsl(:,:,:) = 0d0
+    epotl2 = 0d0
+    epotl3 = 0d0
+!$omp parallel
+!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij,drijj,nr2, &
+!$omp      n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
+!$omp      jsp,ksp,i3b,p3,nij3,inc,bij3,dbij3, &
+!$omp      kk,ka,ks,xk,xik,xjk,rik,dik2,dik,rjk,djk2,djk, &
+!$omp      drikk,drjkk,nik3,njk3,nik,bik3,dbik3,njk,bjk3,dbjk3, &
+!$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
+!$omp      reduction(+:epotl2,epotl3)
+    do ia=1,natm
+      is = int(tag(ia))
+      xi(1:3) = ra(1:3,ia)
+      ls3b(0) = 0
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+!!$        if( ja <= ia ) cycle
+        js = int(tag(ja))
+!.....Pair terms
+        i2b = interact2(is,js)
+        if( i2b <= 0 ) cycle
+        p2 = prm2s(i2b)
+        xj(1:3) = ra(1:3,ja)
+        xij(1:3) = xj(1:3) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2 > p2%rc2 ) cycle
+        dij = sqrt(dij2)
+!.....Make short-distance pair-list for 3-body term
+        if( has_trios ) then
+          if( dij2 < rc2_3b(is,js) ) then
+            ls3b(0) = ls3b(0) +1
+            ls3b(ls3b(0)) = ja
+          endif
+        endif
+        drijj(1:3) = rij(1:3)/dij
+        call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          c2t = p2%coefs(n)
+          tmp = c2t *bij(lij)
+!.....Energy
+          epi(ia) = epi(ia) +tmp
+          epotl2 = epotl2 +tmp
+!.....Forces
+          tmp2 = c2t *dbij(lij)
+          do ixyz=1,3
+!$omp atomic
+            aal2(ixyz,ia) = aal2(ixyz,ia) +drijj(ixyz)*tmp2
+!$omp atomic
+            aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
+          enddo
+!.....Stresses
+          do ixyz=1,3
+            do jxyz=1,3
+!$omp atomic
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+!$omp atomic
+              strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+            enddo
+          enddo
+        enddo  ! lij
+      enddo
+
+!.....Trio part is separated from pair part,
+!.....which may be slower because of double computation of dij,
+!.....but this code is a bit simpler.
+      if( .not.has_trios ) cycle
+      do jsp=1,nspmax
+        do ksp=jsp,nspmax
+          i3b = interact3(is,jsp,ksp)
+          if( i3b <= 0 ) cycle
+          p3 = prm3s(i3b)
+!!$          do jj=1,lspr(0,ia)
+!!$            ja = lspr(jj,ia)
+          do jj=1,ls3b(0)
+            ja = ls3b(jj)
+            js = int(tag(ja))
+            if( js /= jsp ) cycle
+            xj(1:3) = ra(1:3,ja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+            dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+            if( dij2 > p3%rcij2 ) cycle
+            dij = sqrt(dij2)
+            drijj(1:3) = rij(1:3)/dij
+            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+            
+!!$            do kk=1,lspr(0,ia)
+!!$              ka = lspr(kk,ia)
+            do kk=1,ls3b(0)
+              ka = ls3b(kk)
+              if( jsp == ksp .and. ka <= ja ) cycle
+              ks = int(tag(ka))
+              if( ks /= ksp ) cycle
+              xk(1:3) = ra(1:3,ka)
+              xik(1:3) = xk(1:3) -xi(1:3)
+              xjk(1:3) = xk(1:3) -xj(1:3)
+              rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+              dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
+              if( dik2 > p3%rcik2 ) cycle
+              dik = sqrt(dik2)
+              rjk(1:3) = h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
+              djk2 = rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
+              if( djk2 > p3%rcjk2 ) cycle
+              djk = sqrt(djk2)
+              drikk(1:3) = rik(1:3)/dik
+              drjkk(1:3) = rjk(1:3)/djk
+!.....B-spline part
+              call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
+              call b_spl(djk, p3%knjk, p3%nknjk, njk3, bjk3, dbjk3)
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+                do ljk = -3,0
+                  njk = njk3 +ljk
+                  if( njk < 1 .or. njk > p3%nknjk-4 ) cycle
+                  do lij = -3,0
+                    nij = nij3 +lij
+                    if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+!.....Energy
+                    c3t = p3%coefs(nij,nik,njk)
+                    tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
+                    epi(ia) = epi(ia) +tmp
+                    epotl3 = epotl3 +tmp
+!.....Force
+                    tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
+                    tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
+                    tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
+                    do ixyz=1,3
+!$omp atomic
+                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
+!$omp atomic
+                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
+!$omp atomic
+                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
+                    enddo
+!.....Stresses
+                    do jxyz=1,3
+                      do ixyz=1,3
+!$omp atomic
+                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
+                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
+!$omp atomic
+                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
+                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+!$omp atomic
+                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
+                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                      enddo
+                    enddo
+                    
+                  enddo  ! lij
+                enddo  ! ljk
+              enddo  ! lik
+
+            enddo  ! kk
+          enddo  ! jj
+        enddo  ! ksp
+      enddo  ! jsp
+
+    enddo ! ia
+!$omp end do
+!$omp end parallel
+
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aal2,3)
+    if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aal3,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
+
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strsl,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+
+!-----gather epot
+    epot2 = 0d0
+    epot3 = 0d0
+    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    epot= epot +epot2 +epot3
+    if( myid == 0 .and. iprint > 2 ) &
+         print '(a,2es12.4)',' force_uf3 epot2,epot3 = ',epot2,epot3
+
+    return
+  end subroutine force_uf3
+!=======================================================================
+  subroutine force_uf3_rec(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
+       ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
+!
+!  Recursive implementation of force_uf3.
+!
+    use util, only: itotOf
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
+    real(8),intent(in):: ra(3,namax),tag(namax) &
+         ,h(3,3),hi(3,3),sv(3,6)
+    real(8),intent(inout):: rcin
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st 
+    logical:: lstrs
+
+!.....local
+    integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
+         nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
+         ixyz,jxyz,lij,lik,ljk
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij,dbij, &
+         bij3(4),dbij3(4),bik3,dbik3,bjk3,dbjk3, &
+         c2t,c3t
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -378,6 +643,14 @@ contains
     strsl(1:3,1:3,1:namax) = 0d0
     epotl2 = 0d0
     epotl3 = 0d0
+!$omp parallel
+!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij,drijj,nr2, &
+!$omp      n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
+!$omp      jsp,ksp,i3b,p3,nij3,inc,bij3,dbij3, &
+!$omp      kk,ka,ks,xk,xik,xjk,rik,dik2,dik,rjk,djk2,djk, &
+!$omp      drikk,drjkk,nik3,njk3,nik,bik3,dbik3,njk,bjk3,dbjk3, &
+!$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
+!$omp      reduction(+:epotl2,epotl3)
     do ia=1,natm
       is = int(tag(ia))
       xi(1:3) = ra(1:3,ia)
@@ -398,25 +671,28 @@ contains
         drijj(1:3) = rij(1:3)/dij
 !.....Look for nr2 from knots data
         nr2 = knot_index(dij, p2%nknot, p2%knots)
-        do n=nr2-3,nr2
-          if( n < 1 .or. n > p2%nknot-4 ) cycle
-          bij = b_spl(n,3,dij,p2%knots,p2%nknot)
+        do n=max(1,nr2-3),min(nr2,p2%nknot-4)
+          bij = b_spl_rec(n,3,dij,p2%knots,p2%nknot)
           c2t = p2%coefs(n)
           tmp = c2t *bij
           epi(ia) = epi(ia) +tmp
           epotl2 = epotl2 + tmp
-!!$          epi(ja) = epi(ja) +tmp
-!!$          epotl2 = epotl2 + tmp + tmp
 !.....Forces
           dbij = db_spl(n,3,dij,p2%knots,p2%nknot)
           tmp2 = dbij*c2t
-          aal2(1:3,ia) = aal2(1:3,ia) +drijj(1:3)*tmp2
-          aal2(1:3,ja) = aal2(1:3,ja) -drijj(1:3)*tmp2
+          do ixyz=1,3
+!$omp atomic
+            aal2(ixyz,ia) = aal2(ixyz,ia) +drijj(ixyz)*tmp2
+!$omp atomic
+            aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
+          enddo
 !.....Stresses
           do ixyz=1,3
             do jxyz=1,3
+!$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
                    -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+!$omp atomic
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
                    -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
             enddo
@@ -444,6 +720,7 @@ contains
             if( dij2 > p3%rcij2 ) cycle
             dij = sqrt(dij2)
             drijj(1:3) = rij(1:3)/dij
+!!$            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
             nij3 = knot_index(dij, p3%nknij, p3%knij)
             inc = 0
             bij3(:) = 0d0
@@ -451,10 +728,10 @@ contains
             do n=nij3-3,nij3
               inc = inc +1
               if( n < 1 .or. n > p3%nknij-4 ) cycle
-              bij3(inc) = b_spl(n,3,dij, p3%knij, p3%nknij)
+              bij3(inc) = b_spl_rec(n,3,dij, p3%knij, p3%nknij)
               dbij3(inc) = db_spl(n,3,dij, p3%knij, p3%nknij)
             enddo
-
+              
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( jsp == ksp .and. ka <= ja ) cycle
@@ -471,18 +748,16 @@ contains
               djk2 = rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
               if( djk2 > p3%rcjk2 ) cycle
               djk = sqrt(djk2)
-              drikk(1:3) = rik(1:3)/dik
-              drjkk(1:3) = rjk(1:3)/djk
               nik3 = knot_index(dik, p3%nknik, p3%knik)
               njk3 = knot_index(djk, p3%nknjk, p3%knjk)
 !.....B-spline part
               do nik=nik3-3,nik3
                 if( nik < 1 .or. nik > p3%nknik-4 ) cycle
-                bik3 = b_spl(nik,3,dik, p3%knik, p3%nknik)
+                bik3 = b_spl_rec(nik,3,dik, p3%knik, p3%nknik)
                 dbik3 = db_spl(nik,3,dik, p3%knik, p3%nknik)
                 do njk=njk3-3,njk3
                   if( njk < 1 .or. njk > p3%nknjk-4 ) cycle
-                  bjk3 = b_spl(njk,3,djk, p3%knjk, p3%nknjk)
+                  bjk3 = b_spl_rec(njk,3,djk, p3%knjk, p3%nknjk)
                   dbjk3 = db_spl(njk,3,djk, p3%knjk, p3%nknjk)
                   l = 0
                   do nij=nij3-3,nij3
@@ -497,20 +772,24 @@ contains
                     tmpij(1:3) = dbij3(l)*bik3*bjk3*drijj(1:3)
                     tmpik(1:3) = bij3(l)*dbik3*bjk3*drikk(1:3)
                     tmpjk(1:3) = bij3(l)*bik3*dbjk3*drjkk(1:3)
-!!$                    tmpj(1:3) = c3t*(dbij3(l)*bik3*bjk3*(-drijj(1:3)) &
-!!$                         +)
-!!$                    tmpk(1:3) = c3t*(bij3(l)*dbik3*bjk3*(-drikk(1:3)) &
-!!$                         +bij3(l)*bik3*dbjk3*(-drjkk(1:3)))
-                    aal3(1:3,ia)= aal3(1:3,ia) +c3t*(tmpij(1:3) +tmpik(1:3))
-                    aal3(1:3,ja)= aal3(1:3,ja) +c3t*(-tmpij(1:3) +tmpjk(1:3))
-                    aal3(1:3,ka)= aal3(1:3,ka) +c3t*(-tmpik(1:3) -tmpjk(1:3))
+                    do ixyz=1,3
+!$omp atomic
+                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
+!$omp atomic
+                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
+!$omp atomic
+                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
+                    enddo
 !.....Stresses
                     do jxyz=1,3
                       do ixyz=1,3
+!$omp atomic
                         strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
                              -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
+!$omp atomic
                         strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
                              -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+!$omp atomic
                         strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
                              -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
                       enddo
@@ -525,12 +804,15 @@ contains
       enddo  ! jsp
 
     enddo ! ia
+!$omp end do
+!$omp end parallel
 
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal2,3)
     if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal3,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
+
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
@@ -545,9 +827,79 @@ contains
          print '(a,2es12.4)',' force_uf3 epot2,epot3 = ',epot2,epot3
 
     return
-  end subroutine force_uf3
+  end subroutine force_uf3_rec
 !=======================================================================
-  recursive function b_spl(n,d,r,ts,nmax) result(val)
+  subroutine b_spl(r,ts,nmax,nr,b,db)
+!
+!  Non-recursive implementation of B-spline function at R.
+!  Assuming maximum order (d) = 3.
+!
+!  Args:
+!    r --- position to be evaluated
+!    ts --- a list of knots {t_n}
+!    nmax --- length of ts
+!
+!  Return:
+!    nr: index n in ts of position r
+!    b: B array
+!    db: dB array (derivative of B)
+!
+    integer,intent(in):: nmax
+    real(8),intent(in):: r,ts(nmax)
+    integer,intent(out):: nr
+    real(8),intent(out):: b(-3:0), db(-3:0)
+!.....local variables
+    real(8):: btmp(-3:+1,0:3)  ! Temporal B(n,d) array with n in (-3,+1)
+    real(8):: dbtmp(-3:0)
+    integer:: id, n, l
+    real(8):: tn0,tn1,tn2,tn3,tn4,dt1,dt2,tmp1,tmp2
+    real(8),parameter:: teps = 1d-8  ! epsilon for neighboring knot distance
+
+!...index in the knot where ts(nr) <= r < ts(nr+1)
+    nr = knot_index(r,nmax,ts)
+
+!.....Compute B(n,d)
+    btmp(:,:) = 0d0
+    btmp(0,0) = 1d0
+    do id = 1,3
+      do l = -id,0
+        n = nr +l
+        tn0 = ts(n)
+        tn1 = ts(n+id)
+        dt1 = tn1 -tn0
+        tmp1 = 0d0
+        if( abs(dt1) > teps ) tmp1 = (r-tn0)/dt1 *btmp(l,id-1)
+        tn2 = ts(n+1)
+        tn3 = ts(n+id+1)
+        dt2 = tn3 -tn2
+        tmp2 = 0d0
+        if( abs(dt2) > teps ) tmp2 = (tn3-r)/dt2 *btmp(l+1,id-1)
+        btmp(l,id) = tmp1 + tmp2
+      enddo
+    enddo
+
+!.....Compute dB(n) where d=3 is fixed
+    dbtmp(:) = 0d0
+    do l = -3,0
+      n = nr +l
+      tn0 = ts(n)
+      tn1 = ts(n+1)
+      tn3 = ts(n+3)
+      tn4 = ts(n+1+3)
+      tmp1 = 0d0
+      if( abs(tn3-tn0) > teps ) tmp1 = btmp(l,2)/(tn3 -tn0)
+      tmp2 = 0d0
+      if( abs(tn4-tn1) > teps ) tmp2 = btmp(l+1,2)/(tn4 -tn1)
+      dbtmp(l) = 3d0 *(tmp1 -tmp2)
+    enddo
+
+    b(-3:0) = btmp(-3:0,3)
+    db(-3:0) = dbtmp(-3:0)
+
+    return
+  end subroutine b_spl
+!=======================================================================
+  recursive function b_spl_rec(n,d,r,ts,nmax) result(val)
 !
 !  TODO: check the efficiency of recursive func
 !  
@@ -572,15 +924,15 @@ contains
       val = 0d0
       denom1 = ts(n+d)-ts(n)
       if( abs(denom1) > 1d-8 ) then
-        val = val +(r-ts(n))/denom1 *b_spl(n,d-1,r,ts,nmax)
+        val = val +(r-ts(n))/denom1 *b_spl_rec(n,d-1,r,ts,nmax)
       endif
       denom2 = ts(n+d+1)-ts(n+1)
       if( abs(denom2) > 1d-8 ) then
-        val = val +(ts(n+d+1)-r)/denom2 *b_spl(n+1,d-1,r,ts,nmax)
+        val = val +(ts(n+d+1)-r)/denom2 *b_spl_rec(n+1,d-1,r,ts,nmax)
       endif
     endif
     return
-  end function b_spl
+  end function b_spl_rec
 !=======================================================================
   function db_spl(n,d,r,ts,nmax)
     integer,intent(in):: n,d,nmax
@@ -591,11 +943,11 @@ contains
     db_spl = 0d0
     denom1 = ts(n+d)-ts(n)
     if( denom1 > 1d-8 ) then
-      db_spl = db_spl +d*b_spl(n,d-1,r,ts,nmax) /denom1
+      db_spl = db_spl +d*b_spl_rec(n,d-1,r,ts,nmax) /denom1
     endif
     denom2 = ts(n+d+1)-ts(n+1)
     if( denom2 > 1d-8 ) then
-      db_spl = db_spl -d*b_spl(n+1,d-1,r,ts,nmax)/denom2
+      db_spl = db_spl -d*b_spl_rec(n+1,d-1,r,ts,nmax)/denom2
     endif
     return
   end function db_spl
@@ -606,6 +958,7 @@ contains
     real(8),intent(in):: knots(nknot)
     integer:: n, i
 
+!.....TODO: use faster algorithm
     n = 0
     do i=1,nknot
       if( r > knots(i) ) then

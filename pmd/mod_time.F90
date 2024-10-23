@@ -1,6 +1,6 @@
 module time
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-07-01 14:55:28 Ryo KOBAYASHI>
+!                     Last modified: <2024-10-23 06:48:40 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Module for time measurement.
 !-----------------------------------------------------------------------
@@ -40,6 +40,8 @@ contains
 
     get_time_id = 0
 
+!.....TODO: This code would be a bit slow and may need to be replaced
+!           with other concept or approach.
 !.....Search for the name in the list
     do i=1,ntimes
       if( trim(ctnames(i)).eq.trim(cname) ) then

@@ -52,19 +52,6 @@ subroutine get_force(l1st,epot,stnsr)
   implicit none
   include "mpif.h"
   include "./const.h"
-!!$  integer,intent(in):: namax,natm,nnmax,iprint
-!!$  integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6) &
-!!$       ,myparity(3),nnn(6),mpi_md_world,myid_md,nex(3)
-!!$  integer,intent(in):: lspr(0:nnmax,namax) !,numff
-!!$  real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-!!$       ,tag(namax),sorg(3)
-!!$  real(8),intent(inout):: rc
-!!$  real(8),intent(out):: aa(3,namax),epi(namax),strs(3,3,namax)
-!!$  integer,intent(in):: naux
-!!$  real(8),intent(inout):: aux(naux,namax)
-!!$  logical,intent(in):: lstrs,lcell_updated
-!!$  logical,intent(inout):: lvc
-!!$  character(len=3),intent(in):: boundary, specorder(nspmax)
   logical,intent(in):: l1st
   real(8),intent(out):: epot,stnsr(3,3)
 
