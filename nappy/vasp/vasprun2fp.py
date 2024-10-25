@@ -189,7 +189,9 @@ def main():
     elif sequence or type(index) is slice:  # Whole MD sequence
         print(' Extracting sequence of ',len(nsyss),' steps')
         indices = []
-        for j,nsys in enumerate(nsyss):
+        # for j,nsys in enumerate(nsyss):
+        for j in range(*index.indices(len(nsyss))):
+            nsys = nsyss[j]
             dirname = '{0:05d}/'.format(j)
             print('  {0:s}'.format(dirname))
             os.system('mkdir -p {0:s}'.format(dirname))

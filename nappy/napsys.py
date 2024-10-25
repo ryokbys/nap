@@ -275,6 +275,10 @@ class NAPSystem(object):
         Positions, velocities and forces are assumed to be scaled in lattice vectors.
         """
         import pandas as pd
+        #...To remove future warning for pd.concat
+        import warnings
+        warnings.simplefilter(action='ignore',
+                              category=FutureWarning)
         if not self.specorder:
             self.specorder = []
         if type(symbols) not in (list, np.ndarray):

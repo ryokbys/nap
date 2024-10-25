@@ -48,8 +48,9 @@ contains
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij,rij2,riji,dvdr &
-         ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp
+    real(8):: xi(3),xij(3),rij,rij2,riji,dvdr, &
+         dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp,sgm6,sgm12, &
+         riji6, riji12
 
     logical,save:: l1st=.true.
     real(8),save:: vrc,dvdrc,rcmax2
@@ -77,7 +78,9 @@ contains
     endif
 
     epotl= 0d0
-    
+    aal(:,1:natm)= 0d0
+    strsl(:,:,1:natm)= 0d0
+
 !$omp parallel
 !$omp do private(i,xi,j,k,x,y,z,xij,rij2,rij,riji,dxdi,dvdr,tmp,ixyz,jxyz) &
 !$omp    reduction(+:epotl)
@@ -86,37 +89,47 @@ contains
 !$acc         pcreate(xi,xij,dxdi) pcopy(epotl)
 !$acc loop independent reduction(+:epotl) private(xi,xij,dxdi) gang worker vector
     do i=1,natm
-      aal(1:3,i)= 0d0
-      strsl(1:3,1:3,i)= 0d0
+!!$      aal(:,i) = 0d0
+!!$      strsl(:,:,i) = 0d0
       xi(1:3)= ra(1:3,i)
 !$acc loop seq
       do k=1,lspr(0,i)
         j=lspr(k,i)
-!!$        if(j.eq.0) exit
+!!$        if( j < i ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij2= xij(1)**2+ xij(2)**2 +xij(3)**2
-        if( rij2.gt.rcmax2 ) cycle
+        rij2= xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
+        if( rij2 > rcmax2 ) cycle
         rij= dsqrt(rij2)
         riji= 1d0/rij
+!.....Improvement of this treatment is not so significant, ~1%
+        riji6 = riji**6
+        riji12 = riji6*riji6
+        sgm6 = sgmlj**6
+        sgm12 = sgm6*sgm6
         dxdi(1:3)= -xij(1:3)*riji
-        dvdr=(-24.d0*epslj)*(2.d0*(sgmlj*riji)**12*riji &
-             -(sgmlj*riji)**6*riji) &
+        dvdr=(-24.d0*epslj)*(2.d0*(sgm12*riji12)*riji &
+             -(sgm6*riji6)*riji) &
              -dvdrc
-!---------force
+!.....Forces
         aal(1:3,i)=aal(1:3,i) -dxdi(1:3)*dvdr
-!---------potential
-        tmp= 0.5d0*( 4d0*epslj*((sgmlj*riji)**12 &
-             -(sgmlj*riji)**6) -vrc -dvdrc*(rij-rc) )
+!!$        aal(1:3,j)=aal(1:3,j) +dxdi(1:3)*dvdr
+!.....Potential
+        tmp= 0.5d0*( 4d0*epslj*((sgm12*riji12) &
+             -(sgm6*riji6)) -vrc -dvdrc*(rij-rc) )
         epi(i)= epi(i) +tmp
+!!$        epi(j)= epi(j) +tmp
         epotl= epotl +tmp
-!---------stress
+!!$        if( j <= natm ) epotl = epotl +tmp
+!.....Stresses
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
                  -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+!!$            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
+!!$                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -131,13 +144,11 @@ contains
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
     
 !-----gather epot
-    if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
-           ,MPI_SUM,mpi_md_world,ierr)
-      epot= epot +epott
-    else
-      epot= epot +epotl
-    endif
+    epott = 0d0
+    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum, &
+         mpi_md_world,ierr)
+    epot= epot +epott
+    
   end subroutine force_LJ
 !=======================================================================
   subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
