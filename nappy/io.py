@@ -1020,11 +1020,15 @@ def write_extxyz(fileobj, nsys):
     fileobj.write('{0:d}\n'.format(len(nsys)))
     hmat = nsys.get_hmat()
     epot = nsys.get_potential_energy()
+    stnsr = nsys.get_stress_tensor()
     fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[0,:]))
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[1,:]))
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[2,:]))
     fileobj.write('Properties=species:S:1:pos:R:3:forces:R:3 ')
     fileobj.write(f'energy={epot} ')
+    fileobj.write(f'stress="{stnsr[0,0]:.3f} {stnsr[0,1]:.3f} {stnsr[0,2]:.3f} '+
+                  f'{stnsr[1,0]:.3f} {stnsr[1,1]:.3f} {stnsr[1,2]:.3f} '+
+                  f'{stnsr[2,0]:.3f} {stnsr[2,1]:.3f} {stnsr[2,2]:.3f}" ')
     fileobj.write('\n')
 
     symbols = nsys.get_symbols()
@@ -1064,19 +1068,28 @@ def read_extxyz(fname, specorder=None):
 
     try:
         import ase.io
-        atoms = ase.io.read(fname,format='extxyz',index=0)
-        nsys = from_ase(atoms)
+        atoms = ase.io.read(fname,format='extxyz',index=':')
+        if type(atoms) == list:
+            nsyss = []
+            for a in atoms:
+                nsyss.append(from_ase(a))
+        else:
+            nsys = from_ase(atoms)
     except Exception as e:
         print(' Failed to load input file even with ase.')
         raise
 
     if specorder != None:
-        nsys.specorder != specorder
-        print(' specorder given     = ',specorder)
-        print(' specorder from file = ',nsys.specorder)
-        raise ValueError('Specorder specifically given and obtained from the file do not match!')
-
-    return nsys
+        if type(atoms) == list:
+            nsys = nsyss[0]
+        if nsys.specorder != specorder:
+            print(' specorder given     = ',specorder)
+            print(' specorder from file = ',nsys.specorder)
+            raise ValueError('Specorder specifically given and obtained from the file do not match!')
+    if type(atoms) == list:
+        return nsyss
+    else:
+        return nsys
     
 def read_CHGCAR(fname='CHGCAR',specorder=None,):
     """

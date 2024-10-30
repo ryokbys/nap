@@ -280,6 +280,7 @@ class PMD:
         self.nsys.set_hmat(hmat[:,:,0])
         self.nsys.set_scaled_positions(self.result['rtot'].T)
         self.nsys.set_scaled_velocities(self.result['vtot'].T)
+        self.nsys.set_real_forces(self.result['atot'].T)
         self.nsys.atoms['epi'] = [ x for x in self.result['epitot'] ]
         self.nsys.set_kinetic_energy(self.result['ekin'])
         self.nsys.set_potential_energy(self.result['epot'])
