@@ -126,6 +126,7 @@ def get_pmd_done(nsys,nstp=1000,dt=-2.0,print_level=0,damp=0.9):
     """
     Perform pmd of relaxation and return the pmd object.
     """
+    import nappy.pmd
     print(' Relaxing the system: ',nsys.get_chemical_formula())
     pmd = nappy.pmd.PMD(nsys)
     pmd.load_inpmd()

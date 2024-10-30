@@ -146,6 +146,7 @@ class PMD_ASE_Calculator(Calculator):
 
     def calculate(self, atoms=None, properties=['energy'],
                   system_changes=some_changes):
+        import nappy.pmd
         Calculator.calculate(self, atoms, properties, system_changes)
         # # Write in.pmd to be read from pmd executable
         # self.write_input(self.atoms, properties, system_changes)
