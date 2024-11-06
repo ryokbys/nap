@@ -1,6 +1,6 @@
 module DNN
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-23 17:04:11 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-06 17:12:38 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of deep neural-network potential.
 !  See RK's memo 2020-01-21 for formulation details.
@@ -15,6 +15,7 @@ module DNN
   public :: force_DNN, read_params_DNN, update_params_DNN, gradw_DNN, &
        write_tgrads_DNN, set_paramsdir_DNN, set_params_DNN, set_actfunc_DNN
   public :: lprmset_DNN,time
+  public :: nlayer, nhl, itypesig, asig, lbias
   
   character(len=128):: paramsdir = '.'
 
@@ -835,7 +836,8 @@ contains
     return
   end subroutine read_params_DNN
 !=======================================================================
-  subroutine set_params_DNN(nprms_in,prms_in,nl_in,nhl_in)
+  subroutine set_params_DNN(nprms_in,prms_in)
+!!$  subroutine set_params_DNN(nprms_in,prms_in,nl_in,nhl_in)
 !
 !  Accessor routine to set DNN parameters from outside.
 !  Curretnly this routine is supposed to be called only on serial run.
@@ -843,22 +845,23 @@ contains
 !    NL_IN does not count output layer, whereas NLAYER does.
 !
     implicit none 
-    integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
+    integer,intent(in):: nprms_in
+!!$    integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
     real(8),intent(in):: prms_in(nprms_in)
 
-    integer:: i
+    integer:: i, il, inc, istart, ml0, ml1
 
-    nlayer = nl_in +1
-    if( nl_in.lt.1 ) then
-      print *,'ERROR: NL_IN<1, which should not happen.'
-      stop
-    endif
-    if( .not. allocated(nhl) ) then
-      allocate(nhl(0:nlayer+1),iactf(nlayer) ,nwgt(nlayer))
-    endif
-    nhl(0:nlayer-1) = nhl_in(0:nl_in)
-    nhl(nlayer) = 1
-    nhl(nlayer+1) = 1
+!!$    nlayer = nl_in +1
+!!$    if( nl_in.lt.1 ) then
+!!$      print *,'ERROR@set_params_DNN: NL_IN<1, which should not happen.'
+!!$      stop
+!!$    endif
+!!$    if( .not. allocated(nhl) ) then
+!!$      allocate(nhl(0:nlayer+1),iactf(nlayer) ,nwgt(nlayer))
+!!$    endif
+!!$    nhl(0:nlayer-1) = nhl_in(0:nl_in)
+!!$    nhl(nlayer) = 1
+!!$    nhl(nlayer+1) = 1
 
     nwtot = 0
     maxnnode = nhl(0)
@@ -870,7 +873,7 @@ contains
     enddo
 
     if( nwtot.ne.nprms_in ) then
-      print *,'ERROR: nl_in,nhl_in,nprms_in not consistent !!'
+      print *,'ERROR@set_params_DNN: nl_in,nhl_in,nprms_in not consistent !!'
       print *,'  Check in.vars.fitpot or in.params.DNN and'&
            //' NN_num_nodes parameters in in.fitpot.'
       stop
@@ -880,6 +883,23 @@ contains
     if( .not.allocated(prms) ) allocate(prms(nprms))
     prms(1:nprms) = prms_in(1:nprms_in)
 !!$    print *,'prms(12)=',prms(12)
+
+    if( .not.allocated(wgts) ) stop 'ERROR@set_params_DNN:' &
+         //' wgts not allocated, which should not happen.'
+    wgts(:,:,:) = 0d0
+    wgts(:,:,nlayer+1) = 1d0
+
+    inc = 0
+    istart = 0
+    do il=1,nlayer
+      do ml1=1,nhl(il)
+        do ml0=istart,nhl(il-1)
+          inc = inc + 1
+          wgts(ml0,ml1,il) = prms(inc)
+!!$          if( inc.eq.12 ) print *,'inc,il,ml1,ml0=',inc,il,ml1,ml0
+        enddo
+      enddo
+    enddo
 
     lprmset_DNN = .true.
     return
@@ -1020,5 +1040,5 @@ contains
 end module DNN
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

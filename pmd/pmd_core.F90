@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-10-05 14:42:10 KOBAYASHI Ryo>
+!                     Last-modified: <2024-10-30 22:29:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1163,6 +1163,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   use Coulomb,only: gradw_Coulomb
   use linreg,only: gradw_linreg
   use DNN,only: gradw_DNN
+  use UF3,only: gradw_uf3
   use pairlist,only: mk_lspr_para
   implicit none
   include "mpif.h"
@@ -1268,6 +1269,9 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     else if( use_force('DNN') ) then
       iprm0 = 0
       call gradw_DNN(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+           iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+    else if( use_force('UF3') ) then
+      call gradw_uf3(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
     endif
 !.....Derivative of stress should be divided by the cell volume

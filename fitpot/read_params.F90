@@ -4,11 +4,13 @@ subroutine read_vars()
   use random
   implicit none
 
-  if( index(cpot,'NN').ne.0 ) then
-    call read_vars_NN()
-  else
-    call read_vars_fitpot()
-  endif
+!!$  if( index(cpot,'NN').ne.0 ) then
+!!$    call read_vars_NN()
+!!$  else
+!!$    call read_vars_fitpot()
+!!$  endif
+!.....Always call read_vars_fitpot
+  call read_vars_fitpot()
 
 end subroutine read_vars
 !=======================================================================
@@ -37,11 +39,13 @@ subroutine write_vars(cadd)
 !!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
   cfname= trim(cparfile)//'.'//trim(cadd)
 
-  if( index(cpot,'NN').ne.0 ) then
-    call write_vars_NN(cfname)
-  else
-    call write_vars_fitpot(cfname)
-  endif
+!!$  if( index(cpot,'NN').ne.0 ) then
+!!$    call write_vars_NN(cfname)
+!!$  else
+!!$    call write_vars_fitpot(cfname)
+!!$  endif
+!.....Always call write_vars_fitpot
+  call write_vars_fitpot(cfname)
 
   if( cnormalize(1:4).ne.'none' ) then
 !!$    if( trim(cpot).eq.'NN' .and. .not. &
@@ -70,11 +74,14 @@ subroutine read_vars_fitpot()
   integer,parameter:: ionum = 15
   integer:: i
   real(8):: rs0
+  character(len=128):: ctmp
 
   if( myid.eq.0 ) then
     print *,'Read parameters to be optimized from '//trim(cparfile)
     open(ionum,file=trim(cparfile),status='old')
-    read(ionum,*) nvars, rcut, rc3
+10  read(ionum,'(a)') ctmp
+    if( ctmp(1:1).eq.'!' .or. ctmp(1:1).eq.'#' ) goto 10
+    read(ctmp,*) nvars, rcut, rc3
     rcut = max(rcut,rc3)
   endif
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)

@@ -16,7 +16,7 @@ module descriptor
   public:: calc_desci,make_gsf_arrays,pre_desci,read_params_desc, &
        init_desc,calc_desc,prepare_desci
   public:: get_descs, get_dsgnmat_force, get_ints, set_descs, set_gscale, &
-       set_params_desc
+       set_params_desc, set_params_desc_new
   public:: ngl,glval,iglid
   public:: rcmax,rcmax2
   public:: set_paramsdir_desc, lfitpot, desc
@@ -1736,6 +1736,64 @@ contains
     
     return
   end subroutine set_params_desc
+!=======================================================================
+  subroutine set_params_desc_new(descs_in,nsf_in,nsf2_in,nsf3_in, &
+       nsff_in, ilsf2_in, ilsf3_in, lcheby_in, cnst_in, wgtsp_in )
+!
+!  Accessor routine to set desc parameters from outside (fitpot).
+!  Curretnly this routine is supposed to be called after read_params_desc
+!  and only on serial run.
+!
+    integer,intent(in):: nsf_in,nsf2_in,nsf3_in,nsff_in, &
+         ilsf2_in(0:nsf_in,nspmax,nspmax), ilsf3_in(0:nsf_in,nspmax,nspmax,nspmax)
+    logical,intent(in):: lcheby_in
+    real(8),intent(in):: cnst_in(max_ncnst)
+    type(desc),intent(in):: descs_in(nsf_in)
+    real(8),intent(in),optional:: wgtsp_in(nspmax)
+
+    integer:: i,nsp
+    real(8):: rcut
+    character(len=22):: cerr = 'ERROR@set_params_desc:'
+
+    if( lcheby .and. .not. present(wgtsp_in) ) then
+      print *,cerr//' wgtsp_in should be present if lcheby == .true.'
+      stop
+    endif
+
+!.....Check whether some parameters are consistent with those
+!     read in read_params_desc().
+    if( nsf .ne. nsf_in ) stop cerr//' nsf != nsf_in'
+    if( nsf2 .ne. nsf2_in ) stop cerr//' nsf2 != nsf2_in'
+    if( nsf3 .ne. nsf3_in ) stop cerr//' nsf3 != nsf3_in'
+    if( nsff .ne. nsff_in ) stop cerr//' nsff != nsff_in'
+    if( lcheby .neqv. lcheby_in ) stop cerr//' lcheby != lcheby_in'
+    ilsf2(:,:,:) = ilsf2_in(:,:,:)
+    ilsf3(:,:,:,:) = ilsf3_in(:,:,:,:)
+    cnst(:) = cnst_in(:)
+    do i=1,nsf
+      descs(i)%itype = descs_in(i)%itype
+      descs(i)%isp   = descs_in(i)%isp
+      descs(i)%jsp   = descs_in(i)%jsp
+      descs(i)%ksp   = descs_in(i)%ksp
+      descs(i)%rcut  = descs_in(i)%rcut
+      descs(i)%rcut2 = descs_in(i)%rcut2
+      descs(i)%nprm  = descs_in(i)%nprm
+      if( .not. lcheby ) descs(i)%prms(:) = descs_in(i)%prms(:)
+    enddo
+    if( present(wgtsp_in) ) wgtsp(:) = wgtsp_in(:)
+
+!.....Compute maximum rcut in all descriptors
+    rcmax = 0d0
+    rc3max = 0d0
+    do i=1,nsf
+      rcut = descs(i)%rcut
+      rcmax = max(rcmax,rcut)
+      if( descs(i)%itype.gt.100 ) rc3max = max(rc3max,rcut)
+    enddo
+    rcmax2 = rcmax**2
+
+    return
+  end subroutine set_params_desc_new
 !=======================================================================
   subroutine write_desc_unformatted(ionum,natm,namax,nnmax,lspr,tag)
 !

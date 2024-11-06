@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-10-23 14:07:17 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-04 20:40:30 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -21,11 +21,13 @@ module UF3
   character(128),parameter:: ccfname='in.const.uf3'
   integer,parameter:: ioprms = 50
 
+  logical:: lprms_read_uf3 = .false.
   logical:: lprmset_uf3 = .false.
 
 !.....uf2 parameters
   type prm2
     character(2):: cb, csi, csj, cknot
+    integer:: isp,jsp
 !  cb: NA, 2B or 3B
 !  csi,csj,csk: species name
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
@@ -33,11 +35,13 @@ module UF3
     integer:: nknot, ncoef
     real(8):: rc,rc2
     real(8),allocatable:: knots(:), coefs(:)
+    real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm2
 
 !.....uf3 parameters
   type prm3
     character(2):: cb, csi, csj, csk, cknot
+    integer:: isp, jsp, ksp
 !  cb: NA, 2B or 3B
 !  csi,csj,csk: species name
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
@@ -45,13 +49,19 @@ module UF3
     integer:: nknij, nknik, nknjk, ncfij, ncfik, ncfjk
     real(8):: rcij, rcik, rcjk, rcij2, rcik2, rcjk2
     real(8),allocatable:: knij(:), knik(:), knjk(:), coefs(:,:,:)
+    real(8),allocatable:: gwe(:,:,:), gwf(:,:,:,:,:), gws(:,:,:,:)
   end type prm3
 
-  integer:: n2b, n3b
+  integer:: n1b, n2b, n3b
+  integer:: ncoef = 0
+  real(8):: erg1s(nspmax), gerg1s(nspmax)
+  integer,allocatable:: prm1s(:) 
   type(prm2),allocatable:: prm2s(:)
   type(prm3),allocatable:: prm3s(:)
   logical:: has_trios = .false.
+  logical:: has_solo = .false.
   real(8):: rcmax = 0.0d0
+
   
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
@@ -60,13 +70,19 @@ module UF3
   
 !.....constants
   integer:: nelem,nexp,nsp
+  integer,parameter:: ivoigt(3,3)= &
+       reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 
 contains
   subroutine read_params_uf3(myid,mpi_world,iprint)
 !
 !  Read parameters of uf3 potential from in.params.uf3 file that is given
-!  by uf3/lammps_plugin/scripts/generate_uf3_lammps_pots.py, 
+!  by uf3/lammps_plugin/scripts/generate_uf3_lammps_pots.py,
+!  but it can accept 1-body energy as well.
 !-----------------------------------------------------------------------
+!  #UF3 POT UNTIS: metal DATE: 2024-09-12 17:12:36 AUTHOR: RK CITATION:
+!  1B  W  erg
+!  #
 !  #UF3 POT UNITS: metal DATE: 2024-09-12 17:12:36 AUTHOR: RK CITATION:
 !  2B W W 0 3 nk
 !  5.5  22
@@ -94,8 +110,9 @@ contains
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
     
-    integer:: itmp,ierr,i,j,i2b,i3b
+    integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
+    real(8):: etmp
 !  nklead, nktrail: num of leading or trailing knots
     logical:: lexist
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
@@ -113,8 +130,10 @@ contains
         stop
       endif
       cmode = 'none'
+      n1b = 0
       n2b = 0
       n3b = 0
+      erg1s(:) = 0d0
       interact2(:,:) = -1
       interact3(:,:,:) = -1
       open(ioprms,file=trim(fname),status='old')
@@ -138,6 +157,9 @@ contains
           else if( cb == '3B' ) then
             n3b = n3b + 1
             has_trios = .true.
+          else if( cb == '1B' ) then
+            n1b = n1b + 1
+            has_solo = .true.
           endif
 ! do nothing if cb is already set...
         endif
@@ -145,15 +167,19 @@ contains
       end do  ! finished counting 2B & 3B entries
 10    continue
       if( iprint >= ipl_debug ) then
-        print *,'  n2b, n3b = ',n2b,n3b
+        print *,'  n1b, n2b, n3b = ',n1b,n2b,n3b
+        print *,'  has_solo= ',has_solo
         print *,'  has_trios= ',has_trios
       endif
 !.....allocate lists of uf2prms and uf3prms
+      if( allocated(prm1s) ) deallocate(prm1s)
       if( allocated(prm2s) ) deallocate(prm2s)
       if( allocated(prm3s) ) deallocate(prm3s)
+      if( n1b /= 0 ) allocate(prm1s(n1b))
       if( n2b /= 0 ) allocate(prm2s(n2b))
       if( n3b /= 0 ) allocate(prm3s(n3b))
       rewind(ioprms)
+      i1b = 0
       i2b = 0
       i3b = 0
       do while(.true.)
@@ -180,16 +206,30 @@ contains
             i3b = i3b +1
             call read_3b(prm3s(i3b),i3b)
             if( iprint >= ipl_basic ) call print_3b(prm3s(i3b))
+          else if( cb == '1B' ) then
+            i1b = i1b +1
+            backspace(ioprms)
+            read(ioprms,*) ctmp, csi, etmp
+            ncoef = ncoef +1
+            isp = csp2isp(csi)
+            prm1s(i1b) = isp
+            erg1s(isp) = etmp
+            if( iprint >= ipl_basic ) then
+              print '(a,f10.3)','   UF3 parameters of 1B for '//trim(csi) &
+                   //': erg1 = ',etmp
+            endif
           endif
         endif
 !        if( ierr /= 0 ) cycle
 
       enddo  ! while(.true.)
 20    continue  ! when the file reached the end
+      if( iprint >= ipl_basic ) print '(/,a,i0)', &
+           '   Total num of UF3 coefficients =  ',ncoef
     endif
 
     call bcast_uf3_params(mpi_world,myid)
-
+    lprms_read_uf3 = .true.
     return
   end subroutine read_params_uf3
 !=======================================================================
@@ -215,8 +255,11 @@ contains
     allocate(ps%coefs(ps%ncoef))
     read(ioprms,*) (ps%coefs(i), i=1,ps%ncoef)
 
+    ncoef = ncoef + ps%ncoef
     isp = csp2isp(ps%csi)
     jsp = csp2isp(ps%csj)
+    ps%isp = isp
+    ps%jsp = jsp
     interact2(isp,jsp) = i2b
     interact2(jsp,isp) = i2b
     rcmax = max(ps%rc,rcmax)
@@ -252,9 +295,13 @@ contains
       enddo
     enddo
 
+    ncoef = ncoef +ps%ncfij *ps%ncfik *ps%ncfjk
     isp = csp2isp(ps%csi)
     jsp = csp2isp(ps%csj)
     ksp = csp2isp(ps%csk)
+    ps%isp = isp
+    ps%jsp = jsp
+    ps%ksp = ksp
     interact3(isp,jsp,ksp) = i3b
     interact3(isp,ksp,jsp) = i3b
     rcmax = max(ps%rcij,rcmax)
@@ -270,20 +317,24 @@ contains
 !  Broadcast 2B & 3B parameters.
 !
     integer,intent(in):: mpi_world, myid
-    integer:: i, i2b, i3b, ierr
+    integer:: i, i2b, i3b, i1b, ierr
+    character(2):: p1 
     type(prm2):: p2
     type(prm3):: p3
 
-    call mpi_bcast(n2b, 1, mpi_integer, 0,mpi_world,ierr)
-    call mpi_bcast(n3b, 1, mpi_integer, 0,mpi_world,ierr)
+    call mpi_bcast(n2b, 1, mpi_integer, 0, mpi_world, ierr)
+    call mpi_bcast(n3b, 1, mpi_integer, 0, mpi_world, ierr)
+    call mpi_bcast(n1b, 1, mpi_integer, 0, mpi_world, ierr)
     if( .not. allocated(prm2s) ) allocate(prm2s(n2b))
-    if( .not. allocated(prm3s) ) allocate(prm3s(n3b))
+    call mpi_bcast(ncoef, 1, mpi_integer, 0, mpi_world, ierr)
     
     do i2b=1,n2b
       p2 = prm2s(i2b)
       call mpi_bcast(p2%cb,2,mpi_character,0,mpi_world,ierr)
       call mpi_bcast(p2%csi,2,mpi_character,0,mpi_world,ierr)
       call mpi_bcast(p2%csj,2,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(p2%isp,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(p2%jsp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(p2%cknot,2,mpi_character,0,mpi_world,ierr)
       call mpi_bcast(p2%nklead,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(p2%nktrail,1,mpi_integer,0,mpi_world,ierr)
@@ -296,36 +347,48 @@ contains
       call mpi_bcast(p2%coefs,p2%ncoef,mpi_real8,0,mpi_world,ierr)
     enddo
 
-    do i3b=1,n3b
-      p3 = prm3s(i3b)
-      call mpi_bcast(p3%cb,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p3%csi,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p3%csj,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p3%csk,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p3%cknot,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p3%nklead,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%nktrail,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%nknij,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%nknik,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%nknjk,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%ncfij,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%ncfik,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%ncfjk,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p3%rcij,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p3%rcik,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p3%rcjk,1,mpi_real8,0,mpi_world,ierr)
-      if( .not.allocated(p3%knij) ) allocate(p3%knij(p3%nknij))
-      if( .not.allocated(p3%knik) ) allocate(p3%knik(p3%nknik))
-      if( .not.allocated(p3%knjk) ) allocate(p3%knjk(p3%nknjk))
-      if( .not.allocated(p3%coefs)) allocate(p3%coefs(p3%ncfij, p3%ncfik, p3%ncfjk))
-      call mpi_bcast(p3%knij,p3%nknij,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p3%knik,p3%nknik,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p3%knjk,p3%nknjk,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p3%coefs,p3%ncfjk*p3%ncfik*p3%ncfij,mpi_real8,0,mpi_world,ierr)
-    enddo
-
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
-    call mpi_bcast(interact2, nspmax*nspmax, mpi_integer, 0,mpi_world,ierr)
+    if( has_trios ) then
+      if( .not. allocated(prm3s) ) allocate(prm3s(n3b))
+      do i3b=1,n3b
+        p3 = prm3s(i3b)
+        call mpi_bcast(p3%cb,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(p3%csi,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(p3%csj,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(p3%csk,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(p3%isp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%jsp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%ksp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%cknot,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(p3%nklead,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%nktrail,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%nknij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%nknik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%nknjk,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%ncfij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%ncfik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%ncfjk,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(p3%rcij,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(p3%rcik,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(p3%rcjk,1,mpi_real8,0,mpi_world,ierr)
+        if( .not.allocated(p3%knij) ) allocate(p3%knij(p3%nknij))
+        if( .not.allocated(p3%knik) ) allocate(p3%knik(p3%nknik))
+        if( .not.allocated(p3%knjk) ) allocate(p3%knjk(p3%nknjk))
+        if( .not.allocated(p3%coefs)) allocate(p3%coefs(p3%ncfij, p3%ncfik, p3%ncfjk))
+        call mpi_bcast(p3%knij,p3%nknij,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(p3%knik,p3%nknik,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(p3%knjk,p3%nknjk,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(p3%coefs,p3%ncfjk*p3%ncfik*p3%ncfij,mpi_real8,0,mpi_world,ierr)
+      enddo
+    endif  ! has_trios
+
+    if( has_solo ) then
+      if( .not. allocated(prm1s) ) allocate(prm1s(n1b))
+      call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
+    endif  ! has_solo
+    
+    call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
     call mpi_bcast(interact3, nspmax**3, mpi_integer, 0,mpi_world,ierr)
     
   end subroutine bcast_uf3_params
@@ -357,7 +420,7 @@ contains
          ixyz,jxyz,lij,lik,ljk
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t
+         c2t,c3t,epotl1,epot1
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -395,6 +458,7 @@ contains
     aal2(:,:) = 0d0
     aal3(:,:) = 0d0
     strsl(:,:,:) = 0d0
+    epotl1 = 0d0
     epotl2 = 0d0
     epotl3 = 0d0
 !$omp parallel
@@ -407,6 +471,8 @@ contains
 !$omp      reduction(+:epotl2,epotl3)
     do ia=1,natm
       is = int(tag(ia))
+      epi(ia) = epi(ia) +erg1s(is)
+      epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
       ls3b(0) = 0
       do jj=1,lspr(0,ia)
@@ -574,13 +640,15 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
+    epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
     call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8,mpi_sum,mpi_world,ierr)
     if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot= epot +epot2 +epot3
+    epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
-         print '(a,2es12.4)',' force_uf3 epot2,epot3 = ',epot2,epot3
+         print '(a,3es12.4)',' force_uf3 epot1,epot2,epot3 = ',epot1,epot2,epot3
 
     return
   end subroutine force_uf3
@@ -829,6 +897,328 @@ contains
     return
   end subroutine force_uf3_rec
 !=======================================================================
+  subroutine gradw_uf3(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+!
+!  Gradient of UF3 wrt weights.
+!  Note: This routine is always called in single run,
+!  thus no need of parallel implementation.
+!  - iprm0: The starting point -1 in parameter array for this FF.
+!
+    use util, only: itotOf
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint,iprm0
+    integer,intent(in):: lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(8),intent(inout):: rcin
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    logical,intent(in):: lematch,lfmatch,lsmatch
+
+!.....local
+    integer:: i,j,k,ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
+         nik,njk,nij,itot,jtot,ktot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
+         ixyz,jxyz,lij,lik,ljk,ip,jra,kra
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
+         c2t,c3t,epotl1,epot1
+    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+         rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
+         drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
+    real(8),save:: rcin2
+    integer,save,allocatable:: ls3b(:)
+
+    type(prm2):: p2
+    type(prm3):: p3
+
+    if( .not.allocated(ls3b) ) then
+      allocate(ls3b(0:nnmax))
+      if( rcin < rcmax ) then
+        call mpi_finalize(ierr)
+        stop
+      endif
+      rcin2 = rcin*rcin
+    endif
+
+    if( .not.allocated(prm2s(1)%gwe) &
+         .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*(nnmax+1)) then
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        if( allocated(p2%gwe) ) then
+          deallocate(p2%gwe, p2%gwf, p2%gws)
+        endif
+        allocate(p2%gwe(p2%ncoef), p2%gwf(p2%ncoef,3,natm), p2%gws(6,p2%ncoef))
+      enddo
+      do i3b=1,n3b
+        p3 = prm3s(i3b)
+        if( allocated(p3%gwe) ) then
+          deallocate(p3%gwe, p3%gwf, p3%gws)
+        endif
+        allocate(p3%gwe(p3%ncfij,p3%ncfik,p3%ncfjk), &
+             p3%gwf(p3%ncfij,p3%ncfik,p3%ncfjk,3,natm), &
+             p3%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
+      enddo
+    endif
+
+    if( size(ls3b) < nnmax+1 ) then
+      deallocate(ls3b)
+      allocate(ls3b(0:nnmax))
+    endif
+
+    gerg1s(:) = 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      p2%gwe(:) = 0d0
+      p2%gwf(:,:,:) = 0d0
+      p2%gws(:,:) = 0d0
+    enddo
+    do i3b=1,n3b
+      p3 = prm3s(i3b)
+      p3%gwe(:,:,:) = 0d0
+      p3%gwf(:,:,:,:,:) = 0d0
+      p3%gws(:,:,:,:) = 0d0
+    enddo
+
+    do ia=1,natm
+      is = int(tag(ia))
+!!$      epi(ia) = epi(ia) +erg1s(is)
+!!$      epotl1 = epotl1 +erg1s(is)
+      gerg1s(is) = gerg1s(is) +1d0
+      xi(1:3) = ra(1:3,ia)
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+!!$        if( ja <= ia ) cycle
+        js = int(tag(ja))
+        jra = itotOf(tag(ja))
+!.....Pair terms
+        i2b = interact2(is,js)
+        if( i2b <= 0 ) cycle
+        p2 = prm2s(i2b)
+        xj(1:3) = ra(1:3,ja)
+        xij(1:3) = xj(1:3) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2 > p2%rc2 ) cycle
+        dij = sqrt(dij2)
+!!$!.....Pair-list for 3-body cannot be used for gwf
+!!$        if( has_trios ) then
+!!$          if( dij2 < rc2_3b(is,js) ) then
+!!$            ls3b(0) = ls3b(0) +1
+!!$            ls3b(ls3b(0)) = ja
+!!$          endif
+!!$        endif
+        drijj(1:3) = rij(1:3)/dij
+        call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          c2t = p2%coefs(n)
+!.....Energy
+          if( lematch ) p2%gwe(n) = p2%gwe(n) +bij(lij)
+!.....Forces
+          if( lfmatch ) then
+            tmp2 = dbij(lij)
+            p2%gwf(n,:,ia) = p2%gwf(n,:,ia) +drijj(:)*tmp2
+            p2%gwf(n,:,jra) = p2%gwf(n,:,jra) -drijj(:)*tmp2
+          endif
+!.....Stresses
+          if( lsmatch ) then
+            tmp2 = dbij(lij)
+            do ixyz=1,3
+              do jxyz=1,3
+                k = ivoigt(ixyz,jxyz)
+                p2%gws(k,n) = p2%gws(k,n) -rij(ixyz)*drijj(jxyz)*tmp2
+              enddo
+            enddo
+          endif
+        enddo  ! lij
+      enddo
+
+!.....Trio part is separated from pair part,
+!.....which may be slower because of double computation of dij,
+!.....but this code is a bit simpler.
+      if( .not.has_trios ) cycle
+      do jsp=1,nspmax
+        do ksp=jsp,nspmax
+          i3b = interact3(is,jsp,ksp)
+          if( i3b <= 0 ) cycle
+          p3 = prm3s(i3b)
+          do jj=1,lspr(0,ia)
+            ja = lspr(jj,ia)
+            js = int(tag(ja))
+            if( js /= jsp ) cycle
+            jra = itotOf(tag(ja))
+            xj(1:3) = ra(1:3,ja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+            dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+            if( dij2 > p3%rcij2 ) cycle
+            dij = sqrt(dij2)
+            drijj(1:3) = rij(1:3)/dij
+            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+            
+            do kk=1,lspr(0,ia)
+              ka = lspr(kk,ia)
+              if( jsp == ksp .and. ka <= ja ) cycle
+              ks = int(tag(ka))
+              if( ks /= ksp ) cycle
+              kra = itotOf(tag(ka))
+              xk(1:3) = ra(1:3,ka)
+              xik(1:3) = xk(1:3) -xi(1:3)
+              xjk(1:3) = xk(1:3) -xj(1:3)
+              rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+              dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
+              if( dik2 > p3%rcik2 ) cycle
+              dik = sqrt(dik2)
+              rjk(1:3) = h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
+              djk2 = rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
+              if( djk2 > p3%rcjk2 ) cycle
+              djk = sqrt(djk2)
+              drikk(1:3) = rik(1:3)/dik
+              drjkk(1:3) = rjk(1:3)/djk
+!.....B-spline part
+              call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
+              call b_spl(djk, p3%knjk, p3%nknjk, njk3, bjk3, dbjk3)
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+                do ljk = -3,0
+                  njk = njk3 +ljk
+                  if( njk < 1 .or. njk > p3%nknjk-4 ) cycle
+                  do lij = -3,0
+                    nij = nij3 +lij
+                    if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+!.....Energy
+                    c3t = p3%coefs(nij,nik,njk)
+                    if( lematch ) then
+                      tmp = bij3(lij)*bik3(lik)*bjk3(ljk)
+                      p3%gwe(nij,nik,njk) = p3%gwe(nij,nik,njk) +tmp
+!!$                    tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
+!!$                    epi(ia) = epi(ia) +tmp
+!!$                    epotl3 = epotl3 +tmp
+                    endif
+!.....Force
+                    if( lfmatch ) then
+                      tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
+                      tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
+                      tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
+                      p3%gwf(nij,nik,njk,:,ia) = p3%gwf(nij,nik,njk,:,ia) +(tmpij(:) +tmpik(:))
+                      p3%gwf(nij,nik,njk,:,jra)= p3%gwf(nij,nik,njk,:,jra)+(-tmpij(:)+tmpjk(:))
+                      p3%gwf(nij,nik,njk,:,kra)= p3%gwf(nij,nik,njk,:,kra)+(-tmpik(:)-tmpjk(:))
+                    endif
+!!$                    do ixyz=1,3
+!!$                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
+!!$                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
+!!$                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
+!!$                    enddo
+!.....Stresses
+                    if( lsmatch ) then
+                      tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
+                      tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
+                      tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
+                      do jxyz=1,3
+                        do ixyz=1,3
+                          k = ivoigt(jxyz,ixyz)
+                          p3%gws(k,nij,nik,njk) = p3%gws(k,nij,nik,njk) +xij(jxyz)*tmpij(ixyz) &
+                               +xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz)
+!!$                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
+!!$                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
+!!$                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
+!!$                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+!!$                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
+!!$                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                        enddo
+                      enddo
+                    endif
+                    
+                  enddo  ! lij
+                enddo  ! ljk
+              enddo  ! lik
+
+            enddo  ! kk
+          enddo  ! jj
+        enddo  ! ksp
+      enddo  ! jsp
+
+    enddo ! ia
+
+!.....Tidy up gradient arrays
+    if( lematch ) then  ! energy matching
+      ip = iprm0
+      do i1b=1,n1b
+        ip = ip +1
+        gwe(ip) = gwe(ip) +gerg1s(i1b)
+      enddo
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        do i=1,p2%ncoef
+          ip = ip +1
+          gwe(ip) = gwe(ip) +p2%gwe(i)
+        enddo
+      enddo
+      do i3b=1,n3b
+        p3 = prm3s(i3b)
+        do k=1,p3%ncfjk
+          do j=1,p3%ncfik
+            do i=1,p3%ncfij
+              ip = ip +1
+              gwe(ip) = gwe(ip) +p3%gwe(i,j,k)
+            enddo
+          enddo
+        enddo
+      enddo  ! i3b
+    endif
+    
+    if( lfmatch ) then  ! force matching
+      do ia=1,natm
+        is = int(tag(ia))
+        ip = iprm0 +n1b  ! no contrib. from solo term to forces
+        do i2b=1,n2b
+          p2 = prm2s(i2b)
+          do i=1,p2%ncoef
+            ip = ip +1
+            gwf(1:3,ip,ia) = gwf(1:3,ip,ia)  +p2%gwf(i,1:3,ia)
+          enddo
+        enddo  ! i2b
+        do i3b=1,n3b
+          p3 = prm3s(i3b)
+          do k=1,p3%ncfjk
+            do j=1,p3%ncfik
+              do i=1,p3%ncfij
+                ip = ip +1
+                gwf(1:3,ip,ia) = gwf(1:3,ip,ia) +p3%gwf(i,j,k,1:3,ia)
+              enddo
+            enddo
+          enddo
+        enddo
+      enddo ! ia
+    endif
+    
+    if( lsmatch ) then  ! stress matching
+      ip = iprm0 +n1b  ! no contrib. from solo term to forces
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        do i=1,p2%ncoef
+          ip = ip +1
+          gws(1:6,ip) = gws(1:6,ip) +p2%gws(i,1:6)
+        enddo
+      enddo  ! i2b
+      do i3b=1,n3b
+        p3 = prm3s(i3b)
+        do k=1,p3%ncfjk
+          do j=1,p3%ncfik
+            do i=1,p3%ncfij
+              ip = ip +1
+              gws(1:6,ip) = gws(1:6,ip) +p3%gws(i,j,k,1:6)
+            enddo
+          enddo
+        enddo
+      enddo  ! i3b
+    endif
+    
+    return
+  end subroutine gradw_uf3
+!=======================================================================
   subroutine b_spl(r,ts,nmax,nr,b,db)
 !
 !  Non-recursive implementation of B-spline function at R.
@@ -980,6 +1370,74 @@ contains
     paramsdir = trim(dname)
     return
   end subroutine set_paramsdir_uf3
+!=======================================================================
+  subroutine set_params_uf3(ndimp,params_in)
+!
+!  Accesor routine to set uf3 parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!  This will compare num of parameters given from outside
+!  and num of coefficients already read in read_params_uf3().
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc
+    type(prm2):: p2
+    type(prm3):: p3
+
+    if( .not. lprms_read_uf3 ) then
+      print *,'ERROR(set_params_uf3): read_params_uf3 has not been called yet.'
+      stop
+    endif
+    
+!.....Count num of coeffs in force_uf3
+    ncoef = 0
+    do i1b=1,n1b
+      ncoef = ncoef +1
+    enddo
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      ncoef = ncoef +p2%ncoef
+    enddo
+    do i3b=1,n3b
+      p3 = prm3s(i3b)
+      ncoef = ncoef +p3%ncfij *p3%ncfik *p3%ncfjk
+    enddo
+    if( ncoef.ne.ndimp ) then
+      print *,'ERROR(set_params_uf3): ncoef != ndimp'
+      print *,'    This error may be caused when in.vars.fitpot and ' &
+           //'in.params.uf3 are not consistent.'
+      stop
+    endif
+
+!.....Replace coefficients with params given from outside.
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc) 
+    enddo
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      do ic=1,p2%ncoef
+        inc = inc +1
+        p2%coefs(ic) = params_in(inc)
+      enddo
+    enddo
+    do i3b=1,n3b
+      p3 = prm3s(i3b)
+      do icfjk=1,p3%ncfjk
+        do icfik=1,p3%ncfik
+          do icfij=1,p3%ncfij
+            inc = inc +1
+            p3%coefs(icfij,icfik,icfjk) = params_in(inc)
+          enddo
+        enddo
+      enddo
+    enddo
+
+    lprmset_uf3 = .true.
+    return
+  end subroutine set_params_uf3
 !=======================================================================
   subroutine print_2b(ps)
     type(prm2),intent(in):: ps

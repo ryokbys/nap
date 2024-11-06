@@ -1,6 +1,6 @@
-Program fitpot
+program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-07-26 15:29:33 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-06 17:22:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -70,7 +70,8 @@ Program fitpot
 !.....Copy specorder in fitpot to that in pmdvars
   specorder_pmd(:) = specorder(:)
 
-  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
+!!$!.....read_params_desc in read_params.F90
+!!$  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -113,17 +114,6 @@ Program fitpot
   call get_base_energies()
   call set_max_num_atoms()
 
-!.....Subtract atomic energy
-  if( trim(cpot).ne.'vcMorse' ) then
-    if( len(trim(crefstrct)).gt.5 ) then
-      print *,'ERROR: reference_structure is not available in this version...'
-      stop 1
-      call subtract_ref_struct_energy()
-    else
-      call subtract_atomic_energy()
-    endif
-  endif
-
 !!$  if( nswgt.gt.0 ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
@@ -163,12 +153,8 @@ Program fitpot
   endif
 
 !.....Initial computations of all samples
-!!$  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-!!$       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-!!$       .or. trim(cpot).eq.'BMH' &
-!!$       .or. trim(cpot).eq.'Abell' .or. trim(cpot).eq.'fpc' &
-!!$       .or. trim(cpot).eq.'DNN' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
+       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
 !!$    if( lnormalize ) call normalize()
 !!$    if( lgdw ) call compute_gdw()
@@ -854,7 +840,7 @@ subroutine get_base_energies()
   call mpi_allreduce(ebl,ebase,nspmax,mpi_real8,mpi_min &
        ,mpi_world,ierr)
 
-#ifdef _DEBUG
+#ifdef __DEBUG__
   if(myid.eq.0) then
     write(6,'(a)') ' Base energies obtained from unary systems:'
     do ispcs=1,nspmax
@@ -878,7 +864,8 @@ subroutine qn_wrapper(ftrn0,ftst0)
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
+       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -926,7 +913,8 @@ subroutine cg_wrapper(ftrn0,ftst0)
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
+       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1033,9 +1021,6 @@ subroutine test(ftrn0,ftst0)
 !!$    call NN_init()
 !!$    call NN_func(nvars,vars,ftrn,ftst)
 !!$    call NN_grad(nvars,vars,g)
-!!$  if( trim(cpot).eq.'vcMorse' .or. trim(cpot).eq.'Morse' &
-!!$       .or. index(cpot,'BVS').ne.0 .or. trim(cpot).eq.'linreg' &
-!!$       .or. index(cpot,'NN').ne.0 ) then
   if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
@@ -1664,9 +1649,10 @@ subroutine write_stats(iter)
 !!$      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
 !!$      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
 !!$    endif
-!.....Finally write out variances of reference data
-    if( l1st ) print '(a,3es12.4)',' Data variances (energy, force, stress) = ',&
-         evar,fvar,svar
+!.....Finally write out std of reference data
+    if( l1st ) print '(a,3es12.4)',' Standard deviation of reference data ' &
+         //'(energy, force, stress) = ', &
+         sqrt(evar),sqrt(fvar),sqrt(svar)
   endif
 
   l1st = .false.

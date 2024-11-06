@@ -8,6 +8,7 @@ module variables
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
   character(len=128):: cmaindir= 'dataset'
+  character(len=128):: csubstractdir= 'dataset_substract'
   character(len=128):: cparfile= 'in.vars.fitpot'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)

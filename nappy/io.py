@@ -1422,7 +1422,8 @@ def get_PDB_txt(nsys,**kwargs):
 
     return txt
 
-def from_ase(atoms, specorder=None, get_forces=True):
+def from_ase(atoms, specorder=None,
+             get_forces=True, get_stress=True):
     """
     Convert ASE Atoms object to NAPSystem object.
     """
@@ -1462,6 +1463,19 @@ def from_ase(atoms, specorder=None, get_forces=True):
             frcs = atoms.get_forces()
         except:
             pass
+    stnsr = np.zeros((3,3))
+    if get_stress:
+        try:
+            stress = atoms.get_stress()  # 6 voigt values
+            # 6 values to 3x3 matrix
+            stnsr[0,0] = stress[0]
+            stnsr[1,1] = stress[1]
+            stnsr[2,2] = stress[2]
+            stnsr[1,2] = stnsr[2,1] = stress[3]
+            stnsr[0,2] = stnsr[2,0] = stress[4]
+            stnsr[0,1] = stnsr[1,0] = stress[5]
+        except:
+            pass
 
     #...Create arrays to be installed into nsys.atoms
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]
@@ -1472,6 +1486,7 @@ def from_ase(atoms, specorder=None, get_forces=True):
     nsys.atoms['z'] = poss[:,2]
     nsys.set_real_velocities(vels)
     nsys.set_real_forces(frcs)
+    nsys.set_stress_tensor(stnsr)
     if epot is not None:
         nsys.set_potential_energy(epot)
 

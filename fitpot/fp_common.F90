@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-12-07 16:18:46 Ryo KOBAYASHI>
+!                     Last modified: <2024-11-06 17:21:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -83,16 +83,18 @@ contains
 !
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
-    use variables,only:samples,tfunc &
-         ,lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys &
-         ,swgt2trn,swgt2tst,cpot &
-         ,nff,cffs,maxna,rcut,force_limit,stress_limit &
-         ,crefstrct,erefsub,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom &
-         ,lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs
+    use variables,only:samples,tfunc, &
+         lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys, &
+         swgt2trn,swgt2tst,cpot, &
+         nff,cffs,maxna,rcut,force_limit,stress_limit, &
+         crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
+         ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom, &
+         lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs, &
+         nn_nl, nn_nhl, nn_sigtype, nn_asig
     use parallel
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
+    use DNN,only: nlayer, nhl, itypesig, asig
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -112,6 +114,7 @@ contains
 
     logical,external:: string_in_arr
 
+    call flush(6)
     nfunc= nfunc +1
 
     tc0= mpi_wtime()
@@ -143,9 +146,15 @@ contains
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
       endif
+!.....CAUTION: assignment of a structure-type is not pointer copy,
+!              rather a copy of its contents.
+!              So even if one changes the variable in the copied structure,
+!              the variable in the original structure (e.g., samples(ismpl))
+!              will not be changed.
       natm= samples(ismpl)%natm
       cdirname = trim(samples(ismpl)%cdirname)
-      call pre_pmd(ismpl,ndim,x,l1st)
+!.....CAUTION 2: argument of a structure-type is a pointer, contrary to the above.
+      call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,l1st)
 
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
       if( trim(cpot).eq.'linreg' .and. &
@@ -179,7 +188,15 @@ contains
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
-    enddo
+    enddo  ! ismpl
+
+    if( l1st .and. index(cpot,'NN').ne.0 ) then
+      nn_nl = nlayer -1
+      if( .not.allocated(nn_nhl) ) allocate(nn_nhl(0:nn_nl))
+      nn_nhl(0:nn_nl) = nhl(0:nlayer-1)
+      nn_asig = asig
+      nn_sigtype = itypesig
+    endif
 
     if( lnormalize .and. .not.lnormalized ) call normalize()
     if( lgdw .and. .not.lgdwed ) call compute_gdw()
@@ -388,6 +405,7 @@ contains
 
     logical,external:: string_in_arr
 
+    call flush(6)
     if( .not.allocated(gtrnl) ) then
       allocate(gtrnl(ndim))
       dmem = dmem +8d0*size(gtrnl)
@@ -442,23 +460,23 @@ contains
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      call pre_pmd(ismpl,ndim,x,.false.)
+      call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,.false.)
       
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
       if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for cdirname: ',trim(cdirname)
-      call run_pmd(smpl,lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
+      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
-!!$      samples(ismpl)%gwe(:)= gwe(:)
-!!$      samples(ismpl)%gwf(:,:,1:natm)= gwf(:,:,1:natm)
-!!$      samples(ismpl)%gws(:,:)= gws(:,:)
+!!$      smpl%gwe(:)= gwe(:)
+!!$      smpl%gwf(:,:,1:natm)= gwf(:,:,1:natm)
+!!$      smpl%gws(:,:)= gws(:,:)
 !!$    enddo  ! ismpl
 !!$
 !!$    do ismpl=isid0,isid1
 !!$      if( allocated(ismask) ) then
 !!$        if( ismask(ismpl).ne.0 ) cycle
 !!$      endif
-!!$      smpl= samples(ismpl)
+!!$      smpl= smpl
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
@@ -610,112 +628,49 @@ contains
     return
   end subroutine grad_w_pmd
 !=======================================================================
-  subroutine pre_pmd(ismpl,ndim,x,l1st)
+  subroutine pre_pmd(smpl,ndim,x,nff,cffs,rc,l1st)
 !
 !  Preprocesses before running pmd
 !
-    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys,samples, &
+    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys, &
          maxisp,nn_nl,nn_nhl,nn_sigtype,nn_asig,rc3, &
          interact,interact3,num_interact,iprint, &
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
          lcheby,cnst,wgtsp_desc,nspmax
-    use parallel
-    use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
-    use linreg,only: set_paramsdir_linreg,set_params_linreg
-    use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
-         ,lupdate_gsf,set_params_desc, lfitpot_desc => lfitpot
-    implicit none
-    integer,intent(in):: ismpl,ndim
-    real(8),intent(in):: x(ndim)
-    logical,intent(in):: l1st
-
-    integer:: nsf,nal,nnl,ndimt,ndim0
-    character(len=128):: cdirname,ctype
-    type(mdsys):: smpl
-
-    logical,external:: string_in_arr
-
-    smpl = samples(ismpl)
-    cdirname = smpl%cdirname
-
-
-    if( trim(cpot).eq.'linreg' ) then
-!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
-      lfitpot_desc = .true.
-      call set_params_linreg(ndim,x)
-    else if( trim(cpot).eq.'DNN' ) then
-!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
-      lfitpot_desc = .true.
-      call set_params_DNN(ndim,x,nn_nl,nn_nhl)
-      call set_actfunc_DNN(nn_sigtype,nn_asig)
-    endif
-    
-    if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) then
-      if( l1st ) then
-!.....Set descriptor parameters read from in.params.desc only at the first time
-        if( lcheby ) then
-          call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
-               nsff_desc,ilsf2,ilsf3,lcheby,cnst,wgtsp_desc)
-        else
-          call set_params_desc(descs,nsf_desc,nsf2_desc,nsf3_desc, &
-               nsff_desc,ilsf2,ilsf3,lcheby,cnst)
-        endif
-      endif
-!.....Some potentials use descriptors already computed in the previous steps
-!.....and stored in samples (and normalized if specified so.)
-      if( .not. lupdate_gsf ) then
-        nsf = smpl%nsf
-        nal = smpl%nal
-        nnl = smpl%nnl
-        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
-             samples(ismpl)%dgsf,samples(ismpl)%igsf)
-      endif
-    endif
-    return
-  end subroutine pre_pmd
-!=======================================================================
-  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
-       ,lfdsgnmat,gwe,gwf,gws)
-!
-!  Run pmd and get energy and forces of the system.
-!
-    use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
-         ,maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
-    use force
-    use descriptor,only: get_dsgnmat_force
-    use ZBL,only: r_inner,r_outer
+    use force,only: num_forces, force_list, loverlay
     use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
          rc1nn,lvc
     use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
-    use element
+    use element,only: init_element, atom, get_element
+    use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
+    use linreg,only: set_paramsdir_linreg,set_params_linreg
+    use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
+         ,lupdate_gsf,set_params_desc_new, lfitpot_desc => lfitpot
+    use UF3,only: set_params_uf3
     implicit none
-    include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
-    integer,intent(in):: ndimp,nff
-    real(8),intent(in):: rc
-    real(8),intent(inout):: epot,frcs(3,maxna)
-    real(8),intent(out):: strs(3,3)
-    logical,intent(in):: lcalcgrad,lfdsgnmat
+    integer,intent(in):: ndim, nff
+    real(8),intent(in):: x(ndim)
     character(len=20),intent(in):: cffs(nff)
-    real(8),intent(out),optional:: gwe(ndimp),gwf(3,ndimp,maxna),&
-         gws(6,ndimp)
+    real(8),intent(in):: rc
+    logical,intent(in):: l1st
 
-    logical,save:: l1st = .true.
-
-    integer:: i,is
-    real(8):: ptnsr(3,3),ekin
-    character:: csp*3 
-    type(atom):: elem
-    logical:: update_force_list
+    integer:: i,is,nsf,nal,nnl,ndimt,ndim0
+    character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
+    logical,save:: l1st_local = .true.
+    type(atom):: elem
+    logical:: update_force_list
+    real(8):: ptnsr(3,3),ekin
+    character:: csp*3
 
-    if( l1st ) then
+    if( l1st_local ) then
 !.....Create MPI COMM for pmd only for the 1st time
       call create_mpi_comm_pmd()
       call init_element()
-      l1st = .false.
+      l1st_local = .false.
     endif
 
     nstp = 0
@@ -770,11 +725,90 @@ contains
       loverlay = overlay
     endif
 
+!.....init_force would perform read_params_XXX for force_XXX.F90 in it.
     call init_force(.true.)
     call set_cauxarr()
     if( .not.allocated(smpl%aux) ) then
       allocate(smpl%aux(naux,smpl%natm))
     endif
+
+    do i=1,nff
+      if( trim(cffs(i)).eq.'linreg' ) then
+!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+        lfitpot_desc = .true.
+        call set_params_linreg(ndim,x)
+      else if( trim(cffs(i)).eq.'DNN' ) then
+!.....Set lfitpot in descriptor module to let it know that it is called from fitpot
+        lfitpot_desc = .true.
+        call set_params_DNN(ndim,x)
+!!$      call set_params_DNN(ndim,x,nn_nl,nn_nhl)
+!!$      call set_actfunc_DNN(nn_sigtype,nn_asig)
+      else if( trim(cffs(i)).eq.'UF3' .or. trim(cffs(i)).eq.'uf3' ) then
+        call set_params_uf3(ndim,x)
+      endif
+    
+      if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then
+!!$      if( l1st ) then
+!!$!.....Set descriptor parameters read from in.params.desc only at the first time
+!!$        if( lcheby ) then
+!!$          call set_params_desc_new(descs,nsf_desc,nsf2_desc,nsf3_desc, &
+!!$               nsff_desc,ilsf2,ilsf3,lcheby,cnst,wgtsp_desc)
+!!$        else
+!!$          call set_params_desc_new(descs,nsf_desc,nsf2_desc,nsf3_desc, &
+!!$               nsff_desc,ilsf2,ilsf3,lcheby,cnst)
+!!$        endif
+!!$      endif
+!.....Some potentials use descriptors already computed in the previous steps
+!.....and stored in samples (and normalized if specified so.)
+        if( .not. lupdate_gsf ) then
+          nsf = smpl%nsf
+          nal = smpl%nal
+          nnl = smpl%nnl
+!!$        call set_descs(nsf,nal,nnl,samples(ismpl)%gsf, &
+!!$             samples(ismpl)%dgsf,samples(ismpl)%igsf)
+          call set_descs(nsf,nal,nnl,smpl%gsf,smpl%dgsf,smpl%igsf)
+        endif
+      endif
+    enddo  ! i=1,nff
+    return
+  end subroutine pre_pmd
+!=======================================================================
+  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
+       ,lfdsgnmat,gwe,gwf,gws)
+!
+!  Run pmd and get energy and forces of the system.
+!
+    use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
+         ,maxisp
+    use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
+    use force
+    use descriptor,only: get_dsgnmat_force
+    use ZBL,only: r_inner,r_outer
+    use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
+         rc1nn,lvc
+    use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
+    use element
+    implicit none
+    include "../pmd/params_unit.h"
+    type(mdsys),intent(inout):: smpl
+    integer,intent(in):: ndimp,nff
+    real(8),intent(in):: rc
+    real(8),intent(inout):: epot,frcs(3,maxna)
+    real(8),intent(out):: strs(3,3)
+    logical,intent(in):: lcalcgrad,lfdsgnmat
+    character(len=20),intent(in):: cffs(nff)
+    real(8),intent(out),optional:: gwe(ndimp),gwf(3,ndimp,maxna),&
+         gws(6,ndimp)
+
+    logical,save:: l1st = .true.
+
+    integer:: i,is
+    real(8):: ptnsr(3,3),ekin
+    character:: csp*3 
+    type(atom):: elem
+    logical:: update_force_list
+
+    logical,external:: string_in_arr
 
 !.....one_shot force calculation
     call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
@@ -830,6 +864,44 @@ contains
 
   end subroutine create_mpi_comm_pmd
 !=======================================================================
+  subroutine subtract_FF_dataset()
+!
+!  Subtract energies, forces and stresses, obtained from data
+!  of the same filename in dataset_subtract.
+!  Compared to the original subract_FF() routine, this does not
+!  call pmd and compute specific force-field.
+!
+    use variables,only: samples,dmem,maxna
+    use parallel,only: myid,isid0,isid1
+    implicit none
+
+    integer:: i,ismpl,natm
+    logical,save:: l1st = .true.
+    real(8):: epot,strs(3,3)
+    real(8),save,allocatable:: frcs(:,:)
+
+    if( l1st ) then
+
+      if( .not.allocated(frcs) ) then
+        allocate(frcs(3,maxna))
+        dmem = dmem +8d0*size(frcs)
+      endif
+
+!.....Only at the 1st call, perform pmd to get (esub,fsub,ssub)
+      do ismpl=isid0,isid1
+        natm = samples(ismpl)%natm
+        samples(ismpl)%esub = epot
+        samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
+        samples(ismpl)%ssub(1:3,1:3) = strs(1:3,1:3)
+      enddo
+
+    endif
+
+
+    l1st = .false.
+    return
+  end subroutine subtract_FF_dataset
+!=======================================================================
   subroutine subtract_FF()
 !
 !  Subtract energies and forces from other force-fields.
@@ -843,7 +915,7 @@ contains
     use parallel
     use Coulomb,only: set_paramsdir_Coulomb
     use dipole,only: set_paramsdir_dipole
-    use Morse,only: set_paramsdir_Morse,set_params_vcMorse,set_params_Morse
+    use Morse,only: set_paramsdir_Morse,set_params_Morse
     use LJ,only: set_paramsdir_LJ
     use ZBL,only: set_params_ZBL
     use Bonny_WRe,only: set_paramsdir_Bonny
@@ -879,53 +951,53 @@ contains
         dmem = dmem +8d0*size(frcs)
       endif
 
-      do i=1,nsubff
-        if( index(trim(csubffs(i)),'Morse').ne.0 ) then
-          luse_Morse = .true.
-        else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
-          luse_Morse_repul = .true.
-        else if( index(trim(csubffs(i)),'Ewald').ne.0 .or. &
-             index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
-             index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
-          luse_Coulomb = .true.
-        else if( index(trim(csubffs(i)),'LJ_repul').ne.0 ) then
-          luse_LJ_repul = .true.
-        else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
-          luse_ZBL = .true.
-          call read_params_ZBL()
-!!$        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
-!!$          luse_Bonny_WRe = .true.
-!!$        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
-!!$          luse_cspline = .true.
-!!$        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
-!!$          luse_dipole = .true.
-        endif
-      enddo
+      
+!!$      do i=1,nsubff
+! !!$        if( index(trim(csubffs(i)),'Morse').ne.0 ) then
+! !!$          luse_Morse = .true.
+! !!$        else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
+! !!$          luse_Morse_repul = .true.
+! !!$        else if( index(trim(csubffs(i)),'Ewald').ne.0 .or. &
+! !!$             index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
+! !!$             index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
+! !!$          luse_Coulomb = .true.
+! !!$        else if( index(trim(csubffs(i)),'LJ_repul').ne.0 ) then
+! !!$          luse_LJ_repul = .true.
+! !!$        else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
+!!$        if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
+!!$          luse_ZBL = .true.
+!!$          call read_params_ZBL()
+! !!$        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
+! !!$          luse_Bonny_WRe = .true.
+! !!$        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
+! !!$          luse_cspline = .true.
+! !!$        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
+! !!$          luse_dipole = .true.
+!!$        endif
+!!$      enddo  ! i=1,nsubff
 
 !.....Only at the 1st call, perform pmd to get (esub,fsub,ssub)
       do ismpl=isid0,isid1
         natm = samples(ismpl)%natm
-        if( luse_Morse .or. luse_Morse_repul ) then
-          call set_paramsdir_Morse(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
-        if( luse_Coulomb ) then
-          call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
+!!$        if( luse_Morse .or. luse_Morse_repul ) then
+!!$          call set_paramsdir_Morse(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$        endif
+!!$        if( luse_Coulomb ) then
+!!$          call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
+!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$        endif
 !!$        if( luse_dipole ) then
 !!$          call set_paramsdir_dipole(trim(cmaindir)//'/'&
 !!$               //trim(samples(ismpl)%cdirname)//'/pmd')
 !!$        endif
-        if( luse_LJ_repul ) then
-          call set_paramsdir_LJ(trim(cmaindir)//'/'&
-               //trim(samples(ismpl)%cdirname)//'/pmd')
-        endif
-        if( luse_ZBL ) then
-!!$          call set_paramsdir_ZBL(trim(cmaindir)//'/'&
+!!$        if( luse_LJ_repul ) then
+!!$          call set_paramsdir_LJ(trim(cmaindir)//'/'&
 !!$               //trim(samples(ismpl)%cdirname)//'/pmd')
-          call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
-        endif
+!!$        endif
+!!$        if( luse_ZBL ) then
+!!$          call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
+!!$        endif
 !!$        if( luse_Bonny_WRe ) then
 !!$          call set_paramsdir_Bonny(trim(cmaindir)//'/'&
 !!$               //trim(samples(ismpl)%cdirname)//'/pmd')
@@ -934,6 +1006,8 @@ contains
 !!$          call set_paramsdir_cspline(trim(cmaindir)//'/'&
 !!$               //trim(samples(ismpl)%cdirname)//'/pmd')
 !!$        endif
+        call pre_pmd(samples(ismpl),nvars,vars,nsubff,csubffs,&
+             rc_other,.true.)
         call run_pmd(samples(ismpl),lcalcgrad,nvars,&
              nsubff,csubffs,epot,frcs,strs,rc_other,lfdsgnmat)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
@@ -947,7 +1021,7 @@ contains
         if( luse_ZBL ) then
           overlay = loverlay
         endif
-      enddo
+      enddo  ! ismpl
 
     endif
 
@@ -1306,15 +1380,6 @@ contains
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-!!$    else if( trim(cpot).eq.'NN2' ) then
-!!$      iv = 0
-!!$      do ihl0=1,nn_nhl(0)
-!!$        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
-!!$          iv = iv + 1
-!!$          vars(iv) = vars(iv) *sgms(ihl0)
-!!$          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
-!!$        enddo
-!!$      enddo
     else if( trim(cpot).eq.'DNN' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)

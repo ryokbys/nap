@@ -9,7 +9,7 @@ converge_num    3
 test_ratio 0.1
 
 sample_directory  "./dataset/"
-param_file        in.params.DNN
+param_file        in.vars.fitpot
 
 # fitting_method    test
 fitting_method    bfgs
