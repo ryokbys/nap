@@ -212,87 +212,87 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'niter_linmin' ) then
     call read_i1(ionum,niter_linmin)
     return
-  elseif( trim(cname).eq.'sa_temp_control' ) then
-    call read_c1(ionum,sa_tctrl)
-    return
-  elseif( trim(cname).eq.'sa_temperature' ) then
-    call read_r1(ionum,sa_temp0)
-    return
-  elseif( trim(cname).eq.'sa_tau' ) then
-    call read_r1(ionum,sa_tau)
-    return
-  elseif( trim(cname).eq.'sa_dxwidth' ) then
-    call read_r1(ionum,sa_xw0)
-    return
-  elseif( trim(cname).eq.'sa_div_best' ) then
-    call read_r1(ionum,sa_div_best)
-    return
-  elseif( trim(cname).eq.'md_height' ) then
-    call read_r1(ionum,md_height)
-    return
-  elseif( trim(cname).eq.'md_sigma' ) then
-    call read_r1(ionum,md_sigma)
-    return
-  elseif( trim(cname).eq.'md_num_gaussian' ) then
-    call read_i1(ionum,md_ng)
-    return
-  elseif( trim(cname).eq.'ga_temperature' ) then
-    call read_r1(ionum,ga_temp)
-    return
-  elseif( trim(cname).eq.'ga_num_bits' ) then
-    call read_i1(ionum,ga_nbits)
-    return
-  elseif( trim(cname).eq.'ga_num_individuals' ) then
-    call read_i1(ionum,ga_nindivs)
-    return
-  elseif( trim(cname).eq.'ga_num_offsprings' ) then
-    call read_i1(ionum,ga_noffsp)
-    return
-  elseif( trim(cname).eq.'ga_mutation_rate' ) then
-    call read_r1(ionum,ga_rate_mutate)
-    return
-  elseif( trim(cname).eq.'ga_fitness' ) then
-    call read_c1(ionum,ga_fitness)
-    return
-  elseif( trim(cname).eq.'de_fitness' ) then
-    call read_c1(ionum,de_fitness)
-    return
-  elseif( trim(cname).eq.'de_algorithm' ) then
-    call read_c1(ionum,de_algo)
-    return
-  elseif( trim(cname).eq.'de_num_individuals' ) then
-    call read_i1(ionum,de_nindivs)
-    return
-  elseif( trim(cname).eq.'de_fraction' ) then
-    call read_r1(ionum,de_frac)
-    return
-  elseif( trim(cname).eq.'de_lambda' ) then
-    call read_r1(ionum,de_lambda)
-    return
-  elseif( trim(cname).eq.'de_crossover_rate' ) then
-    call read_r1(ionum,de_cross_rate)
-    return
-  elseif( trim(cname).eq.'de_temperature' ) then
-    call read_r1(ionum,de_temp)
-    return
-  elseif( trim(cname).eq.'de_wmin' ) then
-    call read_r1(ionum,de_wmin)
-    return
-  elseif( trim(cname).eq.'de_wmax' ) then
-    call read_r1(ionum,de_wmax)
-    return
-  elseif( trim(cname).eq.'pso_num_individuals' ) then
-    call read_i1(ionum,pso_nindivs)
-    return
-  elseif( trim(cname).eq.'pso_w' ) then
-    call read_r1(ionum,pso_w)
-    return
-  elseif( trim(cname).eq.'pso_c1' ) then
-    call read_r1(ionum,pso_c1)
-    return
-  elseif( trim(cname).eq.'pso_c2' ) then
-    call read_r1(ionum,pso_c2)
-    return
+!!$  elseif( trim(cname).eq.'sa_temp_control' ) then
+!!$    call read_c1(ionum,sa_tctrl)
+!!$    return
+!!$  elseif( trim(cname).eq.'sa_temperature' ) then
+!!$    call read_r1(ionum,sa_temp0)
+!!$    return
+!!$  elseif( trim(cname).eq.'sa_tau' ) then
+!!$    call read_r1(ionum,sa_tau)
+!!$    return
+!!$  elseif( trim(cname).eq.'sa_dxwidth' ) then
+!!$    call read_r1(ionum,sa_xw0)
+!!$    return
+!!$  elseif( trim(cname).eq.'sa_div_best' ) then
+!!$    call read_r1(ionum,sa_div_best)
+!!$    return
+!!$  elseif( trim(cname).eq.'md_height' ) then
+!!$    call read_r1(ionum,md_height)
+!!$    return
+!!$  elseif( trim(cname).eq.'md_sigma' ) then
+!!$    call read_r1(ionum,md_sigma)
+!!$    return
+!!$  elseif( trim(cname).eq.'md_num_gaussian' ) then
+!!$    call read_i1(ionum,md_ng)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_temperature' ) then
+!!$    call read_r1(ionum,ga_temp)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_num_bits' ) then
+!!$    call read_i1(ionum,ga_nbits)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_num_individuals' ) then
+!!$    call read_i1(ionum,ga_nindivs)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_num_offsprings' ) then
+!!$    call read_i1(ionum,ga_noffsp)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_mutation_rate' ) then
+!!$    call read_r1(ionum,ga_rate_mutate)
+!!$    return
+!!$  elseif( trim(cname).eq.'ga_fitness' ) then
+!!$    call read_c1(ionum,ga_fitness)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_fitness' ) then
+!!$    call read_c1(ionum,de_fitness)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_algorithm' ) then
+!!$    call read_c1(ionum,de_algo)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_num_individuals' ) then
+!!$    call read_i1(ionum,de_nindivs)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_fraction' ) then
+!!$    call read_r1(ionum,de_frac)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_lambda' ) then
+!!$    call read_r1(ionum,de_lambda)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_crossover_rate' ) then
+!!$    call read_r1(ionum,de_cross_rate)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_temperature' ) then
+!!$    call read_r1(ionum,de_temp)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_wmin' ) then
+!!$    call read_r1(ionum,de_wmin)
+!!$    return
+!!$  elseif( trim(cname).eq.'de_wmax' ) then
+!!$    call read_r1(ionum,de_wmax)
+!!$    return
+!!$  elseif( trim(cname).eq.'pso_num_individuals' ) then
+!!$    call read_i1(ionum,pso_nindivs)
+!!$    return
+!!$  elseif( trim(cname).eq.'pso_w' ) then
+!!$    call read_r1(ionum,pso_w)
+!!$    return
+!!$  elseif( trim(cname).eq.'pso_c1' ) then
+!!$    call read_r1(ionum,pso_c1)
+!!$    return
+!!$  elseif( trim(cname).eq.'pso_c2' ) then
+!!$    call read_r1(ionum,pso_c2)
+!!$    return
   elseif( trim(cname).eq.'random_seed' ) then
     call read_r1(ionum,rseed)
     return

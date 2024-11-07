@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 14:48:14 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 23:53:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -186,7 +186,7 @@ program fitpot
     call sd_wrapper(ftrn0,ftst0)
   case ('cg','CG')
     call cg_wrapper(ftrn0,ftst0)
-  case ('bfgs','BFGS','dfp','DFP')
+  case ('bfgs','BFGS','dfp','DFP','qn','QN')
     call qn_wrapper(ftrn0,ftst0)
   case ('sgd','SGD')
     call sgd_wrapper(ftrn0,ftst0)
@@ -210,7 +210,6 @@ program fitpot
     endif
   endif
 
-  print *,'write_stats...'
   call write_stats(niter)
 
 !!$  call write_energy_relation('subtracted')
@@ -369,41 +368,6 @@ subroutine write_initial_setting()
       endif
     enddo
   endif
-  if( trim(cfmethod).eq.'sa' .or. trim(cfmethod).eq.'SA' ) then
-    write(6,'(a)') ''
-    write(6,'(2x,a25,2x,es12.3)') 'sa_temperature',sa_temp0
-    write(6,'(2x,a25,2x,es12.3)') 'sa_dxwidth',sa_xw0
-    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
-  else if( trim(cfmethod).eq.'ga' .or. trim(cfmethod).eq.'GA' ) then
-    write(6,'(a)') ''
-    write(6,'(2x,a25,2x,i3)') 'ga_num_bits',ga_nbits
-    write(6,'(2x,a25,2x,i4)') 'ga_num_individuals',ga_nindivs
-    write(6,'(2x,a25,2x,i4)') 'ga_num_offsprings',ga_noffsp
-    write(6,'(2x,a25,2x,a)') 'ga_fitness',trim(ga_fitness)
-    write(6,'(2x,a25,2x,f8.4)') 'ga_mutation_rate',ga_rate_mutate
-    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
-  else if( trim(cfmethod).eq.'de' .or. trim(cfmethod).eq.'DE' ) then
-    write(6,'(a)') ''
-    write(6,'(2x,a25,2x,i4)') 'de_num_individuals',de_nindivs
-    write(6,'(2x,a25,2x,a)') 'de_fitness',trim(de_fitness)
-    write(6,'(2x,a25,2x,f8.4)') 'de_fraction',de_frac
-    write(6,'(2x,a25,2x,f8.4)') 'de_lambda',de_lambda
-    write(6,'(2x,a25,2x,f8.4)') 'de_crossover_rate',de_cross_rate
-    write(6,'(2x,a25,2x,f8.4)') 'de_wmin',de_wmin
-    write(6,'(2x,a25,2x,f8.4)') 'de_wmax',de_wmax
-    write(6,'(2x,a25,2x,es12.3)') 'random_seed',rseed
-  else if( trim(cfmethod).eq.'pso' .or. trim(cfmethod).eq.'PSO' ) then
-    write(6,'(a)') ''
-    write(6,'(2x,a25,2x,i4)') 'pso_num_individuals',pso_nindivs
-    write(6,'(2x,a25,2x,f8.4)') 'pso_w',pso_w
-    write(6,'(2x,a25,2x,f8.4)') 'pso_c1',pso_c1
-    write(6,'(2x,a25,2x,f8.4)') 'pso_c2',pso_c2
-  endif
-!!$  write(6,'(a)') ''
-!!$  write(6,'(2x,a25,2x,i5)') 'individual_weight',nwgtindiv
-!!$  do i=1,nwgtindiv
-!!$    write(6,'(2x,a25,2x,f6.1)') trim(cwgtindiv(i)),wgtindiv(i)
-!!$  enddo
   write(6,'(a)') ''
   write(6,'(a)') '------------------------------------------------------------------------'
 
@@ -2166,46 +2130,12 @@ subroutine sync_input()
   call mpi_bcast(lematch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
-!!$  call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
-!!$  call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(nspcs_neglect,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cspcs_neglect,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(interact3,nspmax*nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
-!.....Simulated annealing
-  call mpi_bcast(sa_temp0,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(sa_xw0,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(sa_tau,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(sa_div_best,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(sa_tctrl,128,mpi_character,0,mpi_world,ierr)
-!.....Metadynamics
-  call mpi_bcast(md_height,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(md_sigma,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(md_ng,1,mpi_integer,0,mpi_world,ierr)
-!.....Genetic algorithm
-  call mpi_bcast(ga_temp,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(ga_nbits,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(ga_nindivs,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(ga_noffsp,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(ga_rate_mutate,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(ga_fitness,128,mpi_character,0,mpi_world,ierr)
-!.....Differential evolution
-  call mpi_bcast(de_nindivs,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(de_frac,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_lambda,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_cross_rate,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_temp,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_wmin,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_wmax,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(de_fitness,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(de_algo,128,mpi_character,0,mpi_world,ierr)
-!.....Particle swarm optimization
-  call mpi_bcast(pso_nindivs,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(pso_w,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pso_c1,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pso_c2,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
   call mpi_bcast(csgdupdate,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(nsgdbsnode,1,mpi_integer,0,mpi_world,ierr)
@@ -2246,13 +2176,6 @@ subroutine sync_input()
   if( lwgt_compos ) then
     call mpi_bcast(escl_compos,1,mpi_real8,0,mpi_world,ierr)
   endif
-!!$  call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
-!!$  if( myid.gt.0 ) then
-!!$    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
-!!$  endif
-!!$  call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
-!!$  call mpi_bcast(swerg0,nswgt,mpi_real8,0,mpi_world,ierr)
-!!$  call mpi_bcast(swdenom,nswgt,mpi_real8,0,mpi_world,ierr)
 !.....GDW
   call mpi_bcast(lgdw,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(gdsgm,1,mpi_real8,0,mpi_world,ierr)

@@ -38,74 +38,11 @@ module minimize
   real(8):: armijo_tau     = 0.5d0
   integer:: armijo_maxiter = 15
 
-!.....Simulated annealing parameters
-  real(8):: sa_temp0 = 1d0
-  real(8):: sa_tau   = 10d0
-  real(8):: sa_xw0   = 1d-3
-  real(8):: sa_fctr  = 0.5d0
-  real(8),allocatable:: sa_xws(:)
-!.....T control method
-!.....  - linear
-!.....  - exp
-!.....  - best
-!.....  - constant
-  character(len=128):: sa_tctrl = 'best'
-  real(8):: sa_div_best = 10d0
-
-!.....Metadynamics
-  real(8):: md_height = 1d0
-  real(8):: md_sigma  = 1d0
-!.....Max num of gaussian potentials
-  integer:: md_ng = 1000
-  real(8),allocatable:: md_gp(:,:)
-
 !.....CG
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
 
 !.....L-BFGS
   integer:: mstore   = 10
-
-!.....Genetic Algorithm variables.......................................
-  real(8):: ga_rate_mutate = 0.1
-  integer:: ga_nindivs = 10
-  integer:: ga_nbits = 16
-  integer:: ga_noffsp = 0
-  real(8):: ga_temp = 1d0
-  integer:: ga_ngenes
-  character(len=128):: ga_fitness = 'inv'
-  
-  type gene  ! A Gene corresponds to a parameter/variable to be optimized
-    integer(2),allocatable:: bits(:)
-    real(8):: val
-    real(8):: vmax,vmin
-  end type gene
-
-  type individual  ! An individual is a set of parameters
-    integer:: iid  ! ID for this individual
-    type(gene),allocatable:: genes(:)
-    real(8):: fvalue  ! Loss function value of the individual
-    real(8):: ftst    ! Loss function value for test set of the individual.
-    real(8):: fitness ! Fittness value of the individual
-    real(8),allocatable:: vel(:)
-  end type individual
-
-!.....Differential evolution variables..................................
-  character(len=128):: de_fitness = 'inv'
-  character(len=128):: de_algo = 'local_neigh'
-  integer:: de_nindivs = 10
-  real(8):: de_frac    = 1d0
-  real(8):: de_lambda  = -1d0
-  real(8):: de_cross_rate = 0.5d0
-  real(8):: de_wmin    = 0.4d0
-  real(8):: de_wmax    = 0.8d0
-  real(8):: de_temp    = 1d0
-
-!.....Particle swarm optimization variables.............................
-  integer:: pso_nindivs = 10
-  real(8):: pso_w       = 0.99d0
-  real(8):: pso_c1      = 2d0
-  real(8):: pso_c2      = 2d0
-  real(8):: pso_vinimax = 0.1d0
 
   real(8):: fupper_lim = 1d+5
   real(8),allocatable:: ranges(:,:)
@@ -174,12 +111,13 @@ contains
     endif
   end subroutine write_status
 !=======================================================================
-  subroutine check_converge(myid,iprint,xtol,gtol,ftol &
+  subroutine check_converge(myid,iprint,cmin,xtol,gtol,ftol &
        ,dxnorm,gnorm,fdiff,nxtol,ngtol,nftol,iflag,lconverged)
     integer,intent(in):: myid,iprint
     real(8),intent(in):: xtol,gtol,ftol,dxnorm,gnorm,fdiff
     integer,intent(inout):: nxtol,ngtol,nftol,iflag
     logical,intent(out):: lconverged
+    character(len=*):: cmin
 
     lconverged = .false.
     if( myid.eq.0 .and. iprint.gt.1 ) then
@@ -191,8 +129,8 @@ contains
       nftol = 0
       if( nxtol.ge.numtol ) then
         if( myid.eq.0 .and. iprint.gt.0 ) then
-          print '(a,i0,a)',' >>> QN converged because xdiff < xtol over ' &
-               ,numtol,' times.'
+          print '(a,i0,a)',' >>> '//trim(cmin)//' converged' &
+               //' because xdiff < xtol over ',numtol,' times.'
           write(6,'(a,2es13.5)') '   dxnorm,xtol=',dxnorm,xtol
         endif
         iflag= iflag +1
@@ -207,8 +145,8 @@ contains
       nftol = 0
       if( ngtol.ge.numtol ) then
         if( myid.eq.0 ) then
-          print '(a,i0,a)',' >>> QN converged because gdiff < gtol over ' &
-               ,numtol,' times.'
+          print '(a,i0,a)',' >>> '//trim(cmin)//' converged' &
+               //' because gdiff < gtol over ',numtol,' times.'
           write(6,'(a,2es13.5)') '   gnorm,gtol=',gnorm,gtol
         endif
         iflag= iflag +2
@@ -223,8 +161,8 @@ contains
       ngtol = 0
       if( nftol.ge.numtol ) then
         if( myid.eq.0 ) then
-          print '(a,i0,a)',' >>> QN converged because fdiff < ftol over ' &
-               ,numtol,' times.'
+          print '(a,i0,a)',' >>> '//trim(cmin)//' converged' &
+               //' because fdiff < ftol over ',numtol,' times.'
           write(6,'(a,2es13.5)') '   fdiff,ftol=',fdiff, ftol
         endif
         iflag= iflag +3
@@ -375,7 +313,7 @@ contains
       vnorm= sqrt(sprod(ndim,x,x))
       call write_status(6,myid,iprint,cpena,iter,niter &
            ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
-      call check_converge(myid,iprint,xtol,gtol,ftol &
+      call check_converge(myid,iprint,'SD',xtol,gtol,ftol &
            ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
       if( lconverged ) then
         x0(:) = x(:)
@@ -420,11 +358,11 @@ contains
 
     integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
     integer:: ninnerstp,innerstp,ierr,itmp
-    real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate,sgd_ratei
+    real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate,sgd_ratei,pvaltmp
     real(8):: fp,ftmp,ftst,ftsttmp
     real(8):: rate_upper, rate_lower
     real(8),allocatable:: x(:),dx(:),rm(:),rmh(:),gpena(:),gtmp(:) &
-         ,gp(:),v(:),vh(:),xp(:)
+         ,gp(:),v(:),vh(:),xp(:),gpenatmp(:)
     integer,allocatable:: imaskarr(:)
     logical:: lconverged
 
@@ -461,7 +399,7 @@ contains
         print *,''
       endif
       allocate(x(ndim),dx(ndim),rm(ndim),rmh(ndim),gpena(ndim) &
-           ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim),xp(ndim))
+           ,gp(ndim),gtmp(ndim),v(ndim),vh(ndim),xp(ndim),gpenatmp(ndim))
       allocate(ismask(isid0:isid1))
       sgd_rate = sgd_rate_ini
     endif
@@ -486,6 +424,7 @@ contains
     call grad(ndim,x0,g)
     call penalty(cpena,ndim,pval,gpena,x0)
     f = f + pval
+    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sqrt(sprod(ndim,g,g))
     xnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
@@ -530,6 +469,7 @@ contains
         call grad(ndim,x,g)
         call penalty(cpena,ndim,pval,gpena,x)
         f = f + pval
+        if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
         gnorm= sqrt(sprod(ndim,g,g))
 !!$        print *,'myid,innerstp,gnorm=',myid,innerstp,gnorm
 
@@ -559,19 +499,20 @@ contains
         endif
 
 !.....Update x
-        if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
+!!$        if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
         if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
           call soft_threshold(ndim,x,dx,1d0)
         else
           x(1:ndim)= x(1:ndim) +dx(1:ndim)
         endif
-        call wrap_ranges(ndim,x,xranges)
-        call penalty(cpena,ndim,pval,gpena,x)
       enddo  ! innerstp
 
+      call wrap_ranges(ndim,x,xranges)
+      call penalty(cpena,ndim,pval,gpena,x)
       dx(:) = x(:) -xp(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       xnorm= sqrt(sprod(ndim,x,x))
+      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
 !!$      print *,'myid,iter,gnorm=',myid,iter,gnorm
 
@@ -581,14 +522,18 @@ contains
         do ismpl=isid0,isid1
           ismask(ismpl) = mod(ismask(ismpl)+1,2)
         enddo
-        call func(ndim,x,f,ftst)
-        call grad(ndim,x,g)
-        gnorm= sqrt(sprod(ndim,g,g))
+        call wrap_ranges(ndim,x,xranges)
+        call penalty(cpena,ndim,pvaltmp,gpenatmp,x)
+        call func(ndim,x,ftmp,ftst)
+        ftmp = ftmp +pval
+        call grad(ndim,x,gtmp)
+        if( trim(cpena).eq.'ridge' ) gtmp(1:ndim)= gtmp(1:ndim) +gpena(1:ndim)
+        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
         call sub_eval(iter)
       endif
       call write_status(6,myid,iprint,cpena,iter,ninnerstp &
            ,f,ftst,pval,xnorm,gnorm,dxnorm,fp)
-      call check_converge(myid,iprint,xtol,gtol,ftol &
+      call check_converge(myid,iprint,'SGD',xtol,gtol,ftol &
            ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
       if( lconverged ) then
         x0(:) = x(:)
@@ -596,7 +541,7 @@ contains
         deallocate(x,dx,rm,rmh,gpena)
         return
       endif
-    enddo
+    enddo  ! iter
 
     x0(1:ndim)= x(1:ndim)
     deallocate(x,dx,rm,rmh,gpena,imaskarr)
@@ -840,7 +785,7 @@ contains
       dxnorm= sqrt(sprod(ndim,dx,dx))
       call write_status(6,myid,iprint,cpena,iter,niter &
            ,f,ftst,pval,vnorm,sgnorm,dxnorm,fp)
-      call check_converge(myid,iprint,xtol,gtol,ftol &
+      call check_converge(myid,iprint,'CG',xtol,gtol,ftol &
            ,dxnorm,sgnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
       if( lconverged ) then
         x0(:) = x(:)
@@ -926,7 +871,6 @@ contains
     call penalty(cpena,ndim,pval,gpena,x0)
     f = f + pval
     if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
@@ -1024,7 +968,7 @@ contains
       dxnorm= sqrt(sprod(ndim,dx,dx))
       call write_status(6,myid,iprint,cpena,iter,niter &
            ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
-      call check_converge(myid,iprint,xtol,gtol,ftol &
+      call check_converge(myid,iprint,'QN',xtol,gtol,ftol &
            ,dxnorm,gnorm,abs(f-fp),nxtol,ngtol,nftol,iflag,lconverged)
       if( lconverged ) then
         x0(:) = x(:)
@@ -2422,178 +2366,6 @@ contains
     return
   end subroutine cap_grad
 !=======================================================================
-  subroutine sa(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
-!
-! Simulated Annealing
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
-
-    integer:: iter,idim,nadpt,i
-    real(8):: f,ft,temp,xw,dx,ptrans,ftst,tau
-    real(8),allocatable:: x(:),xt(:)
-    logical,save:: l1st = .true.
-
-    if( l1st ) then
-      if(.not.allocated(sa_xws) ) allocate(sa_xws(ndim))
-      do i=1,ndim
-!!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
-        sa_xws(i) = 1d-2
-      enddo
-      tau = max(sa_tau,1d0)
-      if(myid.eq.0 .and. iprint.ne.0) then
-        write(6,*) ''
-        write(6,'(a)') '------------------------------------------------------------------------'
-        write(6,'(a)') '                    Simulated annealing'
-        write(6,'(a)') '------------------------------------------------------------------------'
-        write(6,'(a,a)') ' Temperature control method = ',trim(sa_tctrl)
-        if( sa_tctrl(1:3).eq.'exp' ) then
-          write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
-          write(6,'(a,f10.4)') ' Relaxation iteration (tau) = ',tau
-        else if( sa_tctrl(1:3).eq.'bes' ) then
-          write(6,'(a,f8.1)') ' Division of fbest = ',sa_div_best
-        else
-          write(6,'(a,f10.4)') ' Initial temperature = ',sa_temp0
-        endif
-        print *,''
-      endif
-      
-    endif
-
-    if( .not.allocated(x) ) allocate(x(ndim),xt(ndim))
-
-!.....Initialize
-    x(1:ndim)= xbest(1:ndim)
-    do idim=1,ndim
-      if( x(idim).lt.xranges(1,idim) ) x(idim) = xranges(1,idim)
-      if( x(idim).gt.xranges(2,idim) ) x(idim) = xranges(2,idim)
-    enddo
-    call func(ndim,x,f,ftst)
-!!$    p = exp(-f/temp)
-    if( f*0d0 .ne. 0d0 ) f = 1d+10
-    fbest= f
-    if( sa_tctrl(1:3).eq.'bes' ) then
-      temp = fbest/sa_div_best
-    else
-      temp= max(sa_temp0,1d-8)
-    endif
-    xw= sa_xw0
-    nadpt= 0
-
-    iter= 0
-    ft = 0d0
-    idim = 0
-    if( myid.eq.0 .and. iprint.ne.0 ) then
-      write(6,'(a,2i10,4es13.5,2f9.5)')&
-           ' iter,idim,temp,f,ft,fbest,ptrans,radpt='&
-           ,iter,idim,temp,f,ft,fbest,ptrans,0d0
-    endif
-    
-    call sub_eval(0)
-!.....Main loop of random displacements
-    do iter=1,maxiter
-
-!.....Choose a parameter to be displaced
-      idim= urnd()*ndim +1
-
-!.....Compute the displacement using a uniform random number
-      xt(1:ndim)= x(1:ndim)
-      dx= (urnd()-0.5d0)*sa_xws(idim)
-      xt(idim)= xt(idim) +dx
-      if( xt(idim).lt.xranges(1,idim) ) xt(idim) = xranges(1,idim)
-      if( xt(idim).gt.xranges(2,idim) ) xt(idim) = xranges(2,idim)
-
-!.....Compute function value
-      call func(ndim,xt,ft,ftst)
-!.....Detect NaN and skip this trial
-      if( ft*0d0 .ne. 0d0 ) then
-        if( myid.eq.0 .and. iprint.ne.0 ) then
-          write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
-               ' [ft.eq.NaN] iter,idim,sa_xws(idim)=' &
-               ,iter,idim,sa_xws(idim)
-        endif
-!.....Decrease the width of deviation
-        sa_xws(idim) = sa_xws(idim) *sa_fctr
-        goto 10
-      endif
-!!$      pt = exp(-ft/temp)
-
-!.....Compute probability of taking the displacement
-      ptrans= min(1d0,exp(-(ft-f)/temp))
-!!$      ptrans = min(1d0,pt/p)
-
-!.....Store the best one
-      if( ft.lt.fbest ) then
-        fbest= ft
-        xbest(1:ndim)= xt(1:ndim)
-        if( sa_tctrl(1:3).eq.'bes' ) temp = fbest/sa_div_best
-      endif
-
-      if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
-      endif
-
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,2i10,4es13.5,2f9.5)')&
-             ' iter,idim,temp,f,ft,fbest,ptrans,radpt='&
-             ,iter,idim,temp,f,ft,fbest,ptrans,dble(nadpt)/iter
-        flush(6)
-      endif
-      
-!.....Update the parameter if needed
-      if( urnd().lt.ptrans ) then
-        x(idim)= xt(idim)
-        f= ft
-        nadpt= nadpt +1
-!.....Increase the width of deviation
-        sa_xws(idim) = sa_xws(idim) /sa_fctr
-      else
-!.....Decrease the width of deviation
-        sa_xws(idim) = sa_xws(idim) *sa_fctr
-      endif
-
-10    continue
-      if( sa_tctrl(1:3).eq.'lin' ) then
-!.....Update temperature (linear)
-        temp= dble(maxiter-iter)/maxiter *sa_temp0
-      else if( sa_tctrl(1:3).eq.'exp' ) then
-!.....Update temperature (exponential)
-        temp= sa_temp0 *exp(-dble(iter)/tau)
-      endif
-    enddo
-
-    if( myid.eq.0 ) then
-      write(6,'(a,i10,a,i10)') ' Num of adoption in SA='&
-           ,nadpt,'/',maxiter
-!!$      print *,'sa_xws:'
-!!$      do i=1,ndim
-!!$        write(6,'(i6,es15.7)') i,sa_xws(i)
-!!$      enddo
-    endif
-
-!.....Finally compute the function value of the best candidate
-    call func(ndim,xbest,f,ftst)
-
-    l1st = .false.
-    
-  end subroutine sa
-!=======================================================================
   subroutine penalty(cpena,ndim,fp,gp,x)
 !
 ! Calculate penalty term and its derivative.
@@ -2650,1377 +2422,6 @@ contains
 
     return
   end subroutine penalty
-!=======================================================================
-  subroutine random_search(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
-!
-!  Pure random search with variable range
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
-
-    integer:: iter,idim
-    real(8):: f,ftst,fmin,xmin,xmax,xi
-    real(8),allocatable:: x(:)
-    logical,save:: l1st = .true.
-
-    if( l1st ) then
-      if( .not. allocated(x) ) allocate(x(ndim))
-      l1st = .false.
-    endif
-
-    x(1:ndim)= xbest(1:ndim)
-    call func(ndim,x,f,ftst)
-    if( fmin*0d0.ne.0d0 ) then  ! NaN
-      fmin = 1.0d+10
-    endif
-    fmin = f
-    if( myid.eq.0 .and. iprint.gt.0 ) &
-         write(6,'(a,i8,2es15.7,100f7.3)') ' iter,f,fmin = ',0,f,fmin
-    
-    do iter=1,maxiter
-      do idim=1,ndim
-        xmin = xranges(1,idim)
-        xmax = xranges(2,idim)
-        xi = (xmax-xmin)*urnd() +xmin
-        x(idim) = xi
-      enddo
-
-      call func(ndim,x,f,ftst)
-      if( f*0d0.ne.0d0 ) then  !NaN
-        f = 1.0d+10
-      endif
-      if( myid.eq.0 .and. iprint.gt.0 ) &
-           write(6,'(a,i8,2es15.7,100f7.3)') ' iter,f,fmin = ',iter,f,fmin
-      if( f.lt.fmin ) then
-        if( myid.eq.0 .and. iprint.gt.0 ) then
-          write(6,'(a,i8,2es15.7)') ' fmin is updated: iter,fmin,df= ' &
-               ,iter,f,abs(f-fmin)
-        endif
-        fmin = f
-        fbest = fmin
-        xbest(1:ndim) = x(1:ndim)
-        call sub_eval(iter)
-      endif
-    enddo
-
-  end subroutine random_search
-!=======================================================================
-  subroutine metadynamics(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
-!
-!  Metadynamics for minimum search
-!  Use simulated annealing-like search for local minimum search
-!  and once the local minimum is found, add a gaussian potential to
-!  the minimum to make it possible to escape from the minimum.
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
-
-    integer:: iter,idim,nadpt,i,ng,ig,interval
-    real(8):: f,ft,temp,xw,dx,ptrans,ftst,tau,adx,&
-         fg,fgt,tmp
-    real(8),allocatable:: x(:),xt(:),xxt(:)
-    logical,save:: l1st = .true.
-
-    if( l1st ) then
-      interval = max(maxiter/md_ng,1)
-      if(.not.allocated(md_gp) ) allocate(md_gp(ndim,md_ng))
-      md_gp(:,:) = 0d0
-      if(.not.allocated(sa_xws) ) allocate(sa_xws(ndim))
-      do i=1,ndim
-!!$        sa_xws(i) = max(xbest(i)*sa_xw0,1d-2)
-        sa_xws(i) = 1d-2
-      enddo
-      tau = max(sa_tau,1d0)
-      if(myid.eq.0 .and. iprint.ne.0) then
-        print *,''
-        print *,'******************** Metadynamics ********************'
-        print *,''
-        write(6,'(a,i5)') ' Number of gaussians to be added = ',md_ng
-        write(6,'(a,f10.4)') ' Gaussian height         = ',md_height
-        write(6,'(a,f10.4)') ' Gaussian width (sigma)  = ',md_sigma
-      endif
-      l1st = .false.
-    endif
-
-    if( .not.allocated(x) ) allocate(x(ndim),xt(ndim),xxt(ndim))
-
-!.....Initialize
-    x(1:ndim)= xbest(1:ndim)
-    do idim=1,ndim
-      if( x(idim).lt.xranges(1,idim) ) x(idim) = xranges(1,idim)
-      if( x(idim).gt.xranges(2,idim) ) x(idim) = xranges(2,idim)
-    enddo
-    call func(ndim,x,f,ftst)
-!!$    p = exp(-f/temp)
-    if( f*0d0.ne.0d0 ) f = 1.0d+10
-    fbest= f
-    fg = f
-!!$    temp= sa_temp0
-    temp= fbest/sa_div_best
-    xw= sa_xw0
-    nadpt= 0
-    ng = 0
-
-    call sub_eval(0)
-!.....Main loop of random displacements
-    do iter=1,maxiter
-
-!.....Choose a parameter to be displaced
-      idim= urnd()*ndim +1
-
-!.....Compute the displacement using a uniform random number
-      xt(1:ndim)= x(1:ndim)
-      dx= (urnd()-0.5d0)*sa_xws(idim)
-      xt(idim)= xt(idim) +dx
-      if( xt(idim).lt.xranges(1,idim) ) xt(idim) = xranges(1,idim)
-      if( xt(idim).gt.xranges(2,idim) ) xt(idim) = xranges(2,idim)
-
-!.....Compute function value
-      call func(ndim,xt,ft,ftst)
-!.....Detect NaN and skip this trial
-      if( ft*0d0 .ne. 0d0 ) then
-        if( myid.eq.0 .and. iprint.ne.0 ) then
-          write(6,'(a,2i10,es12.4,3es13.5,2f9.5)')&
-               ' [ft.eq.NaN] iter,idim,sa_xws(idim)=' &
-               ,iter,idim,sa_xws(idim)
-        endif
-!.....Decrease the width of deviation
-        sa_xws(idim) = sa_xws(idim) *sa_fctr
-        goto 10
-      endif
-!.....Add gaussian potentials to ft
-      fgt = ft
-      do ig=1,ng
-        xxt(1:ndim) = xt(1:ndim)-md_gp(1:ndim,ig)
-        adx = dot_product(xxt(1:ndim),xxt(1:ndim))
-        tmp = md_height*exp(-adx/2/md_sigma**2)
-        fgt = fgt +tmp
-      enddo
-      fg = f
-      do ig=1,ng
-        xxt(1:ndim) = x(1:ndim)-md_gp(1:ndim,ig)
-        adx = dot_product(xxt(1:ndim),xxt(1:ndim))
-        tmp = md_height*exp(-adx/2/md_sigma**2)
-        fg = fg +tmp
-      enddo
-!!$      pt = exp(-ft/temp)
-
-!.....Store the best one
-      if( ft.lt.fbest ) then
-        fbest= ft
-        xbest(1:ndim)= xt(1:ndim)
-        temp = fbest/sa_div_best
-      endif
-
-!.....Compute probability of taking the displacement
-      ptrans= min(1d0,exp(-(fgt-fg)/temp))
-!!$      ptrans = min(1d0,pt/p)
-
-      if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
-      endif
-
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,'(a,2i10,6es13.5,2f9.5,i5,es13.5)')&
-             ' iter,idim,temp,f,ft,fbest,fg,fgt,ptrans,radpt,ng='&
-             ,iter,idim,temp,f,ft,fbest,fg,fgt,ptrans,dble(nadpt)/iter,ng
-      endif
-      
-!.....Update the parameter if adopted
-      if( urnd().lt.ptrans ) then
-        x(idim)= xt(idim)
-        f= ft
-        fg= fgt
-        nadpt= nadpt +1
-!.....Increase the width of deviation
-        sa_xws(idim) = sa_xws(idim) /sa_fctr
-      else
-!.....Decrease the width of deviation
-        sa_xws(idim) = sa_xws(idim) *sa_fctr
-      endif
-
-!.....Put a gaussian potential to the current variable position
-      if( mod(iter,interval).eq.0 ) then
-        ng = ng + 1
-        if( ng.gt.md_ng ) then
-          if( myid.eq.0 .and. iprint.gt.0 ) then
-            write(6,'(a,i8)') ' Number of gaussian exceeds md_ng = ',md_ng
-          endif
-          exit
-        endif
-        md_gp(1:ndim,ng) = x(1:ndim)
-      endif
-
-10    continue
-!!$!.....Update temperature (linear)
-!!$      temp= dble(maxiter-iter)/maxiter *sa_temp0
-!!$!.....Update temperature (exponential)
-!!$      temp= sa_temp0 *exp(-dble(iter)/tau)
-
-    enddo
-
-    if( myid.eq.0 ) then
-      write(6,'(a,i10,a,i10)') ' Num of adoption in SA in Metadynamics='&
-           ,nadpt,'/',maxiter
-    endif
-
-!.....Finally compute the function value of the best candidate
-    call func(ndim,xbest,f,ftst)
-
-    
-  end subroutine metadynamics
-!=======================================================================
-  subroutine ga(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval,sub_ergrel)
-!
-! Genetic algorithm (GA) which does not use gradient information.
-! GA itself is a serial code, but the function evaluation can be parallel.
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-      subroutine sub_ergrel(cadd)
-        character(len=*),intent(in):: cadd
-      end subroutine sub_ergrel
-    end interface
-
-    integer:: i,j,iter,i1,i2
-    real(8):: ftrn,ftst
-    logical,save:: l1st = .true.
-    integer:: iid,iidbest
-    type(individual),allocatable:: indivs(:),offsprings(:)
-    real(8),allocatable:: xtmp(:)
-    character(len=128):: cadd
-
-    integer,parameter:: io_indivs = 30
-    character(len=128),parameter:: cf_indivs = 'out.ga.individuals'
-    integer,parameter:: io_steps = 31
-    character(len=128),parameter:: cf_steps = 'out.ga.generations'
-
-    if( l1st ) then
-!.....Initialize
-      ga_ngenes = ndim
-      if( ga_noffsp.le.0 ) then
-        ga_noffsp = ga_nindivs
-      endif
-!.....Allocate necessary memory spaces
-      allocate(indivs(ga_nindivs),offsprings(ga_noffsp))
-      allocate(xtmp(ndim))
-      do i=1,ga_noffsp
-        allocate(offsprings(i)%genes(ga_ngenes))
-        do j=1,ga_ngenes
-          allocate(offsprings(i)%genes(j)%bits(ga_nbits))
-        enddo
-      enddo
-      do i=1,ga_nindivs
-        allocate(indivs(i)%genes(ga_ngenes))
-        do j=1,ga_ngenes
-          allocate(indivs(i)%genes(j)%bits(ga_nbits))
-        enddo
-      enddo
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') '------------------------------------------------------------------------'
-        write(6,'(a)') '                    Genetic Algorithm'
-        write(6,'(a)') '------------------------------------------------------------------------'
-        print '(a,i4)',' Number of individuals = ',ga_nindivs
-        print '(a,i4)',' Number of genes       = ',ga_ngenes
-        print '(a,i4)',' Number of bits        = ',ga_nbits
-        print '(a,i4)',' Number of offsprings  = ',ga_noffsp
-        print *,''
-        call wrap_ranges(ndim,xbest,xranges)
-      endif
-      l1st = .false.
-    endif
-
-    if( myid.eq.0 ) then
-      open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
-      open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
-    endif
-100 format(i6,2es14.6,100es11.3)
-
-    iter = 0
-    
-!.....Create population that includes some individuals
-    iid = 0
-    fbest = 1d+30
-    do i=1,ga_nindivs
-      do j=1,ga_ngenes
-        indivs(i)%genes(j)%vmin = xranges(1,j)
-        indivs(i)%genes(j)%vmax = xranges(2,j)
-      enddo
-      do j=1,ga_ngenes
-        call var2gene(xbest(j),indivs(i)%genes(j))
-      enddo
-!.....Use a given X in case of i==1, otherwise mutate it with high rate.
-      if( i.ne.1 ) then
-        do j=1,ga_ngenes
-          call mutate(indivs(i)%genes(j),0.25d0)
-        enddo
-      endif
-      call indiv2vars(indivs(i),ndim,xtmp)
-      call func(ndim,xtmp,ftrn,ftst)
-      iid = iid + 1
-      if( iprint.gt.1 ) print *,'iid,ftrn,ftst=',iid,ftrn,ftst
-!.....Detect NaN and replace it with 1d+10
-      if( ftrn*0d0 .ne. 0d0 ) then
-        if( myid.eq.0 .and. iprint.ne.0 ) then
-          write(6,'(a,2i10)')&
-               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
-        endif
-        ftrn = fupper_lim
-      else if( ftrn.gt.fupper_lim ) then
-        ftrn = fupper_lim
-      endif
-      indivs(i)%fvalue = ftrn
-      indivs(i)%ftst = ftst
-      indivs(i)%fitness = 1d0/ftrn
-      indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-      if( ftrn.lt.fbest ) then
-        fbest = ftrn
-        iidbest = iid
-        xbest(1:ndim) = xtmp(1:ndim)
-      endif
-      if( i.eq.1 ) call sub_eval(iter)
-    enddo
-
-    if( myid.eq.0 ) then
-      write(6,'(a,i8,1x,100es11.3)') &
-           " iter,fbest,fvals= ",&
-           iter,fbest,(indivs(i)%fvalue,i=1,min(ga_nindivs,10))
-      do i=1,ga_nindivs
-        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
-             ,indivs(i)%ftst
-      enddo
-    endif
-
-!.....GA loop starts....................................................
-    do iter=1,maxiter
-
-!.....Give birth some offsprings by crossover
-!!$      print *,'giving birth...'
-      do i=1,ga_noffsp
-        i1 = int(urnd()*ga_nindivs) +1
-10      i2 = int(urnd()*ga_nindivs) +1
-        if( i1.eq.i2 ) goto 10
-        call crossover(indivs(i1),indivs(i2),offsprings(i))
-!.....Mutation of new-born babies
-        do j=1,ga_ngenes
-          call mutate(offsprings(i)%genes(j),ga_rate_mutate)
-        enddo
-!.....Evaluate the value of each new-born babies
-        call indiv2vars(offsprings(i),ndim,xtmp)
-        call func(ndim,xtmp,ftrn,ftst)
-        iid = iid + 1
-        if( iprint.gt.1 ) print *,'iid,ftrn,ftst=',iid,ftrn,ftst
-!.....Detect NaN and replace it with 1d+10
-        if( ftrn*0d0 .ne. 0d0 ) then
-          if( myid.eq.0 .and. iprint.ne.0 ) then
-            write(6,'(a,2i10)')&
-                 ' [ftrn.eq.NaN] iter,iid = ',iter,iid
-          endif
-          ftrn = fupper_lim
-        endif
-        if( ftrn.gt.fupper_lim ) then
-          ftrn = fupper_lim
-        endif
-        if( ftst.gt.fupper_lim ) then
-          ftst = fupper_lim
-        endif
-        offsprings(i)%fvalue = ftrn
-        offsprings(i)%ftst = ftst
-        offsprings(i)%fitness = 1d0/ftrn
-        offsprings(i)%iid = iid
-        if( myid.eq.0 ) write(io_indivs,100) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-        if( ftrn.lt.fbest ) then
-          fbest = ftrn
-          iidbest = iid
-          xbest(1:ndim) = xtmp(1:ndim)
-          if( iprint.ge.2 ) then
-            write(cadd,'(i0)') iid
-            call sub_ergrel(cadd)
-          endif
-          call sub_eval(iid)
-        endif
-      enddo
-
-!.....Selection
-!!$      print *,'selecting...'
-      call roulette_selection(ga_nindivs,indivs,ga_noffsp,offsprings,fbest)
-
-      if( myid.eq.0 ) then
-        write(6,'(a,i8,1x,100es11.3)') &
-           " iter,fbest,fvals= ",&
-           iter,fbest,(indivs(i)%fvalue,i=1,min(ga_nindivs,10))
-        do i=1,ga_nindivs
-          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
-               ,indivs(i)%ftst
-        enddo
-        flush(io_indivs)
-        flush(io_steps)
-      endif
-    end do
-!.....END of GA loop....................................................
-
-!.....Output information of the best
-    if( myid.eq.0 ) then
-      write(6,*) ''
-      write(6,'(a)') ' The best one in this GA simulation run:'
-      write(6,'(a,i0,2x,f0.4)') '   ID, f-value: ',iidbest,fbest
-!!$      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
-      write(6,*) ''
-    endif
-
-!.....Just for outputing out.erg.fin.1 of the best one     
-    call func(ndim,xbest,ftrn,ftst)
-!!$    if( myid.eq.0 ) then
-!!$      write(6,*) 'best one re-caluclated = ', ftrn
-!!$    endif
-
-    close(io_indivs)
-    close(io_steps)
-    return
-  end subroutine ga
-!=======================================================================
-  subroutine bin2dec(nbit,bin,dec)
-    integer,intent(in):: nbit
-    integer(2),intent(in):: bin(nbit)
-    integer,intent(out):: dec
-    integer:: i
-
-    dec = 0
-    do i=1,nbit
-      dec = dec +bin(i)*2**(i-1)
-    end do
-    return
-  end subroutine bin2dec
-!=======================================================================
-  subroutine dec2bin(nbit,dec,bin)
-    integer,intent(in):: nbit
-    integer,intent(in):: dec
-    integer(2),intent(out):: bin(nbit)
-    integer:: i,idec
-
-    idec = dec
-    bin(1:nbit) = 0
-    do i=1,nbit
-      bin(i) = mod(idec,2)
-      idec = idec /2
-    enddo
-    return
-  end subroutine dec2bin
-!=======================================================================
-  subroutine make_pairs(num,pairs)
-!
-!  Make random pairs from NUM elements.
-!
-    use random
-    integer,intent(in):: num
-    integer,intent(out):: pairs(2,num/2)
-
-    integer:: i,j,l,m,n,ival,jval
-    integer:: chosen(num),navail
-
-    chosen(1:num) = 0
-    
-    navail = num
-    do n=1,num/2
-      i = int(urnd()*navail) +1
-10    j = int(urnd()*navail) +1
-      if( j.eq.i ) goto 10
-      l=0
-      ival = 0
-      jval = 0
-      do m=1,num
-        if( chosen(m).eq.0 ) then
-          l=l+1
-          if( l.eq.i ) then
-            ival = m
-            chosen(m) = 1
-          else if( l.eq.j ) then
-            jval = m
-            chosen(m) = 1
-          endif
-          if( ival.ne.0 .and. jval.ne.0 ) then
-            exit
-          endif
-        endif
-      enddo
-      pairs(1,n) = ival
-      pairs(2,n) = jval
-      navail = 0
-      do m=1,num
-        if( chosen(m).eq.0 ) then
-          navail = navail + 1
-        endif
-      enddo
-    enddo
-    return
-  end subroutine make_pairs
-!=======================================================================
-  subroutine mutate(g,rate)
-    use random
-    type(gene),intent(inout):: g
-    real(8),intent(in):: rate
-    integer:: i
-
-    do i=1,ga_nbits
-      if( urnd().lt.rate ) then
-        g%bits(i) = mod(int(g%bits(i))+1,2)
-      endif
-    enddo
-    return
-  end subroutine mutate
-!=======================================================================
-  subroutine gene2var(g,v)
-    type(gene),intent(in):: g
-    real(8),intent(out):: v
-    integer:: dec
-
-    call bin2dec(ga_nbits,g%bits,dec)
-    v = g%vmin +dble(dec)*(g%vmax-g%vmin)/(2**ga_nbits-1)
-    return
-  end subroutine gene2var
-!=======================================================================
-  subroutine wrap_gene(g)
-!
-!  Wrap gene into the given variable range.
-!
-    type(gene),intent(inout):: g
-    real(8):: v
-
-    call gene2var(g,v)
-    v = min(v,g%vmax)
-    v = max(v,g%vmin)
-    g%val = v
-    return
-  end subroutine wrap_gene
-!=======================================================================
-  subroutine var2gene(v,g)
-    real(8),intent(in):: v
-    type(gene),intent(inout):: g
-    integer:: dec
-    
-    dec = int((v -g%vmin)/(g%vmax-g%vmin)*(2**ga_nbits-1))
-    call dec2bin(ga_nbits,dec,g%bits)
-    return
-  end subroutine var2gene
-!=======================================================================
-  subroutine indiv2vars(indiv,ndim,vars)
-    type(individual),intent(in):: indiv
-    integer,intent(in):: ndim
-    real(8),intent(out):: vars(ndim)
-    integer:: i
-    
-    do i=1,ndim
-      call gene2var(indiv%genes(i),vars(i))
-    enddo
-    return
-  end subroutine indiv2vars
-!=======================================================================
-  subroutine crossover(ind1,ind2,offspring)
-!
-!  Homogeneous crossover of two individuals to create an offspring
-!  that has some similarities to the parents.
-!
-    use random
-    type(individual),intent(in):: ind1,ind2
-    type(individual),intent(inout):: offspring
-    
-    integer:: i,j
-    type(gene):: g1,g2
-    real(8):: v1,v2,r1
-    
-    do i=1,ga_ngenes
-      g1 = ind1%genes(i)
-      g2 = ind2%genes(i)
-      v1 = ind1%fvalue
-      v2 = ind2%fvalue
-      r1 = log(v2+1d0)/(log(v1+1d0)+log(v2+1d0))
-      do j=1,ga_nbits
-        offspring%genes(i)%bits(j) = g1%bits(j)
-        offspring%genes(i)%vmin = g1%vmin
-        offspring%genes(i)%vmax = g1%vmax
-        if( g1%bits(j).ne.g2%bits(j) .and. urnd() .gt. r1 ) then
-          offspring%genes(i)%bits(j) = g2%bits(j)
-        end if
-      end do
-      call wrap_gene(offspring%genes(i))
-!!$      print '(a,i4,2x,100i1)','i,bits=',i,&
-!!$           (mod(offspring%genes(i)%bits(j),10),j=1,ga_nbits)
-    end do
-    return
-  end subroutine crossover
-!=======================================================================
-  subroutine roulette_selection(nindivs,indivs,noffsp,offsprings,fbest)
-!
-!  Select individuals that are alive in the next generation according to
-!  their evaulation values.
-!  Selected ones are returned as an INDIVS array.
-!  The best one is always selected at first.
-!
-    use random
-    integer,intent(in):: nindivs,noffsp
-    type(individual),intent(inout):: indivs(nindivs)
-    type(individual),intent(in):: offsprings(noffsp)
-    real(8),intent(in):: fbest
-
-    integer:: i,j,n,ibest
-    integer:: islct(nindivs)
-    real(8):: fbestl,prnd,ptot
-
-    integer,save:: nall
-    real(8),save,allocatable:: probs(:)
-    logical,save:: l1st = .true.
-    type(individual),save,allocatable:: tmp_indivs(:)
-    real(8),parameter:: pmax = 1d+10
-
-    if( l1st ) then
-      nall = nindivs + noffsp
-      allocate(probs(nall),tmp_indivs(nindivs))
-      l1st = .false.
-    endif
-
-!.....Compute all the probabilities using func values and temperature
-    n = 0
-    ibest = 0
-    fbestl = 1d+30
-    do i=1,nindivs
-      n = n + 1
-      if( indivs(i)%fvalue.lt.fbestl ) then
-        fbestl = indivs(i)%fvalue
-        ibest = n
-      endif
-      probs(n) = indivs(i)%fitness
-!!$      if( trim(ga_fitness).eq.'exp' ) then
-!!$        probs(n) = exp(-(indivs(i)%fvalue-fbest)/ga_temp)
-!!$      else if( trim(ga_fitness).eq.'inv' ) then
-!!$        probs(n) = 1d0/indivs(i)%fvalue
-!!$      endif
-!!$      print *,'n,fvalue,prob=',n,indivs(i)%fvalue,probs(n)
-    enddo
-    do i=1,noffsp
-      n = n + 1
-      if( offsprings(i)%fvalue.lt.fbestl ) then
-        fbestl = offsprings(i)%fvalue
-        ibest = n
-      endif
-      probs(n) = indivs(i)%fitness
-!!$      if( trim(ga_fitness).eq.'exp' ) then
-!!$        probs(n) = exp(-(offsprings(i)%fvalue-fbest)/ga_temp)
-!!$      else if( trim(ga_fitness).eq.'inv' ) then
-!!$        probs(n) = 1d0/offsprings(i)%fvalue
-!!$      endif
-!!$      print *,'n,fvalue,prob=',n,offsprings(i)%fvalue,probs(n)
-    enddo
-
-!.....Select individuals
-    islct(1) = ibest
-    probs(ibest) = 0d0
-    do i=2,nindivs
-      ptot = 0d0
-      do j=1,nall
-        ptot = ptot + probs(j)
-      enddo
-      prnd = urnd()*ptot
-      ptot = 0d0
-      do j=1,nall
-        ptot = ptot +probs(j)
-        if( prnd.lt.ptot ) then
-          islct(i) = j
-          probs(j) = 0d0
-          exit
-        endif
-      enddo
-    enddo
-
-!!$    print *,'islct:'
-!!$    do i=1,ga_nindivs
-!!$      print *,'i,islct(i)=',i,islct(i)
-!!$    enddo
-
-!.....Replace indivs elements with selected ones
-    do i=1,nindivs
-      j = islct(i)
-      if( j.le.nindivs ) then
-        tmp_indivs(i) = indivs(j)
-      else
-        j = j - nindivs
-        tmp_indivs(i) = offsprings(j)
-      endif
-    enddo
-    do i=1,nindivs
-      indivs(i) = tmp_indivs(i)
-    enddo
-    return
-  end subroutine roulette_selection
-!=======================================================================
-  subroutine de(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval,sub_ergrel)
-!
-! Differential evolution (DE) which does not use gradient information.
-! DE itself is a serial code, but the function evaluation can be parallel.
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-      subroutine sub_ergrel(cadd)
-        character(len=*),intent(in):: cadd
-      end subroutine sub_ergrel
-    end interface
-
-    integer:: i,j,iter,ip,iq,ir,is
-    real(8):: ftrn,ftst,fracl,fracg,lmdl,lmdg,w,fdiff,prob,ftbest&
-         ,xtbest(ndim)
-    logical,save:: l1st = .true.
-    integer:: iid,iidbest,iidtbest,ibest,ibest0,iidmax
-    type(individual),allocatable:: indivs(:),offsprings(:)
-    real(8),allocatable,dimension(:):: xtmp,xi,xp,xq,xr,xs,xbestl,xbestg&
-         ,xl,xg,xd
-    real(8),allocatable:: xpbest(:,:)
-    character(len=128):: cadd
-
-    integer,parameter:: io_indivs = 30
-    character(len=128),parameter:: cf_indivs = 'out.de.individuals'
-    integer,parameter:: io_steps = 31
-    character(len=128),parameter:: cf_steps = 'out.de.generations'
-
-    if( l1st ) then
-!.....Allocate necessary memory spaces
-      allocate(indivs(de_nindivs),offsprings(de_nindivs))
-      allocate(xtmp(ndim),xi(ndim),xp(ndim),xq(ndim),xr(ndim),xs(ndim)&
-           ,xbestl(ndim),xbestg(ndim),xl(ndim),xg(ndim),xd(ndim))
-      allocate(xpbest(ndim,de_nindivs))
-      do i=1,de_nindivs
-        allocate(indivs(i)%genes(ndim),offsprings(i)%genes(ndim))
-      enddo
-!.....Initialize
-      fracg = de_frac
-      fracl = fracg
-      if( de_lambda.le.0d0 ) de_lambda = de_frac
-      lmdg = de_lambda
-      lmdl = lmdg
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') '------------------------------------------------------------------------'
-        write(6,'(a)') '                          Differential Evolution'
-        write(6,'(a)') '------------------------------------------------------------------------'
-        print '(a,i4)',' Number of individuals = ',de_nindivs
-        print '(a,f8.4)',' Fraction              =',de_frac
-        print '(a,f8.4)',' Crossover rate        =',de_cross_rate
-!!$        print '(a,f8.4)',' fracg                 =',fracg
-!!$        print '(a,f8.4)',' fracl                 =',fracl
-        print '(a,f8.4)',' frac                  =',de_frac
-        if( trim(de_algo).eq.'local_neighbor' ) then
-          print '(a,f8.4)',' wmin                  =',de_wmin
-          print '(a,f8.4)',' wmax                  =',de_wmax
-          print '(a,f8.4)',' lmdg                  =',lmdg
-          print '(a,f8.4)',' lmdl                  =',lmdl
-        endif
-        print '(a,es12.4)',' Pseudo Temperature    =',de_temp
-
-        print *,''
-      endif
-      l1st = .false.
-    endif
-
-    if( myid.eq.0 ) then
-      open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
-      open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
-    endif
-10  format(i6,2es14.6,100es11.3)
-
-    iter = 0
-
-!.....Create population that includes some individuals
-    iid = 0
-    fbest = 1d+30
-    ftbest = 1d+30
-    do i=1,de_nindivs
-      do j=1,ndim
-        indivs(i)%genes(j)%vmin = xranges(1,j)
-        indivs(i)%genes(j)%vmax = xranges(2,j)
-        if( i.eq.1 ) then
-          indivs(i)%genes(j)%val = xbest(j)
-        else
-          indivs(i)%genes(j)%val = xranges(1,j) + &
-               (xranges(2,j)-xranges(1,j))*urnd()
-        endif
-      enddo
-      do j=1,ndim
-        xtmp(j) = indivs(i)%genes(j)%val
-      enddo
-      call func(ndim,xtmp,ftrn,ftst)
-      iid = iid + 1
-      iidmax = max(iidmax,iid)
-!.....Detect NaN and replace it with 1d+10
-      if( ftrn*0d0 .ne. 0d0 ) then
-        if( myid.eq.0 .and. iprint.ne.0 ) then
-          write(6,'(a,2i10)')&
-               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
-        endif
-        ftrn = fupper_lim
-      endif
-      if( ftrn.gt.fupper_lim ) then
-        ftrn = fupper_lim
-      endif
-      indivs(i)%fvalue = ftrn
-      indivs(i)%ftst = ftst
-      if( ftrn*0d0.ne.0d0 ) then
-        indivs(i)%fitness = 0d0
-      else
-        indivs(i)%fitness = 1d0/ftrn
-      endif
-      indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-      if( ftrn.lt.fbest ) then
-        fbest = ftrn
-        iidbest = iid
-        ibest = iid
-        xbest(1:ndim) = xtmp(1:ndim)
-      else if( ftst.lt.ftbest ) then
-        ftbest = ftst
-        iidtbest = iid
-        xtbest(1:ndim) = xtmp(1:ndim)
-      endif
-
-      if( iprint.ge.2 ) then
-        write(cadd,'(i0)') iid
-        call sub_ergrel(cadd)
-      endif
-      if( i.eq.1 ) call sub_eval(iter)
-    enddo
-    w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
-    if( maxiter.eq.0 ) w = de_wmin
-
-    if( myid.eq.0 ) then
-      if( trim(de_algo).eq.'local_neighbor' ) then
-        write(6,'(a,i8,es12.4,f5.2,1x,100es12.4)') &
-             " iter,fbest,w,fvals= ",&
-             iter,fbest,w,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
-      else  ! classical DE
-        write(6,'(a,i8,es12.4,1x,100es12.4)') &
-             " iter,fbest,fvals= ",&
-             iter,fbest,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
-      endif
-      do i=1,de_nindivs
-        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
-             ,indivs(i)%ftst
-      enddo
-    endif
-
-!.....DE loop starts....................................................
-    do iter=1,maxiter
-
-      w = de_wmin + (de_wmax -de_wmin)*dble(iter)/maxiter
-      call make_global_best(de_nindivs,indivs,ndim,xbestg)
-      ibest0 = ibest
-
-!.....Loop for individuals
-      do i=1,de_nindivs
-
-        do j=1,ndim
-          xi(j) = indivs(i)%genes(j)%val
-        enddo
-
-        if( trim(de_algo).eq.'local_neighbor' ) then
-
-!.....Create a local vector
-          ip = i+1
-          if( ip.gt.de_nindivs ) ip = ip - de_nindivs
-          iq = i-1
-          if( iq.le.0 ) iq = iq + de_nindivs
-          do j=1,ndim
-            xp(j) = indivs(ip)%genes(j)%val
-            xq(j) = indivs(iq)%genes(j)%val
-          enddo
-          xbestl(1:ndim) = 0d0
-          call make_local_best(indivs(i),indivs(ip),indivs(iq),ndim,xbestl)
-!!$        xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
-!!$             +fracl*(xp(1:ndim)-xq(1:ndim))
-          xl(1:ndim) = xi(1:ndim) +lmdl*(xbestl(1:ndim)-xi(1:ndim)) &
-               +urnd()*(xp(1:ndim)-xq(1:ndim))
-!!$        print '(a,8es12.4)','xi,xp,xq,xbestl,fi,fp,fq,xl=' &
-!!$             ,xi(1),xp(1),xq(1),xbestl(1)&
-!!$             ,indivs(i)%fvalue,indivs(ip)%fvalue,indivs(iq)%fvalue,xl(1)
-!.....Create a global vector
-100       ir = int(urnd() *de_nindivs) +1
-          if( ir.eq.i ) goto 100
-110       is = int(urnd() *de_nindivs) +1
-          if( is.eq.i .or. is.eq.ir ) goto 110
-          do j=1,ndim
-            xr(j) = indivs(ir)%genes(j)%val
-            xs(j) = indivs(is)%genes(j)%val
-          enddo
-!!$        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
-!!$             +fracg*(xr(1:ndim)-xs(1:ndim))
-          xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
-               +urnd()*(xr(1:ndim)-xs(1:ndim))
-!!$        print '(a,100f7.3)','xg(1:ndim)=',xg(1:ndim)
-!.....Make the donor vector from the local and global vectors
-          xd(1:ndim) = w*xg(1:ndim) +(1d0-w)*xl(1:ndim)
-
-!.....Classical DE
-        else
-200       ip = int(urnd()*de_nindivs) +1
-          if( ip.eq.i ) goto 200
-210       ir = int(urnd()*de_nindivs) +1
-          if( ir.eq.i .or. ir.eq.ip ) goto 210
-220       is = int(urnd()*de_nindivs) +1
-          if( is.eq.i .or. is.eq.ip .or. is.eq.ir )  goto 220
-          do j=1,ndim
-            xp(j) = indivs(ip)%genes(j)%val
-            xr(j) = indivs(ir)%genes(j)%val
-            xs(j) = indivs(is)%genes(j)%val
-          enddo
-!!$        xg(1:ndim) = xi(1:ndim) +lmdg*(xbestg(1:ndim)-xi(1:ndim)) &
-!!$             +fracg*(xr(1:ndim)-xs(1:ndim))
-!!$          xd(1:ndim) = xp(1:ndim) +de_frac *(xr(1:ndim)-xs(1:ndim))
-          xd(1:ndim) = xp(1:ndim) +urnd()*de_frac *(xr(1:ndim)-xs(1:ndim))
-        endif  ! de_algo
-
-        iid = iid + 1
-!.....Make a new candidate by the crossover of xd and xi
-        do j=1,ndim
-          if( urnd().lt.de_cross_rate ) then
-            xtmp(j) = xd(j)
-          else
-            xtmp(j) = xi(j)
-          endif
-        enddo
-        do j=1,ndim
-          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
-          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
-!!$          offsprings(i)%genes(j)%val = xtmp(j)
-        enddo
-!!$        offsprings(i)%iid = iid
-        call func(ndim,xtmp,ftrn,ftst)
-!!$        offsprings(i)%fvalue = ftrn
-!.....Detect NaN and replace it with fupper_lim
-!!$        if( ftrn*0d0.ne.0d0 ) then
-!!$          offsprings(i)%fitness = 0d0
-!!$        else
-!!$          offsprings(i)%fitness = 1d0/ftrn
-!!$        endif
-!!$        print *,'i,fvalue,ftrn=',i,indivs(i)%fvalue,ftrn
-        fdiff = ftrn -indivs(i)%fvalue
-        prob = min(1d0,exp(-fdiff/de_temp))
-!!$        if( ftrn.le.indivs(i)%fvalue .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
-        if( urnd().le.prob .or. indivs(i)%fvalue*0d0.ne.0d0 ) then
-          if( i.eq.ibest0 .and. fdiff.gt.0d0 ) cycle
-          do j=1,ndim
-            indivs(i)%genes(j)%val = xtmp(j)
-          enddo
-          indivs(i)%iid = iid
-          if( ftrn.gt.fupper_lim ) ftrn = fupper_lim
-          indivs(i)%fvalue = ftrn
-          indivs(i)%ftst = ftst
-          indivs(i)%fitness = 1d0/ftrn
-        else
-          cycle
-        endif
-        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-        if( ftrn.lt.fbest ) then
-          fbest = ftrn
-          iidbest = iid
-          ibest = i
-          xbest(1:ndim) = xtmp(1:ndim)
-          if( iprint.ge.2 ) then
-            write(cadd,'(i0)') iid
-            call sub_ergrel(cadd)
-          endif
-          call sub_eval(iid)
-        else if( ftst.lt.ftbest ) then
-          ftbest = ftst
-          iidtbest = iid
-          xtbest(1:ndim) = xtmp(1:ndim)
-          xtmp(1:ndim) = xbest(1:ndim)
-          xbest(1:ndim) = xtbest(1:ndim)
-          call sub_eval(iid)
-          xbest(1:ndim) = xtmp(1:ndim)
-        endif
-      enddo  ! loop over individuals
-
-      if( myid.eq.0 ) then
-        write(6,'(a,i8,es12.4,1x,100es12.4)') &
-             " iter,fbest,fvals= ",&
-             iter,fbest,(indivs(i)%fvalue,i=1,min(de_nindivs,10))
-        do i=1,de_nindivs
-          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
-               ,indivs(i)%ftst
-        enddo
-        flush(io_indivs)
-        flush(io_steps)
-      endif
-    enddo
-!.....DE loop ends......................................................
-
-!.....Output information of the best
-    if( myid.eq.0 ) then
-      write(6,*) ''
-      write(6,'(a)') ' The best one in this DE simulation run:'
-      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
-!!$      write(6,'(a,100f7.3)') '   Variables: ', xbest(1:min(ndim,100))
-      write(6,*) ''
-    endif
-
-!.....Just for outputing out.erg.fin.1 of the best one     
-    call func(ndim,xbest,ftrn,ftst)
-
-    close(io_indivs)
-    close(io_steps)
-    return
-  end subroutine de
-!=======================================================================
-  subroutine make_local_best(ind0,ind1,ind2,ndim,xbestl)
-    type(individual),intent(in):: ind0,ind1,ind2
-    integer,intent(in):: ndim
-    real(8),intent(out):: xbestl(ndim)
-
-    integer:: i
-    real(8):: allf
-    
-    xbestl(1:ndim) = 0d0
-    allf = ind0%fitness +ind1%fitness +ind2%fitness
-    do i=1,ndim
-      xbestl(i) = xbestl(i) + (&
-           ind0%genes(i)%val *ind0%fitness  &
-           +ind1%genes(i)%val *ind1%fitness  &
-           +ind2%genes(i)%val *ind2%fitness ) /allf
-    enddo
-    return
-  end subroutine make_local_best
-!=======================================================================
-  subroutine make_global_best(nindivs,indivs,ndim,xbestg)
-    integer,intent(in):: nindivs,ndim
-    type(individual),intent(in):: indivs(nindivs)
-    real(8),intent(out):: xbestg(ndim)
-
-    integer:: i,j
-    real(8):: allf
-
-    xbestg(1:ndim) = 0d0
-    allf = 0d0
-    do i=1,nindivs
-      allf = allf +indivs(i)%fitness
-    enddo
-    do i=1,ndim
-      do j=1,nindivs
-        xbestg(i) = xbestg(i) +indivs(j)%fitness *indivs(j)%genes(i)%val
-      enddo
-      xbestg(i) = xbestg(i) /allf
-    enddo
-    return
-  end subroutine make_global_best
-!=======================================================================
-  subroutine pso(ndim,xbest,fbest,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,cfmethod,niter_eval,sub_eval)
-!
-! Particle Swarm Optimization (PSO).
-! DE itself is a serial code, but the function evaluation can be parallel.
-!
-    use random
-    implicit none
-    integer,intent(in):: ndim,iprint,myid,maxiter,niter_eval
-    integer,intent(inout):: iflag
-    real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
-    real(8),intent(inout):: fbest,xbest(ndim)
-    character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
-
-    integer:: i,j,iter
-    real(8):: ftrn,ftst,xj,vj,r1,r2,w
-    logical,save:: l1st = .true.
-    integer:: iid,iidbest
-    type(individual),allocatable:: indivs(:)
-    real(8),allocatable:: xtmp(:),xpbest(:,:),fpbest(:)
-
-    integer,parameter:: io_indivs = 30
-    character(len=128),parameter:: cf_indivs = 'out.pso.individuals'
-    integer,parameter:: io_fvalues = 31
-    character(len=128),parameter:: cf_fvalues = 'out.pso.fvalues'
-    integer,parameter:: io_steps = 32
-    character(len=128),parameter:: cf_steps = 'out.pso.generations'
-
-    if( l1st ) then
-!.....Allocate necessary memory spaces
-      allocate(indivs(pso_nindivs))
-      allocate(xtmp(ndim),fpbest(pso_nindivs),xpbest(ndim,pso_nindivs))
-      do i=1,pso_nindivs
-        allocate(indivs(i)%genes(ndim),indivs(i)%vel(ndim))
-      enddo
-      if( myid.eq.0 .and. iprint.ne.0 ) then
-        write(6,*) ''
-        write(6,'(a)') '------------------------------------------------------------------------'
-        write(6,'(a)') '                   Particle Swarm Optimization (PSO)'
-        write(6,'(a)') '------------------------------------------------------------------------'
-        print '(a,i4)',  ' Number of individuals = ',pso_nindivs
-        print '(a,f8.4)',' w                     =',pso_w
-        print '(a,f8.4)',' C1                    =',pso_c1
-        print '(a,f8.4)',' C2                    =',pso_c2
-        print '(a,es12.4)',' fval upper limit      =',fupper_lim
-        print *,''
-      endif
-      l1st = .false.
-    endif
-
-    if( myid.eq.0 ) then
-      open(io_indivs,file=cf_indivs,status='replace')
-      write(io_indivs,'(a)') '# iid, ftrn, ftst, vars...'
-      open(io_fvalues,file=cf_fvalues,status='replace')
-      write(io_fvalues,'(a)') '# iter, iid, fvals...'
-      open(io_steps,file=cf_steps,status='replace')
-      write(io_steps,'(a)') '# iter, iid, ftrn, ftst'
-    endif
-10  format(i6,2es14.6,100es11.3)
-
-    iter = 0
-
-!.....Create population that includes some individuals
-    iid = 0
-    fbest = 1d+30
-    do i=1,pso_nindivs
-      do j=1,ndim
-        indivs(i)%genes(j)%vmin = xranges(1,j)
-        indivs(i)%genes(j)%vmax = xranges(2,j)
-        if( i.eq.1 ) then
-          indivs(i)%genes(j)%val = xbest(j)
-        else
-          indivs(i)%genes(j)%val = xranges(1,j) + &
-               (xranges(2,j)-xranges(1,j))*urnd()
-        endif
-        indivs(i)%vel(j) = pso_vinimax*(urnd()-0.5d0)
-      enddo
-      do j=1,ndim
-        xtmp(j) = indivs(i)%genes(j)%val
-      enddo
-      call func(ndim,xtmp,ftrn,ftst)
-      iid = iid + 1
-!.....Detect NaN and replace it with 1d+10
-      if( ftrn*0d0 .ne. 0d0 ) then
-        if( myid.eq.0 .and. iprint.ne.0 ) then
-          write(6,'(a,2i10)')&
-               ' [ftrn.eq.NaN] iter,iid = ',iter,iid
-        endif
-        ftrn = fupper_lim
-      else if( ftrn.gt.fupper_lim ) then
-        ftrn = fupper_lim
-      endif
-      indivs(i)%fvalue = ftrn
-      indivs(i)%ftst = ftst
-      fpbest(i) = ftrn
-      xpbest(1:ndim,i) = xtmp(1:ndim)
-      if( ftrn*0d0.ne.0d0 ) then
-        indivs(i)%fitness = 0d0
-      else
-        indivs(i)%fitness = 1d0/ftrn
-      endif
-      indivs(i)%iid = iid
-      if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-      if( ftrn.lt.fbest ) then
-        fbest = ftrn
-        iidbest = iid
-        xbest(1:ndim) = xtmp(1:ndim)
-      endif
-      if( i.eq.1 ) call sub_eval(iter)
-!!$      if( myid.eq.0 ) print *,'myid,iid,fval,pbest=',myid,iid,ftrn,fpbest(i)
-    enddo
-    if( myid.eq.0 ) then
-      write(6,'(a,i8,es12.4,1x,100es12.4)') &
-           " iter,fbest,fvals= ",&
-           iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
-      write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
-           (indivs(i)%fvalue,i=1,pso_nindivs)
-      do i=1,pso_nindivs
-        write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue,&
-             indivs(i)%ftst
-      enddo
-    endif
-!!$    if( myid.eq.0 ) print *,'myid,iidbest,fbest=',myid,iidbest,fbest
-    
-!.....PSO loop starts....................................................
-    do iter=1,maxiter
-
-
-!.....Loop for individuals
-      do i=1,pso_nindivs
-
-!.....Update velocity and position
-        r1 = urnd()
-        r2 = urnd()
-        do j=1,ndim
-          xj = indivs(i)%genes(j)%val
-          vj = indivs(i)%vel(j)
-          w = indivs(i)%genes(j)%vmax -indivs(i)%genes(j)%vmin
-          if( w.lt.0d0 ) then
-            indivs(i)%vel(j) = 0d0
-            xtmp(j) = indivs(i)%genes(j)%vmax
-            indivs(i)%genes(j)%val = xtmp(j)
-            cycle
-          endif
-          indivs(i)%vel(j) = vj &
-               +pso_c1*r1*( xpbest(j,i) -xj ) &
-               +pso_c2*r2*( xbest(j) -xj )
-          if( abs(indivs(i)%vel(j)).gt.w/5 ) &
-               indivs(i)%vel(j) = sign(w/5,indivs(i)%vel(j))
-          xtmp(j) = xj +indivs(i)%vel(j)
-!.....Make sure the range of xtmp and if hit the wall,
-!     make its velocity oposite direction.
-!!$          xtmp(j) = max(xtmp(j),indivs(i)%genes(j)%vmin)
-!!$          xtmp(j) = min(xtmp(j),indivs(i)%genes(j)%vmax)
-          if( xtmp(j).lt.indivs(i)%genes(j)%vmin ) then
-            indivs(i)%vel(j) = -indivs(i)%vel(j)
-            xtmp(j) = 2d0*indivs(i)%genes(j)%vmin -xtmp(j)
-          else if( xtmp(j).gt.indivs(i)%genes(j)%vmax ) then
-            indivs(i)%vel(j) = -indivs(i)%vel(j)
-            xtmp(j) = 2d0*indivs(i)%genes(j)%vmax -xtmp(j)
-          endif
-          indivs(i)%genes(j)%val = xtmp(j)
-        enddo
-        call func(ndim,xtmp,ftrn,ftst)
-        iid = iid + 1
-!.....Detect NaN and replace it with 1d+10
-        if( ftrn*0d0 .ne. 0d0 ) then
-          ftrn = fupper_lim
-        endif
-        if( ftrn.gt.fupper_lim ) then
-          ftrn = fupper_lim
-        endif
-        if( ftst.gt.fupper_lim ) then
-          ftst = fupper_lim
-        endif
-        indivs(i)%fvalue = ftrn
-        indivs(i)%iid = iid
-        if( myid.eq.0 ) write(io_indivs,10) iid,ftrn,ftst,xtmp(1:min(ndim,100))
-!.....Check the global best and update if needed
-        if( ftrn.lt.fbest ) then
-          fbest = ftrn
-          iidbest = iid
-          xbest(1:ndim) = xtmp(1:ndim)
-          call sub_eval(iid)
-        endif
-!.....Check the particle best and update if needed
-        if( ftrn.lt.fpbest(i) ) then
-          fpbest(i)= ftrn
-          xpbest(1:ndim,i) = xtmp(1:ndim)
-        endif
-
-!!$        if( myid.eq.0 ) print *,'myid,iid,fval,pbest=',myid,iid,ftrn,fpbest(i)
-      enddo  ! loop over individuals
-!!$      if( myid.eq.0 ) print *,'myid,iidbest,fbest=',myid,iidbest,fbest
-
-      if( myid.eq.0 ) then
-        write(6,'(a,i8,es12.4,1x,100es12.4)') &
-             " iter,fbest,fvals= ",&
-             iter,fbest,(indivs(i)%fvalue,i=1,min(ndim,10))
-        write(io_fvalues,'(2i8, 100es12.4)') iter, indivs(i)%iid, &
-             (indivs(i)%fvalue,i=1,pso_nindivs)
-        do i=1,pso_nindivs
-          write(io_steps,'(2i8,2es15.7)') iter, indivs(i)%iid, indivs(i)%fvalue &
-               ,indivs(i)%ftst
-        enddo
-        flush(io_indivs)
-        flush(io_steps)
-        flush(io_fvalues)
-      endif
-    enddo
-!.....DE loop ends......................................................
-
-!.....Output information of the best
-    if( myid.eq.0 ) then
-      write(6,*) ''
-      write(6,'(a)') ' The best one in this PSO simulation run:'
-      write(6,'(a,i8,1x,f0.4)') '   ID, f-value: ',iidbest,fbest
-!!$      write(6,'(a,100f7.3)')  '   Variables: ',xbest(1:ndim)
-      write(6,*) ''
-
-!!$      do i=1,pso_nindivs
-!!$        print '(a,i4,f10.1,1x,100f9.4)', ' i,fpbest,xpbest =' ,i,fpbest(i),&
-!!$             xpbest(1:ndim,i)
-!!$      enddo
-      print *,''
-    endif
-
-!.....Just for outputing out.erg.fin.1 of the best one     
-    call func(ndim,xbest,ftrn,ftst)
-
-    close(io_indivs)
-    close(io_fvalues)
-    close(io_steps)
-    return
-  end subroutine pso
 !=======================================================================
   
 end module
