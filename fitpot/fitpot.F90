@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 10:37:58 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 14:48:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -90,10 +90,10 @@ program fitpot
 
   allocate(samples(isid0:isid1))
 
-  call get_dir_list(11)
+  call get_smpl_list(11)
 !.....store dirname
   do ismpl=isid0,isid1
-    samples(ismpl)%cdirname= cdirlist(ismpl)
+    samples(ismpl)%csmplname= csmplist(ismpl)
     samples(ismpl)%wgt = 1d0
   enddo
 
@@ -106,7 +106,7 @@ program fitpot
   endif
 
   call read_samples()
-  call read_ref_data()
+!!$  call read_ref_data()
   if( lwgt_compos ) then
     call read_compos_list()
     call assign_compos_weight()
@@ -210,6 +210,7 @@ program fitpot
     endif
   endif
 
+  print *,'write_stats...'
   call write_stats(niter)
 
 !!$  call write_energy_relation('subtracted')
@@ -285,7 +286,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,f5.2)') 'test_ratio',ratio_test
   
   print *,''
-  write(6,'(2x,a25,2x,a)') 'main_directory',trim(cmaindir)
+  write(6,'(2x,a25,2x,a)') 'dataset_directory',trim(cdatasetdir)
   write(6,'(2x,a25,2x,a)') 'param_file',trim(cparfile)
 !!$  write(6,'(2x,a25,2x,a)') 'run_mode',trim(crunmode)
   write(6,'(2x,a25,10(2x,a3))') 'specorder',(trim(specorder(i)),i=1,nsp)
@@ -414,34 +415,28 @@ subroutine get_dir_list(ionum)
   use fp_common,only: ndat_in_line
   use util,only: num_data
   implicit none
-  interface
-    subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
-      integer,intent(in):: nsmpl
-      character(len=128),intent(inout):: cdirlist(nsmpl)
-      integer,optional,intent(inout):: iclist(nsmpl)
-    end subroutine shuffle_dirlist
-  end interface
   integer,intent(in):: ionum
   integer:: is,ndat
   logical:: lerror = .false.
 !!$  integer,external:: num_data
-  character(len=128):: ctmp 
+  character(len=128):: ctmp
+  logical:: luse_iclist
 
   if( .not. allocated(cdirlist)) allocate(cdirlist(nsmpl))
   if( .not. allocated(iclist)) allocate(iclist(nsmpl))
 
   if( myid.eq.0 ) then
     lerror = .true.
-    if( len(trim(csmplist)).lt.1 ) then
+    if( len(trim(csmplistfile)).lt.1 ) then
       print '(/,a)',' Sample list was created by performing the following command:'
-      print *,'  $ ls '//trim(cmaindir) &
+      print *,'  $ ls '//trim(cdatasetdir) &
            //' | grep "smpl_" > dir_list.txt'
-      call system('ls '//trim(cmaindir) &
+      call system('ls '//trim(cdatasetdir) &
            //' | grep "smpl_" > dir_list.txt')
       open(ionum,file='dir_list.txt',status='old')
     else
       print *,'Sample list was given by input.'
-      open(ionum,file=trim(csmplist),status='old')
+      open(ionum,file=trim(csmplistfile),status='old')
     endif
     read(ionum,'(a)',end=998) ctmp
     backspace(ionum)
@@ -451,14 +446,16 @@ subroutine get_dir_list(ionum)
         read(ionum,*,end=998) cdirlist(is)
       enddo
       lerror = .false.
-      call shuffle_dirlist(nsmpl,cdirlist)
+      luse_iclist = .false.
+      call shuffle_list(nsmpl,cdirlist,iclist,luse_iclist)
     else if(ndat.eq.2 ) then
-      print *,'training and test are determined by input, ',trim(csmplist)
+      print *,'training and test are determined by input, ',trim(csmplistfile)
       do is=1,nsmpl
         read(ionum,*,end=998) cdirlist(is),iclist(is)
       enddo
       lerror = .false.
-      call shuffle_dirlist(nsmpl,cdirlist,iclist)
+      luse_iclist = .true.
+      call shuffle_list(nsmpl,cdirlist,iclist,luse_iclist)
     else
       print *,'[Error] ndat should be 1 or 2, ndat = ',ndat
       call mpi_finalize(ierr)
@@ -492,6 +489,87 @@ subroutine get_dir_list(ionum)
   stop
 
 end subroutine get_dir_list
+!=======================================================================
+subroutine get_smpl_list(ionum)
+  use variables
+  use parallel
+  use fp_common,only: ndat_in_line
+  use util,only: num_data
+  implicit none
+  integer,intent(in):: ionum
+  integer:: is,ndat
+  logical:: lerror = .false.
+!!$  integer,external:: num_data
+  character(len=128):: ctmp
+  logical:: luse_iclist
+
+  if( .not. allocated(csmplist)) allocate(csmplist(nsmpl))
+  if( .not. allocated(iclist)) allocate(iclist(nsmpl))
+
+  if( myid.eq.0 ) then
+    lerror = .true.
+    if( len(trim(csmplistfile)).lt.1 ) then
+      print '(/,a)',' Sample list was created by performing the following command:'
+      print *,'  $ ls '//trim(cdatasetdir) &
+           //' | grep "smpl_" > smpl_list.txt'
+      call system('ls '//trim(cdatasetdir) &
+           //' | grep "smpl_" > smpl_list.txt')
+      open(ionum,file='smpl_list.txt',status='old')
+    else
+      print *,'Sample list was given by input.'
+      open(ionum,file=trim(csmplistfile),status='old')
+    endif
+    read(ionum,'(a)',end=998) ctmp
+    backspace(ionum)
+    ndat = num_data(trim(ctmp),' ')
+    if( ndat.eq.1 ) then
+      do is=1,nsmpl
+        read(ionum,*,end=998) csmplist(is)
+      enddo
+      lerror = .false.
+      luse_iclist = .false.
+      call shuffle_list(nsmpl,csmplist,iclist,luse_iclist)
+    else if(ndat.eq.2 ) then
+      print *,'training and test are determined by input, ',trim(csmplistfile)
+      do is=1,nsmpl
+        read(ionum,*,end=998) csmplist(is),iclist(is)
+      enddo
+      lerror = .false.
+      luse_iclist = .true.
+      call shuffle_list(nsmpl,csmplist,iclist,luse_iclist)
+    else
+      print *,'[Error] ndat should be 1 or 2, ndat = ',ndat
+      call mpi_finalize(ierr)
+      stop
+    endif
+    close(ionum)
+  endif  ! myid.eq.0
+998 continue
+  call mpi_bcast(lerror,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_barrier(mpi_world,ierr)
+  if( lerror ) goto 999
+  call mpi_bcast(csmplist,128*nsmpl,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(ndat,1,mpi_integer,0,mpi_world,ierr)
+  if( ndat.eq.2 ) then
+    call mpi_bcast(iclist,nsmpl,mpi_integer,0,mpi_world,ierr)
+    test_assigned = .true.
+  endif
+
+!!$  if( myid.eq.0 ) then
+!!$    do is=1,nsmpl
+!!$      print *,' is,csmpl=',is,csmplist(is)
+!!$    enddo
+!!$  endif
+  
+  if(myid.eq.0 .and. iprint.gt.1 ) print*,'Finished get_dir_list'
+  return
+
+999 continue
+  if( myid.eq.0 ) print *,' ERROR@get_smp_list: num_samples may be wrong.'
+  call mpi_finalize(ierr)
+  stop
+
+end subroutine get_smpl_list
 !=======================================================================
 subroutine set_training_test_with_ratio()
   use variables
@@ -578,6 +656,86 @@ subroutine count_training_test()
 end subroutine count_training_test
 !=======================================================================
 subroutine read_samples()
+!
+!  Read sample files of the new pmd format, in which erg, frc, strs data
+!  are stored not as separate files.
+!
+  use variables
+  use parallel
+  implicit none
+
+  integer:: is,isp,jsp,ia,ispmax,ispmaxl,nfrc,nfrcg,nftot,nftotg
+  character:: cdir*128, cspmd*3, cspfp*3
+  character:: cfname*128
+  integer,allocatable:: nal(:)
+
+  if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
+  allocate(nal(nsmpl))
+  nalist(1:nsmpl)= 0
+  nal(1:nsmpl)= 0
+  nftot = 0
+  nfrc = 0
+  ispmaxl = 0
+  
+  do is=isid0,isid1
+    cfname= samples(is)%csmplname
+    call read_smpl(12,trim(cdatasetdir)//'/'//trim(cfname),is,samples(is))
+    nal(is)= samples(is)%natm
+!.....Num of each species
+    samples(is)%naps(1:nspmax) = 0
+    ispmax = 0
+    do ia=1,samples(is)%natm
+      isp = int(samples(is)%tag(ia))
+      ispmax = max(ispmax,isp)
+      samples(is)%naps(isp) = samples(is)%naps(isp) +1
+    enddo
+    ispmaxl = max(ispmaxl,ispmax)
+    samples(is)%ispmax = ispmax
+!.....Num of forces to be calculated
+    nfrc = nfrc +samples(is)%nfcal*3
+    nftot = nftot +samples(is)%natm*3
+!.....Specorder in fitpot and that in sample should be the same
+    do isp=1,nspmax
+      cspmd = samples(is)%specorder(isp)
+      cspfp = specorder(isp)
+      if( trim(cspfp).ne.trim(cspmd) .and. trim(cspmd).ne.'x' ) then
+        print '(a)','ERROR: specorder in the sample is different from that in fitpot.'
+        print '(a,2a5)','   failed species in fitpot and the sample: ',trim(cspfp),trim(cspmd)
+        print '(a)','   specorder in fitpot and the sample, '//trim(cdir)
+        do jsp=1,nspmax
+          print '(i5,2a5)',jsp,specorder(jsp), samples(is)%specorder(jsp)
+        enddo
+        stop
+      endif
+    enddo
+  enddo
+
+  nfrcg = 0
+  nftotg = 0
+  maxisp = 0
+  call mpi_reduce(nfrc,nfrcg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(nftot,nftotg,1,mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_allreduce(ispmaxl,maxisp,1,mpi_integer,mpi_max,mpi_world,ierr)
+
+  call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
+       ,0,mpi_world,ierr)
+
+  call mpi_barrier(mpi_world,ierr)
+  deallocate(nal)
+  
+  if( myid.eq.0 ) then
+    print *,''
+    if( iprint.gt.1 ) print '(a)',' Finished read_smpl'
+    if( lfmatch ) then
+      write(6,'(a,i0)') ' Number of forces to be used = ',nfrcg
+      write(6,'(a,i0)') ' Total number of forces      = ',nftotg
+    endif
+    write(6,'(a,i0)') ' Number of species in all samples = ',maxisp
+  endif
+  return
+end subroutine read_samples
+!=======================================================================
+subroutine read_samples_old()
   use variables
   use parallel
   implicit none
@@ -593,7 +751,7 @@ subroutine read_samples()
 
   do is=isid0,isid1
     cdir= samples(is)%cdirname
-    call read_pos(12,trim(cmaindir)//'/'//trim(cdir) &
+    call read_pos(12,trim(cdatasetdir)//'/'//trim(cdir) &
          //'/pos',is,samples(is))
     nal(is)= samples(is)%natm
 !.....Specorder in fitpot and that in sample should be the same
@@ -620,7 +778,109 @@ subroutine read_samples()
   endif
   deallocate(nal)
   return
-end subroutine read_samples
+end subroutine read_samples_old
+!=======================================================================
+subroutine read_smpl(ionum,fname,ismpl,smpl)
+!
+!  Read a sample from smpl_XXX file which is a new format since 2024-11-07
+!  and contains energy, forces, stress data in it.
+!
+  use variables
+  use util,only: num_data
+  implicit none 
+  integer,intent(in):: ionum,ismpl
+  character(len=*),intent(in):: fname
+  type(mdsys),intent(inout):: smpl
+
+  integer:: i,natm,num,ia,l
+  real(8):: tmp,stmp(3,3)
+  character(len=128):: cline
+  character(len=10):: c1,copt,ctmp1,ctmp2,ctmp3
+
+  open(ionum,file=trim(fname),status='old')
+  do while(.true.)
+    read(ionum,'(a)') cline
+    if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) then
+      if( index(cline,'specorder:').ne.0 ) then
+        num = num_data(trim(cline),' ')
+        if( num.gt.11 ) stop 'ERROR@read_smpl: number of species exceeds the limit.'
+        read(cline,*) c1, copt, smpl%specorder(1:num-2)
+!!$        print *,'specorder = ',smpl%specorder(1:num-2)
+      else if( index(cline,'energy:').ne.0 .or. &
+           index(cline,'potential_energy:').ne.0 ) then
+        read(cline,*) c1, copt, smpl%eref
+        smpl%leref_given = .true.
+      else if( index(cline,'stress:').ne.0 ) then
+        num = num_data(trim(cline),' ')
+        if( num.lt.8 ) stop 'ERROR@read_smpl: number of data'&
+             //' for stress is not enough, it must be more than 6.'
+        read(cline,*) c1, copt, stmp(1,1),stmp(2,2),stmp(3,3), &
+             stmp(2,3),stmp(1,3),stmp(1,2)
+        stmp(2,1) = stmp(1,2)
+        stmp(3,1) = stmp(1,3)
+        stmp(3,2) = stmp(2,3)
+        smpl%sref(1:3,1:3) = stmp(1:3,1:3)
+        smpl%lsref_given = .true.
+      else if( index(cline,'auxiliary_data:').ne.0 .or. &
+           index(cline,'aux_data:').ne.0 ) then
+        read(cline,*) c1, copt, ctmp1, ctmp2, ctmp3
+        if( trim(ctmp1).eq.'fx' .and. trim(ctmp2).eq.'fy' &
+             .and. trim(ctmp3).eq.'fz' ) smpl%lfref_given = .true.
+      endif
+    else
+      backspace(ionum)
+      exit
+    endif
+  enddo
+  smpl%h(:,:,:) = 0d0
+  read(ionum,*) smpl%h0
+  read(ionum,*) ((smpl%h(ia,1,l),ia=1,3),l=0,1)
+  read(ionum,*) ((smpl%h(ia,2,l),ia=1,3),l=0,1)
+  read(ionum,*) ((smpl%h(ia,3,l),ia=1,3),l=0,1)
+!!$  read(ionum,*) tmp,tmp,tmp
+!!$  read(ionum,*) tmp,tmp,tmp
+!!$  read(ionum,*) tmp,tmp,tmp
+  smpl%h(1:3,1:3,0) = smpl%h(1:3,1:3,0)*smpl%h0
+  read(ionum,*) natm
+  smpl%natm= natm
+  allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
+       ,smpl%tag(natm) &
+       ,smpl%fref(3,natm), smpl%fabs(natm) &
+       ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
+       ,smpl%eki(3,3,natm),smpl%epi(natm) &
+       ,smpl%fsub(3,natm),smpl%eatm(natm) )
+  dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
+       +8d0*size(smpl%fref) +8d0*size(smpl%fabs) &
+       +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
+       +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
+  if( lgdw ) then
+    allocate(smpl%gdf(natm),smpl%gdw(natm))
+    dmem = dmem +8d0*size(smpl%gdf) +8d0*size(smpl%gdw)
+  endif
+  smpl%esub= 0d0
+  smpl%fsub(1:3,1:natm)= 0d0
+  smpl%ssub(1:3,1:3) = 0d0
+  if( smpl%lfref_given ) then
+    do i=1,smpl%natm
+      read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp, &
+           smpl%fref(1:3,i)
+      smpl%fabs(i) = sqrt(smpl%fref(1,i)**2 +smpl%fref(2,i)**2 &
+           +smpl%fref(3,i)**2)
+    enddo
+!.....Count num of force to be calculated
+    smpl%nfcal = 0
+    do i=1,smpl%natm
+      smpl%nfcal = smpl%nfcal +1
+    enddo
+  else
+    do i=1,smpl%natm
+      read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp
+    enddo
+  endif
+  close(ionum)
+
+  
+end subroutine read_smpl
 !=======================================================================
 subroutine read_pos(ionum,fname,ismpl,smpl)
   use variables
@@ -663,12 +923,12 @@ subroutine read_pos(ionum,fname,ismpl,smpl)
   smpl%natm= natm
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
-       ,smpl%fref(3,natm), smpl%ifcal(natm),smpl%fabs(natm) &
+       ,smpl%fref(3,natm),smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
        ,smpl%fsub(3,natm),smpl%eatm(natm) )
   dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
-       +8d0*size(smpl%fref) +4d0*size(smpl%ifcal) +8d0*size(smpl%fabs) &
+       +8d0*size(smpl%fref) +8d0*size(smpl%fabs) &
        +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
        +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
   if( lgdw ) then
@@ -702,7 +962,7 @@ subroutine read_ref_data()
   ispmaxl = 0
   do ismpl=isid0,isid1
     cdir=samples(ismpl)%cdirname
-    open(13,file=trim(cmaindir)//'/'//trim(cdir) &
+    open(13,file=trim(cdatasetdir)//'/'//trim(cdir) &
          //'/erg.ref',status='old')
     read(13,*) samples(ismpl)%eref
     close(13)
@@ -717,11 +977,10 @@ subroutine read_ref_data()
     enddo
     ispmaxl = max(ispmaxl,ispmax)
     samples(ismpl)%ispmax = ispmax
-    samples(ismpl)%ifcal(1:samples(ismpl)%natm)= 1
 !!$    erefminl= min(erefminl,samples(ismpl)%eref/samples(ismpl)%natm)
 !    write(6,*) 'ismpl,naps=',ismpl,samples(ismpl)%naps(1:nspmax)
 
-    open(14,file=trim(cmaindir)//'/'//trim(cdir) &
+    open(14,file=trim(cdatasetdir)//'/'//trim(cdir) &
          //'/frc.ref',status='old')
     read(14,*) natm
     if( natm.ne.samples(ismpl)%natm ) then
@@ -754,7 +1013,6 @@ subroutine read_ref_data()
       is= int(samples(ismpl)%tag(i))
       cspi = samples(ismpl)%specorder(is)
       if( csp_in_neglect(cspi) ) ifcal = 0
-      samples(ismpl)%ifcal(i)= ifcal
 !!$      write(6,'(a,2i5,3es12.4)') 'ismpl,i,samples(ismpl)%fref(1:3,i) = ',&
 !!$           ismpl,i,samples(ismpl)%fref(1:3,i)
     enddo
@@ -763,15 +1021,13 @@ subroutine read_ref_data()
 !.....count nfcal
     samples(ismpl)%nfcal= 0
     do i=1,natm
-      if( samples(ismpl)%ifcal(i).eq.1 ) then
-        samples(ismpl)%nfcal = samples(ismpl)%nfcal +1
-        nfrc = nfrc +3
-      endif
+      samples(ismpl)%nfcal = samples(ismpl)%nfcal +1
+      nfrc = nfrc +3
     enddo
 
 !.....Read stress tensor data
     ptnsr(1:3,1:3) = 0d0
-    open(15,file=trim(cmaindir)//'/'//trim(cdir) &
+    open(15,file=trim(cdatasetdir)//'/'//trim(cdir) &
          //'/strs.ref',status='old')
     read(15,*) ptnsr(1,1),ptnsr(2,2),ptnsr(3,3), &
          ptnsr(2,3),ptnsr(1,3),ptnsr(1,2)
@@ -1117,18 +1373,18 @@ subroutine write_energy_relation(cadd)
   if( myid.eq.0 ) then
     open(90,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(91,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
-    write(90,'(a)') '# eref, epot, cdirname, diff, error, esub, swgt'
-    write(91,'(a)') '# eref, epot, cdirname, diff, error, esub, swgt'
+    write(90,'(a)') '# eref, epot, smplname, diff, error, esub, swgt'
+    write(91,'(a)') '# eref, epot, smplname, diff, error, esub, swgt'
     do ismpl=1,nsmpl
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
       if( iclist(ismpl).eq.1 ) then
         write(90,'(2es15.7,2x,a,10es13.4e3)') erefg(ismpl) &
-             ,epotg(ismpl),trim(cdirlist(ismpl)) &
+             ,epotg(ismpl),trim(csmplist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
              ,eerrg(ismpl),esubg(ismpl),swgtg(ismpl)
       else if( iclist(ismpl).eq.2 ) then
         write(91,'(2es15.7,2x,a,10es12.3e3)') erefg(ismpl) &
-             ,epotg(ismpl),trim(cdirlist(ismpl)) &
+             ,epotg(ismpl),trim(csmplist(ismpl)) &
              ,abs(erefg(ismpl)-epotg(ismpl)) &
              ,eerrg(ismpl),esubg(ismpl),swgtg(ismpl)
 !!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
@@ -1152,7 +1408,6 @@ subroutine write_force_relation(cadd)
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   real(8):: dmeml
   logical:: l1st = .true.
-  logical:: lfcal
   
   cfname= 'out.frc'
 
@@ -1168,11 +1423,11 @@ subroutine write_force_relation(cadd)
     allocate(frefl(3,nmax,nsmpl)&
          ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
          ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
-         ,fsubg(3,nmax,nsmpl),lfcall(nmax,nsmpl),lfcalg(nmax,nsmpl) &
+         ,fsubg(3,nmax,nsmpl) &
          ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
     dmeml = 8d0*size(frefl) +8d0*size(frefg) +8d0*size(fal) +8d0*size(fag) &
          +8d0*size(ferrl) +8d0*size(ferrg) +8d0*size(fsubl) +8d0*size(fsubg) &
-         +4d0*size(lfcall) +4d0*size(lfcalg) +8d0*size(gdwl) +8d0*size(gdwg)
+         +8d0*size(gdwl) +8d0*size(gdwg)
     dmem = dmem +dmeml
     if( iprint.gt.1 .and. myid.eq.0 .and. l1st ) then
       print '(a,f0.3,a)',' Memory for write_force_relation = ', &
@@ -1184,30 +1439,23 @@ subroutine write_force_relation(cadd)
     frefl(1:3,1:nmax,1:nsmpl)= 0d0
     fsubl(1:3,1:nmax,1:nsmpl)= 0d0
     ferrl(1:nsmpl) = 0d0
-    lfcall(1:nmax,1:nsmpl) = .true.
     gdwl(:,:) = 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
       frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
       fsubl(1:3,1:natm,ismpl)= samples(ismpl)%fsub(1:3,1:natm)
       ferrl(ismpl) = samples(ismpl)%ferr
-      do ia=1,natm
-        lfcall(ia,ismpl) = samples(ismpl)%ifcal(ia).eq.1
-      enddo
       if( lgdw ) gdwl(1:natm,ismpl) = samples(ismpl)%gdw(1:natm)
     enddo
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
     fsubg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
-    lfcalg(1:nmax,1:nsmpl) = .true.
     gdwg(:,:) = 0d0
     call mpi_reduce(frefl,frefg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(fsubl,fsubg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
-         ,0,mpi_world,ierr)
-    call mpi_reduce(lfcall,lfcalg,nmax*nsmpl,mpi_logical,mpi_land &
          ,0,mpi_world,ierr)
     if( lgdw ) call mpi_reduce(gdwl,gdwg,nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
@@ -1226,33 +1474,31 @@ subroutine write_force_relation(cadd)
   if( myid.eq.0 ) then
     open(92,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(93,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
-    write(92,'(a)') '# 1:fref, 2:fpot, 3:cdirname, 4:ia, 5:ixyz, 6:diff,' &
-         //' 7:error, 8:fsub, 9:gdw, 10:lfcal'
-    write(93,'(a)') '# 1:fref, 2:fpot, 3:cdirname, 4:ia, 5:ixyz, 6:diff,' &
-         //' 7:error, 8;fsub, 9;gdw, 10;lfcal'
+    write(92,'(a)') '# 1:fref, 2:fpot, 3:smplname, 4:ia, 5:ixyz, 6:diff,' &
+         //' 7:error, 8:fsub, 9:gdw'
+    write(93,'(a)') '# 1:fref, 2:fpot, 3:smplname, 4:ia, 5:ixyz, 6:diff,' &
+         //' 7:error, 8;fsub, 9;gdw'
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)
         do ia=1,natm
-          lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
             write(92,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,trim(cdirlist(ismpl)),ia,ixyz &
+                 ,trim(csmplist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl),lfcal
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl)
           enddo
         enddo
       else if( iclist(ismpl).eq.2 ) then
         natm= nalist(ismpl)
         do ia=1,natm
-          lfcal = lfcalg(ia,ismpl)
           do ixyz=1,3
             write(93,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
                  ,fag(ixyz,ia,ismpl) &
-                 ,trim(cdirlist(ismpl)),ia,ixyz &
+                 ,trim(csmplist(ismpl)),ia,ixyz &
                  ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl),lfcal
+                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl)
           enddo
         enddo
       endif
@@ -1329,7 +1575,7 @@ subroutine write_stress_relation(cadd)
           do jxyz=ixyz,3
             write(94,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
                  ,strsg(ixyz,jxyz,ismpl) &
-                 ,trim(cdirlist(ismpl)),ixyz,jxyz &
+                 ,trim(csmplist(ismpl)),ixyz,jxyz &
                  ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
                  ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
           enddo
@@ -1339,7 +1585,7 @@ subroutine write_stress_relation(cadd)
           do jxyz=ixyz,3
             write(95,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
                  ,strsg(ixyz,jxyz,ismpl) &
-                 ,trim(cdirlist(ismpl)),ixyz,jxyz &
+                 ,trim(csmplist(ismpl)),ixyz,jxyz &
                  ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
                  ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
           enddo
@@ -1499,7 +1745,6 @@ subroutine write_stats(iter)
     natm= smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
 !!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia) -smpl%fsub(l,ia)))
@@ -1513,7 +1758,6 @@ subroutine write_stats(iter)
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
           df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
 !!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia)) -smpl%fsub(l,ia))
@@ -1742,7 +1986,6 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
 !!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
           tmp = smpl%fref(l,ia)
@@ -1753,7 +1996,6 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
-        if( smpl%ifcal(ia).eq.0 ) cycle
         do l=1,3
 !!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
           tmp = smpl%fref(l,ia)
@@ -1891,11 +2133,11 @@ subroutine sync_input()
   call mpi_bcast(iprint,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(cfmethod,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cmaindir,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cdatasetdir,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cparfile,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crunmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cevaltype,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(csmplist,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(csmplistfile,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(csmplftype,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
@@ -2069,54 +2311,52 @@ subroutine get_node2sample()
   return
 end subroutine get_node2sample
 !=======================================================================
-subroutine shuffle_dirlist(nsmpl,cdirlist,iclist)
+subroutine shuffle_list(nsmpl,clist,iclist,luse_iclist)
 !
-!  Randomize the order of the cdirlist
+!  Randomize the order of the clist
 !
   use random
   implicit none
   integer,intent(in):: nsmpl
-  character(len=128),intent(inout):: cdirlist(nsmpl)
-  integer,optional,intent(inout):: iclist(nsmpl)
+  character(len=128),intent(inout):: clist(nsmpl)
+  integer,intent(inout):: iclist(nsmpl)
+  logical,intent(in):: luse_iclist 
 
   integer:: i,j,k,n
-  character(len=128),allocatable:: cdltmp(:)
+  character(len=128),allocatable:: cltmp(:)
   integer,allocatable:: icltmp(:)
 
-  allocate(cdltmp(nsmpl))
-  if( .not. present(iclist) ) then
-    cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
+  allocate(cltmp(nsmpl))
+  if( .not. luse_iclist ) then
+    cltmp(1:nsmpl)= clist(1:nsmpl)
     n=nsmpl
     do i=1,nsmpl
       j= n*urnd()+1
-      cdirlist(i)= cdltmp(j)
+      clist(i)= cltmp(j)
       do k=j,n-1
-        cdltmp(k)= cdltmp(k+1)
+        cltmp(k)= cltmp(k+1)
       enddo
       n= n -1
     enddo
-!!$  do i=1,nsmpl
-!!$    print *,i,trim(cdirlist(i))
-!!$  enddo
   else
     allocate(icltmp(nsmpl))
-    cdltmp(1:nsmpl)= cdirlist(1:nsmpl)
+    cltmp(1:nsmpl)= clist(1:nsmpl)
     icltmp(1:nsmpl)= iclist(1:nsmpl)
     n=nsmpl
     do i=1,nsmpl
       j= n*urnd()+1
-      cdirlist(i)= cdltmp(j)
+      clist(i)= cltmp(j)
       iclist(i)= icltmp(j)
       do k=j,n-1
-        cdltmp(k)= cdltmp(k+1)
+        cltmp(k)= cltmp(k+1)
         icltmp(k)= icltmp(k+1)
       enddo
       n= n -1
     enddo
     deallocate(icltmp)
   endif
-  deallocate(cdltmp)
-end subroutine shuffle_dirlist
+  deallocate(cltmp)
+end subroutine shuffle_list
 !=======================================================================
 subroutine set_sample_errors()
   use variables
@@ -2126,7 +2366,7 @@ subroutine set_sample_errors()
 
   do ismpl=isid0,isid1
     do iserr= 1,nserr
-      idx= index(samples(ismpl)%cdirname,trim(cserr(iserr)))
+      idx= index(samples(ismpl)%csmplname,trim(cserr(iserr)))
       if( idx.ne.0 ) then
         samples(ismpl)%eerr= seerr(iserr)
         samples(ismpl)%ferr= sferr(iserr)
@@ -2151,7 +2391,7 @@ subroutine set_sample_weights()
     erg = samples(ismpl)%eref /natm
     samples(ismpl)%wgt = 1d0
     do iswgt=1,nswgt
-      idx = index(samples(ismpl)%cdirname,trim(cswgt(iswgt)))
+      idx = index(samples(ismpl)%csmplname,trim(cswgt(iswgt)))
       if( idx.ne.0 ) then
         samples(ismpl)%wgt = exp(-(erg -swerg0(iswgt))/swdenom(iswgt))
       endif
@@ -2200,7 +2440,7 @@ subroutine subtract_ref_struct_energy()
 
   myidrefsub = -1
   do ismpl=isid0,isid1
-    if( trim(samples(ismpl)%cdirname).eq.trim(crefstrct) ) then
+    if( trim(samples(ismpl)%csmplname).eq.trim(crefstrct) ) then
       myidrefsub = myid
       isidrefsub = ismpl
       erefsub = samples(ismpl)%eref /samples(ismpl)%natm

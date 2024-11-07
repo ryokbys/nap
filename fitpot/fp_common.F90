@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 11:24:28 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 14:47:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -112,7 +112,7 @@ contains
     logical,parameter:: lgrad = .false.
     logical,parameter:: lgrad_done = .false.
     logical:: lfdsgnmat
-    character(len=128):: cdirname
+    character(len=128):: csmplname
 
     logical,external:: string_in_arr
 
@@ -154,7 +154,7 @@ contains
 !              the variable in the original structure (e.g., samples(ismpl))
 !              will not be changed.
       natm= samples(ismpl)%natm
-      cdirname = trim(samples(ismpl)%cdirname)
+      csmplname = trim(samples(ismpl)%csmplname)
 !.....CAUTION 2: argument of a structure-type is a pointer, contrary to the above.
       call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,l1st)
 
@@ -224,7 +224,7 @@ contains
         if( ismask(ismpl).ne.0 ) cycle
       endif
       smpl = samples(ismpl)
-      cdirname= smpl%cdirname
+      csmplname= smpl%csmplname
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
@@ -251,8 +251,8 @@ contains
         endif
         ftmp= ftmp +ediff *swgt
         if( iprint.gt.2 ) then
-          write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,cdirname,epot,eref,esub,(epot+esub)/natm= ', &
-               myid,ismpl,trim(cdirname),epot,eref,esub,(epot+esub)/natm
+          write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,smplname,epot,eref,esub,(epot+esub)/natm= ', &
+               myid,ismpl,trim(csmplname),epot,eref,esub,(epot+esub)/natm
         endif
         tergl = tergl +mpi_wtime() -tmp
       endif
@@ -264,8 +264,6 @@ contains
 !!$        ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
-          
-          if( smpl%ifcal(ia).eq.0 ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
@@ -409,7 +407,7 @@ contains
     logical,parameter:: lgrad = .true.
     logical:: lgrad_done = .false.
     logical,parameter:: lfdsgnmat = .false.
-    character(len=128):: cdirname
+    character(len=128):: csmplname
 
     logical,external:: string_in_arr
 
@@ -463,8 +461,8 @@ contains
       endif
       smpl = samples(ismpl)
       natm= smpl%natm
-      cdirname = smpl%cdirname
-      if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,cdirname=',myid,ismpl,trim(cdirname)
+      csmplname = smpl%csmplname
+      if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,csmplname=',myid,ismpl,trim(csmplname)
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
@@ -472,12 +470,14 @@ contains
       
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
-      if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for cdirname: ',trim(cdirname)
+      if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for csmplname: ',trim(csmplname)
       lgrad_done = smpl%lgrad_done
       call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
-!.....Since gradw of uf3 potential do not change even if x values are changed,
-!     no need to recompute gwe,gwf,gws.
+!.....Even though gradw of uf3 potential do not change when x values are changed,
+!     gradw variables cannot be stored in force_uf3 module for each sample.
+!     Thus gradw variables must be computed every time for each sample,
+!     otherwise store them in memory or storage, which can be huge more than tens of GB.
 !!$      do iff=1,nff
 !!$        if( trim(cffs(iff)).eq.'UF3' .or. trim(cffs(iff)).eq.'uf3' ) then
 !!$          samples(ismpl)%lgrad_done = .true.
@@ -545,7 +545,6 @@ contains
         ferr= smpl%ferr
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
-          if( smpl%ifcal(ia).eq.0 ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
@@ -648,7 +647,7 @@ contains
 !
 !  Preprocesses before running pmd
 !
-    use variables,only: cmaindir,cpot,nsubff,csubffs,mdsys, &
+    use variables,only: cdatasetdir,cpot,nsubff,csubffs,mdsys, &
          maxisp,nn_nl,nn_nhl,nn_sigtype,nn_asig,rc3, &
          interact,interact3,num_interact,iprint, &
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
@@ -673,7 +672,7 @@ contains
     logical,intent(in):: l1st
 
     integer:: i,is,nsf,nal,nnl,ndimt,ndim0,i2b
-    character(len=128):: cdirname,ctype
+    character(len=128):: csmplname,ctype
 
     logical,external:: string_in_arr
     logical,save:: l1st_local = .true.
@@ -810,8 +809,9 @@ contains
     real(8),intent(inout):: epot,frcs(3,maxna)
     real(8),intent(out):: strs(3,3)
     logical,intent(in):: lgrad,lgrad_done,lfdsgnmat
-    real(8),intent(out),optional:: gwe(ndimp),gwf(3,ndimp,maxna),&
-         gws(6,ndimp)
+    real(8),intent(out),optional:: gwe(ndimp)
+    real(8),intent(out),optional:: gwf(3,ndimp,maxna)
+    real(8),intent(out),optional:: gws(6,ndimp)
 
     logical,save:: l1st = .true.
 
@@ -993,31 +993,31 @@ contains
       do ismpl=isid0,isid1
         natm = samples(ismpl)%natm
 !!$        if( luse_Morse .or. luse_Morse_repul ) then
-!!$          call set_paramsdir_Morse(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_Morse(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
 !!$        if( luse_Coulomb ) then
-!!$          call set_paramsdir_Coulomb(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_Coulomb(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
 !!$        if( luse_dipole ) then
-!!$          call set_paramsdir_dipole(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_dipole(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
 !!$        if( luse_LJ_repul ) then
-!!$          call set_paramsdir_LJ(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_LJ(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
 !!$        if( luse_ZBL ) then
 !!$          call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
 !!$        endif
 !!$        if( luse_Bonny_WRe ) then
-!!$          call set_paramsdir_Bonny(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_Bonny(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
 !!$        if( luse_cspline ) then
-!!$          call set_paramsdir_cspline(trim(cmaindir)//'/'&
-!!$               //trim(samples(ismpl)%cdirname)//'/pmd')
+!!$          call set_paramsdir_cspline(trim(cdatasetdir)//'/'&
+!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
 !!$        endif
         call pre_pmd(samples(ismpl),nvars,vars,nsubff,csubffs,&
              rc_other,.true.)
@@ -1238,7 +1238,7 @@ contains
       natm = samples(ismpl)%natm
       do ia=1,natm
         write(21,'('//trim(cnum)//'es12.3e3)',advance='no') (samples(ismpl)%gsf(isf,ia),isf=1,nsf)
-        write(21,'(1x,a)') trim(samples(ismpl)%cdirname)
+        write(21,'(1x,a)') trim(samples(ismpl)%csmplname)
       enddo
     enddo
     close(21)
@@ -1371,8 +1371,8 @@ contains
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
         if( .not. allocated(samples(ismpl)%gsf) ) then
-          print *,'ERROR: gsf not allocated, myid,ismpl,cdirname='&
-               ,myid,ismpl,trim(samples(ismpl)%cdirname)
+          print *,'ERROR: gsf not allocated, myid,ismpl,csmplname='&
+               ,myid,ismpl,trim(samples(ismpl)%csmplname)
           stop
         endif
         do isf=1,nsf
@@ -1441,8 +1441,8 @@ contains
       do ismpl=isid0,isid1
         natm= samples(ismpl)%natm
         if( .not. allocated(samples(ismpl)%gsf) ) then
-          print *,'ERROR: gsf not allocated, myid,ismpl,cdirname='&
-               ,myid,ismpl,trim(samples(ismpl)%cdirname)
+          print *,'ERROR: gsf not allocated, myid,ismpl,csmplname='&
+               ,myid,ismpl,trim(samples(ismpl)%csmplname)
           stop
         endif
 !.....Set gscale in descriptor module

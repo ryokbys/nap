@@ -36,7 +36,6 @@ subroutine write_vars(cadd)
     endif
   endif
 
-!!$  cfname= trim(cmaindir)//'/'//trim(cparfile)//'.'//trim(cadd)
   cfname= trim(cparfile)//'.'//trim(cadd)
 
 !!$  if( index(cpot,'NN').ne.0 ) then

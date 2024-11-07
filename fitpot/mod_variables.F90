@@ -7,12 +7,12 @@ module variables
   integer:: niter= 1
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
-  character(len=128):: cmaindir= 'dataset'
+  character(len=128):: cdatasetdir= 'dataset'
   character(len=128):: csubstractdir= 'dataset_substract'
   character(len=128):: cparfile= 'in.vars.fitpot'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
-  character(len=128):: csmplist= ''
+  character(len=128):: csmplistfile= ''
   character(len=128):: csmplftype= 'dir'  ! (dir|file)
   integer:: nprcs= 1
   real(8):: epse= 1d-4
@@ -89,7 +89,7 @@ module variables
   integer:: natot = 0
 
   integer:: nwgtindiv = 0
-  character(len=128),allocatable:: cdirlist(:),cwgtindiv(:)
+  character(len=128),allocatable:: cdirlist(:),cwgtindiv(:),csmplist(:)
   integer,allocatable:: nalist(:),iclist(:)
   real(8),allocatable:: wgtindiv(:)
 
@@ -106,6 +106,7 @@ module variables
   
   type mdsys
     character(len=128):: cdirname
+    character(len=128):: csmplname
     integer:: natm,nfcal
     real(8):: h0,h(3,3,0:1),epot,eref,wgt,esub
     real(8):: eerr = 1.0d-3  ! in eV
@@ -119,6 +120,10 @@ module variables
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
          ,fsub(:,:),eatm(:)
     real(8),allocatable:: aux(:,:)
+!.....Check flag for {e,f,s}ref data
+    logical:: leref_given = .false.
+    logical:: lfref_given = .false.
+    logical:: lsref_given = .false.
 !.....This specorder is for this sample
     character(len=3),dimension(nspmax):: specorder  &
          = (/'x','x','x','x','x','x','x','x','x'/)

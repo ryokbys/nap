@@ -155,7 +155,7 @@ def read_pmd(fname:str = 'pmdini',
                         print(' WARNING: specorders are inconsistent, '
                               +'use one in the file.')
                     nsys.specorder = specorder
-                elif option == 'potential_energy:':
+                elif option in ('potential_energy:', 'energy:'):
                     epot = float(values[2])
                     nsys.set_potential_energy(epot)
                 elif option == 'stress:':
