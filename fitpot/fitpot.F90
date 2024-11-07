@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-06 17:22:14 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 10:37:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -325,7 +325,7 @@ subroutine write_initial_setting()
   write(6,'(a)') ''
   write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
   write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
-  write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
+!!$  write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
@@ -955,13 +955,13 @@ subroutine check_grad(ftrn0,ftst0)
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: iv
-  real(8):: dv,vmax,ftst,ftmp1,ftmp2
+  real(8):: dv,vmax,ftst,ftmp1,ftmp2, absgnum, absgana
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
-  real(8),parameter:: tiny = 1d-6
+  real(8),parameter:: tiny = 1d-8
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
-
+ 
   call grad_w_pmd(nvars,vars,ganal)
 
   vars0(1:nvars)= vars(1:nvars)
@@ -992,9 +992,12 @@ subroutine check_grad(ftrn0,ftst0)
     call func_w_pmd(nvars,vars,ftmp2,ftst)
     gnumer(iv)= (ftmp1-ftmp2)/dv
     if( myid.eq.0 ) then
+      absgnum = abs(gnumer(iv))
+      absgana = abs(ganal(iv))
       write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
            ganal(iv) ,gnumer(iv), &
-           abs((ganal(iv)-gnumer(iv))/(gnumer(iv)+tiny))*100
+           abs(ganal(iv)-gnumer(iv)) &
+           /(max(max(absgnum,absgana),tiny)) *100
     endif
   enddo
 
@@ -1921,8 +1924,8 @@ subroutine sync_input()
   call mpi_bcast(lematch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
-  call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
+!!$  call mpi_bcast(lgrad,1,mpi_logical,0,mpi_world,ierr)
+!!$  call mpi_bcast(lgscale,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(nspcs_neglect,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cspcs_neglect,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
@@ -2264,8 +2267,7 @@ function string_in_arr(string,narr,array)
       return
     endif
   enddo
-  return
-  
+  return  
 end function string_in_arr
 !-----------------------------------------------------------------------
 ! Local Variables:

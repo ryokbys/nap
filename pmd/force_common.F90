@@ -481,7 +481,7 @@ subroutine init_force(linit)
   use angular,only: read_params_angular, lprmset_angular
   use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   use Pellenq,only: read_params_Pellenq, lprmset_Pellenq
-  use UF3,only: read_params_uf3, lprmset_uf3
+  use UF3,only: read_params_uf3, lprmset_uf3, lprms_read_uf3
   use repel,only: read_params_repel, lprmset_repel
   use fdesc, only: init_fdesc
   implicit none
@@ -664,7 +664,7 @@ subroutine init_force(linit)
 
 !.....UF3
   if( use_force('UF3') .or. use_force('uf3') ) then
-    if( .not.lprmset_uf3 ) then
+    if( .not.lprms_read_uf3 ) then
       call read_params_uf3(myid_md,mpi_md_world,iprint)
     endif
   endif

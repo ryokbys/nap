@@ -25,7 +25,7 @@ module variables
        (/'x','x','x','x','x','x','x','x','x'/)
   integer:: nsp = 0  ! number of species used
   real(8):: eatom(nspmax)
-  logical:: lematch= .true.   ! energy matching
+  logical:: lematch= .false.   ! energy matching
   logical:: lfmatch= .false.  ! force matching
   logical:: lsmatch= .false.  ! stress matching
 !.....Forces of species listed in it are to be neglected
@@ -41,8 +41,8 @@ module variables
   real(8):: rc3    = 3.0d0
 !.....Cutoff for other FFs that are subtracted [default: 5.0 Ang]
   real(8):: rc_other = 5.0
-  logical:: lgrad  = .true.
-  logical:: lgscale= .false.
+!!$  logical:: lgrad  = .true.
+!!$  logical:: lgscale= .false.
   real(8):: gscl   = 1d0
   integer:: nfpsmpl= -10
   real(8):: seqcoef= 1d-2
@@ -136,6 +136,8 @@ module variables
     real(8),allocatable:: hl1(:,:)
 !.....Design-matrix for force-matching
     real(8),allocatable:: dgsfa(:,:,:)
+!.....flag for skipping gradw, will be set .true. when linear regression-type forces
+    logical:: lgrad_done = .false.
   end type mdsys
   real(8):: erefmin
   real(8):: gsfmean,gsfvar

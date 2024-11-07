@@ -148,12 +148,12 @@ subroutine set_variable(ionum,cname)
        trim(cname).eq.'cutoff_other_FF' ) then
     call read_r1(ionum,rc_other)
     return
-  elseif( trim(cname).eq.'gradient' ) then
-    call read_l1(ionum,lgrad)
-    return
-  elseif( trim(cname).eq.'grad_scale' ) then
-    call read_l1(ionum,lgscale)
-    return
+!!$  elseif( trim(cname).eq.'gradient' ) then
+!!$    call read_l1(ionum,lgrad)
+!!$    return
+!!$  elseif( trim(cname).eq.'grad_scale' ) then
+!!$    call read_l1(ionum,lgscale)
+!!$    return
   elseif( trim(cname).eq.'gscale_factor' ) then
     call read_r1(ionum,gscl)
     return
@@ -687,3 +687,7 @@ subroutine read_specorder(ionum)
   read(ctmp,*) c1, (specorder(i),i=1,nsp)
   
 end subroutine read_specorder
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:

@@ -128,7 +128,7 @@ subroutine write_vars_fitpot(cfname)
     open(ionum,file=trim(cfname),status='replace')
     write(ionum,'(i10,2es15.4)') nvars,rcut,rc3
     do i=1,nvars
-      write(ionum,'(es23.14e3,2es12.4)') vars(i),vranges(1:2,i)
+      write(ionum,'(es24.14e3,2es12.3)') vars(i),vranges(1:2,i)
     enddo
     close(ionum)
 !    print *, 'wrote '//trim(cfname)

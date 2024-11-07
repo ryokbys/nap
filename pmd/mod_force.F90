@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-09-28 11:27:25 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-06 21:18:51 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   implicit none
@@ -71,7 +71,7 @@ contains
     force_index_list(33) =  "angular"
     force_index_list(34) =  "DNN"
     force_index_list(35) =  "fdesc"
-    force_index_list(36) =  "fdesc"
+    force_index_list(36) =  "UF3"
 
     luse_force(:) = .false.
 

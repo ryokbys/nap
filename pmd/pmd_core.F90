@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-10-30 22:29:29 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-07 10:02:58 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1150,8 +1150,8 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 end subroutine oneshot
 !=======================================================================
 subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-     ekitot,epitot,auxtot,ekin,epot,stnsr,lcalcgrad,ndimp,maxisp, &
-     gwe,gwf,gws,lematch,lfmatch,lsmatch)
+     ekitot,epitot,auxtot,ekin,epot,stnsr,lgrad,lgrad_done, &
+     ndimp,maxisp,gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
@@ -1174,7 +1174,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
   real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
   real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
-  logical,intent(in):: lcalcgrad
+  logical,intent(in):: lgrad, lgrad_done
   integer,intent(in):: ndimp,maxisp
   real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,ntot0),gws(6,ndimp)
   logical,intent(in):: lematch,lfmatch,lsmatch
@@ -1237,11 +1237,12 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   call mk_lspr_para(l1st)
   lstrs = .true.
 
-  if( .not.lcalcgrad ) then
+  if( .not.lgrad ) then
     if( iprint.ge.ipl_basic ) print *,'get_force...'
     call get_force(.true.,epot,stnsr)
     if( iprint.ge.ipl_basic ) print '(a,es15.7)',' Potential energy = ',epot
-  else  ! lcalcgrad = .true.
+  endif
+  if( lgrad ) then
     if( iprint.ge.ipl_basic ) print *,'gradw_xxxx...'
     epot = 0d0
     gwe(1:ndimp) = 0d0
@@ -1270,9 +1271,12 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
       iprm0 = 0
       call gradw_DNN(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
-    else if( use_force('UF3') ) then
+    else if( use_force('UF3').or.use_force('uf3') ) then
+      iprm0 = 0
       call gradw_uf3(namax,natm,tag,ra,nnmax,h,rc,lspr, &
-           iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+           iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
+           lgrad_done)
+      
     endif
 !.....Derivative of stress should be divided by the cell volume
     gws(:,:) = gws(:,:) /vol
@@ -1280,6 +1284,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 
 !      print *,'one_shot: 07'
   if( iprint.ge.ipl_basic ) print *,'sa2stnsr...'
+  eki(:,:,:) = 0d0
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   stnsr(:,:) = stnsr(:,:) *up2gpa
 

@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-04 20:40:30 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 11:24:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -71,7 +71,7 @@ module UF3
 !.....constants
   integer:: nelem,nexp,nsp
   integer,parameter:: ivoigt(3,3)= &
-       reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
+       reshape((/ 1, 6, 5,  6, 2, 4,  5, 4, 3 /),shape(ivoigt))
 
 contains
   subroutine read_params_uf3(myid,mpi_world,iprint)
@@ -605,14 +605,14 @@ contains
                     do jxyz=1,3
                       do ixyz=1,3
 !$omp atomic
-                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
-                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
+                        strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                             -0.5d0 *c3t *(rij(jxyz)*tmpij(ixyz) +rik(jxyz)*tmpik(ixyz))
 !$omp atomic
-                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
-                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                        strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                             -0.5d0 *c3t *(rij(jxyz)*tmpij(ixyz) +rjk(jxyz)*tmpjk(ixyz))
 !$omp atomic
-                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
-                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
+                        strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
+                             -0.5d0 *c3t *(rik(jxyz)*tmpik(ixyz) +rjk(jxyz)*tmpjk(ixyz))
                       enddo
                     enddo
                     
@@ -898,7 +898,7 @@ contains
   end subroutine force_uf3_rec
 !=======================================================================
   subroutine gradw_uf3(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
-       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
+       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0,lgrad_done)
 !
 !  Gradient of UF3 wrt weights.
 !  Note: This routine is always called in single run,
@@ -913,7 +913,7 @@ contains
     real(8),intent(inout):: rcin
     integer,intent(in):: ndimp
     real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
-    logical,intent(in):: lematch,lfmatch,lsmatch
+    logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
     integer:: i,j,k,ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
@@ -931,6 +931,8 @@ contains
     type(prm2):: p2
     type(prm3):: p3
 
+    if( lgrad_done ) goto 10
+
     if( .not.allocated(ls3b) ) then
       allocate(ls3b(0:nnmax))
       if( rcin < rcmax ) then
@@ -944,19 +946,34 @@ contains
          .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*(nnmax+1)) then
       do i2b=1,n2b
         p2 = prm2s(i2b)
-        if( allocated(p2%gwe) ) then
-          deallocate(p2%gwe, p2%gwf, p2%gws)
+        if( lematch ) then
+          if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
+          allocate(prm2s(i2b)%gwe(p2%ncoef))
         endif
-        allocate(p2%gwe(p2%ncoef), p2%gwf(p2%ncoef,3,natm), p2%gws(6,p2%ncoef))
+        if( lfmatch ) then
+          if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
+          allocate(prm2s(i2b)%gwf(p2%ncoef,3,natm))
+        endif
+        if( lsmatch ) then
+          if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
+          allocate(prm2s(i2b)%gws(6,p2%ncoef))
+        endif
       enddo
       do i3b=1,n3b
         p3 = prm3s(i3b)
-        if( allocated(p3%gwe) ) then
-          deallocate(p3%gwe, p3%gwf, p3%gws)
+        if( lematch ) then
+          if( allocated(prm3s(i3b)%gwe) ) deallocate(prm3s(i3b)%gwe)
+          allocate(prm3s(i3b)%gwe(p3%ncfij,p3%ncfik,p3%ncfjk))
         endif
-        allocate(p3%gwe(p3%ncfij,p3%ncfik,p3%ncfjk), &
-             p3%gwf(p3%ncfij,p3%ncfik,p3%ncfjk,3,natm), &
-             p3%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
+        if( lfmatch ) then
+          if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
+          allocate(prm3s(i3b)%gwf(p3%ncfij,p3%ncfik,p3%ncfjk,3,natm))
+        endif
+        if( lsmatch ) then
+          if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
+          allocate(prm3s(i3b)%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
+        endif
+
       enddo
     endif
 
@@ -965,18 +982,16 @@ contains
       allocate(ls3b(0:nnmax))
     endif
 
-    gerg1s(:) = 0d0
+    if( lematch ) gerg1s(:) = 0d0
     do i2b=1,n2b
-      p2 = prm2s(i2b)
-      p2%gwe(:) = 0d0
-      p2%gwf(:,:,:) = 0d0
-      p2%gws(:,:) = 0d0
+      if( lematch ) prm2s(i2b)%gwe(:) = 0d0
+      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0d0
+      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0d0
     enddo
     do i3b=1,n3b
-      p3 = prm3s(i3b)
-      p3%gwe(:,:,:) = 0d0
-      p3%gwf(:,:,:,:,:) = 0d0
-      p3%gws(:,:,:,:) = 0d0
+      if( lematch ) prm3s(i3b)%gwe(:,:,:) = 0d0
+      if( lfmatch ) prm3s(i3b)%gwf(:,:,:,:,:) = 0d0
+      if( lsmatch ) prm3s(i3b)%gws(:,:,:,:) = 0d0
     enddo
 
     do ia=1,natm
@@ -1014,22 +1029,29 @@ contains
           if( n < 1 .or. n > p2%nknot-4 ) cycle
           c2t = p2%coefs(n)
 !.....Energy
-          if( lematch ) p2%gwe(n) = p2%gwe(n) +bij(lij)
+          if( lematch ) prm2s(i2b)%gwe(n) = prm2s(i2b)%gwe(n) +bij(lij)
 !.....Forces
           if( lfmatch ) then
             tmp2 = dbij(lij)
-            p2%gwf(n,:,ia) = p2%gwf(n,:,ia) +drijj(:)*tmp2
-            p2%gwf(n,:,jra) = p2%gwf(n,:,jra) -drijj(:)*tmp2
+            prm2s(i2b)%gwf(n,:,ia) = prm2s(i2b)%gwf(n,:,ia) +drijj(:)*tmp2
+            prm2s(i2b)%gwf(n,:,jra) = prm2s(i2b)%gwf(n,:,jra) -drijj(:)*tmp2
           endif
 !.....Stresses
           if( lsmatch ) then
             tmp2 = dbij(lij)
-            do ixyz=1,3
-              do jxyz=1,3
-                k = ivoigt(ixyz,jxyz)
-                p2%gws(k,n) = p2%gws(k,n) -rij(ixyz)*drijj(jxyz)*tmp2
-              enddo
-            enddo
+            prm2s(i2b)%gws(1,n) = prm2s(i2b)%gws(1,n) -rij(1)*drijj(1)*tmp2
+            prm2s(i2b)%gws(2,n) = prm2s(i2b)%gws(2,n) -rij(2)*drijj(2)*tmp2
+            prm2s(i2b)%gws(3,n) = prm2s(i2b)%gws(3,n) -rij(3)*drijj(3)*tmp2
+            prm2s(i2b)%gws(4,n) = prm2s(i2b)%gws(4,n) -rij(2)*drijj(3)*tmp2
+            prm2s(i2b)%gws(5,n) = prm2s(i2b)%gws(5,n) -rij(1)*drijj(3)*tmp2
+            prm2s(i2b)%gws(6,n) = prm2s(i2b)%gws(6,n) -rij(1)*drijj(2)*tmp2
+!!$            do ixyz=1,3
+!!$              do jxyz=1,3
+!!$                k = ivoigt(ixyz,jxyz)
+!!$                prm2s(i2b)%gws(k,n) = prm2s(i2b)%gws(k,n) &
+!!$                     -rij(ixyz)*drijj(jxyz)*tmp2
+!!$              enddo
+!!$            enddo
           endif
         enddo  ! lij
       enddo
@@ -1089,46 +1111,37 @@ contains
                     nij = nij3 +lij
                     if( nij < 1 .or. nij > p3%nknij-4 ) cycle
 !.....Energy
-                    c3t = p3%coefs(nij,nik,njk)
+!!$                    c3t = p3%coefs(nij,nik,njk)
                     if( lematch ) then
                       tmp = bij3(lij)*bik3(lik)*bjk3(ljk)
-                      p3%gwe(nij,nik,njk) = p3%gwe(nij,nik,njk) +tmp
-!!$                    tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
-!!$                    epi(ia) = epi(ia) +tmp
-!!$                    epotl3 = epotl3 +tmp
+                      prm3s(i3b)%gwe(nij,nik,njk) = prm3s(i3b)%gwe(nij,nik,njk) +tmp
                     endif
 !.....Force
                     if( lfmatch ) then
                       tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
                       tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
                       tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
-                      p3%gwf(nij,nik,njk,:,ia) = p3%gwf(nij,nik,njk,:,ia) +(tmpij(:) +tmpik(:))
-                      p3%gwf(nij,nik,njk,:,jra)= p3%gwf(nij,nik,njk,:,jra)+(-tmpij(:)+tmpjk(:))
-                      p3%gwf(nij,nik,njk,:,kra)= p3%gwf(nij,nik,njk,:,kra)+(-tmpik(:)-tmpjk(:))
+                      prm3s(i3b)%gwf(nij,nik,njk,:,ia) = prm3s(i3b)%gwf(nij,nik,njk,:,ia) +(tmpij(:) +tmpik(:))
+                      prm3s(i3b)%gwf(nij,nik,njk,:,jra)= prm3s(i3b)%gwf(nij,nik,njk,:,jra)+(-tmpij(:)+tmpjk(:))
+                      prm3s(i3b)%gwf(nij,nik,njk,:,kra)= prm3s(i3b)%gwf(nij,nik,njk,:,kra)+(-tmpik(:)-tmpjk(:))
                     endif
-!!$                    do ixyz=1,3
-!!$                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
-!!$                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
-!!$                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
-!!$                    enddo
 !.....Stresses
                     if( lsmatch ) then
                       tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
                       tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
                       tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
-                      do jxyz=1,3
-                        do ixyz=1,3
-                          k = ivoigt(jxyz,ixyz)
-                          p3%gws(k,nij,nik,njk) = p3%gws(k,nij,nik,njk) +xij(jxyz)*tmpij(ixyz) &
-                               +xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz)
-!!$                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
-!!$                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
-!!$                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
-!!$                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
-!!$                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
-!!$                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
-                        enddo
-                      enddo
+                      prm3s(i3b)%gws(1,nij,nik,njk) = prm3s(i3b)%gws(1,nij,nik,njk) &
+                           -rij(1)*tmpij(1) -rik(1)*tmpik(1) -rjk(1)*tmpjk(1)
+                      prm3s(i3b)%gws(2,nij,nik,njk) = prm3s(i3b)%gws(2,nij,nik,njk) &
+                           -rij(2)*tmpij(2) -rik(2)*tmpik(2) -rjk(2)*tmpjk(2)
+                      prm3s(i3b)%gws(3,nij,nik,njk) = prm3s(i3b)%gws(3,nij,nik,njk) &
+                           -rij(3)*tmpij(3) -rik(3)*tmpik(3) -rjk(3)*tmpjk(3)
+                      prm3s(i3b)%gws(4,nij,nik,njk) = prm3s(i3b)%gws(4,nij,nik,njk) &
+                           -rij(2)*tmpij(3) -rik(2)*tmpik(3) -rjk(2)*tmpjk(3)
+                      prm3s(i3b)%gws(5,nij,nik,njk) = prm3s(i3b)%gws(5,nij,nik,njk) &
+                           -rij(1)*tmpij(3) -rik(1)*tmpik(3) -rjk(1)*tmpjk(3)
+                      prm3s(i3b)%gws(6,nij,nik,njk) = prm3s(i3b)%gws(6,nij,nik,njk) &
+                           -rij(1)*tmpij(2) -rik(1)*tmpik(2) -rjk(1)*tmpjk(2)
                     endif
                     
                   enddo  ! lij
@@ -1139,8 +1152,10 @@ contains
           enddo  ! jj
         enddo  ! ksp
       enddo  ! jsp
-
     enddo ! ia
+
+!.....Skip to here if grad calc is already done before.
+10  continue
 
 !.....Tidy up gradient arrays
     if( lematch ) then  ! energy matching
@@ -1200,7 +1215,7 @@ contains
         p2 = prm2s(i2b)
         do i=1,p2%ncoef
           ip = ip +1
-          gws(1:6,ip) = gws(1:6,ip) +p2%gws(i,1:6)
+          gws(1:6,ip) = gws(1:6,ip) +p2%gws(1:6,i)
         enddo
       enddo  ! i2b
       do i3b=1,n3b
@@ -1209,7 +1224,7 @@ contains
           do j=1,p3%ncfik
             do i=1,p3%ncfij
               ip = ip +1
-              gws(1:6,ip) = gws(1:6,ip) +p3%gws(i,j,k,1:6)
+              gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,i,j,k)
             enddo
           enddo
         enddo
@@ -1417,27 +1432,30 @@ contains
       erg1s(i1b) = params_in(inc) 
     enddo
     do i2b=1,n2b
-      p2 = prm2s(i2b)
-      do ic=1,p2%ncoef
+      do ic=1,prm2s(i2b)%ncoef
         inc = inc +1
-        p2%coefs(ic) = params_in(inc)
+        prm2s(i2b)%coefs(ic) = params_in(inc)
       enddo
     enddo
     do i3b=1,n3b
-      p3 = prm3s(i3b)
-      do icfjk=1,p3%ncfjk
-        do icfik=1,p3%ncfik
-          do icfij=1,p3%ncfij
+      do icfjk=1,prm3s(i3b)%ncfjk
+        do icfik=1,prm3s(i3b)%ncfik
+          do icfij=1,prm3s(i3b)%ncfij
             inc = inc +1
-            p3%coefs(icfij,icfik,icfjk) = params_in(inc)
+            prm3s(i3b)%coefs(icfij,icfik,icfjk) = params_in(inc)
           enddo
         enddo
       enddo
     enddo
 
-    lprmset_uf3 = .true.
     return
   end subroutine set_params_uf3
+!=======================================================================
+  subroutine print_1b()
+    integer:: i
+    print '(/,a)','   UF3 parameters of 1B:'
+    print '(a,9(2x,f0.3))','   ',(erg1s(i),i=1,nspmax)
+  end subroutine print_1b
 !=======================================================================
   subroutine print_2b(ps)
     type(prm2),intent(in):: ps
@@ -1475,6 +1493,32 @@ contains
 !!$    write(c,'(i2)') size(ps%coefs)
 !!$    print '(a,'//trim(c)//'es11.2)','     coefs =',(ps%coefs(i),i=1,size(ps%coefs))
   end subroutine print_3b
+!=======================================================================
+  function get_mem_uf3() result(dmem)
+!
+!  Compute and return memory usage in this module.
+!
+    real(8):: dmem
+    integer:: i2b, i3b
+    type(prm2):: p2
+    type(prm3):: p3
+
+    dmem = 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8d0*(size(p2%gwe) &
+           +size(p2%gwf) +size(p2%gws) )
+    enddo
+    do i3b=1,n3b
+      p3 = prm3s(i3b)
+      dmem = dmem +8d0*( size(p3%knij) +size(p3%knik) +size(p3%knjk) &
+           +size(p3%coefs) )
+      if( allocated(p3%gwe) ) dmem = dmem +8d0*( size(p3%gwe) &
+           +size(p3%gwf) +size(p3%gws) )
+    enddo
+    return
+  end function get_mem_uf3
 end module UF3
 !-----------------------------------------------------------------------
 !     Local Variables:

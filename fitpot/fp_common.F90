@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-06 17:21:41 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-07 11:24:28 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -95,6 +95,7 @@ contains
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
     use DNN,only: nlayer, nhl, itypesig, asig
+    use UF3,only: get_mem_uf3
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -108,7 +109,8 @@ contains
     real(8):: tergl,tfrcl,tstrsl,tmp
     type(mdsys):: smpl
     logical,save:: l1st = .true.
-    logical,parameter:: lcalcgrad = .false.
+    logical,parameter:: lgrad = .false.
+    logical,parameter:: lgrad_done = .false.
     logical:: lfdsgnmat
     character(len=128):: cdirname
 
@@ -162,7 +164,7 @@ contains
           lfdsgnmat = .true.
       endif
       
-      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs &
+      call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs &
            ,rcut,lfdsgnmat)
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
@@ -187,6 +189,9 @@ contains
 !!$             samples(ismpl)%dgsf,samples(ismpl)%igsf)
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
+      endif
+      if( l1st .and. (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') ) then
+        dmem = dmem + get_mem_uf3()
       endif
     enddo  ! ismpl
 
@@ -309,10 +314,12 @@ contains
           endif
         else if( cstrs_denom(1:3).eq.'abs' ) then
           serri = 1d0/ max(abssref,serr)
-        else  ! default: absolute
+        else  ! default: relative
           serri = 1d0/ serr
         endif
-        if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
+!.....Skip abnormally large stress
+!!$        if( stress_limit.lt.0d0 .or. &
+!!$             .not.(cstrs_denom(1:7).ne.'abs2rel' .and. abssref.gt.stress_limit) ) then
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
@@ -335,7 +342,7 @@ contains
               ftmp= ftmp +pdiff(k) *swgt /6
             enddo
           endif
-        endif
+!!$        endif
         tstrsl = tstrsl +mpi_wtime() -tmp
       endif  ! stress matching
 
@@ -393,13 +400,14 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv
+    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
     real(8):: tergl, tfrcl, tstrsl, ttmp
     type(mdsys):: smpl
-    logical,parameter:: lcalcgrad = .true.
+    logical,parameter:: lgrad = .true.
+    logical:: lgrad_done = .false.
     logical,parameter:: lfdsgnmat = .false.
     character(len=128):: cdirname
 
@@ -465,8 +473,17 @@ contains
 !.....Although epot, frcs, and strs are calculated,
 !.....only gs is required.
       if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for cdirname: ',trim(cdirname)
-      call run_pmd(samples(ismpl),lcalcgrad,ndim,nff,cffs,epot,frcs,strs,rcut &
+      lgrad_done = smpl%lgrad_done
+      call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
+!.....Since gradw of uf3 potential do not change even if x values are changed,
+!     no need to recompute gwe,gwf,gws.
+!!$      do iff=1,nff
+!!$        if( trim(cffs(iff)).eq.'UF3' .or. trim(cffs(iff)).eq.'uf3' ) then
+!!$          samples(ismpl)%lgrad_done = .true.
+!!$        endif
+!!$      enddo
+      
 !!$      smpl%gwe(:)= gwe(:)
 !!$      smpl%gwf(:,:,1:natm)= gwf(:,:,1:natm)
 !!$      smpl%gws(:,:)= gws(:,:)
@@ -547,16 +564,16 @@ contains
             fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
                  -(smpl%fref(ixyz,ia))) *ferri
             if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *fdiff(ixyz,ia)
+              tmp = 2d0 *fdiff(ixyz,ia) *ferri
             else  ! Huber
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 tmp = 2d0 *sign(1d0,fdiff(ixyz,ia))
               else
-                tmp = 2d0 *fdiff(ixyz,ia)
+                tmp = 2d0 *fdiff(ixyz,ia) *ferri
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
+                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *gdw
 !!$                 *smpl%gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
           enddo
         enddo
@@ -579,33 +596,32 @@ contains
         else ! default: absolute
           serri = 1d0/ serr
         endif
-        if( stress_limit.lt.0d0 .or. (cstrs_denom(1:7).ne.'abs2rel' .and. abssref.lt.stress_limit) ) then
+!.....Skip abnormally large stress?
+!!$        if( stress_limit.lt.0d0 .or. &
+!!$             .not.(cstrs_denom(1:7).ne.'abs2rel' .and. abssref.gt.stress_limit) ) then
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
-              pdiff(k) = pdiff(k) +( smpl%strs(ixyz,jxyz) &
-                   +smpl%ssub(ixyz,jxyz) &
-                   -smpl%sref(ixyz,jxyz) ) *serri
+              pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
+                   -smpl%sref(ixyz,jxyz)) *serri
             enddo
           enddo
           do k=1,6
             if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *pdiff(k)
+              tmp = 2d0 *pdiff(k) *serri 
             else  ! Huber
               if( abs(pdiff(k)).gt.1d0 ) then
                 tmp = 2d0 *sign(1d0,pdiff(k))
               else
-                tmp = 2d0 *pdiff(k)
+                tmp = 2d0 *pdiff(k) *serri 
               endif
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gws(k,1:ndim) *swgt *serri /6
-  !!$               *smpl%gws(k,1:ndim) *swgt *serri /6
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt /6
           enddo
-        endif
+!!$        endif
         tstrsl = tstrs +mpi_wtime() -ttmp
       endif
-    enddo
+    enddo  ! ismpl
     terg = terg +tergl
     tfrc = tfrc +tfrcl
     tstrs = tstrs +tstrsl
@@ -647,7 +663,7 @@ contains
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf,set_params_desc_new, lfitpot_desc => lfitpot
-    use UF3,only: set_params_uf3
+    use UF3,only: set_params_uf3, print_1b, print_2b, prm2s, n2b
     implicit none
     type(mdsys),intent(inout):: smpl
     integer,intent(in):: ndim, nff
@@ -656,7 +672,7 @@ contains
     real(8),intent(in):: rc
     logical,intent(in):: l1st
 
-    integer:: i,is,nsf,nal,nnl,ndimt,ndim0
+    integer:: i,is,nsf,nal,nnl,ndimt,ndim0,i2b
     character(len=128):: cdirname,ctype
 
     logical,external:: string_in_arr
@@ -670,18 +686,14 @@ contains
 !.....Create MPI COMM for pmd only for the 1st time
       call create_mpi_comm_pmd()
       call init_element()
-      l1st_local = .false.
     endif
 
     nstp = 0
-!!$    nerg = 1
-!!$    npmd = 1
 !.....Since at least one of FF requires mass infomation,
 !     set mass info from specorder anyways.
     am(:) = 12d0
     specorder(:) = smpl%specorder
     do is=1,nspmax
-!!$      csp = smpl%specorder(is)
       csp = specorder(is)
       if( trim(csp).ne.'x' ) then
         elem = get_element(trim(csp))
@@ -741,10 +753,10 @@ contains
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
         lfitpot_desc = .true.
         call set_params_DNN(ndim,x)
-!!$      call set_params_DNN(ndim,x,nn_nl,nn_nhl)
-!!$      call set_actfunc_DNN(nn_sigtype,nn_asig)
       else if( trim(cffs(i)).eq.'UF3' .or. trim(cffs(i)).eq.'uf3' ) then
         call set_params_uf3(ndim,x)
+!!$        call print_1b()
+!!$        call print_2b(prm2s(1))
       endif
     
       if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then
@@ -770,16 +782,18 @@ contains
         endif
       endif
     enddo  ! i=1,nff
+    
+    l1st_local = .false.
     return
   end subroutine pre_pmd
 !=======================================================================
-  subroutine run_pmd(smpl,lcalcgrad,ndimp,nff,cffs,epot,frcs,strs,rc &
+  subroutine run_pmd(smpl,lgrad,lgrad_done,ndimp,epot,frcs,strs,rc &
        ,lfdsgnmat,gwe,gwf,gws)
 !
 !  Run pmd and get energy and forces of the system.
 !
-    use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch&
-         ,maxisp
+    use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch, &
+         maxisp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
     use descriptor,only: get_dsgnmat_force
@@ -791,12 +805,11 @@ contains
     implicit none
     include "../pmd/params_unit.h"
     type(mdsys),intent(inout):: smpl
-    integer,intent(in):: ndimp,nff
+    integer,intent(in):: ndimp
     real(8),intent(in):: rc
     real(8),intent(inout):: epot,frcs(3,maxna)
     real(8),intent(out):: strs(3,3)
-    logical,intent(in):: lcalcgrad,lfdsgnmat
-    character(len=20),intent(in):: cffs(nff)
+    logical,intent(in):: lgrad,lgrad_done,lfdsgnmat
     real(8),intent(out),optional:: gwe(ndimp),gwf(3,ndimp,maxna),&
          gws(6,ndimp)
 
@@ -813,12 +826,11 @@ contains
 !.....one_shot force calculation
     call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
-         smpl%aux,ekin,epot,ptnsr,lcalcgrad,ndimp,maxisp, &
+         smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch)
 !.....Stress definition, negative as compressive, positive as tensile
     strs(1:3,1:3) = -ptnsr(1:3,1:3)
-!!$    if( present(gws) ) gws(1:ndimp,1:6) = gws(1:ndimp,1:6) *up2gpa*(-1d0)
-    if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *up2gpa*(-1d0)
+    if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *(-up2gpa)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 
     if( lvc ) smpl%charge_set = .true.
@@ -924,7 +936,8 @@ contains
     implicit none
 
     integer:: i,ismpl,natm
-    logical:: lcalcgrad = .false.
+    logical:: lgrad = .false.
+    logical:: lgrad_done = .false.
     logical:: luse_Morse = .false.
     logical:: luse_Morse_repul = .false.
     logical:: luse_Coulomb = .false.
@@ -1008,8 +1021,8 @@ contains
 !!$        endif
         call pre_pmd(samples(ismpl),nvars,vars,nsubff,csubffs,&
              rc_other,.true.)
-        call run_pmd(samples(ismpl),lcalcgrad,nvars,&
-             nsubff,csubffs,epot,frcs,strs,rc_other,lfdsgnmat)
+        call run_pmd(samples(ismpl),lgrad,lgrad_done,nvars,&
+             epot,frcs,strs,rc_other,lfdsgnmat)
 !!$      print *,'myid,ismpl,epot=',myid,ismpl,epot
         samples(ismpl)%esub = epot
         samples(ismpl)%fsub(1:3,1:natm) = frcs(1:3,1:natm)
