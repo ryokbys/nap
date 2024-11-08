@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-08 18:08:33 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-08 21:52:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -186,7 +186,7 @@ program fitpot
     call sd_wrapper(ftrn0,ftst0)
   case ('cg','CG')
     call cg_wrapper(ftrn0,ftst0)
-  case ('bfgs','BFGS','dfp','DFP','qn','QN')
+  case ('lbfgs','L-BFGS','LBFGS','bfgs','BFGS')
     call qn_wrapper(ftrn0,ftst0)
   case ('sgd','SGD')
     call sgd_wrapper(ftrn0,ftst0)

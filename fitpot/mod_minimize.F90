@@ -805,22 +805,38 @@ contains
     end interface
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
-!!$    real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
-!!$         ,ggy(:),gpena(:),dx(:)
-    real(8),save,allocatable:: x(:),s(:,:),y(:,:),gp(:) &
-         ,ggy(:),dx(:),q(:),rho(:),ai(:),bi(:)
+    real(8),save,allocatable:: x(:),gp(:),s(:),y(:),dx(:)
+    real(8),save,allocatable:: gg(:,:),ggy(:)
+    real(8),save,allocatable:: si(:,:),yi(:,:),q(:), &
+         rho(:),ai(:),bi(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,estmem,ftst,dxnorm
     integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter
-    logical:: lconverged = .false. 
+    logical:: lconverged = .false.
+    logical:: limited_mem = .true.  ! L-BFGS
 
-    if( .not.allocated(y) ) then
+    if( .not.allocated(x) ) then
+      allocate(x(ndim),dx(ndim),gp(ndim))
+      estmem = 8*3*ndim
+      if( cfmethod(1:1).eq.'b' .or. cfmethod(1:1).eq.'B' ) then ! BFGS
+        limited_mem = .false.
+        allocate(gg(ndim,ndim),s(ndim),y(ndim),ggy(ndim))
+        estmem = estmem +8*(ndim**2 +3*ndim)
+      else  ! L-BFGS
+        limited_mem = .true.
+        allocate(rho(m_lbfgs),si(ndim,m_lbfgs),yi(ndim,m_lbfgs), &
+             q(ndim),ai(m_lbfgs),bi(m_lbfgs))
+        estmem = estmem +8*(ndim**2 +3*ndim)
+        yi(:,:) = 0d0
+        si(:,:) = 0d0
+        rho(:) = 0d0
+      endif
       if(myid.eq.0) then
         print *,''
         print *, '******************************* QN(BFGS) '&
              //'*******************************'
 !!$        estmem = (ndim*ndim +ndim*6)*8
-        estmem = 8*(6*ndim +2*ndim*m_lbfgs +3*m_lbfgs)
+!!$        estmem = 8*(6*ndim +2*ndim*m_lbfgs +3*m_lbfgs)
         dmem = dmem +estmem
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
@@ -832,14 +848,6 @@ contains
                ,int(estmem/1000/1000),' MB'
         endif
       endif
-!!$      allocate(gg(ndim,ndim),x(ndim),dx(ndim) &
-!!$           ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
-      allocate(x(ndim),dx(ndim),q(ndim), &
-           s(ndim,m_lbfgs),y(ndim,m_lbfgs),gp(ndim),ggy(ndim))
-      allocate(rho(m_lbfgs),ai(m_lbfgs),bi(m_lbfgs))
-      y(:,:) = 0d0
-      s(:,:) = 0d0
-      rho(:) = 0d0
     endif
 
 !.....initialize alpha (line minimization factor)
@@ -848,11 +856,13 @@ contains
     nftol= 0
     ngtol= 0
     nxtol= 0
-!!$!.....initial G = I
-!!$    gg(1:ndim,1:ndim)= 0d0
-!!$    do i=1,ndim
-!!$      gg(i,i)= 1d0
-!!$    enddo
+    if( .not. limited_mem ) then
+!.....initial G = I
+      gg(1:ndim,1:ndim)= 0d0
+      do i=1,ndim
+        gg(i,i)= 1d0
+      enddo
+    endif
 
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,f,ftst)
@@ -868,13 +878,15 @@ contains
          ,f,ftst,pval,vnorm,gnorm,dxnorm,f)
 
     call sub_eval(0)
-!.....Initial direction assuming H_0 == I
-    u(:) = -g(:)
+!.....Initial direction assuming H_0 == I in L-BFGS
+    if( limited_mem ) u(:) = -g(:)
     do iter=1,maxiter
-!!$      u(1:ndim)= 0d0
-!!$      do i=1,ndim
-!!$        u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
-!!$      enddo
+      if( .not.limited_mem ) then
+        u(1:ndim)= 0d0
+        do i=1,ndim
+          u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+        enddo
+      endif
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
@@ -924,10 +936,12 @@ contains
             print *,'>>> Initialize gg because alpha was not found.'
           endif
           alpha= 1d0  ! reset alpha to 1
-!!$          gg(1:ndim,1:ndim)= 0d0
-!!$          do i=1,ndim
-!!$            gg(i,i)= 1d0
-!!$          enddo
+          if( .not.limited_mem ) then
+            gg(1:ndim,1:ndim)= 0d0
+            do i=1,ndim
+              gg(i,i)= 1d0
+            enddo
+          endif
           f= fp
           iflag= iflag -100*(iflag/100)
           cycle
@@ -941,7 +955,7 @@ contains
 !.....Update x
       x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       call wrap_ranges(ndim,x,xranges)
-      
+
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
@@ -958,80 +972,81 @@ contains
         return
       endif
 
+      if( limited_mem ) then
 !.....Newest data is at s(:,m_lbfgs), oldest data is at s(:,1)
-      do i=2,m_lbfgs
-        s(:,i-1) = s(:,i)
-        y(:,i-1) = y(:,i)
-        rho(i-1) = rho(i)
-      enddo
-      s(:,m_lbfgs)= alpha *u(:)
-      y(:,m_lbfgs)= g(:) -gp(:)
-!!$      ynorm= sprod(ndim,y,y)
-!!$      if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
-!!$           .or. abs(f-fp).lt.ftol ) then
-!!$        if(myid.eq.0) then
-!!$          print *,'>>> Initialize gg'
-!!$        endif
-!!$        gg(1:ndim,1:ndim)= 0d0
-!!$        do i=1,ndim
-!!$          gg(i,i)= 1d0
-!!$        enddo
-!!$        cycle
-!!$      endif
-
+        do i=2,m_lbfgs
+          si(:,i-1) = si(:,i)
+          yi(:,i-1) = yi(:,i)
+          rho(i-1) = rho(i)
+        enddo
+        si(:,m_lbfgs)= alpha *u(:)
+        yi(:,m_lbfgs)= g(:) -gp(:)
 !.....L-BFGS update
-      rho(m_lbfgs) = 0d0
-      do j=1,ndim
-        rho(m_lbfgs) = rho(m_lbfgs) +y(j,m_lbfgs)*s(j,m_lbfgs)
-      enddo
-      rho(m_lbfgs) = 1d0/rho(m_lbfgs)
-      q(:) = g(:)
-      ai(:) = 0d0
-      do i= m_lbfgs,1,-1
-        ai(i) = 0d0
+        rho(m_lbfgs) = 0d0
         do j=1,ndim
-          ai(i) = ai(i) + s(j,i)*q(j)
+          rho(m_lbfgs) = rho(m_lbfgs) +yi(j,m_lbfgs)*si(j,m_lbfgs)
         enddo
-        ai(i) = ai(i)*rho(i)
-        q(:) = q(:) -ai(i)*y(:,i)
-      enddo
+        rho(m_lbfgs) = 1d0/rho(m_lbfgs)
+        q(:) = g(:)
+        ai(:) = 0d0
+        do i= m_lbfgs,1,-1
+          ai(i) = 0d0
+          do j=1,ndim
+            ai(i) = ai(i) + si(j,i)*q(j)
+          enddo
+          ai(i) = ai(i)*rho(i)
+          q(:) = q(:) -ai(i)*yi(:,i)
+        enddo
 !.....Since H_0 == I, here we assume q = H_0*q ==> q=q
-      do i= 1,m_lbfgs
-        bi(i) = 0d0
-        do j=1,ndim
-          bi(i) = bi(i) +y(j,i)*q(j)
+        do i= 1,m_lbfgs
+          bi(i) = 0d0
+          do j=1,ndim
+            bi(i) = bi(i) +yi(j,i)*q(j)
+          enddo
+          bi(i) = bi(i) *rho(i)
+          q(:) = q(:) +(ai(i)-bi(i))*si(:,i)
         enddo
-        bi(i) = bi(i) *rho(i)
-        q(:) = q(:) +(ai(i)-bi(i))*s(:,i)
-      enddo
-      u(:) = -q(:)
-!!$      print '(a,10es10.2)','rho=',rho(:)
-!!$      print '(a,10es10.2)','ai =',ai(:)
-!!$      print '(a,10es10.2)','bi =',bi(:)
+        u(:) = -q(:)
+      else  ! BFGS
+        s(:)= alpha *u(:)
+        y(:)= g(:) -gp(:)
+        ynorm= sprod(ndim,y,y)
+        if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
+             .or. abs(f-fp).lt.ftol ) then
+          if(myid.eq.0) then
+            print *,'>>> Initialize gg'
+          endif
+          gg(1:ndim,1:ndim)= 0d0
+          do i=1,ndim
+            gg(i,i)= 1d0
+          enddo
+          cycle
+        endif
 
-!!$!.....update matrix gg in BFGS
-!!$      sy= sprod(ndim,s,y)
-!!$      syi= 1d0/sy
-!!$      do i=1,ndim
-!!$        tmp1= 0d0
-!!$        tmp2= 0d0
-!!$        do j=1,ndim
-!!$          tmp1= tmp1 +gg(j,i)*y(j)
-!!$        enddo
-!!$        ggy(i)= tmp1 *syi
-!!$      enddo
-!!$      b= 1d0
-!!$      do i=1,ndim
-!!$        b=b +y(i)*ggy(i)
-!!$      enddo
-!!$      b= b*syi
-!!$!.....without temporary matrix aa
-!!$      do j=1,ndim
-!!$        do i=1,ndim
-!!$          gg(i,j)=gg(i,j) +s(j)*s(i)*b &
-!!$               -(s(i)*ggy(j) +ggy(i)*s(j))
-!!$        enddo
-!!$      enddo
+!.....update matrix gg in BFGS
+        sy= sprod(ndim,s,y)
+        syi= 1d0/sy
+        do i=1,ndim
+          tmp1= 0d0
+          tmp2= 0d0
+          do j=1,ndim
+            tmp1= tmp1 +gg(j,i)*y(j)
+          enddo
+          ggy(i)= tmp1 *syi
+        enddo
+        b= 1d0
+        do i=1,ndim
+          b=b +y(i)*ggy(i)
+        enddo
+        b= b*syi
+!.....without temporary matrix aa
+        do j=1,ndim
+          do i=1,ndim
+            gg(i,j)=gg(i,j) +s(j)*s(i)*b &
+                 -(s(i)*ggy(j) +ggy(i)*s(j))
+          enddo
+        enddo
+      endif
 
     enddo  ! iter
 
