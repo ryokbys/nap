@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 23:53:43 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-08 18:08:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -273,6 +273,7 @@ subroutine write_initial_setting()
   use minimize
   use random
   use composition
+  use fp_common,only: cpenalty, penalty
   implicit none 
   integer:: i
 
@@ -323,8 +324,8 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
   
   write(6,'(a)') ''
-  write(6,'(2x,a25,2x,a)') 'penalty',trim(cpena)
-  write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',pwgt
+  write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
+  write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
 !!$  write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
@@ -2089,6 +2090,7 @@ subroutine sync_input()
   use random
   use pmdvars,only: nnmax
   use composition
+  use fp_common,only: cpenalty, penalty
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -2104,7 +2106,7 @@ subroutine sync_input()
   call mpi_bcast(csmplistfile,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(csmplftype,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cpena,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cpenalty,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
@@ -2119,7 +2121,7 @@ subroutine sync_input()
   call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(pwgt,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(penalty,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(force_limit,1,mpi_real8,0,mpi_world,ierr)
@@ -2152,7 +2154,7 @@ subroutine sync_input()
 !.....CG
   call mpi_bcast(icgbtype,1,mpi_integer,0,mpi_world,ierr)
 !.....L-BFGS
-  call mpi_bcast(mstore,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(m_lbfgs,1,mpi_integer,0,mpi_world,ierr)
 !.....Armijo
   call mpi_bcast(armijo_xi,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_tau,1,mpi_real8,0,mpi_world,ierr)

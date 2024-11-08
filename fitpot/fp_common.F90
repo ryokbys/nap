@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 14:47:33 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-08 00:49:11 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -17,6 +17,10 @@ module fp_common
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
+
+!.....Penalty is moved from minimize module
+  character(len=128):: cpenalty = 'none'
+  real(8):: penalty = 1d-15
 
 !.....Store loverlay and r_inner/outer arrays
   logical:: overlay
@@ -104,7 +108,7 @@ contains
     integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
     real(8):: dn3i,ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
-    real(8):: ftrnl,ftstl,ftmp,gdw
+    real(8):: ftrnl,ftstl,ftmp,gdw,fpena
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: tergl,tfrcl,tstrsl,tmp
     type(mdsys):: smpl
@@ -367,6 +371,10 @@ contains
     endif
     tcl = tcl + (mpi_wtime() -tc0)
 
+!.....Penalty to function
+    call func_penalty(ndim,x,fpena)
+    ftrn = ftrn +fpena
+
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
@@ -408,6 +416,7 @@ contains
     logical:: lgrad_done = .false.
     logical,parameter:: lfdsgnmat = .false.
     character(len=128):: csmplname
+    real(8),allocatable,save:: gpena(:)
 
     logical,external:: string_in_arr
 
@@ -635,6 +644,11 @@ contains
 
     gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
+!.....Penalty
+    if( .not.allocated(gpena) ) allocate(gpena(ndim))
+    call grad_penalty(ndim,x,gpena)
+    gtrn(:) = gtrn(:) +gpena(:)
+
 !.....only the bottle-neck times are taken into account
     call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
@@ -837,6 +851,37 @@ contains
 
     return
   end subroutine run_pmd
+!=======================================================================
+  subroutine func_penalty(ndim,x,fp)
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8),intent(out):: fp
+
+    integer:: i
+
+    fp = 0d0
+    if( trim(cpenalty).eq.'ridge' ) then
+      do i=1,ndim
+        fp = fp +x(i)*x(i)
+      enddo
+      fp = fp *penalty
+    endif
+    return
+  end subroutine func_penalty
+!=======================================================================
+  subroutine grad_penalty(ndim,x,gp)
+    integer,intent(in):: ndim
+    real(8),intent(in):: x(ndim)
+    real(8),intent(out):: gp(ndim)
+
+    integer:: i
+
+    gp(:) = 0d0
+    if( trim(cpenalty).eq.'ridge' ) then
+      gp(:) = 2d0*penalty*x(:)
+    endif
+    return
+  end subroutine grad_penalty
 !=======================================================================
   subroutine create_mpi_comm_pmd()
 !

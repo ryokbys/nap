@@ -1,9 +1,10 @@
 module minimize
+  use variables,only: dmem
   implicit none 
   save
 !.....number of convergence criteria achieved
   integer:: numtol = 1
-  
+
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
   character(len=128):: clinmin= 'backtrack'
@@ -42,7 +43,7 @@ module minimize
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
 
 !.....L-BFGS
-  integer:: mstore   = 10
+  integer:: m_lbfgs   = 10
 
   real(8):: fupper_lim = 1d+5
   real(8),allocatable:: ranges(:,:)
@@ -95,14 +96,13 @@ contains
     
     if( myid.eq.0 ) then
       if( iprint.ge.1 ) then
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' &
-             .or. trim(cpena).eq.'ridge' ) then
-          write(6,'(a,i5,i4,2es13.5,5es12.4)') &
+        if( trim(cpena).eq.'ridge' ) then
+          write(6,'(a,i5,i4,7es11.3)') &
                ' iter,ninner,ftrn,ftst,penalty,|x|,|g|,|dx|,|df|=' &
                ,iter,ninner,ftrn-pval,ftst &
                ,pval,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         else
-          write(6,'(a,i5,i4,2es13.5,4es12.4,i4)') &
+          write(6,'(a,i5,i4,7es11.3)') &
                ' iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
                ,iter,ninner,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         endif
@@ -205,8 +205,7 @@ contains
 
     integer:: iter,niter,nxtol,ngtol,nftol
     real(8):: alpha,fp,gnorm,dxnorm,vnorm,ftst,pval
-    real(8),save,allocatable:: gpena(:),dx(:),xp(:),x(:) &
-         ,s(:),y(:),gprev(:)
+    real(8),save,allocatable:: s(:),y(:),x(:),gpena(:),gp(:),xp(:),dx(:)
     logical:: lconverged = .false. 
 
     if( myid.eq.0 ) then
@@ -217,7 +216,7 @@ contains
 
     if( .not.allocated(gpena) ) then
       allocate(gpena(ndim),dx(ndim),xp(ndim),x(ndim) &
-           ,s(ndim),y(ndim),gprev(ndim))
+           ,s(ndim),y(ndim),gp(ndim))
     endif
 
     iter= 0
@@ -226,9 +225,6 @@ contains
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
-    call penalty(cpena,ndim,pval,gpena,x)
-    f = f +pval
-    if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
     gnorm= sqrt(sprod(ndim,g,g))
     vnorm= sqrt(sprod(ndim,x,x))
     d(1:ndim)= -g(1:ndim)
@@ -291,21 +287,15 @@ contains
       if( mod(iter,niter_eval).eq.0 ) &
            call sub_eval(iter)
 !.....Update x
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,d,alpha)
-      else
-        x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
-      endif
+      x(1:ndim)= x(1:ndim) +alpha*d(1:ndim)
       s(1:ndim) = alpha*d(1:ndim)
       dx(:) = x(:) -xp(:)
       xp(:) = x(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       call wrap_ranges(ndim,x,xranges)
-      gprev(:) = g(:)
+      gp(:) = g(:)
       call grad(ndim,x,g)
-      call penalty(cpena,ndim,pval,gpena,x)
-      if( trim(cpena).eq.'ridge' ) g(:) = g(:) +gpena(:)
-      y(:) = g(:) -gprev(:)
+      y(:) = g(:) -gp(:)
       gnorm= sqrt(sprod(ndim,g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
@@ -422,9 +412,6 @@ contains
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
-    call penalty(cpena,ndim,pval,gpena,x0)
-    f = f + pval
-    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sqrt(sprod(ndim,g,g))
     xnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
@@ -467,9 +454,6 @@ contains
         call wrap_ranges(ndim,x,xranges)
         call func(ndim,x,f,ftst)
         call grad(ndim,x,g)
-        call penalty(cpena,ndim,pval,gpena,x)
-        f = f + pval
-        if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
         gnorm= sqrt(sprod(ndim,g,g))
 !!$        print *,'myid,innerstp,gnorm=',myid,innerstp,gnorm
 
@@ -500,19 +484,17 @@ contains
 
 !.....Update x
 !!$        if( trim(cpena).eq.'ridge' ) dx(:) = dx(:) -gpena(:)
-        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-          call soft_threshold(ndim,x,dx,1d0)
-        else
+!!$        if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
+!!$          call soft_threshold(ndim,x,dx,1d0)
+!!$        else
           x(1:ndim)= x(1:ndim) +dx(1:ndim)
-        endif
+!!$        endif
       enddo  ! innerstp
 
       call wrap_ranges(ndim,x,xranges)
-      call penalty(cpena,ndim,pval,gpena,x)
       dx(:) = x(:) -xp(:)
       dxnorm = sqrt(sprod(ndim,dx,dx))
       xnorm= sqrt(sprod(ndim,x,x))
-      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
 !!$      print *,'myid,iter,gnorm=',myid,iter,gnorm
 
@@ -523,11 +505,8 @@ contains
           ismask(ismpl) = mod(ismask(ismpl)+1,2)
         enddo
         call wrap_ranges(ndim,x,xranges)
-        call penalty(cpena,ndim,pvaltmp,gpenatmp,x)
         call func(ndim,x,ftmp,ftst)
-        ftmp = ftmp +pval
         call grad(ndim,x,gtmp)
-        if( trim(cpena).eq.'ridge' ) gtmp(1:ndim)= gtmp(1:ndim) +gpena(1:ndim)
         gnorm= sqrt(sprod(ndim,gtmp,gtmp))
         call sub_eval(iter)
       endif
@@ -644,12 +623,20 @@ contains
     integer:: iter,nftol,ngtol,nxtol,niter
     real(8):: alpha,fp,gnorm,gnormp,vnorm,beta,pval,sgnorm,ftst,dxnorm
     real(8),save,allocatable:: gpena(:),gp(:),y(:),xp(:),s(:),dx(:),uu(:),x(:)
-    logical:: lconverged = .false. 
+    logical:: lconverged = .false.
+    integer:: mem
 
     if( myid.eq.0 ) then
       print *,''
       print *, '********************** Conjugate Gradient (CG) '&
            //  '**********************'
+      mem = ndim*8*8
+      dmem = dmem +mem
+      if( mem > 1000000000 ) then
+        print '(a,f0.3,a)',' Memory for CG = ',float(mem)/1000000000,' GB'
+      else
+        print '(a,f0.3,a)',' Memory for CG = ',float(mem)/1000000,' MB'
+      endif
     endif
 
     if( .not.allocated(gpena) ) allocate(gpena(ndim),gp(ndim)&
@@ -667,10 +654,6 @@ contains
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,f,ftst)
     call grad(ndim,x,g)
-!.....penalty
-    call penalty(cpena,ndim,pval,gpena,x)
-    f = f + pval
-    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sprod(ndim,g,g)
     sgnorm= sqrt(gnorm)
     vnorm= sqrt(sprod(ndim,x,x))
@@ -743,19 +726,14 @@ contains
            call sub_eval(iter)
 
 !.....Update x
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,u,alpha)
-      else
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-      endif
+      x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       call wrap_ranges(ndim,x,xranges)
-      call penalty(cpena,ndim,pval,gpena,x)
 
       dx(1:ndim)= x(1:ndim) -xp(1:ndim)
       gnormp= gnorm
       gp(1:ndim)= g(1:ndim)
       call grad(ndim,x,g)
-      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
+!!$      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sprod(ndim,g,g)
       sgnorm= sqrt(gnorm)
       if( icgbtype.eq.2 ) then
@@ -798,10 +776,12 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine qn(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+  subroutine qn(ndim,x0,f,g,u,xranges,xtol,gtol,ftol,maxiter, &
+       iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
-!  Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
+!  Limited-memory Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
+!  Since BFGS is a bit too heavy for high-dimension parameters (> 10,000),
+!  adopt L-BFGS and avoid allocating ndim*ndim array.
 !
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
@@ -825,19 +805,23 @@ contains
     end interface
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
-    real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
-         ,ggy(:),gpena(:),dx(:)
+!!$    real(8),save,allocatable:: gg(:,:),x(:),s(:),y(:),gp(:) &
+!!$         ,ggy(:),gpena(:),dx(:)
+    real(8),save,allocatable:: x(:),s(:,:),y(:,:),gp(:) &
+         ,ggy(:),dx(:),q(:),rho(:),ai(:),bi(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,estmem,ftst,dxnorm
     integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter
     logical:: lconverged = .false. 
 
-    if( .not.allocated(gg) ) then
+    if( .not.allocated(y) ) then
       if(myid.eq.0) then
         print *,''
         print *, '******************************* QN(BFGS) '&
              //'*******************************'
-        estmem = (ndim*ndim +ndim*6)*8
+!!$        estmem = (ndim*ndim +ndim*6)*8
+        estmem = 8*(6*ndim +2*ndim*m_lbfgs +3*m_lbfgs)
+        dmem = dmem +estmem
         mem= estmem/1000/1000
         if( mem.eq.0 ) then
           mem= estmem/1000
@@ -848,10 +832,15 @@ contains
                ,int(estmem/1000/1000),' MB'
         endif
       endif
-      allocate(gg(ndim,ndim),x(ndim),dx(ndim) &
-           ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
+!!$      allocate(gg(ndim,ndim),x(ndim),dx(ndim) &
+!!$           ,s(ndim),y(ndim),gp(ndim),ggy(ndim),gpena(ndim))
+      allocate(x(ndim),dx(ndim),q(ndim), &
+           s(ndim,m_lbfgs),y(ndim,m_lbfgs),gp(ndim),ggy(ndim))
+      allocate(rho(m_lbfgs),ai(m_lbfgs),bi(m_lbfgs))
+      y(:,:) = 0d0
+      s(:,:) = 0d0
+      rho(:) = 0d0
     endif
-
 
 !.....initialize alpha (line minimization factor)
     alpha = 1d0
@@ -859,18 +848,15 @@ contains
     nftol= 0
     ngtol= 0
     nxtol= 0
-!.....initial G = I
-    gg(1:ndim,1:ndim)= 0d0
-    do i=1,ndim
-      gg(i,i)= 1d0
-    enddo
+!!$!.....initial G = I
+!!$    gg(1:ndim,1:ndim)= 0d0
+!!$    do i=1,ndim
+!!$      gg(i,i)= 1d0
+!!$    enddo
 
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,f,ftst)
     call grad(ndim,x0,g)
-    call penalty(cpena,ndim,pval,gpena,x0)
-    f = f + pval
-    if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
     vnorm= sqrt(sprod(ndim,x,x))
@@ -882,11 +868,13 @@ contains
          ,f,ftst,pval,vnorm,gnorm,dxnorm,f)
 
     call sub_eval(0)
+!.....Initial direction assuming H_0 == I
+    u(:) = -g(:)
     do iter=1,maxiter
-      u(1:ndim)= 0d0
-      do i=1,ndim
-        u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
-      enddo
+!!$      u(1:ndim)= 0d0
+!!$      do i=1,ndim
+!!$        u(1:ndim)= u(1:ndim) -gg(1:ndim,i)*g(i)
+!!$      enddo
 !.....store previous func and grad values
       fp= f
       gp(1:ndim)= g(1:ndim)
@@ -936,10 +924,10 @@ contains
             print *,'>>> Initialize gg because alpha was not found.'
           endif
           alpha= 1d0  ! reset alpha to 1
-          gg(1:ndim,1:ndim)= 0d0
-          do i=1,ndim
-            gg(i,i)= 1d0
-          enddo
+!!$          gg(1:ndim,1:ndim)= 0d0
+!!$          do i=1,ndim
+!!$            gg(i,i)= 1d0
+!!$          enddo
           f= fp
           iflag= iflag -100*(iflag/100)
           cycle
@@ -951,18 +939,12 @@ contains
       if( mod(iter,niter_eval).eq.0 ) &
            call sub_eval(iter)
 !.....Update x
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x,u,alpha)
-      else
-        x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
-      endif
+      x(1:ndim)= x(1:ndim) +alpha*u(1:ndim)
       call wrap_ranges(ndim,x,xranges)
-      call penalty(cpena,ndim,pval,gpena,x)
       
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
-      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
       gnorm= sqrt(sprod(ndim,g,g))
       vnorm= sqrt(sprod(ndim,x,x))
       dxnorm= sqrt(sprod(ndim,dx,dx))
@@ -976,45 +958,82 @@ contains
         return
       endif
 
-      s(1:ndim)= alpha *u(1:ndim)
-      y(1:ndim)= g(1:ndim) -gp(1:ndim)
-      ynorm= sprod(ndim,y,y)
-      if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
-           .or. abs(f-fp).lt.ftol ) then
-        if(myid.eq.0) then
-          print *,'>>> Initialize gg'
-        endif
-        gg(1:ndim,1:ndim)= 0d0
-        do i=1,ndim
-          gg(i,i)= 1d0
-        enddo
-        cycle
-      endif
+!.....Newest data is at s(:,m_lbfgs), oldest data is at s(:,1)
+      do i=2,m_lbfgs
+        s(:,i-1) = s(:,i)
+        y(:,i-1) = y(:,i)
+        rho(i-1) = rho(i)
+      enddo
+      s(:,m_lbfgs)= alpha *u(:)
+      y(:,m_lbfgs)= g(:) -gp(:)
+!!$      ynorm= sprod(ndim,y,y)
+!!$      if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
+!!$           .or. abs(f-fp).lt.ftol ) then
+!!$        if(myid.eq.0) then
+!!$          print *,'>>> Initialize gg'
+!!$        endif
+!!$        gg(1:ndim,1:ndim)= 0d0
+!!$        do i=1,ndim
+!!$          gg(i,i)= 1d0
+!!$        enddo
+!!$        cycle
+!!$      endif
 
-!.....update matrix gg
-      sy= sprod(ndim,s,y)
-      syi= 1d0/sy
-      do i=1,ndim
-        tmp1= 0d0
-        tmp2= 0d0
-        do j=1,ndim
-          tmp1= tmp1 +gg(j,i)*y(j)
-        enddo
-        ggy(i)= tmp1 *syi
-      enddo
-      b= 1d0
-      do i=1,ndim
-        b=b +y(i)*ggy(i)
-      enddo
-      b= b*syi
-!.....without temporary matrix aa
+!.....L-BFGS update
+      rho(m_lbfgs) = 0d0
       do j=1,ndim
-        do i=1,ndim
-          gg(i,j)=gg(i,j) +s(j)*s(i)*b &
-               -(s(i)*ggy(j) +ggy(i)*s(j))
-        enddo
+        rho(m_lbfgs) = rho(m_lbfgs) +y(j,m_lbfgs)*s(j,m_lbfgs)
       enddo
-    enddo
+      rho(m_lbfgs) = 1d0/rho(m_lbfgs)
+      q(:) = g(:)
+      ai(:) = 0d0
+      do i= m_lbfgs,1,-1
+        ai(i) = 0d0
+        do j=1,ndim
+          ai(i) = ai(i) + s(j,i)*q(j)
+        enddo
+        ai(i) = ai(i)*rho(i)
+        q(:) = q(:) -ai(i)*y(:,i)
+      enddo
+!.....Since H_0 == I, here we assume q = H_0*q ==> q=q
+      do i= 1,m_lbfgs
+        bi(i) = 0d0
+        do j=1,ndim
+          bi(i) = bi(i) +y(j,i)*q(j)
+        enddo
+        bi(i) = bi(i) *rho(i)
+        q(:) = q(:) +(ai(i)-bi(i))*s(:,i)
+      enddo
+      u(:) = -q(:)
+!!$      print '(a,10es10.2)','rho=',rho(:)
+!!$      print '(a,10es10.2)','ai =',ai(:)
+!!$      print '(a,10es10.2)','bi =',bi(:)
+
+!!$!.....update matrix gg in BFGS
+!!$      sy= sprod(ndim,s,y)
+!!$      syi= 1d0/sy
+!!$      do i=1,ndim
+!!$        tmp1= 0d0
+!!$        tmp2= 0d0
+!!$        do j=1,ndim
+!!$          tmp1= tmp1 +gg(j,i)*y(j)
+!!$        enddo
+!!$        ggy(i)= tmp1 *syi
+!!$      enddo
+!!$      b= 1d0
+!!$      do i=1,ndim
+!!$        b=b +y(i)*ggy(i)
+!!$      enddo
+!!$      b= b*syi
+!!$!.....without temporary matrix aa
+!!$      do j=1,ndim
+!!$        do i=1,ndim
+!!$          gg(i,j)=gg(i,j) +s(j)*s(i)*b &
+!!$               -(s(i)*ggy(j) +ggy(i)*s(j))
+!!$        enddo
+!!$      enddo
+
+    enddo  ! iter
 
     x0(1:ndim)= x(1:ndim)
     return
@@ -1130,9 +1149,7 @@ contains
 
     integer:: iter,imin,imax,ix
     real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
-    real(8),save,allocatable:: xi(:),fi(:),fti(:)
-
-    if( .not. allocated(xi) ) allocate(xi(4),fi(4),fti(4))
+    real(8):: xi(4),fi(4),fti(4)
     
     xi(1)= 0d0
     xi(2)= xi(1) +STP0
@@ -1381,21 +1398,14 @@ contains
       return
     endif
     alphai= alpha
-    call penalty(cpena,ndim,pval,gpena,x0)
 
     f0= f
     fp= f0
     do iter=1,niter_linmin
       x1(1:ndim)= x0(1:ndim)
-      if( trim(cpena).eq.'lasso' .or.trim(cpena).eq.'glasso') then
-        call soft_threshold(ndim,x1,d,alphai)
-      else
-        x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
-      endif
+      x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
       call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti)
-      call penalty(cpena,ndim,pval,gpena,x1)
-      fi = fi +pval
       if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,5es12.4)') &
            ' armijo: iter,fi,fi-f0,fi-fp,xigd*alphai,alphai=',&
            iter,fi,fi-fp,xigd*alphai,alphai
@@ -1465,15 +1475,9 @@ contains
     alphai = alpha
     do iter=1,niter_linmin
       x1(:) = x0(:)
-      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' ) then
-        call soft_threshold(ndim,x1,d,alphai)
-      else
-        x1(1:ndim) = x1(1:ndim) +alphai*d(1:ndim)
-      endif
+      x1(1:ndim) = x1(1:ndim) +alphai*d(1:ndim)
       call wrap_ranges(ndim,x1,xranges)
-      call func(ndim,x1,fti,ftsti)
-      call penalty(cpena,ndim,fpi,gpena,x1)
-      fi = fti +fpi
+      call func(ndim,x1,fi,ftsti)
       if( myid.eq.0 .and. iprint.gt.2 ) then
         print '(a,i8,5es12.4)','   iter,alphai,fi,fti,fi-f0,fi-fp = ' &
              ,iter,alphai,fi,fti,fi-f0,fi-fp
@@ -1580,13 +1584,13 @@ contains
     real(8):: alpha,gnorm,gmax,absg,sgnx,xad,val,absx,pval,fp,ftst
     real(8),allocatable,dimension(:):: xt,gpena,grpg
 
-    if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
-      if(myid.eq.0) then
-        print *,'>>> fs works only with lasso or glasso.'
-      endif
-      iflag= iflag +100
-      return
-    endif
+!!$    if( trim(cpena).ne.'lasso' .and. trim(cpena).ne.'glasso' ) then
+!!$      if(myid.eq.0) then
+!!$        print *,'>>> fs works only with lasso or glasso.'
+!!$      endif
+!!$      iflag= iflag +100
+!!$      return
+!!$    endif
 
     if( .not.allocated(xt) ) allocate(xt(ndim) &
          ,gpena(ndim),grpg(0:ngl))
@@ -1972,12 +1976,12 @@ contains
       endif
       call func(ndim,xt,f,ftst)
       call grad(ndim,xt,g)
-!.....Penalty
-      if( trim(cpena).eq.'ridge' ) then
-        call penalty(cpena,ndim,pval,gpena,xt)
-        f = f +pval
-        g(1:ndim) = g(1:ndim) +gpena(1:ndim)
-      endif
+!!$!.....Penalty
+!!$      if( trim(cpena).eq.'ridge' ) then
+!!$        call penalty(cpena,ndim,pval,gpena,xt)
+!!$        f = f +pval
+!!$        g(1:ndim) = g(1:ndim) +gpena(1:ndim)
+!!$      endif
 !.....preparation for BFGS
       gg(1:ndim,1:ndim)= 0d0
       do i=1,ndim
@@ -2095,8 +2099,6 @@ contains
         xt(1:ndim)= xt(1:ndim) +alpha*u(1:ndim)
         call wrap_ranges(ndim,xt,xranges)
         call grad(ndim,xt,g)
-        call penalty(cpena,ndim,pval,gpena,xt)
-        if( trim(cpena).eq.'ridge' ) g(1:ndim) = g(1:ndim) +gpena(1:ndim)
         do i=1,ndim
           ig= iglid(i)
           if( ig.le.0 ) cycle
@@ -2365,63 +2367,63 @@ contains
     endif
     return
   end subroutine cap_grad
-!=======================================================================
-  subroutine penalty(cpena,ndim,fp,gp,x)
-!
-! Calculate penalty term and its derivative.
-! lasso and ridge are available.
-!
-    use descriptor,only: glval,ngl,iglid
-    implicit none
-    character(len=*),intent(in):: cpena
-    integer,intent(in):: ndim
-    real(8),intent(in):: x(ndim)
-    real(8),intent(out):: fp,gp(ndim)
-
-    integer:: i,ig
-    real(8):: absx,sgnx
-    real(8),parameter:: xtiny  = 1d-14
-
-    fp= 0d0
-    gp(1:ndim)= 0d0
-    if( trim(cpena).eq.'lasso' ) then
-      do i=1,ndim
-        absx= abs(x(i))
-        fp= fp +pwgt*absx
-        sgnx= sign(1d0,x(i))
-        if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
-      enddo
-    else if( trim(cpena).eq.'glasso' ) then
-      glval(0:ngl)= 0d0
-      do i=1,ndim
-        ig= iglid(i)
-        if(ig.gt.0) glval(ig)= glval(ig) +x(i)*x(i)
-      enddo
-      glval(0)= 1d0
-      do ig=1,ngl
-        glval(ig)= sqrt(glval(ig))
-        fp= fp +pwgt*glval(ig)
-      enddo
-      do i=1,ndim
-        ig= iglid(i)
-        if( ig.eq.0 ) then ! i is not in a group
-          absx= abs(x(i))
-          sgnx= sign(1d0,x(i))
-          if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
-          fp= fp +pwgt*absx
-        else if( ig.gt.0 ) then ! i is in a group
-          if( glval(ig).gt.xtiny) gp(i)= pwgt*x(i)/glval(ig)
-        endif
-      enddo
-    else if( trim(cpena).eq.'ridge' ) then
-      do i=1,ndim
-        fp= fp +pwgt*x(i)*x(i)
-        gp(i)= 2d0*pwgt*x(i)
-      enddo
-    endif
-
-    return
-  end subroutine penalty
+!!$!=======================================================================
+!!$  subroutine penalty(cpena,ndim,fp,gp,x)
+!!$!
+!!$! Calculate penalty term and its derivative.
+!!$! lasso and ridge are available.
+!!$!
+!!$    use descriptor,only: glval,ngl,iglid
+!!$    implicit none
+!!$    character(len=*),intent(in):: cpena
+!!$    integer,intent(in):: ndim
+!!$    real(8),intent(in):: x(ndim)
+!!$    real(8),intent(out):: fp,gp(ndim)
+!!$
+!!$    integer:: i,ig
+!!$    real(8):: absx,sgnx
+!!$    real(8),parameter:: xtiny  = 1d-14
+!!$
+!!$    fp= 0d0
+!!$    gp(1:ndim)= 0d0
+!!$    if( trim(cpena).eq.'lasso' ) then
+!!$      do i=1,ndim
+!!$        absx= abs(x(i))
+!!$        fp= fp +pwgt*absx
+!!$        sgnx= sign(1d0,x(i))
+!!$        if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
+!!$      enddo
+!!$    else if( trim(cpena).eq.'glasso' ) then
+!!$      glval(0:ngl)= 0d0
+!!$      do i=1,ndim
+!!$        ig= iglid(i)
+!!$        if(ig.gt.0) glval(ig)= glval(ig) +x(i)*x(i)
+!!$      enddo
+!!$      glval(0)= 1d0
+!!$      do ig=1,ngl
+!!$        glval(ig)= sqrt(glval(ig))
+!!$        fp= fp +pwgt*glval(ig)
+!!$      enddo
+!!$      do i=1,ndim
+!!$        ig= iglid(i)
+!!$        if( ig.eq.0 ) then ! i is not in a group
+!!$          absx= abs(x(i))
+!!$          sgnx= sign(1d0,x(i))
+!!$          if( absx.gt.xtiny ) gp(i)= pwgt*sgnx
+!!$          fp= fp +pwgt*absx
+!!$        else if( ig.gt.0 ) then ! i is in a group
+!!$          if( glval(ig).gt.xtiny) gp(i)= pwgt*x(i)/glval(ig)
+!!$        endif
+!!$      enddo
+!!$    else if( trim(cpena).eq.'ridge' ) then
+!!$      do i=1,ndim
+!!$        fp= fp +pwgt*x(i)*x(i)
+!!$        gp(i)= 2d0*pwgt*x(i)
+!!$      enddo
+!!$    endif
+!!$
+!!$    return
+!!$  end subroutine penalty
 !=======================================================================
   
 end module
