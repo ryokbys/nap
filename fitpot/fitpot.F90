@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-14 11:22:18 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-14 17:43:21 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -760,7 +760,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   integer:: i,natm,num,ia,l
   real(8):: tmp,stmp(3,3)
   character(len=128):: cline
-  character(len=10):: c1,copt,ctmp1,ctmp2,ctmp3
+  character(len=10):: c1,copt,ctmp1,ctmp2,ctmp3,ctmp
 
   open(ionum,file=trim(fname),status='old')
   do while(.true.)
@@ -788,7 +788,8 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
         smpl%lsref_given = .true.
       else if( index(cline,'auxiliary_data:').ne.0 .or. &
            index(cline,'aux_data:').ne.0 ) then
-        read(cline,*) c1, copt, ctmp1, ctmp2, ctmp3
+!.....Assuming that auxiliary_data is "vx vy vz fx fy fz"
+        read(cline,*) c1, copt, ctmp, ctmp, ctmp, ctmp1, ctmp2, ctmp3
         if( trim(ctmp1).eq.'fx' .and. trim(ctmp2).eq.'fy' &
              .and. trim(ctmp3).eq.'fz' ) smpl%lfref_given = .true.
       endif

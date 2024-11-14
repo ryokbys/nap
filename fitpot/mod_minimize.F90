@@ -812,7 +812,7 @@ contains
          rho(:),ai(:),bi(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
          ,estmem,ftst,dxnorm,yy
-    integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter
+    integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter,ngg_init
     logical:: lconverged = .false.
     logical:: limited_mem = .true.  ! L-BFGS
 
@@ -863,6 +863,7 @@ contains
       do i=1,ndim
         gg(i,i)= 1d0
       enddo
+      ngg_init = 0  ! 1st init is not counted
     endif
 
     call wrap_ranges(ndim,x0,xranges)
@@ -942,6 +943,7 @@ contains
             do i=1,ndim
               gg(i,i)= 1d0
             enddo
+            ngg_init = ngg_init +1
           endif
           f= fp
           iflag= iflag -100*(iflag/100)
@@ -1016,13 +1018,20 @@ contains
         ynorm= sprod(ndim,y,y)
         if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
              .or. abs(f-fp).lt.ftol ) then
-          if(myid.eq.0) then
-            print *,'>>> Initialize gg'
+          if( ngg_init > 3 ) then
+            x0(1:ndim) = x(1:ndim)
+            if( myid.eq.0 ) print *,'>>> BFGS seems to be stacked, since gg initialized 3 times...'
+            return
+          else
+            if(myid.eq.0) then
+              print *,'>>> Initialize gg'
+            endif
           endif
           gg(1:ndim,1:ndim)= 0d0
           do i=1,ndim
             gg(i,i)= 1d0
           enddo
+          ngg_init = ngg_init +1
           cycle
         endif
 
@@ -1049,6 +1058,7 @@ contains
                  -(s(i)*ggy(j) +ggy(i)*s(j))
           enddo
         enddo
+        ngg_init = 0
       endif
 
     enddo  ! iter

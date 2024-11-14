@@ -21,8 +21,6 @@ Options:
   --velocity
              Compute velocities of atoms at time t from the diference of positions between t and t+dt. 
              This option is obsolete and it is not available in this version. [default: False]
-  --force
-             Write forces in pmdini files. [default: False]
 """
 import os
 from ase.io import read,write
@@ -40,79 +38,22 @@ def get_tag(symbol,atom_id,specorder):
     tag= float(sid) +0.1 +atom_id*1e-14
     return '{0:17.14f}'.format(tag)
 
-def write_pmdini(nsys,fname="pmdini",velocity=False):
-    hmat = nsys.get_hmat()
-    a1,a2,a3 = nsys.get_lattice_vectors()
-    specorder = nsys.specorder
-    spos= nsys.get_scaled_positions()
-    if velocity:
-        vels = nsys.get_velocities()
-    else:
-        vels = np.zeros((len(nsys),3), dtype=float)
-
-    with open(fname,'w') as f:
-        f.write('!\n')
-        f.write('!  specorder: ')
-        for s in specorder:
-            f.write(' {0:<3s}'.format(s))
-        f.write('\n')
-        f.write('!\n')
-        f.write('   1.000  \n')
-        # f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(hmat[0,0],hmat[0,1],hmat[0,2]))
-        # f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(hmat[1,0],hmat[1,1],hmat[1,2]))
-        # f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(hmat[2,0],hmat[2,1],hmat[2,2]))
-        f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(*a1))
-        f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(*a2))
-        f.write(' {0:22.14e} {1:22.14e} {2:22.14e}\n'.format(*a3))
-        f.write(' 0.00000000 0.00000000 0.00000000\n')
-        f.write(' 0.00000000 0.00000000 0.00000000\n')
-        f.write(' 0.00000000 0.00000000 0.00000000\n')
-        f.write(' {0:10d}\n'.format(len(nsys)))
-        symbols = nsys.get_symbols()
-        for i in range(len(nsys)):
-            f.write(' {0:s}'.format(get_tag(symbols[i],i+1,specorder))
-                    +' {0:12.8f} {1:12.8f} {2:12.8f}'.format(*spos[i])
-                    +' {0:12.4e} {1:12.4e} {2:12.4e}'.format(*vels[i])
-                    +'\n')
-    return None
-
-def output_for_fitpot(nsys, dirname='./', fname='pmdini',
-                      specorder=[],
-                      force=False):
+def output_for_fitpot(nsys, fname='smpl',
+                      specorder=[]):
     try:
         epot = nsys.get_potential_energy()
     except:
         print(' Failed to get_potential_energy(), so skip it.')
         return None
-    with open(dirname+'/erg.ref','w') as f:
-        f.write("{0:12.7f}\n".format(epot))
-    with open(dirname+'/frc.ref','w') as f:
-        f.write("{0:6d}\n".format(len(nsys)))
-        frcs= nsys.get_scaled_forces()
-        for frc in frcs:
-            f.write("{0:12.7f} {1:12.7f} {2:12.7f}\n".format(frc[0],frc[1],frc[2]))
-    if not os.path.exists(dirname+'/POSCAR'):
-        nappy.io.write_POSCAR(nsys, fname=dirname+'/POSCAR')
     try:
-        strs = nsys.get_stress_tensor()
+        strs = nsys.get_stress_tensor()*_kb2gpa # Convert from kBar to GPa
         strs = strs.reshape(9)[[0, 4, 8, 5, 2, 1]]
     except:
-        with open(dirname+'/WARNING','w') as f:
+        with open('WARNING','w') as f:
             f.write(' Since failed to get stress tensor, put 0.0s into strs.ref file.\n')
-        strs = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    with open(dirname+'/strs.ref','w') as f:
-        for s in strs:
-            # Convert from kBar to GPa
-            # The minus sign comes from the difference of definition betw pmd.
-            # f.write(" {0:15.7f}".format(s*(-_kb2gpa)))
-            #...It seems no need to multiply (-1).
-            f.write(" {0:15.7f}".format(s*_kb2gpa))
-        f.write('\n')
-    #write_pmdini(nsys,fname=dirname+'/pmdini')
-    nappy.io.write_pmd(nsys, fname=dirname+'/'+fname,
-                       potential_energy=epot,
-                       stress=strs,
-                       forces=force)
+        strs = np.array([ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    nappy.io.write_pmd(nsys, fname=fname,
+                       auxs=['fx','fy','fz'])
     return None
 
 def main():
@@ -123,7 +64,6 @@ def main():
     velocity = args['--velocity']
     if velocity:
         raise ValueError('velocity option is obsolete and not available in this version.')
-    force = args['--force']
 
     if specorder == 'None':
         raise ValueError('specorder must be specified.')
@@ -179,38 +119,35 @@ def main():
         for j,nsys in enumerate(nsyss):
             if j not in index:
                 continue
-            dirname = '{0:05d}/'.format(n)
-            print('  {0:s}'.format(dirname))
-            os.system('mkdir -p {0:s}'.format(dirname))
-            output_for_fitpot(nsys,dirname=dirname,
-                              specorder=specorder,
-                              force=force)
+            fname = f'smpl_{j:05d}'
+            output_for_fitpot(nsys,fname=fname,
+                              specorder=specorder)
             n += 1
-    elif sequence or type(index) is slice:  # Whole MD sequence
+    elif sequence:  # Whole MD sequence
         print(' Extracting sequence of ',len(nsyss),' steps')
         indices = []
         # for j,nsys in enumerate(nsyss):
-        for j in range(*index.indices(len(nsyss))):
-            nsys = nsyss[j]
-            dirname = '{0:05d}/'.format(j)
-            print('  {0:s}'.format(dirname))
-            os.system('mkdir -p {0:s}'.format(dirname))
-            output_for_fitpot(nsys,dirname=dirname,
-                              specorder=specorder,
-                              force=force)
-        pass
-    else:   # snapshopt
-        dirname = './'
-        if index == 0:
-            fname = 'pmdini'
-        elif index == -1:
-            fname = 'pmdfin'
+        for j,nsys in enumerate(nsyss):
+            fname = f'smpl_{j:05d}'
+            output_for_fitpot(nsys, fname=fname,
+                              specorder=specorder)
+    elif type(index) is slice:
+        indices = index.indices(len(nsyss))
+        print(' Extracting indiecs by the slice:', indices)
+        inc = 0
+        for nsys in nsyss[indices]:
+            fname = f'smpl_{inc:05d}'
+            output_for_fitpot(nsys, fname=fname,
+                              specorder=specorder)
+            inc += 1
+    else:   # snapshot
+        if index < 0:
+            fname = f'smpl_{len(nsyss)+index}'
         else:
             fname = f'pmd_{index}'
         output_for_fitpot(nsyss[index],
-                          dirname=dirname, fname=fname,
-                          specorder=specorder,
-                          force=force)
+                          fname=fname,
+                          specorder=specorder)
     return None
 
 if __name__ == "__main__":

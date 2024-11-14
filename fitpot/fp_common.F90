@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-14 11:22:09 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-14 12:14:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -858,9 +858,12 @@ contains
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch)
-!.....Stress definition, negative as compressive, positive as tensile
-    strs(1:3,1:3) = -ptnsr(1:3,1:3)
-    if( present(gws) ) gws(1:6,1:ndimp) = gws(1:6,1:ndimp) *(-up2gpa)
+!!$!.....Stress definition, negative as compressive, positive as tensile,
+!!$!     which is opposite in pmd. So multiply -1 to ptnsr and gws.
+!!$!     But this should not be corrected here, rather before converting to sample data.
+!!$    strs(1:3,1:3) = -ptnsr(1:3,1:3)
+!!$    if( present(gws) ) gws(1:6,1:ndimp) = -gws(1:6,1:ndimp)
+    strs(1:3,1:3) = ptnsr(1:3,1:3)
     if( lfdsgnmat ) call get_dsgnmat_force(smpl%dgsfa,mpi_comm_pmd)
 
     if( lvc ) smpl%charge_set = .true.

@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-13 22:08:44 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-14 12:01:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1279,7 +1279,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
       
     endif
 !.....Derivative of stress should be divided by the cell volume
-    gws(:,:) = gws(:,:) /vol
+    gws(:,:) = gws(:,:) /vol *up2gpa
   endif
 
 !      print *,'one_shot: 07'

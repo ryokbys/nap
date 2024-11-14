@@ -238,7 +238,7 @@ def read_pmd(fname:str = 'pmdini',
     nsys.atoms['ifmv']= ifmvs
     return nsys
 
-def write_pmd(nsys,fname='pmdini', **kwargs):
+def write_pmd(nsys,fname='pmdini', auxs=[], **kwargs):
     myopen, mode = get_open_func(fname,'w')
     f=myopen(fname,mode)
     f.write("#\n")
@@ -255,6 +255,16 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
         f.write('#  stress: ')
         f.write(f' {stnsr[0]:11.3e} {stnsr[1]:11.3e} {stnsr[2]:11.3e}')
         f.write(f' {stnsr[3]:11.3e} {stnsr[4]:11.3e} {stnsr[5]:11.3e}')
+        f.write('\n')
+    auxs_exist = list(nsys.atoms.columns)
+    aux_names = []
+    for aux in auxs:
+        if aux in auxs_exist:
+            aux_names.append(aux)
+    if len(aux_names) > 0:
+        f.write('#  auxiliary_data:')
+        for aux in aux_names:
+            f.write(f' {aux:s}')
         f.write('\n')
     for k,v in kwargs.items():
         if type(v) is list or type(v) is np.ndarray:
@@ -274,41 +284,29 @@ def write_pmd(nsys,fname='pmdini', **kwargs):
     f.write(" {0:10.4f} {1:10.4f} {2:10.4f}\n".format(0.0, 0.0, 0.0))
     f.write(" {0:19.15f} {1:19.15f} {2:19.15f}".format(*nsys.a3))
     f.write(" {0:10.4f} {1:10.4f} {2:10.4f}\n".format(0.0, 0.0, 0.0))
-    # # velocities of cell vectors
-    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
-    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
-    # f.write(" {0:19.15f} {1:19.15f} {2:19.15f}\n".format(0.0, 0.0, 0.0))
     # num of atoms
     f.write(" {0:10d}\n".format(len(nsys.atoms)))
     # atom positions
     poss = nsys.get_scaled_positions()
     vels = nsys.get_scaled_velocities()
-    frcs = None
-    if 'forces' in kwargs.keys() and kwargs['forces']:
-        frcs = nsys.get_scaled_forces()
     sids = nsys.atoms.sid
     if 'ifmv' not in nsys.atoms.columns:
         ifmvs = [ 1 for i in range(len(poss)) ]
     else:
         ifmvs = nsys.atoms.ifmv
+    
     for i in range(len(nsys.atoms)):
         pi = poss[i]
         vi = vels[i]
         sid = sids[i]
         ifmv = ifmvs[i]
         tag = get_tag(sid,ifmv,i+1)  # assuming ifmv=1
-        if frcs is not None:
-            fi = frcs[i]
-            f.write(" {0:18.14f}".format(tag)
-                    +"  {0:23.14e} {1:23.14e} {2:23.14e}".format(*pi)
-                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
-                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*fi)
-                    +"\n")
-        else:
-            f.write(" {0:18.14f}".format(tag)
-                    +"  {0:23.14e} {1:23.14e} {2:23.14e}".format(*pi)
-                    +"  {0:12.4e}  {1:12.4e}  {2:12.4e}".format(*vi)
-                    +"\n")
+        f.write(f' {tag:18.14f}' +
+                f' {pi[0]:23.14e} {pi[1]:23.14e} {pi[2]:23.14e}' +
+                f' {vi[0]:10.3e} {vi[1]:10.3e} {vi[2]:10.3e}')
+        for name in aux_names:
+            f.write(f' {nsys.atoms[name][i]:11.3e}')
+        f.write('\n')
     f.close()
     return None
 
