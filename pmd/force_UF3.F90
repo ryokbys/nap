@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-07 11:24:15 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-13 22:09:52 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -1404,7 +1404,7 @@ contains
       print *,'ERROR(set_params_uf3): read_params_uf3 has not been called yet.'
       stop
     endif
-    
+
 !.....Count num of coeffs in force_uf3
     ncoef = 0
     do i1b=1,n1b
@@ -1429,7 +1429,7 @@ contains
     inc = 0
     do i1b=1,n1b
       inc = inc +1
-      erg1s(i1b) = params_in(inc) 
+      erg1s(i1b) = params_in(inc)
     enddo
     do i2b=1,n2b
       do ic=1,prm2s(i2b)%ncoef

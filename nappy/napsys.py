@@ -310,6 +310,7 @@ class NAPSystem(object):
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)
         self._reset_atoms_dtypes()
+        self.assign_pbc()
         return None
 
     def remove_atoms(self,*indices):

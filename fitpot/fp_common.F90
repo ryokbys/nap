@@ -1,13 +1,13 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-08 00:49:11 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-14 11:22:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
 !
   implicit none
   save
-  real(8),allocatable:: fdiff(:,:),frcs(:,:),gtrnl(:)
+  real(8),allocatable:: fdiff(:,:),frcs(:,:),fref(:,:),fsub(:,:),gtrnl(:)
   real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
   real(8),allocatable:: gwesub(:)
   real(8):: pdiff(6), ptnsr(3,3)
@@ -107,7 +107,8 @@ contains
 
     integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
     real(8):: dn3i,ediff,eref,epot,swgt,esub,gsfmem
-    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref
+    real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
+         sref(3,3),ssub(3,3)
     real(8):: ftrnl,ftstl,ftmp,gdw,fpena
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: tergl,tfrcl,tstrsl,tmp
@@ -133,8 +134,8 @@ contains
     if( l1st ) then
       if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) then
-        allocate(fdiff(3,maxna),frcs(3,maxna))
-        dmem = dmem +8d0*size(fdiff) +8d0*size(frcs)
+        allocate(fdiff(3,maxna),frcs(3,maxna),fref(3,maxna),fsub(3,maxna))
+        dmem = dmem +8d0*size(fdiff) +8d0*size(frcs)*3
       endif
       if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
       gsfmem = 0d0
@@ -167,7 +168,7 @@ contains
            l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
           lfdsgnmat = .true.
       endif
-      
+
       call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs &
            ,rcut,lfdsgnmat)
       samples(ismpl)%epot = epot
@@ -264,13 +265,15 @@ contains
       if( lfmatch .and. smpl%nfcal.ne.0 ) then
         tmp = mpi_wtime()
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
+        fref(1:3,1:natm) = smpl%fref(1:3,1:natm)
+        fsub(1:3,1:natm) = smpl%fsub(1:3,1:natm)
         ferr = smpl%ferr
 !!$        ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
-          absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
+          absfref = sqrt(fref(1,ia)**2 +fref(2,ia)**2 +fref(3,ia)**2)
           if( cfrc_denom(1:7).eq.'abs2rel' ) then
             if( absfref.lt.force_limit ) then
               ferri = 1d0 /ferr
@@ -283,8 +286,8 @@ contains
             ferri = 1d0/ ferr
           endif
           do ixyz=1,3
-            fdiff(ixyz,ia)= (frcs(ixyz,ia)+smpl%fsub(ixyz,ia) &
-                 -(smpl%fref(ixyz,ia))) *ferri
+            fdiff(ixyz,ia)= (frcs(ixyz,ia)+fsub(ixyz,ia) &
+                 -fref(ixyz,ia)) *ferri
             if( trim(ctype_loss).eq.'Huber' ) then
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
@@ -305,9 +308,11 @@ contains
         tmp = mpi_wtime()
 !.....Compare these ptnsr elements with sref elements
         serr = smpl%serr
-!!$        serri = 1d0/serr
+        strs(:,:) = smpl%strs(:,:)
+        sref(:,:) = smpl%sref(:,:)
+        ssub(:,:) = smpl%ssub(:,:)
         pdiff(1:6) = 0d0
-        abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
+        abssref = abs(sref(1,1) + sref(2,2) + sref(3,3))/3
         if( cstrs_denom(1:7).eq.'abs2rel' ) then
           if( abssref.lt.stress_limit ) then
             serri = 1d0/ serr
@@ -325,8 +330,8 @@ contains
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
-              pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
-                   -smpl%sref(ixyz,jxyz)) *serri
+              pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  +ssub(ixyz,jxyz) &
+                   - sref(ixyz,jxyz)) *serri
             enddo
           enddo
           if( trim(ctype_loss).eq.'Huber' ) then
@@ -360,24 +365,27 @@ contains
 
     tfl = mpi_wtime() -tf0
 
-    tc0= mpi_wtime()
     ftrn= 0d0
     ftst = 0d0
+    call mpi_barrier(mpi_world,ierr)
+    tc0= mpi_wtime()
     call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    tcl = tcl + (mpi_wtime() -tc0)
     ftrn = ftrn /swgt2trn
     if( swgt2tst.gt.1d-5 ) then
       ftst = ftst /swgt2tst
     endif
-    tcl = tcl + (mpi_wtime() -tc0)
 
 !.....Penalty to function
     call func_penalty(ndim,x,fpena)
     ftrn = ftrn +fpena
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
-    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    tcg = tcl
+    tfg = tfl
+!!$    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+!!$    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
 
@@ -407,7 +415,8 @@ contains
     real(8),intent(out):: gtrn(ndim)
 
     integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3),dn3i
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3), &
+         sref(3,3),ssub(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
     real(8):: tergl, tfrcl, tstrsl, ttmp
@@ -477,10 +486,9 @@ contains
       if( smpl%iclass.ne.1 ) cycle
       call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,.false.)
       
-!.....Although epot, frcs, and strs are calculated,
-!.....only gs is required.
       if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for csmplname: ',trim(csmplname)
       lgrad_done = smpl%lgrad_done
+!.....Note: since lgrad==.true., epot, frcs, strs are not calculated in this run_pmd.
       call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
            ,lfdsgnmat,gwe,gwf,gws)
 !.....Even though gradw of uf3 potential do not change when x values are changed,
@@ -551,12 +559,14 @@ contains
       if( lfmatch ) then
         ttmp = mpi_wtime()
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
+        fref(1:3,1:natm)= smpl%fref(1:3,1:natm)
+        fsub(1:3,1:natm)= smpl%fsub(1:3,1:natm)
         ferr= smpl%ferr
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
-          absfref = sqrt(smpl%fref(1,ia)**2 +smpl%fref(2,ia)**2 +smpl%fref(3,ia)**2)
+          absfref = sqrt(fref(1,ia)**2 + fref(2,ia)**2 + fref(3,ia)**2)
           if( cfrc_denom(1:7).eq.'abs2rel' ) then
             if( absfref.lt.force_limit ) then
               ferri = 1d0 /ferr
@@ -569,8 +579,8 @@ contains
             ferri = 1d0/ ferr
           endif
           do ixyz=1,3
-            fdiff(ixyz,ia)= (frcs(ixyz,ia) +smpl%fsub(ixyz,ia) &
-                 -(smpl%fref(ixyz,ia))) *ferri
+            fdiff(ixyz,ia)= (frcs(ixyz,ia) + fsub(ixyz,ia) &
+                 -fref(ixyz,ia)) *ferri
             if( trim(ctype_loss).eq.'LS' ) then
               tmp = 2d0 *fdiff(ixyz,ia) *ferri
             else  ! Huber
@@ -591,8 +601,11 @@ contains
       if( lsmatch ) then
         ttmp = mpi_wtime()
         serr= smpl%serr
+        strs(:,:) = smpl%strs(:,:)
+        sref(:,:) = smpl%sref(:,:)
+        ssub(:,:) = smpl%ssub(:,:)
         pdiff(1:6) = 0d0
-        abssref = abs(smpl%sref(1,1)+smpl%sref(2,2)+smpl%sref(3,3))/3
+        abssref = abs(sref(1,1) + sref(2,2) + sref(3,3))/3
         if( cstrs_denom(1:7).eq.'abs2rel' ) then
           if( abssref.lt.stress_limit ) then
             serri = 1d0/ serr
@@ -610,8 +623,8 @@ contains
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
-              pdiff(k)= pdiff(k) +(smpl%strs(ixyz,jxyz) +smpl%ssub(ixyz,jxyz) &
-                   -smpl%sref(ixyz,jxyz)) *serri
+              pdiff(k)= pdiff(k) +(strs(ixyz,jxyz) + ssub(ixyz,jxyz) &
+                   - sref(ixyz,jxyz)) *serri
             enddo
           enddo
           do k=1,6
@@ -635,8 +648,9 @@ contains
     tstrs = tstrs +tstrsl
     tgl= mpi_wtime() -tg0
 
-    tc0= mpi_wtime()
     gtrn(1:ndim) = 0d0
+    call mpi_barrier(mpi_world,ierr)
+    tc0= mpi_wtime()
 !.....TODO: allreduce may be redundant,  only reducing to node-0 is enough
 !           if the minimization routine is wrtten so...
     call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
@@ -650,8 +664,10 @@ contains
     gtrn(:) = gtrn(:) +gpena(:)
 
 !.....only the bottle-neck times are taken into account
-    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
-    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    tcg = tcl
+    tgg = tgl
+!!$    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+!!$    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
     return

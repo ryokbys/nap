@@ -19,6 +19,7 @@ module minimize
   real(8):: sgd_rate_ini = 0.001d0
   real(8):: sgd_rate_fin = -0.001d0
   real(8):: sgd_eps = 1.0d-8
+!.....Parameters for ADAM and AdaBound
   real(8):: adam_b1 = 0.9d0
   real(8):: adam_b2 = 0.999d0
 
@@ -465,7 +466,7 @@ contains
           vh(:) = v(:)/(1d0-adam_b2**iter)
           dx(:) = -sgd_rate*rmh(:)/(sqrt(vh(:)) +sgd_eps)
         else if( trim(csgdupdate).eq.'adabound' ) then
-          rm(:) = adam_b1*rm(:) +(1d0 -adam_b1)*g(:)
+          rm(:) = adam_b1*rm(:) +(1d0 -adam_b1/iter)*g(:)
           v(:) = adam_b2*v(:) +(1d0 -adam_b2)*g(:)*g(:)
           rmh(:) = rm(:)/(1d0-adam_b1**iter)
           vh(:) = v(:)/(1d0-adam_b2**iter)
@@ -473,8 +474,8 @@ contains
           rate_upper = sgd_rate *(1d0 +1d0/((1d0 -adam_b2)*iter))
           if( iprint.gt.1 ) print '(a,i6,2es12.4)','iter,lower,upper=',iter,rate_lower,rate_upper
           do i=1,ndim
-            sgd_ratei = sgd_rate/(sqrt(vh(i))+sgd_eps)
-            sgd_ratei = min(max(rate_lower,sgd_ratei),rate_upper) !/sqrt(dble(iter))
+            sgd_ratei = sgd_rate/(sqrt(vh(i)) +sgd_eps)
+            sgd_ratei = min(max(rate_lower,sgd_ratei),rate_upper) /sqrt(dble(iter))
             dx(i) = -sgd_ratei*rmh(i)
           enddo
         else  ! normal SGD
@@ -810,7 +811,7 @@ contains
     real(8),save,allocatable:: si(:,:),yi(:,:),q(:), &
          rho(:),ai(:),bi(:)
     real(8):: tmp1,tmp2,b,sy,syi,fp,alpha,gnorm,ynorm,vnorm,pval &
-         ,estmem,ftst,dxnorm
+         ,estmem,ftst,dxnorm,yy
     integer:: i,j,iter,nftol,ngtol,nxtol,mem,niter
     logical:: lconverged = .false.
     logical:: limited_mem = .true.  ! L-BFGS
@@ -818,7 +819,7 @@ contains
     if( .not.allocated(x) ) then
       allocate(x(ndim),dx(ndim),gp(ndim))
       estmem = 8*3*ndim
-      if( cfmethod(1:1).eq.'b' .or. cfmethod(1:1).eq.'B' ) then ! BFGS
+      if( trim(cfmethod).eq.'bfgs' .or. trim(cfmethod).eq.'BFGS' ) then ! BFGS
         limited_mem = .false.
         allocate(gg(ndim,ndim),s(ndim),y(ndim),ggy(ndim))
         estmem = estmem +8*(ndim**2 +3*ndim)
@@ -826,7 +827,7 @@ contains
         limited_mem = .true.
         allocate(rho(m_lbfgs),si(ndim,m_lbfgs),yi(ndim,m_lbfgs), &
              q(ndim),ai(m_lbfgs),bi(m_lbfgs))
-        estmem = estmem +8*(ndim**2 +3*ndim)
+        estmem = estmem +8*(3*m_lbfgs +ndim +2*ndim*m_lbfgs)
         yi(:,:) = 0d0
         si(:,:) = 0d0
         rho(:) = 0d0
@@ -972,7 +973,10 @@ contains
         return
       endif
 
+      
       if( limited_mem ) then
+!.....L-BFGS algorithm, see wikipedia page for detail
+        
 !.....Newest data is at s(:,m_lbfgs), oldest data is at s(:,1)
         do i=2,m_lbfgs
           si(:,i-1) = si(:,i)
@@ -981,32 +985,31 @@ contains
         enddo
         si(:,m_lbfgs)= alpha *u(:)
         yi(:,m_lbfgs)= g(:) -gp(:)
-!.....L-BFGS update
+!.....Compute current rho, s*y, y*y
         rho(m_lbfgs) = 0d0
-        do j=1,ndim
-          rho(m_lbfgs) = rho(m_lbfgs) +yi(j,m_lbfgs)*si(j,m_lbfgs)
-        enddo
-        rho(m_lbfgs) = 1d0/rho(m_lbfgs)
+        yy = 0d0
+        sy = 0d0
+        rho(m_lbfgs) = 1d0/sprod(ndim,yi(1,m_lbfgs),si(1,m_lbfgs))
+        sy = sprod(ndim,si(1,m_lbfgs-1),yi(1,m_lbfgs-1))
+        yy = sprod(ndim,yi(1,m_lbfgs-1),yi(1,m_lbfgs-1))
+        if( iter.eq.1 ) then
+          u(:) = -g(:)
+          cycle
+        endif
+!.....L-BFGS update
         q(:) = g(:)
-        ai(:) = 0d0
-        do i= m_lbfgs,1,-1
-          ai(i) = 0d0
-          do j=1,ndim
-            ai(i) = ai(i) + si(j,i)*q(j)
-          enddo
-          ai(i) = ai(i)*rho(i)
+        do i= m_lbfgs-1,1,-1
+          ai(i) = rho(i) *sprod(ndim,si(1,i),q)
           q(:) = q(:) -ai(i)*yi(:,i)
         enddo
-!.....Since H_0 == I, here we assume q = H_0*q ==> q=q
-        do i= 1,m_lbfgs
-          bi(i) = 0d0
-          do j=1,ndim
-            bi(i) = bi(i) +yi(j,i)*q(j)
-          enddo
-          bi(i) = bi(i) *rho(i)
+!.....H_k^0
+        q(:) = sy/yy *q(:)
+        do i= 1,m_lbfgs-1
+          bi(i) = rho(i) *sprod(ndim,yi(1,i),q)
           q(:) = q(:) +(ai(i)-bi(i))*si(:,i)
         enddo
         u(:) = -q(:)
+        
       else  ! BFGS
         s(:)= alpha *u(:)
         y(:)= g(:) -gp(:)
