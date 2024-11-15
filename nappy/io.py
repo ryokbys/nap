@@ -1696,9 +1696,13 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
             for i, vector in enumerate(sblocks):
                 strs[i] = np.array(
                     [float(val) for val in vector.text.split()])
-            #...The definition of stress in VASP is opposite to conventional stress
-            #...and in kBar unit.
-            strs *= -0.1
+            #...The definition of stress in VASP is that
+            #     - negative when system is elongated (strain is positive)
+            #     - positive when system is compressed (strain is negative)
+            #   which is the same definition as pmd, so no need of change.
+            #...And in kBar unit.
+            # strs *= -1.0
+            strs *= 0.1
             #strs = strss.reshape(9)[[0, 4, 8, 5, 2, 1]]
         
         nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
