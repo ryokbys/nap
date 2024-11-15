@@ -258,18 +258,22 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'nsmpl_outfrc' ) then
     call read_i1(ionum,nsmpl_outfrc)
     return
+  elseif( trim(cname).eq.'weights' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp, wgte, wgtf, wgts
+    return
   elseif( trim(cname).eq.'sample_error' ) then
     backspace(ionum)
     read(ionum,*) ctmp,nserr
     allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
     call read_smpl_err(ionum,nserr,cserr,seerr,sferr,sserr)
     return
-!!$  elseif( trim(cname).eq.'sample_weight' ) then
-!!$    backspace(ionum)
-!!$    read(ionum,*) ctmp,nswgt
-!!$    allocate(cswgt(nswgt),swerg0(nswgt),swdenom(nswgt))
-!!$    call read_smpl_wgt(ionum,nswgt,cswgt,swerg0,swdenom)
-!!$    return
+  elseif( trim(cname).eq.'sample_weight' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp,nswgt
+    allocate(cswgt(nswgt),swgt0(nswgt))
+    call read_smpl_wgt(ionum,nswgt,cswgt,swgt0)
+    return
   elseif( trim(cname).eq.'compos_weight' ) then
     call read_l1(ionum,lwgt_compos)
     return
@@ -380,21 +384,21 @@ subroutine read_smpl_err(ionum,nrow,cval,eerr,ferr,serr)
 
 end subroutine read_smpl_err
 !=======================================================================
-subroutine read_smpl_wgt(ionum,nrow,cval,erg0,temp)
+subroutine read_smpl_wgt(ionum,nrow,cval,swgt)
 !
 !  Read sample weights
 !
   use util,only: num_data
   implicit none
   integer,intent(in):: ionum,nrow
-  real(8),intent(out):: erg0(nrow),temp(nrow)
+  real(8),intent(out):: swgt(nrow)
   character(len=*),intent(out):: cval(nrow)
 
 !      integer,external:: num_data
   integer:: irow
 
   do irow=1,nrow
-    read(ionum,*) cval(irow),erg0(irow),temp(irow)
+    read(ionum,*) cval(irow),swgt(irow)
   enddo
 
 end subroutine read_smpl_wgt

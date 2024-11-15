@@ -93,6 +93,11 @@ module variables
   integer,allocatable:: nalist(:),iclist(:)
   real(8),allocatable:: wgtindiv(:)
 
+!.....Relative weights bewteen energy, force, and stress
+  real(8):: wgte = 0.5d0
+  real(8):: wgtf = 0.3d0
+  real(8):: wgts = 0.2d0
+
 !.....sample error
   integer:: nserr = 0
   character(len=128),allocatable:: cserr(:)
@@ -101,7 +106,7 @@ module variables
 !.....sample weights
   integer:: nswgt = 0
   character(len=128),allocatable:: cswgt(:)
-  real(8),allocatable:: swerg0(:),swdenom(:)
+  real(8),allocatable:: swgt0(:)
 
   
   type mdsys

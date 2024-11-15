@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 00:04:47 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 07:11:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -64,6 +64,7 @@ program fitpot
 !.....GDW assumes that G's are normalized
     if( lgdw ) lnormalize = .true.
     call write_initial_setting()
+    call normalize_weights()
   endif
   call sync_input()
 
@@ -114,7 +115,7 @@ program fitpot
   call get_base_energies()
   call set_max_num_atoms()
 
-!!$  if( nswgt.gt.0 ) call set_sample_weights()
+  if( nswgt.gt.0 ) call set_sample_weights()
 
 !.....Subtract energy and forces of other force-fields
   if( nsubff.gt.0 ) then
@@ -343,26 +344,28 @@ subroutine write_initial_setting()
     print '(2x,a25,2x,l3)','compos_weight',lwgt_compos
     print '(2x,a25,2x,f6.2)','compos_weight_scale',escl_compos
   endif
-  if( nswgt.gt.0 ) then
-    write(6,'(2x,a25,2x,i5)') 'sample_weight',nswgt
-    do i=1,nswgt
-      write(6,'(4x,a23,2x,f8.4,2x,f8.1)') trim(cswgt(i)), swerg0(i), swdenom(i)
-    enddo
-  endif
 
   if( lgdw ) then
     print *,''
     write(6,'(2x,a25,2x,l3)') 'gaussian_density_weight',lgdw
     write(6,'(2x,a25,2x,es12.3)') 'GDW_sigma',gdsgm
   endif
+  if( nswgt > 0 ) then
+    write(6,'(2x,a25,2x,i0)') 'sample_weight',nswgt
+    do i=1,nswgt
+      write(6,'(4x,a23,1x,f10.4)') trim(cswgt(i)), swgt0(i)
+    enddo
+  endif
   
 !!$  write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
-  write(6,'(2x,a25,2x,i0)') 'sample_error',nserr
-  do i=1,nserr
-    write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
-  enddo
+  if( nserr > 0 ) then
+    write(6,'(2x,a25,2x,i0)') 'sample_error',nserr
+    do i=1,nserr
+      write(6,'(4x,a23,3(1x,f10.4))') trim(cserr(i)), seerr(i), sferr(i), sserr(i)
+    enddo
+  endif
   if( len(trim(crefstrct)).gt.5 ) then
     print *,''
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
@@ -2166,6 +2169,9 @@ subroutine sync_input()
   call mpi_bcast(cspcs_neglect,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(interact3,nspmax*nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(wgte,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(wgtf,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(wgts,1,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
@@ -2196,13 +2202,20 @@ subroutine sync_input()
   call mpi_bcast(maxfsrefresh,1,mpi_integer,0,mpi_world,ierr)
 
   call mpi_bcast(nserr,1,mpi_integer,0,mpi_world,ierr)
-  if( myid.gt.0 ) then
+  if( myid.ne.0 ) then
     allocate(cserr(nserr),seerr(nserr),sferr(nserr),sserr(nserr))
   endif
   call mpi_bcast(cserr,128*nserr,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sserr,nserr,mpi_real8,0,mpi_world,ierr)
+  
+  call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
+  if( myid.ne.0 ) then
+    allocate(cswgt(nserr),swgt0(nserr))
+  endif
+  call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(swgt0,nswgt,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(lwgt_compos,1,mpi_logical,0,mpi_world,ierr)
   if( lwgt_compos ) then
@@ -2313,6 +2326,24 @@ subroutine shuffle_list(nsmpl,clist,iclist,luse_iclist)
   deallocate(cltmp)
 end subroutine shuffle_list
 !=======================================================================
+subroutine normalize_weights()
+  use variables,only: wgte,wgtf,wgts,lematch,lfmatch,lsmatch
+  real(8):: denom
+
+  if( .not. lematch ) wgte = 0d0
+  if( .not. lfmatch ) wgtf = 0d0
+  if( .not. lsmatch ) wgts = 0d0
+  wgte = abs(wgte)
+  wgtf = abs(wgtf)
+  wgts = abs(wgts)
+  denom = wgte + wgtf + wgts
+  if( denom < 1d-15 ) stop 'ERROR(normalize_weights): denom < 1d-15'
+  wgte = wgte /denom
+  wgtf = wgtf /denom
+  wgts = wgts /denom
+  print '(a,3f7.3)',' Normalized weights = ',wgte,wgtf,wgts
+end subroutine normalize_weights
+!=======================================================================
 subroutine set_sample_errors()
   use variables
   use parallel
@@ -2348,7 +2379,8 @@ subroutine set_sample_weights()
     do iswgt=1,nswgt
       idx = index(samples(ismpl)%csmplname,trim(cswgt(iswgt)))
       if( idx.ne.0 ) then
-        samples(ismpl)%wgt = exp(-(erg -swerg0(iswgt))/swdenom(iswgt))
+!!$        samples(ismpl)%wgt = exp(-(erg -swerg0(iswgt))/swdenom(iswgt))
+        samples(ismpl)%wgt = swgt0(iswgt)
       endif
     enddo
 !!$    write(6,'(a,i5,a20,3es12.4)') ' ismpl,cdirname,wgt,eref,erg=' &

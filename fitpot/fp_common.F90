@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-15 22:00:21 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 07:53:07 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -13,6 +13,7 @@ module fp_common
   real(8):: pdiff(6), ptnsr(3,3)
   real(8):: epotsub
 
+  real(8):: fac_etrn,fac_ftrn,fac_strn,fac_etst,fac_ftst,fac_stst
   logical:: fp_common_initialized= .false.
 
   integer,parameter:: ivoigt(3,3)= &
@@ -28,25 +29,49 @@ module fp_common
 contains
 !=======================================================================
   subroutine init()
-    use variables,only: swgt2trn,swgt2tst,lematch,lfmatch,lsmatch
+!!$    use variables,only: swgt2trn,swgt2tst,lematch,lfmatch,lsmatch
+    use variables,only: lematch,lfmatch,lsmatch,wgte,wgtf,wgts, &
+         evtrn,fvtrn,svtrn,netrn,nftrn,nstrn, &
+         evtst,fvtst,svtst,netst,nftst,nstst
     use parallel,only: myid
 
     integer:: nterms
 
-    call calc_swgts(swgt2trn,swgt2tst)
-
-    nterms = 0
-    if( lematch ) nterms = nterms + 1
-    if( lfmatch ) nterms = nterms + 1
-    if( lsmatch ) nterms = nterms + 1
-    swgt2trn = swgt2trn*nterms
-    swgt2tst = swgt2tst*nterms
+    fac_etrn = wgte
+    fac_ftrn = wgtf
+    fac_strn = wgts
+    if( netrn > 1 ) fac_etrn = wgte /(evtrn*netrn)
+    if( nftrn > 1 ) fac_ftrn = wgtf /(fvtrn*nftrn)
+    if( nstrn > 1 ) fac_strn = wgts /(svtrn*nstrn)
+    fac_etst = wgte
+    fac_ftst = wgtf
+    fac_stst = wgts
+    if( netst > 1 ) fac_etst = wgte /(evtst*netst)
+    if( nftst > 1 ) fac_ftst = wgtf /(fvtst*nftst)
+    if( nstst > 1 ) fac_stst = wgts /(svtst*nstst)
     if( myid.eq.0 ) then
-      print *,''
-      write(6,'(a)') ' Weights to divide loss function:'
-      write(6,'(a,f10.1)') '   for training: ',swgt2trn
-      write(6,'(a,f10.1)') '   for test:     ',swgt2tst
+      write(6,'(/a)') ' Prefactors for loss function by terms (train,test):'
+      write(6,'(a,2e14.3)') '   Energy: ', fac_etrn, fac_etst
+      write(6,'(a,2e14.3)') '   Force:  ', fac_ftrn, fac_ftst
+      write(6,'(a,2e14.3)') '   Stress: ', fac_strn, fac_stst
     endif
+    
+    
+!!$
+!!$    call calc_swgts(swgt2trn,swgt2tst)
+!!$
+!!$    nterms = 0
+!!$    if( lematch ) nterms = nterms + 1
+!!$    if( lfmatch ) nterms = nterms + 1
+!!$    if( lsmatch ) nterms = nterms + 1
+!!$    swgt2trn = swgt2trn*nterms
+!!$    swgt2tst = swgt2tst*nterms
+!!$    if( myid.eq.0 ) then
+!!$      print *,''
+!!$      write(6,'(a)') ' Weights to divide loss function:'
+!!$      write(6,'(a,f10.1)') '   for training: ',swgt2trn
+!!$      write(6,'(a,f10.1)') '   for test:     ',swgt2tst
+!!$    endif
 
     fp_common_initialized = .true.
 
@@ -94,7 +119,8 @@ contains
          crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
          ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom, &
          lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs, &
-         nn_nl, nn_nhl, nn_sigtype, nn_asig
+         nn_nl, nn_nhl, nn_sigtype, nn_asig, &
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn
     use parallel
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
@@ -109,9 +135,10 @@ contains
     real(8):: dn3i,ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
-    real(8):: ftrnl,ftstl,ftmp,gdw,fpena
+    real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0
     real(8):: tergl,tfrcl,tstrsl,tmp
+!!$    real(8):: fac_e, fac_f, fac_s
     type(mdsys):: smpl
     logical,save:: l1st = .true.
     logical,parameter:: lgrad = .false.
@@ -129,6 +156,12 @@ contains
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
 
+!!$    fac_e = wgte
+!!$    fac_f = wgtf
+!!$    fac_s = wgts
+!!$    if( netrn > 1 ) fac_e = wgte /(evtrn*netrn)
+!!$    if( nftrn > 1 ) fac_f = wgtf /(fvtrn*nftrn)
+!!$    if( nstrn > 1 ) fac_s = wgts /(svtrn*nstrn)
     lfdsgnmat = .false.  ! Initialize lfdsgnmat
 
     if( l1st ) then
@@ -225,13 +258,17 @@ contains
       natm = smpl%natm
       epot = smpl%epot
       ftmp = 0d0
+      fetmp = 0d0
+      fftmp = 0d0
+      fstmp = 0d0
       swgt = smpl%wgt
 !.....Energy matching
       if( lematch ) then
         tmp = mpi_wtime()
         eref= smpl%eref
         esub= smpl%esub
-        eerr = smpl%eerr
+!!$        eerr = smpl%eerr
+        eerr = 1d0
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub &
                -(eref-erefsub*natm))/natm /eerr
@@ -247,7 +284,7 @@ contains
         else ! LS as default
           ediff= ediff*ediff
         endif
-        ftmp= ftmp +ediff *swgt
+        fetmp= fetmp +ediff *swgt
         if( iprint.gt.2 ) then
           write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,smplname,epot,eref,esub,(epot+esub)/natm= ', &
                myid,ismpl,trim(csmplname),epot,eref,esub,(epot+esub)/natm
@@ -260,7 +297,8 @@ contains
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         fref(1:3,1:natm) = smpl%fref(1:3,1:natm)
         fsub(1:3,1:natm) = smpl%fsub(1:3,1:natm)
-        ferr = smpl%ferr
+!!$        ferr = smpl%ferr
+        ferr = 1d0
 !!$        ferri = 1d0/ferr
         dn3i = 1d0/3/smpl%nfcal
         do ia=1,natm
@@ -290,7 +328,7 @@ contains
             else ! LS as default
               fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
-            ftmp= ftmp +fdiff(ixyz,ia) *dn3i *swgt *gdw
+            fftmp= fftmp +fdiff(ixyz,ia) *dn3i *swgt *gdw
           enddo
         enddo
         tfrcl = tfrcl +mpi_wtime() -tmp
@@ -300,7 +338,8 @@ contains
       if( lsmatch ) then
         tmp = mpi_wtime()
 !.....Compare these ptnsr elements with sref elements
-        serr = smpl%serr
+!!$        serr = smpl%serr
+        serr = 1d0
         strs(:,:) = smpl%strs(:,:)
         sref(:,:) = smpl%sref(:,:)
         ssub(:,:) = smpl%ssub(:,:)
@@ -335,12 +374,12 @@ contains
               else
                 pdiff(k)= pdiff(k)*pdiff(k)
               endif
-              ftmp= ftmp +pdiff(k) *swgt /6
+              fstmp= fstmp +pdiff(k) *swgt /6
             enddo
           else  ! LS as default
             do k=1,6
               pdiff(k)= pdiff(k)*pdiff(k)
-              ftmp= ftmp +pdiff(k) *swgt /6
+              fstmp= fstmp +pdiff(k) *swgt /6
             enddo
           endif
 !!$        endif
@@ -348,9 +387,9 @@ contains
       endif  ! stress matching
 
       if( smpl%iclass.eq.1 ) then
-        ftrnl = ftrnl +ftmp
+        ftrnl = ftrnl +fetmp*fac_etrn +fftmp*fac_ftrn +fstmp*fac_strn
       else if( smpl%iclass.eq.2 ) then
-        ftstl = ftstl +ftmp
+        ftstl = ftstl +fetmp*fac_etst +fftmp*fac_ftst +fstmp*fac_stst
       endif
     enddo  ! ismpl
     terg = terg + tergl
@@ -366,10 +405,10 @@ contains
     call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
     tcl = tcl + (mpi_wtime() -tc0)
-    ftrn = ftrn /swgt2trn
-    if( swgt2tst.gt.1d-5 ) then
-      ftst = ftst /swgt2tst
-    endif
+!!$    ftrn = ftrn /swgt2trn
+!!$    if( swgt2tst.gt.1d-5 ) then
+!!$      ftst = ftst /swgt2tst
+!!$    endif
 
 !.....Penalty to function
     call func_penalty(ndim,x,fpena)
@@ -400,7 +439,8 @@ contains
          ,samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit &
          ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
          ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs
+         ,ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn
     use parallel
     use minimize
     implicit none
@@ -414,6 +454,7 @@ contains
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
     real(8):: tergl, tfrcl, tstrsl, ttmp
+!!$    real(8):: fac_e, fac_f, fac_s
     type(mdsys):: smpl
     logical,parameter:: lgrad = .true.
     logical:: lgrad_done = .false.
@@ -453,6 +494,13 @@ contains
       stop
     endif
 
+!!$    fac_e = wgte
+!!$    fac_f = wgtf
+!!$    fac_s = wgts
+!!$    if( netrn > 1 ) fac_e = wgte /(evtrn*netrn)
+!!$    if( nftrn > 1 ) fac_f = wgtf /(fvtrn*nftrn)
+!!$    if( nstrn > 1 ) fac_s = wgts /(svtrn*nstrn)
+    
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
@@ -516,7 +564,9 @@ contains
         ttmp = mpi_wtime()
         eref= smpl%eref
         esub= smpl%esub
+!!$        eerr= smpl%eerr
         eerr= smpl%eerr
+        eerr = 1d0
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
           if( trim(ctype_loss).eq.'LS' ) then
@@ -529,7 +579,7 @@ contains
             endif
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
-               +tmp/natm/eerr *swgt &
+               +tmp/natm/eerr *swgt *fac_etrn &
                *(gwe(1:ndim) -gwesub(1:ndim))
 !!$               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
         else
@@ -544,7 +594,7 @@ contains
             endif
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
-               +tmp*gwe(1:ndim)/natm/eerr *swgt
+               +tmp*gwe(1:ndim)/natm/eerr *swgt *fac_etrn
 !!$               +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
         tergl = tergl +mpi_wtime() -ttmp
@@ -555,7 +605,8 @@ contains
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
         fref(1:3,1:natm)= smpl%fref(1:3,1:natm)
         fsub(1:3,1:natm)= smpl%fsub(1:3,1:natm)
-        ferr= smpl%ferr
+!!$        ferr= smpl%ferr
+        ferr= 1d0
         dn3i= 1d0/3/smpl%nfcal
         do ia=1,natm
           gdw = 1d0
@@ -585,7 +636,7 @@ contains
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *gdw
+                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *gdw *fac_ftrn
 !!$                 *smpl%gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
           enddo
         enddo
@@ -594,7 +645,8 @@ contains
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
         ttmp = mpi_wtime()
-        serr= smpl%serr
+!!$        serr= smpl%serr
+        serr= 1d0
         strs(:,:) = smpl%strs(:,:)
         sref(:,:) = smpl%sref(:,:)
         ssub(:,:) = smpl%ssub(:,:)
@@ -631,7 +683,7 @@ contains
                 tmp = 2d0 *pdiff(k) *serri 
               endif
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt /6
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt /6 *fac_strn
           enddo
 !!$        endif
         tstrsl = tstrs +mpi_wtime() -ttmp
@@ -650,7 +702,7 @@ contains
     call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
     tcl= tcl +mpi_wtime() -tc0
 
-    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
+!!$    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
 !.....Penalty
     if( .not.allocated(gpena) ) allocate(gpena(ndim))
