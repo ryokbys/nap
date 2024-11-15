@@ -822,7 +822,7 @@ contains
       if( trim(cfmethod).eq.'bfgs' .or. trim(cfmethod).eq.'BFGS' ) then ! BFGS
         limited_mem = .false.
         allocate(gg(ndim,ndim),s(ndim),y(ndim),ggy(ndim))
-        estmem = estmem +8*(ndim**2 +3*ndim)
+        estmem = estmem +8*(dble(ndim)**2 +3*ndim)
       else  ! L-BFGS
         limited_mem = .true.
         allocate(rho(m_lbfgs),si(ndim,m_lbfgs),yi(ndim,m_lbfgs), &

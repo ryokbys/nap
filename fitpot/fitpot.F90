@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-14 17:43:21 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 00:04:47 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -120,6 +120,10 @@ program fitpot
   if( nsubff.gt.0 ) then
     call subtract_FF()
   endif
+
+!.....Compute data statistics after reading ref samples and
+!     subtracting FFs if needed.
+  call get_data_stats()
 
 !!$!.....Set cffs only for pmd calculation
 !!$  if( trim(cpot).eq.'BVS' ) then
@@ -581,7 +585,7 @@ subroutine set_training_test_with_ratio()
 !!$    do ismpl=1,nsmpl
 !!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
 !!$    enddo
-    print *,''
+!!$    print *,''
     print '(a,3(2x,i0))',' Number of samples (total,training,test) = ', &
          nsmpl,nsmpl_trn,nsmpl_tst
     if( iprint.gt.1 ) print *,'Finished set_training_test_with_ratio'
@@ -788,8 +792,8 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
         smpl%lsref_given = .true.
       else if( index(cline,'auxiliary_data:').ne.0 .or. &
            index(cline,'aux_data:').ne.0 ) then
-!.....Assuming that auxiliary_data is "vx vy vz fx fy fz"
-        read(cline,*) c1, copt, ctmp, ctmp, ctmp, ctmp1, ctmp2, ctmp3
+!.....Assuming that auxiliary_data is "fx fy fz"
+        read(cline,*) c1, copt, ctmp1, ctmp2, ctmp3
         if( trim(ctmp1).eq.'fx' .and. trim(ctmp2).eq.'fy' &
              .and. trim(ctmp3).eq.'fz' ) smpl%lfref_given = .true.
       endif
@@ -1582,9 +1586,6 @@ subroutine write_stats(iter)
   real(8):: dfmaxl_tst,dfmax_tst,dfsuml_tst,dfsum_tst
   real(8):: dsmaxl_trn,dsmax_trn,dssuml_trn,dssum_trn
   real(8):: dsmaxl_tst,dsmax_tst,dssuml_tst,dssum_tst
-  real(8),save:: etrndnm,etstdnm
-  real(8),save:: ftrndnm,ftstdnm
-  real(8),save:: strndnm,ststdnm
   real(8):: er2trn,er2tst,fr2trn,fr2tst,sr2trn,sr2tst
   real(8),save:: epotsub
   character(len=128):: cnum
@@ -1606,15 +1607,15 @@ subroutine write_stats(iter)
            //'R^2(TRAINING), R^2(TEST)'
     endif
 
-    call get_r2denom(etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm)
-    if( myid.eq.0 .and. iprint.gt.1 ) then
-      print '(a,2es12.4)',' Denominator (energy) for trn, tst = ' &
-           ,etrndnm, etstdnm
-      print '(a,2es12.4)',' Denominator (force)  for trn, tst = ' &
-           ,ftrndnm, ftstdnm
-      print '(a,2es12.4)',' Denominator (stress) for trn, tst = ' &
-           ,strndnm, ststdnm
-    endif
+!!$    call get_r2denom(etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm)
+!!$    if( myid.eq.0 .and. iprint.gt.1 ) then
+!!$      print '(a,2es12.4)',' Denominator (energy) for trn, tst = ' &
+!!$           ,etrndnm, etstdnm
+!!$      print '(a,2es12.4)',' Denominator (force)  for trn, tst = ' &
+!!$           ,ftrndnm, ftstdnm
+!!$      print '(a,2es12.4)',' Denominator (stress) for trn, tst = ' &
+!!$           ,strndnm, ststdnm
+!!$    endif
 
   endif
 
@@ -1862,27 +1863,26 @@ subroutine write_stats(iter)
 !!$      print *,' dssum_trn,strndnm,sr2trn=',dssum_trn,strndnm,sr2trn
 !!$      print *,' dssum_tst,ststdnm,sr2tst=',dssum_tst,ststdnm,sr2tst
 !!$    endif
-!.....Finally write out std of reference data
-    if( l1st ) print '(a,3es12.4)',' Standard deviation of reference data ' &
-         //'(energy, force, stress) = ', &
-         sqrt(evar),sqrt(fvar),sqrt(svar)
+!!$!.....Finally write out std of reference data
+!!$    if( l1st ) print '(a,3es12.4)',' Standard deviation of reference data ' &
+!!$         //'(energy, force, stress) = ', &
+!!$         sqrt(evar),sqrt(fvar),sqrt(svar)
   endif
 
   l1st = .false.
   return
 end subroutine write_stats
 !=======================================================================
-subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
+subroutine get_data_stats()
 !
-!  Compute denominator for R^2 score.
-!  It is called only once at the 1st call of the subroutine write_stats.
+!  Compute data statistics that are used for denominators in R^2 score.
+!  It is called only once after reading ref data.
 !  Subtract fixed FF from the reference values (erg,frc,strs),
 !  to evaluate R^2 in the range of subtracted data.
 !
   use variables
   use parallel
   implicit none
-  real(8),intent(out):: etrn,etst,ftrn,ftst,strn,stst
   
   integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
   type(mdsys)::smpl
@@ -1935,8 +1935,18 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     print *,'emtrn,emtrn^2,e2mtrn,nsmpl_trn =',emtrn,emtrn**2,e2mtrn,nsmpl_trn
     print *,'emtst,emtst^2,e2mtst,nsmpl_tst =',emtst,emtst**2,e2mtst,nsmpl_tst
   endif
-  etrn = (e2mtrn -emtrn**2)*nsmpl_trn
-  etst = (e2mtst -emtst**2)*nsmpl_tst
+  evtrn = (e2mtrn -emtrn**2)
+  evtst = (e2mtst -emtst**2)
+  etrndnm = evtrn *nsmpl_trn
+  etstdnm = evtst *nsmpl_tst
+  netrn = nsmpl_trn
+  netst = nsmpl_tst
+  call mpi_bcast(evtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(evtst,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(etrndnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(etstdnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(netrn,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(netst,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force
   fsumltrn = 0d0
@@ -1980,31 +1990,36 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   call mpi_reduce(f2sumltrn,f2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(fsumltst,fsumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(f2sumltst,f2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
-  ntrn = 0
-  ntst = 0
-  call mpi_reduce(ntrnl,ntrn,1 &
+  nftrn = 0
+  nftst = 0
+  call mpi_reduce(ntrnl,nftrn,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(ntstl,ntst,1 &
+  call mpi_reduce(ntstl,nftst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  fmtrn = fsumtrn/ntrn
-  f2mtrn= f2sumtrn/ntrn
-  if( ntst.ne.0 ) then
-    fmtst = fsumtst/ntst
-    f2mtst= f2sumtst/ntst
+  fmtrn = fsumtrn/nftrn
+  f2mtrn= f2sumtrn/nftrn
+  if( nftst.ne.0 ) then
+    fmtst = fsumtst/nftst
+    f2mtst= f2sumtst/nftst
   else
     fmtst = 0d0
     f2mtst= 0d0
   endif
   if( iprint.gt.1 .and. myid.eq.0 ) then
-    print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,ntrn
-    print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,ntst
+    print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,nftrn
+    print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,nftst
   endif
-  ftrn = (f2mtrn -fmtrn**2) *ntrn
-  ftst = (f2mtst -fmtst**2) *ntst
-  
+  fvtrn = (f2mtrn -fmtrn**2)
+  fvtst = (f2mtst -fmtst**2)
+  ftrndnm = fvtrn *nftrn
+  ftstdnm = fvtst *nftst
+  call mpi_bcast(fvtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fvtst,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ftrndnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ftstdnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(nftrn,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nftst,1,mpi_integer,0,mpi_world,ierr)
 
-  strn = 0d0
-  stst = 0d0
 !.....Stress
   ssumltrn = 0d0
   s2sumltrn = 0d0
@@ -2016,7 +2031,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
     smpl = samples(ismpl)
     if( smpl%iclass.eq.1 ) then
       do ixyz=1,3
-        do jxyz=1,3
+        do jxyz=ixyz,3
 !!$          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
           tmp = smpl%sref(ixyz,jxyz)
           ssumltrn = ssumltrn +tmp
@@ -2026,7 +2041,7 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ixyz=1,3
-        do jxyz=1,3
+        do jxyz=ixyz,3
 !!$          tmp = smpl%sref(ixyz,jxyz)-smpl%ssub(ixyz,jxyz)
           tmp = smpl%sref(ixyz,jxyz)
           ssumltst = ssumltst +tmp
@@ -2044,30 +2059,44 @@ subroutine get_r2denom(etrn,etst,ftrn,ftst,strn,stst)
   call mpi_reduce(s2sumltrn,s2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(ssumltst,ssumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
   call mpi_reduce(s2sumltst,s2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
-  ntrn = 0
-  ntst = 0
-  call mpi_reduce(ntrnl,ntrn,1 &
+  nstrn = 0
+  nstst = 0
+  call mpi_reduce(ntrnl,nstrn,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(ntstl,ntst,1 &
+  call mpi_reduce(ntstl,nstst,1 &
        ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  smtrn = ssumtrn/ntrn
-  s2mtrn= s2sumtrn/ntrn
-  if( ntst.ne.0 ) then
-    smtst = ssumtst/ntst
-    s2mtst= s2sumtst/ntst
+  smtrn = ssumtrn/nstrn
+  s2mtrn= s2sumtrn/nstrn
+  if( nstst.ne.0 ) then
+    smtst = ssumtst/nstst
+    s2mtst= s2sumtst/nstst
   else
     smtst = 0d0
     s2mtst= 0d0
   endif
   if( iprint.gt.1 .and. myid.eq.0 ) then
-    print *,'smtrn,smtrn^2,s2mtrn,ntrn =',smtrn,smtrn**2,s2mtrn,ntrn
-    print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,ntst
+    print *,'smtrn,smtrn^2,s2mtrn,ntrn =',smtrn,smtrn**2,s2mtrn,nstrn
+    print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,nstst
   endif
-  strn = (s2mtrn -smtrn**2) *ntrn
-  stst = (s2mtst -smtst**2) *ntst
+  svtrn = (s2mtrn -smtrn**2)
+  svtst = (s2mtst -smtst**2)
+  strndnm = svtrn *nstrn
+  ststdnm = svtst *nstst
+  call mpi_bcast(svtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(svtst,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(strndnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(ststdnm,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(nstrn,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(nstst,1,mpi_integer,0,mpi_world,ierr)
+  if( myid.eq.0 .and. iprint.ge.1 ) then
+    print '(/a)',' Number of data (total,train,test), standard deviations (train, test):'
+    print '(a,3i10,2es12.3)', '   Energy: ',netrn+netst,netrn,netst,sqrt(evtrn),sqrt(evtst)
+    print '(a,3i10,2es12.3)', '   Force:  ',nftrn+nftst,nftrn,nftst,sqrt(fvtrn),sqrt(fvtst)
+    print '(a,3i10,2es12.3)', '   Stress: ',nstrn+nstst,nstrn,nstst,sqrt(svtrn),sqrt(svtst)
+  endif
   
   return
-end subroutine get_r2denom
+end subroutine get_data_stats
 !=======================================================================
 subroutine write_eliminated_vars()
   use variables

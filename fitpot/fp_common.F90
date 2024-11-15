@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-14 12:14:29 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-15 22:00:21 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -180,18 +180,10 @@ contains
           samples(ismpl)%nsf = nsf
           samples(ismpl)%nal = nal
           samples(ismpl)%nnl = nnl
-!!$          allocate(samples(ismpl)%gsf(nsf,nal) &
-!!$               ,samples(ismpl)%dgsf(3,nsf,0:nnl,nal) &
-!!$               ,samples(ismpl)%igsf(nsf,0:nnl,nal) )
-!!$          memgsf = memgsf +8*size(samples(ismpl)%gsf) +8*size(samples(ismpl)%dgsf) &
-!!$               +2*size(samples(ismpl)%igsf)
           allocate(samples(ismpl)%gsf(nsf,nal) )
           gsfmem = gsfmem +8d0*size(samples(ismpl)%gsf)
           dmem = dmem +gsfmem
         endif
-!!$        call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
-!!$             samples(ismpl)%nnl,samples(ismpl)%gsf, &
-!!$             samples(ismpl)%dgsf,samples(ismpl)%igsf)
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
@@ -241,7 +233,8 @@ contains
         esub= smpl%esub
         eerr = smpl%eerr
         if( len(trim(crefstrct)).gt.5 ) then
-          ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
+          ediff= (epot-epotsub*natm+esub &
+               -(eref-erefsub*natm))/natm /eerr
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
@@ -330,8 +323,9 @@ contains
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
-              pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  +ssub(ixyz,jxyz) &
-                   - sref(ixyz,jxyz)) *serri
+              pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  &
+                   +ssub(ixyz,jxyz) &
+                   -sref(ixyz,jxyz)) *serri
             enddo
           enddo
           if( trim(ctype_loss).eq.'Huber' ) then
