@@ -112,6 +112,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'force_match' ) then
     call read_l1(ionum,lfmatch)
     return
+  elseif( trim(cname).eq.'reduce_fmatch' ) then
+    call read_r1(ionum,rate_eval_frc)
+    return
   elseif( trim(cname).eq.'force_neglect_species' ) then
     call read_force_neglect_species(ionum)
     return

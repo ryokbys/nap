@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 07:53:07 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 23:53:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -435,11 +435,11 @@ contains
 !  Evaluate the gradient of loss function value
 !  using pmd (actually one_shot routine.)
 !
-    use variables,only: tgrad,ngrad,tcomm,tgrad &
-         ,samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit &
-         ,maxna,lematch,lfmatch,lsmatch,erefsub,crefstrct &
-         ,rcut,myidrefsub,isidrefsub,iprint &
-         ,ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
+    use variables,only: tgrad,ngrad,tcomm,tgrad, &
+         samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit, &
+         maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
+         rcut,myidrefsub,isidrefsub,iprint, &
+         ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
          wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn
     use parallel
     use minimize
@@ -448,7 +448,7 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i
+    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i,jfcal
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3), &
          sref(3,3),ssub(3,3),dn3i
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
@@ -470,7 +470,7 @@ contains
       dmem = dmem +8d0*size(gtrnl)
     endif
     if( .not.allocated(gwe) ) then
-      allocate(gwe(ndim),gwf(3,ndim,maxna),gws(6,ndim))
+      allocate(gwe(ndim),gwf(3,ndim,maxnf),gws(6,ndim))
       dmem = dmem +8d0*size(gwe) +8d0*size(gwf) +8d0*size(gws)
     endif
     if( len(trim(crefstrct)).gt.5 ) then
@@ -608,7 +608,10 @@ contains
 !!$        ferr= smpl%ferr
         ferr= 1d0
         dn3i= 1d0/3/smpl%nfcal
+        jfcal = 0
         do ia=1,natm
+          if( .not. smpl%lfrc_eval(ia) ) cycle
+          jfcal = jfcal +1
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 + fref(2,ia)**2 + fref(3,ia)**2)
@@ -636,10 +639,10 @@ contains
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gwf(ixyz,1:ndim,ia) *dn3i *swgt *gdw *fac_ftrn
+                 *gwf(ixyz,1:ndim,jfcal) *dn3i *swgt *gdw *fac_ftrn
 !!$                 *smpl%gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
-          enddo
-        enddo
+          enddo  ! ixyz=1,3
+        enddo  ! ia=1,natm
         tfrcl = tfrcl +mpi_wtime() -ttmp
       endif
 !.....Derivative of stress w.r.t. weights
@@ -868,7 +871,7 @@ contains
 !  Run pmd and get energy and forces of the system.
 !
     use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch, &
-         maxisp
+         maxisp,maxnf
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
     use descriptor,only: get_dsgnmat_force
@@ -886,7 +889,7 @@ contains
     real(8),intent(out):: strs(3,3)
     logical,intent(in):: lgrad,lgrad_done,lfdsgnmat
     real(8),intent(out),optional:: gwe(ndimp)
-    real(8),intent(out),optional:: gwf(3,ndimp,maxna)
+    real(8),intent(out),optional:: gwf(3,ndimp,maxnf)
     real(8),intent(out),optional:: gws(6,ndimp)
 
     logical,save:: l1st = .true.
@@ -903,7 +906,7 @@ contains
     call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &
-         gwe,gwf,gws,lematch,lfmatch,lsmatch)
+         gwe,gwf,gws,lematch,lfmatch,lsmatch,smpl%nfcal,smpl%lfrc_eval)
 !!$!.....Stress definition, negative as compressive, positive as tensile,
 !!$!     which is opposite in pmd. So multiply -1 to ptnsr and gws.
 !!$!     But this should not be corrected here, rather before converting to sample data.

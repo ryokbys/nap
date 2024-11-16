@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-07-26 10:41:33 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 22:40:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use util, only: num_data
   implicit none
@@ -106,6 +106,9 @@ contains
     endif
     do i=1,ntot
       read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
+      rtot(1,i) = pbc(rtot(1,i))
+      rtot(2,i) = pbc(rtot(2,i))
+      rtot(3,i) = pbc(rtot(3,i))
     enddo
     close(ionum)
 
@@ -214,6 +217,11 @@ contains
     read(ionum) rtot(1:3,1:ntot)
     read(ionum) vtot(1:3,1:ntot)
     close(ionum)
+    do i=1,ntot
+      rtot(1,i) = pbc(rtot(1,i))
+      rtot(2,i) = pbc(rtot(2,i))
+      rtot(3,i) = pbc(rtot(3,i))
+    enddo
 
   end subroutine read_pmdtot_bin
 !=======================================================================

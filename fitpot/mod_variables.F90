@@ -19,7 +19,7 @@ module variables
   real(8):: epsf= 1d-4
   real(8):: xtol= 1d-4
   real(8):: gtol= 1d-5
-  real(8):: ftol= 1d-5
+  real(8):: ftol= 1d-6
 !.....This specorder is the one for whole fitpot process not for each sample.
   character(len=3),dimension(nspmax):: specorder = &
        (/'x','x','x','x','x','x','x','x','x'/)
@@ -87,6 +87,8 @@ module variables
   integer:: maxnin = 0
 !.....Total num of atoms among reference samples
   integer:: natot = 0
+!.....Max num of atoms whose forces are used for force-matching
+  integer:: maxnf = 0
 
   integer:: nwgtindiv = 0
   character(len=128),allocatable:: cdirlist(:),cwgtindiv(:),csmplist(:)
@@ -108,6 +110,8 @@ module variables
   character(len=128),allocatable:: cswgt(:)
   real(8),allocatable:: swgt0(:)
 
+!.....Limit number of forces to be evaluated
+  real(8):: rate_eval_frc = 1.0d0
   
   type mdsys
     character(len=128):: cdirname
@@ -136,6 +140,8 @@ module variables
     integer:: naps(nspmax)  ! num of atoms per species
     integer:: iclass       ! 1: training,  2: test
     logical:: charge_set = .false.
+!.....Limit number of forces to be evaluated
+    logical,allocatable:: lfrc_eval(:)
 !.....Related to descriptors
     integer:: nsf,nal,nnl
     real(8),allocatable:: gsf(:,:),gsfo(:,:),dgsf(:,:,:,:)

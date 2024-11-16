@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-07-28 11:47:36 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-16 22:20:47 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -439,7 +439,7 @@ subroutine write_initial_setting()
           write(6,'(2x,a,i3,f8.2)') 'temperature_target',i,ttgt(i)
         enddo
       else
-        write(6,'(2x,a,1x,f8.2)') 'temperature_target',ttgt(1)
+        write(6,'(2x,a,5x,f8.2)') 'temperature_target',ttgt(1)
       endif
     endif
     write(6,'(2x,a,5x,f0.1)') 'temperature_relax_time',trlx

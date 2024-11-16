@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-13 22:09:52 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 23:48:40 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -898,7 +898,8 @@ contains
   end subroutine force_uf3_rec
 !=======================================================================
   subroutine gradw_uf3(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
-       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0,lgrad_done)
+       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
+       lgrad_done,nfcal,lfrc_eval)
 !
 !  Gradient of UF3 wrt weights.
 !  Note: This routine is always called in single run,
@@ -914,11 +915,14 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
+    integer,intent(in):: nfcal
+    logical,intent(in):: lfrc_eval(natm)
 
 !.....local
     integer:: i,j,k,ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
          nik,njk,nij,itot,jtot,ktot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lij,lik,ljk,ip,jra,kra
+    integer:: ifcal,jfcal,kfcal
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
          c2t,c3t,epotl1,epot1
@@ -926,7 +930,7 @@ contains
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
     real(8),save:: rcin2
-    integer,save,allocatable:: ls3b(:)
+    integer,save,allocatable:: ls3b(:),ia2ifcal(:)
 
     type(prm2):: p2
     type(prm3):: p3
@@ -934,7 +938,7 @@ contains
     if( lgrad_done ) goto 10
 
     if( .not.allocated(ls3b) ) then
-      allocate(ls3b(0:nnmax))
+      allocate(ls3b(0:nnmax),ia2ifcal(namax))
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -943,7 +947,7 @@ contains
     endif
 
     if( .not.allocated(prm2s(1)%gwe) &
-         .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*(nnmax+1)) then
+         .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
       do i2b=1,n2b
         p2 = prm2s(i2b)
         if( lematch ) then
@@ -952,7 +956,7 @@ contains
         endif
         if( lfmatch ) then
           if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
-          allocate(prm2s(i2b)%gwf(p2%ncoef,3,natm))
+          allocate(prm2s(i2b)%gwf(3,nfcal,p2%ncoef))
         endif
         if( lsmatch ) then
           if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
@@ -967,13 +971,12 @@ contains
         endif
         if( lfmatch ) then
           if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
-          allocate(prm3s(i3b)%gwf(p3%ncfij,p3%ncfik,p3%ncfjk,3,natm))
+          allocate(prm3s(i3b)%gwf(3,nfcal,p3%ncfij,p3%ncfik,p3%ncfjk))
         endif
         if( lsmatch ) then
           if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
           allocate(prm3s(i3b)%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
         endif
-
       enddo
     endif
 
@@ -981,6 +984,19 @@ contains
       deallocate(ls3b)
       allocate(ls3b(0:nnmax))
     endif
+    if( size(ia2ifcal) < namax ) then
+      deallocate(ia2ifcal)
+      allocate(ia2ifcal(namax))
+    endif
+!.....Construct ia2ifcal
+    ifcal = 0
+    ia2ifcal(:) = 0
+    do ia=1,natm
+      if( lfrc_eval(ia) ) then
+        ifcal = ifcal +1
+        ia2ifcal(ia) = ifcal
+      endif
+    enddo
 
     if( lematch ) gerg1s(:) = 0d0
     do i2b=1,n2b
@@ -1033,8 +1049,10 @@ contains
 !.....Forces
           if( lfmatch ) then
             tmp2 = dbij(lij)
-            prm2s(i2b)%gwf(n,:,ia) = prm2s(i2b)%gwf(n,:,ia) +drijj(:)*tmp2
-            prm2s(i2b)%gwf(n,:,jra) = prm2s(i2b)%gwf(n,:,jra) -drijj(:)*tmp2
+            ifcal = ia2ifcal(ia)
+            jfcal = ia2ifcal(jra)
+            prm2s(i2b)%gwf(:,ifcal,n) = prm2s(i2b)%gwf(:,ifcal,n) +drijj(:)*tmp2
+            prm2s(i2b)%gwf(:,jfcal,n) = prm2s(i2b)%gwf(:,jfcal,n) -drijj(:)*tmp2
           endif
 !.....Stresses
           if( lsmatch ) then
@@ -1121,9 +1139,12 @@ contains
                       tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
                       tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
                       tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
-                      prm3s(i3b)%gwf(nij,nik,njk,:,ia) = prm3s(i3b)%gwf(nij,nik,njk,:,ia) +(tmpij(:) +tmpik(:))
-                      prm3s(i3b)%gwf(nij,nik,njk,:,jra)= prm3s(i3b)%gwf(nij,nik,njk,:,jra)+(-tmpij(:)+tmpjk(:))
-                      prm3s(i3b)%gwf(nij,nik,njk,:,kra)= prm3s(i3b)%gwf(nij,nik,njk,:,kra)+(-tmpik(:)-tmpjk(:))
+                      ifcal = ia2ifcal(ia)
+                      jfcal = ia2ifcal(jra)
+                      kfcal = ia2ifcal(kra)
+                      prm3s(i3b)%gwf(:,ifcal,nij,nik,njk)= prm3s(i3b)%gwf(:,ifcal,nij,nik,njk)+(tmpij(:) +tmpik(:))
+                      prm3s(i3b)%gwf(:,jfcal,nij,nik,njk)= prm3s(i3b)%gwf(:,jfcal,nij,nik,njk)+(-tmpij(:)+tmpjk(:))
+                      prm3s(i3b)%gwf(:,kfcal,nij,nik,njk)= prm3s(i3b)%gwf(:,kfcal,nij,nik,njk)+(-tmpik(:)-tmpjk(:))
                     endif
 !.....Stresses
                     if( lsmatch ) then
@@ -1186,13 +1207,15 @@ contains
     
     if( lfmatch ) then  ! force matching
       do ia=1,natm
+        if( .not. lfrc_eval(ia) ) cycle
+        ifcal = ia2ifcal(ia)
         is = int(tag(ia))
         ip = iprm0 +n1b  ! no contrib. from solo term to forces
         do i2b=1,n2b
           p2 = prm2s(i2b)
           do i=1,p2%ncoef
             ip = ip +1
-            gwf(1:3,ip,ia) = gwf(1:3,ip,ia)  +p2%gwf(i,1:3,ia)
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal)  +p2%gwf(1:3,ifcal,i)
           enddo
         enddo  ! i2b
         do i3b=1,n3b
@@ -1201,7 +1224,7 @@ contains
             do j=1,p3%ncfik
               do i=1,p3%ncfij
                 ip = ip +1
-                gwf(1:3,ip,ia) = gwf(1:3,ip,ia) +p3%gwf(i,j,k,1:3,ia)
+                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,ifcal,i,j,k)
               enddo
             enddo
           enddo

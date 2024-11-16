@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-14 12:01:43 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-16 23:26:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1151,7 +1151,8 @@ end subroutine oneshot
 !=======================================================================
 subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
      ekitot,epitot,auxtot,ekin,epot,stnsr,lgrad,lgrad_done, &
-     ndimp,maxisp,gwe,gwf,gws,lematch,lfmatch,lsmatch)
+     ndimp,maxisp,gwe,gwf,gws,lematch,lfmatch,lsmatch, &
+     nfcal,lfrc_eval)
 !
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
@@ -1176,7 +1177,9 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: lgrad, lgrad_done
   integer,intent(in):: ndimp,maxisp
-  real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,ntot0),gws(6,ndimp)
+  integer,intent(in):: nfcal
+  logical,intent(in):: lfrc_eval(ntot0)
+  real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
   logical,intent(in):: lematch,lfmatch,lsmatch
 
   integer:: i,ierr,is,nspl,iprm0
@@ -1275,7 +1278,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
       iprm0 = 0
       call gradw_uf3(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
-           lgrad_done)
+           lgrad_done,nfcal,lfrc_eval)
       
     endif
 !.....Derivative of stress should be divided by the cell volume

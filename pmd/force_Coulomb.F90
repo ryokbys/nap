@@ -1,6 +1,6 @@
 module Coulomb
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-18 10:14:05 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-16 22:31:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Coulomb potential
 !
@@ -452,6 +452,7 @@ contains
           if( isp.gt.0 .and. isp.le.nspmax .and. jsp.gt.0 .and. jsp.le.nspmax ) then
             interact(isp,jsp) = .true.
             interact(jsp,isp) = .true.
+            if( iprint.ge.ipl_basic ) print '(5x,a)',trim(cspi)//'-'//trim(cspj)
           else
             if( iprint.ge.ipl_info ) print *,'  interacion read but not used: ',isp,jsp
           endif
@@ -507,6 +508,7 @@ contains
             cmode = 'interactions'
             cinteract = 'given'
             interact(1:nspmax,1:nspmax) = .false.
+            if( iprint.ge.ipl_basic ) print *,'  selected interactions:'
           else if( nentry.eq.2 ) then
             backspace(ioprms)
             read(ioprms,*) ctmp, cinteract

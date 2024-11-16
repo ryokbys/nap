@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 07:11:24 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-17 00:03:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -321,6 +321,8 @@ subroutine write_initial_setting()
   if( lfmatch ) then
     write(6,'(2x,a25,2x,a)') 'force_denom_type',trim(cfrc_denom)
     write(6,'(2x,a25,2x,es12.3)') 'force_limit',force_limit
+    if( rate_eval_frc < 1d0 -1d-8 ) write(6,'(2x,a25,2x,f6.3)') &
+         'reduce_fmatch',rate_eval_frc
   endif
   if( lsmatch ) then
     write(6,'(2x,a25,2x,a)') 'stress_denom_type',trim(cstrs_denom)
@@ -759,6 +761,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
 !
   use variables
   use util,only: num_data
+  use random,only: urnd
   implicit none 
   integer,intent(in):: ionum,ismpl
   character(len=*),intent(in):: fname
@@ -768,6 +771,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   real(8):: tmp,stmp(3,3)
   character(len=128):: cline
   character(len=10):: c1,copt,ctmp1,ctmp2,ctmp3,ctmp
+  logical:: ltmp
 
   open(ionum,file=trim(fname),status='old')
   do while(.true.)
@@ -821,11 +825,12 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
        ,smpl%fref(3,natm), smpl%fabs(natm) &
        ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
        ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%fsub(3,natm),smpl%eatm(natm) )
+       ,smpl%fsub(3,natm),smpl%eatm(natm), &
+       smpl%lfrc_eval(natm))
   dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
        +8d0*size(smpl%fref) +8d0*size(smpl%fabs) &
        +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
-       +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
+       +8d0*size(smpl%fsub) +8d0*size(smpl%eatm) +4d0*size(smpl%lfrc_eval)
   if( lgdw ) then
     allocate(smpl%gdf(natm),smpl%gdw(natm))
     dmem = dmem +8d0*size(smpl%gdf) +8d0*size(smpl%gdw)
@@ -840,10 +845,23 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
       smpl%fabs(i) = sqrt(smpl%fref(1,i)**2 +smpl%fref(2,i)**2 &
            +smpl%fref(3,i)**2)
     enddo
+!.....Limit number of forces to be evaluated if rate_eval_frc < 1.0
+    smpl%lfrc_eval(:) = .true.
+    if( rate_eval_frc < 1d0 -1d-8 .and. rate_eval_frc > 0d0 ) then
+      do i=1,smpl%natm
+        if( urnd() > rate_eval_frc ) smpl%lfrc_eval(i) = .false.
+      enddo
+!.....if all the atoms are excluded, set 1st atom to true
+      ltmp = .false.
+      do i=1,smpl%natm
+        ltmp = smpl%lfrc_eval(i)
+      enddo
+      if( .not. ltmp ) smpl%lfrc_eval(1)= .true.
+    endif
 !.....Count num of force to be calculated
     smpl%nfcal = 0
     do i=1,smpl%natm
-      smpl%nfcal = smpl%nfcal +1
+      if( smpl%lfrc_eval(i) ) smpl%nfcal = smpl%nfcal +1
     enddo
   else
     do i=1,smpl%natm
@@ -851,7 +869,6 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
     enddo
   endif
   close(ionum)
-
   
 end subroutine read_smpl
 !=======================================================================
@@ -1965,6 +1982,7 @@ subroutine get_data_stats()
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
+        if( .not. smpl%lfrc_eval(ia) ) cycle
         do l=1,3
 !!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
           tmp = smpl%fref(l,ia)
@@ -2172,6 +2190,7 @@ subroutine sync_input()
   call mpi_bcast(wgte,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(wgtf,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(wgts,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(rate_eval_frc,1,mpi_real8,0,mpi_world,ierr)
 
   call mpi_bcast(fupper_lim,1,mpi_real8,0,mpi_world,ierr)
 !.....sgd
@@ -2454,27 +2473,37 @@ subroutine subtract_ref_struct_energy()
 end subroutine subtract_ref_struct_energy
 !=======================================================================
 subroutine set_max_num_atoms()
+!
+!  Set max num of atoms among all samples.
+!  Also set max num of atoms whose force are to be used for force-matching.
+!
   use variables
   use parallel
-  integer:: ismpl, maxnal, maxninl
+  integer:: ismpl, maxnal, maxninl, maxnfl
 
   maxnal = 0
+  maxnfl = 0
   maxninl = 0
   do ismpl=isid0,isid1
     na = samples(ismpl)%natm
     maxnal = max(na,maxnal)
     maxninl = maxninl +na
+    maxnfl = max(maxnfl, samples(ismpl)%nfcal)
   enddo
   maxna = 0
+  maxnf = 0
   maxnin = 0
   natot = 0
   call mpi_allreduce(maxnal,maxna,1,mpi_integer,mpi_max,mpi_world,ierr)
+  call mpi_allreduce(maxnfl,maxnf,1,mpi_integer,mpi_max,mpi_world,ierr)
   call mpi_allreduce(maxninl,maxnin,1,mpi_integer,mpi_max,mpi_world,ierr)
   call mpi_allreduce(maxninl,natot,1,mpi_integer,mpi_sum,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
     write(6,'(a,i0)') ' Max num of atoms among samples   = ',maxna
     write(6,'(a,i0)') ' Max num of atoms among nodes     = ',maxnin
     write(6,'(a,i0)') ' Total num of atoms among samples = ',natot
+    if( lfmatch ) write(6,'(a,i0)') ' Max num of atoms whose forces' &
+         //' are used for force-matching = ',maxnf
   endif
   
 end subroutine set_max_num_atoms
