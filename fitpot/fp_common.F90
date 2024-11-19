@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 23:53:19 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-19 15:28:06 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -113,7 +113,7 @@ contains
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
     use variables,only:samples,tfunc, &
-         lematch,lfmatch,lsmatch,nfunc,tcomm,mdsys, &
+         lematch,lfmatch,lsmatch,nfunc,tcomm,twait,mdsys, &
          swgt2trn,swgt2tst,cpot, &
          nff,cffs,maxna,rcut,force_limit,stress_limit, &
          crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
@@ -125,18 +125,17 @@ contains
     use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
     use DNN,only: nlayer, nhl, itypesig, asig
-    use UF3,only: get_mem_uf3
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl
-    real(8):: dn3i,ediff,eref,epot,swgt,esub,gsfmem
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,jfcal
+    real(8):: ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
     real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp
-    real(8):: tfl,tcl,tfg,tcg,tf0,tc0
+    real(8):: tfl,tcl,tfg,tcg,tf0,tc0,tw0,twl,twg,tsmp0
     real(8):: tergl,tfrcl,tstrsl,tmp
 !!$    real(8):: fac_e, fac_f, fac_s
     type(mdsys):: smpl
@@ -183,6 +182,7 @@ contains
     endif
 
     do ismpl=isid0,isid1
+      tsmp0 = mpi_wtime()
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
       endif
@@ -201,9 +201,11 @@ contains
            l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
           lfdsgnmat = .true.
       endif
+!!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl 01=',myid,ismpl,mpi_wtime()-tsmp0
 
       call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs &
            ,rcut,lfdsgnmat)
+!!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl 02=',myid,ismpl,mpi_wtime()-tsmp0
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
@@ -220,9 +222,7 @@ contains
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
-      if( l1st .and. (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') ) then
-        dmem = dmem + get_mem_uf3()
-      endif
+!!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl=',myid,ismpl,mpi_wtime()-tsmp0
     enddo  ! ismpl
 
     if( l1st .and. index(cpot,'NN').ne.0 ) then
@@ -300,8 +300,10 @@ contains
 !!$        ferr = smpl%ferr
         ferr = 1d0
 !!$        ferri = 1d0/ferr
-        dn3i = 1d0/3/smpl%nfcal
+        jfcal = 0
         do ia=1,natm
+          if( .not. smpl%lfrc_eval(ia) ) cycle
+          jfcal = jfcal +1
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 +fref(2,ia)**2 +fref(3,ia)**2)
@@ -328,7 +330,7 @@ contains
             else ! LS as default
               fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
-            fftmp= fftmp +fdiff(ixyz,ia) *dn3i *swgt *gdw
+            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw
           enddo
         enddo
         tfrcl = tfrcl +mpi_wtime() -tmp
@@ -374,12 +376,12 @@ contains
               else
                 pdiff(k)= pdiff(k)*pdiff(k)
               endif
-              fstmp= fstmp +pdiff(k) *swgt /6
+              fstmp= fstmp +pdiff(k) *swgt
             enddo
           else  ! LS as default
             do k=1,6
               pdiff(k)= pdiff(k)*pdiff(k)
-              fstmp= fstmp +pdiff(k) *swgt /6
+              fstmp= fstmp +pdiff(k) *swgt
             enddo
           endif
 !!$        endif
@@ -398,9 +400,12 @@ contains
 
     tfl = mpi_wtime() -tf0
 
+    tw0 = mpi_wtime()
+    call mpi_barrier(mpi_world,ierr)
+    twl = mpi_wtime() -tw0
+
     ftrn= 0d0
     ftst = 0d0
-    call mpi_barrier(mpi_world,ierr)
     tc0= mpi_wtime()
     call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
@@ -417,10 +422,13 @@ contains
 !.....only the bottle-neck times are taken into account
     tcg = tcl
     tfg = tfl
-!!$    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
-!!$    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    twg = twl
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    call mpi_reduce(tfl,tfg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    call mpi_reduce(twl,twg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tfunc= tfunc +tfg
+    twait= twait +twg
 
     if( l1st .and. myid.eq.0 .and. iprint.gt.1 ) then
       print '(a,f0.3,a)',' Memory for gsfs = ',gsfmem/1000/1000,' MB'
@@ -435,33 +443,35 @@ contains
 !  Evaluate the gradient of loss function value
 !  using pmd (actually one_shot routine.)
 !
-    use variables,only: tgrad,ngrad,tcomm,tgrad, &
+    use variables,only: tgrad,ngrad,tcomm,tgrad,twait, &
          samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit, &
          maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
          rcut,myidrefsub,isidrefsub,iprint, &
          ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
-         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot
     use parallel
     use minimize
+    use UF3,only: get_mem_uf3, dealloc_gwx_uf3
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i,jfcal
-    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,epot,esub,strs(3,3), &
-         sref(3,3),ssub(3,3),dn3i
+    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i,jfcal,nfcal
+    real(8):: tcl,tgl,tcg,tgg,tc0,tg0,tw0,twl,twg,tsmp0, &
+         epot,esub,strs(3,3), &
+         sref(3,3),ssub(3,3)
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
     real(8):: absfref,abssref
     real(8):: tergl, tfrcl, tstrsl, ttmp
-!!$    real(8):: fac_e, fac_f, fac_s
     type(mdsys):: smpl
+    logical,save:: l1st = .true.
     logical,parameter:: lgrad = .true.
     logical:: lgrad_done = .false.
     logical,parameter:: lfdsgnmat = .false.
     character(len=128):: csmplname
     real(8),allocatable,save:: gpena(:)
-
+    
     logical,external:: string_in_arr
 
     call flush(6)
@@ -494,13 +504,6 @@ contains
       stop
     endif
 
-!!$    fac_e = wgte
-!!$    fac_f = wgtf
-!!$    fac_s = wgts
-!!$    if( netrn > 1 ) fac_e = wgte /(evtrn*netrn)
-!!$    if( nftrn > 1 ) fac_f = wgtf /(fvtrn*nftrn)
-!!$    if( nstrn > 1 ) fac_s = wgts /(svtrn*nstrn)
-    
     if( len(trim(crefstrct)).gt.5 ) then
       if( myid.eq.myidrefsub ) then
         epotsub = samples(isidrefsub)%epot +samples(isidrefsub)%esub
@@ -516,46 +519,66 @@ contains
     tfrcl = 0d0
     tstrsl = 0d0
     do ismpl=isid0,isid1
+      tsmp0 = mpi_wtime()
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
       endif
       smpl = samples(ismpl)
       natm= smpl%natm
+      nfcal = smpl%nfcal
       csmplname = smpl%csmplname
       if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,csmplname=',myid,ismpl,trim(csmplname)
+
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,.false.)
       
-      if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for csmplname: ',trim(csmplname)
-      lgrad_done = smpl%lgrad_done
+      if( (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') &
+           .and. (allocated(samples(ismpl)%gwe) .or. allocated(samples(ismpl)%gwf) &
+           .or. allocated(samples(ismpl)%gws) ) ) then
+        if( lematch ) gwe(:) = smpl%gwe(:)
+        if( lfmatch ) gwf(:,:,1:nfcal) = smpl%gwf(:,:,1:nfcal)
+        if( lsmatch ) gws(:,:) = smpl%gws(:,:)
+      else
+        call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,.false.)
+        if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for csmplname: ',trim(csmplname)
+        lgrad_done = smpl%lgrad_done
 !.....Note: since lgrad==.true., epot, frcs, strs are not calculated in this run_pmd.
-      call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
-           ,lfdsgnmat,gwe,gwf,gws)
-!.....Even though gradw of uf3 potential do not change when x values are changed,
-!     gradw variables cannot be stored in force_uf3 module for each sample.
-!     Thus gradw variables must be computed every time for each sample,
-!     otherwise store them in memory or storage, which can be huge more than tens of GB.
-!!$      do iff=1,nff
-!!$        if( trim(cffs(iff)).eq.'UF3' .or. trim(cffs(iff)).eq.'uf3' ) then
-!!$          samples(ismpl)%lgrad_done = .true.
-!!$        endif
-!!$      enddo
+        call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
+             ,lfdsgnmat,gwe,gwf,gws)
+        if( (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') ) then
+!!$          allocate(samples(ismpl)%gwe(ndim), samples(ismpl)%gwf(3,ndim,maxnf), &
+!!$               samples(ismpl)%gws(6,ndim))
+!!$          dmem = dmem +4d0*(size(gwe) +size(gwf) +size(gws))
+          if( lematch ) then
+            if( .not.allocated(samples(ismpl)%gwe) ) allocate(samples(ismpl)%gwe(ndim))
+            samples(ismpl)%gwe(:)= gwe(:)
+            dmem = dmem +4d0*size(gwe)
+          endif
+          if( lfmatch ) then
+            if( .not.allocated(samples(ismpl)%gwf) ) allocate(samples(ismpl)%gwf(3,ndim,maxnf))
+            samples(ismpl)%gwf(:,:,1:nfcal)= gwf(:,:,1:nfcal)
+            dmem = dmem +4d0*size(gwf)
+          endif
+          if( lsmatch ) then
+            if( .not.allocated(samples(ismpl)%gws) ) allocate(samples(ismpl)%gws(6,ndim))
+            samples(ismpl)%gws(:,:)= gws(:,:)
+            dmem = dmem +4d0*size(gwf)
+          endif
+        endif
+      endif
       
-!!$      smpl%gwe(:)= gwe(:)
-!!$      smpl%gwf(:,:,1:natm)= gwf(:,:,1:natm)
-!!$      smpl%gws(:,:)= gws(:,:)
 !!$    enddo  ! ismpl
 !!$
 !!$    do ismpl=isid0,isid1
 !!$      if( allocated(ismask) ) then
 !!$        if( ismask(ismpl).ne.0 ) cycle
 !!$      endif
-!!$      smpl= smpl
-!.....Since g calc is time consuming,
-!.....not calculate g for test set.
-      if( smpl%iclass.ne.1 ) cycle
+!!$      smpl= samples(ismpl)
+!!$!.....Since g calc is time consuming,
+!!$!.....not calculate g for test set.
+!!$      if( smpl%iclass.ne.1 ) cycle
+      
       natm= smpl%natm
       epot= smpl%epot
       swgt= smpl%wgt
@@ -607,7 +630,6 @@ contains
         fsub(1:3,1:natm)= smpl%fsub(1:3,1:natm)
 !!$        ferr= smpl%ferr
         ferr= 1d0
-        dn3i= 1d0/3/smpl%nfcal
         jfcal = 0
         do ia=1,natm
           if( .not. smpl%lfrc_eval(ia) ) cycle
@@ -639,8 +661,7 @@ contains
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gwf(ixyz,1:ndim,jfcal) *dn3i *swgt *gdw *fac_ftrn
-!!$                 *smpl%gwf(ixyz,1:ndim,ia) *dn3i *swgt *ferri *gdw
+                 *gwf(ixyz,1:ndim,jfcal) *swgt *gdw *fac_ftrn
           enddo  ! ixyz=1,3
         enddo  ! ia=1,natm
         tfrcl = tfrcl +mpi_wtime() -ttmp
@@ -686,19 +707,24 @@ contains
                 tmp = 2d0 *pdiff(k) *serri 
               endif
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt /6 *fac_strn
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt *fac_strn
           enddo
 !!$        endif
         tstrsl = tstrs +mpi_wtime() -ttmp
       endif
+!!$      print '(a,3i5,f8.4)','grad: myid,ismpl,nfcal,tsmpl=',myid,ismpl,smpl%nfcal,mpi_wtime()-tsmp0
     enddo  ! ismpl
+
     terg = terg +tergl
     tfrc = tfrc +tfrcl
     tstrs = tstrs +tstrsl
     tgl= mpi_wtime() -tg0
 
-    gtrn(1:ndim) = 0d0
+    tw0 = mpi_wtime()
     call mpi_barrier(mpi_world,ierr)
+    twl = mpi_wtime() -tw0
+
+    gtrn(1:ndim) = 0d0
     tc0= mpi_wtime()
 !.....TODO: allreduce may be redundant,  only reducing to node-0 is enough
 !           if the minimization routine is wrtten so...
@@ -715,10 +741,24 @@ contains
 !.....only the bottle-neck times are taken into account
     tcg = tcl
     tgg = tgl
-!!$    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
-!!$    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    twg = twl
+    call mpi_reduce(tcl,tcg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    call mpi_reduce(tgl,tgg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
+    call mpi_reduce(twl,twg,1,mpi_real8,mpi_max,0,mpi_world,ierr)
     tcomm= tcomm +tcg
     tgrad= tgrad +tgg
+    twait= twait +twg
+
+    if( l1st ) then
+      if( trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') then
+        dmem = dmem + get_mem_uf3()
+      endif
+    endif
+    
+    if( trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') then
+      call dealloc_gwx_uf3()
+    endif
+    l1st = .false.
     return
   end subroutine grad_w_pmd
 !=======================================================================
@@ -816,10 +856,12 @@ contains
     endif
 
 !.....init_force would perform read_params_XXX for force_XXX.F90 in it.
-    call init_force(.true.)
-    call set_cauxarr()
-    if( .not.allocated(smpl%aux) ) then
-      allocate(smpl%aux(naux,smpl%natm))
+    if( l1st ) then
+      call init_force(.true.)
+      call set_cauxarr()
+      if( .not.allocated(smpl%aux) ) then
+        allocate(smpl%aux(naux,smpl%natm))
+      endif
     endif
 
     do i=1,nff
@@ -903,7 +945,7 @@ contains
     logical,external:: string_in_arr
 
 !.....one_shot force calculation
-    call oneshot4fitpot(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
+    call oneshot4fp(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch,smpl%nfcal,smpl%lfrc_eval)

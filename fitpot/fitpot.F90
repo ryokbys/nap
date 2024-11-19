@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-17 00:03:19 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-19 15:40:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -25,6 +25,7 @@ program fitpot
   call mpi_comm_rank(mpi_comm_world,myid,ierr)
   mpi_world= mpi_comm_world
   tcomm= 0d0
+  twait= 0d0
   terg = 0d0
   tfrc = 0d0
   tstrs = 0d0
@@ -251,10 +252,20 @@ program fitpot
 99 if( myid.eq.0 ) then
     write(6,'(a,2(2x,i0))') ' Number of func and grad calls =',nfunc, ngrad
 !!$    write(6,'(a,i0)') ' Number of grad calls = ',ngrad
-    write(6,'(a,f13.3,a)') ' Memory/proc = ',dmem/1000/1000,' MB'
-    write(6,'(a,f15.3,a)') ' Time func = ', tfunc,' sec'
-    write(6,'(a,f15.3,a)') ' Time grad = ', tgrad,' sec'
-    write(6,'(a,f15.3,a)') ' Time comm = ', tcomm,' sec'
+    if( dmem > 1d+9 ) then
+      write(6,'(a,f19.3,a)') ' Memory/proc = ',dmem/1d+9,' GB'
+      write(6,'(a,f17.3,a)') ' Memory(total) = ',nnode*dmem/1d+9,' GB'
+    else if( dmem > 1d+6 ) then
+      write(6,'(a,f19.1,a)') ' Memory/proc = ',dmem/1d+6,' MB'
+      write(6,'(a,f17.1,a)') ' Memory(total) = ',nnode*dmem/1d+6,' MB'
+    else
+      write(6,'(a,f19.1,a)') ' Memory/proc = ',dmem/1d+3,' kB'
+      write(6,'(a,f17.1,a)') ' Memory(total) = ',nnode*dmem/1d+3,' kB'
+    endif
+    write(6,'(a,f15.3,a)') ' Time func (max) = ', tfunc,' sec'
+    write(6,'(a,f15.3,a)') ' Time grad (max) = ', tgrad,' sec'
+    write(6,'(a,f15.3,a)') ' Time comm (max) = ', tcomm,' sec'
+    write(6,'(a,f15.3,a)') ' Time wait (max) = ', twait,' sec'
     tmp = mpi_wtime() -time0
     ihour = int(tmp/3600)
     imin  = int((tmp-ihour*3600)/60)
@@ -847,7 +858,9 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
     enddo
 !.....Limit number of forces to be evaluated if rate_eval_frc < 1.0
     smpl%lfrc_eval(:) = .true.
-    if( rate_eval_frc < 1d0 -1d-8 .and. rate_eval_frc > 0d0 ) then
+    if( rate_eval_frc < 1d0 -1d-8 &
+         .and. rate_eval_frc > 0d0 &
+         .and. lfmatch ) then
       do i=1,smpl%natm
         if( urnd() > rate_eval_frc ) smpl%lfrc_eval(i) = .false.
       enddo
@@ -2210,6 +2223,8 @@ subroutine sync_input()
   call mpi_bcast(icgbtype,1,mpi_integer,0,mpi_world,ierr)
 !.....L-BFGS
   call mpi_bcast(m_lbfgs,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(fac_inc,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fac_dec,1,mpi_real8,0,mpi_world,ierr)
 !.....Armijo
   call mpi_bcast(armijo_xi,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_tau,1,mpi_real8,0,mpi_world,ierr)

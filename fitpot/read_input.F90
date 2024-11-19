@@ -258,6 +258,12 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'m_lbfgs' ) then
     call read_i1(ionum,m_lbfgs)
     return
+  elseif( trim(cname).eq.'fac_dec' ) then
+    call read_r1(ionum,fac_dec)
+    return
+  elseif( trim(cname).eq.'fac_inc' ) then
+    call read_r1(ionum,fac_inc)
+    return
   elseif( trim(cname).eq.'nsmpl_outfrc' ) then
     call read_i1(ionum,nsmpl_outfrc)
     return

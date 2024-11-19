@@ -834,8 +834,13 @@ contains
       endif
       if(myid.eq.0) then
         print *,''
-        print *, '******************************* QN(BFGS) '&
-             //'*******************************'
+        if( limited_mem ) then
+          print *, '******************************* QN (L-BFGS) '&
+               //'*******************************'
+        else
+          print *, '******************************* QN (BFGS) '&
+               //'*******************************'
+        endif
 !!$        estmem = (ndim*ndim +ndim*6)*8
 !!$        estmem = 8*(6*ndim +2*ndim*m_lbfgs +3*m_lbfgs)
         dmem = dmem +estmem

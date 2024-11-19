@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 23:48:40 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-18 16:25:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -62,6 +62,8 @@ module UF3
   logical:: has_solo = .false.
   real(8):: rcmax = 0.0d0
 
+  real(8),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
+  integer,allocatable:: ls3b(:)
   
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
@@ -424,16 +426,19 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save,allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
-    real(8),save:: rcin2
-    integer,save,allocatable:: ls3b(:)
+    real(8),save:: rcin2 = -1d0
 
     type(prm2):: p2
     type(prm3):: p3
 
-    if( l1st ) then
-      if( allocated(aal2) ) deallocate(aal2,aal3,strsl,ls3b)
-      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+!.....Do not use l1st to detect memory allocation check.
+!!$    if( l1st ) then
+!!$      if( allocated(aal2) ) deallocate(aal2,aal3,strsl,ls3b)
+!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+!!$      
+!!$    endif
+
+    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
         if( myid == 0 ) then
           write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
@@ -445,11 +450,13 @@ contains
       rcin2 = rcin*rcin
     endif
 
+    if( .not.allocated(aal2) ) then
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+    endif
     if( size(aal2) < 3*namax ) then
       deallocate(aal2,aal3,strsl)
       allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
     endif
-
     if( size(ls3b) < nnmax+1 ) then
       deallocate(ls3b)
       allocate(ls3b(0:nnmax))
@@ -681,7 +688,6 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save,allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
     real(8),save:: rcin2
 
     type(prm2):: p2
@@ -913,10 +919,10 @@ contains
     real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
     real(8),intent(inout):: rcin
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
-    logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
     integer,intent(in):: nfcal
     logical,intent(in):: lfrc_eval(natm)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
     integer:: i,j,k,ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
@@ -925,20 +931,20 @@ contains
     integer:: ifcal,jfcal,kfcal
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t,epotl1,epot1
+         c2t,c3t,epotl1,epot1,ttmp
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save:: rcin2
-    integer,save,allocatable:: ls3b(:),ia2ifcal(:)
+    real(8),save:: rcin2 = -1d0
+    integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
     type(prm3):: p3
 
     if( lgrad_done ) goto 10
 
-    if( .not.allocated(ls3b) ) then
-      allocate(ls3b(0:nnmax),ia2ifcal(namax))
+    if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
+    if( rcin2 < 0d0 ) then
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -948,19 +954,23 @@ contains
 
     if( .not.allocated(prm2s(1)%gwe) &
          .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
+      tmp = 0d0
       do i2b=1,n2b
         p2 = prm2s(i2b)
         if( lematch ) then
           if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
           allocate(prm2s(i2b)%gwe(p2%ncoef))
+          tmp = tmp +size(prm2s(i2b)%gwe)*8d0
         endif
         if( lfmatch ) then
           if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
-          allocate(prm2s(i2b)%gwf(3,nfcal,p2%ncoef))
+          allocate(prm2s(i2b)%gwf(3,p2%ncoef,nfcal))
+          tmp = tmp +size(prm2s(i2b)%gwf)*8d0
         endif
         if( lsmatch ) then
           if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
           allocate(prm2s(i2b)%gws(6,p2%ncoef))
+          tmp = tmp +size(prm2s(i2b)%gws)*8d0
         endif
       enddo
       do i3b=1,n3b
@@ -968,16 +978,20 @@ contains
         if( lematch ) then
           if( allocated(prm3s(i3b)%gwe) ) deallocate(prm3s(i3b)%gwe)
           allocate(prm3s(i3b)%gwe(p3%ncfij,p3%ncfik,p3%ncfjk))
+          tmp = tmp +size(prm3s(i3b)%gwe)*8d0
         endif
         if( lfmatch ) then
           if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
-          allocate(prm3s(i3b)%gwf(3,nfcal,p3%ncfij,p3%ncfik,p3%ncfjk))
+          allocate(prm3s(i3b)%gwf(3,p3%ncfij,p3%ncfik,p3%ncfjk,nfcal))
+          tmp = tmp +size(prm3s(i3b)%gwf)*8d0
         endif
         if( lsmatch ) then
           if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
           allocate(prm3s(i3b)%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
+          tmp = tmp +size(prm3s(i3b)%gws)*8d0
         endif
       enddo
+!!$      print '(a,f10.3,a)','gradw_uf3: allocate, tmp=',tmp/1000/1000,'MB'
     endif
 
     if( size(ls3b) < nnmax+1 ) then
@@ -1009,6 +1023,8 @@ contains
       if( lfmatch ) prm3s(i3b)%gwf(:,:,:,:,:) = 0d0
       if( lsmatch ) prm3s(i3b)%gws(:,:,:,:) = 0d0
     enddo
+
+    ttmp = mpi_wtime()
 
     do ia=1,natm
       is = int(tag(ia))
@@ -1043,7 +1059,7 @@ contains
         do lij = -3,0
           n = nr2 +lij
           if( n < 1 .or. n > p2%nknot-4 ) cycle
-          c2t = p2%coefs(n)
+!!$          c2t = p2%coefs(n)
 !.....Energy
           if( lematch ) prm2s(i2b)%gwe(n) = prm2s(i2b)%gwe(n) +bij(lij)
 !.....Forces
@@ -1051,8 +1067,10 @@ contains
             tmp2 = dbij(lij)
             ifcal = ia2ifcal(ia)
             jfcal = ia2ifcal(jra)
-            prm2s(i2b)%gwf(:,ifcal,n) = prm2s(i2b)%gwf(:,ifcal,n) +drijj(:)*tmp2
-            prm2s(i2b)%gwf(:,jfcal,n) = prm2s(i2b)%gwf(:,jfcal,n) -drijj(:)*tmp2
+            if( ifcal.ne.0 ) prm2s(i2b)%gwf(:,n,ifcal) = prm2s(i2b)%gwf(:,n,ifcal) +drijj(:)*tmp2
+            if( jfcal.ne.0 ) prm2s(i2b)%gwf(:,n,jfcal) = prm2s(i2b)%gwf(:,n,jfcal) -drijj(:)*tmp2
+!!$            prm2s(i2b)%gwf(:,n,ia)  = prm2s(i2b)%gwf(:,n,ia) +drijj(:)*tmp2
+!!$            prm2s(i2b)%gwf(:,n,jra) = prm2s(i2b)%gwf(:,n,jra) -drijj(:)*tmp2
           endif
 !.....Stresses
           if( lsmatch ) then
@@ -1142,9 +1160,15 @@ contains
                       ifcal = ia2ifcal(ia)
                       jfcal = ia2ifcal(jra)
                       kfcal = ia2ifcal(kra)
-                      prm3s(i3b)%gwf(:,ifcal,nij,nik,njk)= prm3s(i3b)%gwf(:,ifcal,nij,nik,njk)+(tmpij(:) +tmpik(:))
-                      prm3s(i3b)%gwf(:,jfcal,nij,nik,njk)= prm3s(i3b)%gwf(:,jfcal,nij,nik,njk)+(-tmpij(:)+tmpjk(:))
-                      prm3s(i3b)%gwf(:,kfcal,nij,nik,njk)= prm3s(i3b)%gwf(:,kfcal,nij,nik,njk)+(-tmpik(:)-tmpjk(:))
+                      if( ifcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,ifcal) &
+                           = prm3s(i3b)%gwf(:,nij,nik,njk,ifcal)+(tmpij(:) +tmpik(:))
+                      if( jfcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,jfcal) &
+                           = prm3s(i3b)%gwf(:,nij,nik,njk,jfcal)+(-tmpij(:)+tmpjk(:))
+                      if( kfcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,kfcal) &
+                           = prm3s(i3b)%gwf(:,nij,nik,njk,kfcal)+(-tmpik(:)-tmpjk(:))
+!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,ia )= prm3s(i3b)%gwf(:,nij,nik,njk,ia)+(tmpij(:) +tmpik(:))
+!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,jra)= prm3s(i3b)%gwf(:,nij,nik,njk,jra)+(-tmpij(:)+tmpjk(:))
+!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,kra)= prm3s(i3b)%gwf(:,nij,nik,njk,kra)+(-tmpik(:)-tmpjk(:))
                     endif
 !.....Stresses
                     if( lsmatch ) then
@@ -1215,7 +1239,8 @@ contains
           p2 = prm2s(i2b)
           do i=1,p2%ncoef
             ip = ip +1
-            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal)  +p2%gwf(1:3,ifcal,i)
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal)  +p2%gwf(1:3,i,ifcal)
+!!$            gwf(1:3,ip,ia) = gwf(1:3,ip,ia)  +p2%gwf(1:3,i,ia)
           enddo
         enddo  ! i2b
         do i3b=1,n3b
@@ -1224,7 +1249,8 @@ contains
             do j=1,p3%ncfik
               do i=1,p3%ncfij
                 ip = ip +1
-                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,ifcal,i,j,k)
+                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,i,j,k,ifcal)
+!!$                gwf(1:3,ip,ia) = gwf(1:3,ip,ia) +p3%gwf(1:3,i,j,k,ia)
               enddo
             enddo
           enddo
@@ -1527,6 +1553,10 @@ contains
     type(prm3):: p3
 
     dmem = 0d0
+
+    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+    dmem = dmem +4d0*size(ls3b)
+    
     do i2b=1,n2b
       p2 = prm2s(i2b)
       dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
@@ -1542,6 +1572,23 @@ contains
     enddo
     return
   end function get_mem_uf3
+!=======================================================================
+  subroutine dealloc_gwx_uf3()
+!
+!  Release memories for gw{e,f,s} for the purpose of efficiency.
+!
+    integer:: i2b,i3b
+    do i2b=1,n2b
+      if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
+      if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
+      if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
+    enddo
+    do i3b=1,n3b
+      if( allocated(prm3s(i3b)%gwe) ) deallocate(prm3s(i3b)%gwe)
+      if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
+      if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
+    enddo
+  end subroutine dealloc_gwx_uf3
 end module UF3
 !-----------------------------------------------------------------------
 !     Local Variables:

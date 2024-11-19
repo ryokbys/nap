@@ -129,6 +129,10 @@ module variables
     real(8),allocatable:: va(:,:),strsi(:,:,:),eki(:,:,:),epi(:)&
          ,fsub(:,:),eatm(:)
     real(8),allocatable:: aux(:,:)
+!.....Gradients w.r.t. parameters to avoid recalculation of gradw
+!     in the case of linear regression (uf3 as well).
+!     To save the memory usage, use single-precision variable
+    real(4),allocatable:: gwe(:), gwf(:,:,:),gws(:,:)
 !.....Check flag for {e,f,s}ref data
     logical:: leref_given = .false.
     logical:: lfref_given = .false.
@@ -171,7 +175,7 @@ module variables
   real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst
   real(8):: etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm
   
-  real(8):: time0,tcomm,tfunc,tgrad
+  real(8):: time0,tcomm,tfunc,tgrad,twait
   real(8):: terg, tfrc, tstrs
   integer:: nfunc,ngrad
   integer:: iflag

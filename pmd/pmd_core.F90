@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-16 23:26:12 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-18 13:29:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1108,8 +1108,6 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
-  tcpu1= mpi_wtime()
-
 !!$  call init_force(linit)
 
 !-----copy RA of boundary atoms
@@ -1149,7 +1147,7 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   return
 end subroutine oneshot
 !=======================================================================
-subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
+subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
      ekitot,epitot,auxtot,ekin,epot,stnsr,lgrad,lgrad_done, &
      ndimp,maxisp,gwe,gwf,gws,lematch,lfmatch,lsmatch, &
      nfcal,lfrc_eval)
@@ -1183,10 +1181,11 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   logical,intent(in):: lematch,lfmatch,lsmatch
 
   integer:: i,ierr,is,nspl,iprm0
-  real(8):: aai(3),epott
+  real(8):: aai(3),epott,ttmp
   logical:: l1st
   character(len=3):: csp
 
+  ttmp = mpi_wtime()
   ntot = ntot0
   h(:,:,:) = hmat(:,:,:)
 
@@ -1225,8 +1224,6 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
-  tcpu1= mpi_wtime()
-
 !!$  call init_force(.true.)
 
 !-----copy RA of boundary atoms
@@ -1249,7 +1246,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     if( iprint.ge.ipl_basic ) print *,'gradw_xxxx...'
     epot = 0d0
     gwe(1:ndimp) = 0d0
-    gwf(1:3,1:ndimp,1:natm) = 0d0
+    gwf(1:3,1:ndimp,:) = 0d0
     gws(1:6,1:ndimp) = 0d0
     if( use_force('Morse') &
          .and. use_force('screened_Coulomb') ) then
@@ -1279,7 +1276,6 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
       call gradw_uf3(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
            lgrad_done,nfcal,lfrc_eval)
-      
     endif
 !.....Derivative of stress should be divided by the cell volume
     gws(:,:) = gws(:,:) /vol *up2gpa
@@ -1307,7 +1303,7 @@ subroutine oneshot4fitpot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   endif
 
   return
-end subroutine oneshot4fitpot
+end subroutine oneshot4fp
 !=======================================================================
 subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,auxtot,epot,stnsr)
