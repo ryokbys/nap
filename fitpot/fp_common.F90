@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-19 15:28:06 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-20 21:51:13 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -155,12 +155,6 @@ contains
     tcl= mpi_wtime() -tc0
     tf0= mpi_wtime()
 
-!!$    fac_e = wgte
-!!$    fac_f = wgtf
-!!$    fac_s = wgts
-!!$    if( netrn > 1 ) fac_e = wgte /(evtrn*netrn)
-!!$    if( nftrn > 1 ) fac_f = wgtf /(fvtrn*nftrn)
-!!$    if( nstrn > 1 ) fac_s = wgts /(svtrn*nstrn)
     lfdsgnmat = .false.  ! Initialize lfdsgnmat
 
     if( l1st ) then

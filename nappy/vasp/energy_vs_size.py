@@ -149,7 +149,7 @@ if __name__ == '__main__':
         os.system(cmd)
         erg= float(subprocess.getoutput("tail -n1 OSZICAR | awk '{print $5}'"))
         os.system("mkdir -p "+dname)
-        os.system("cp INCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
+        os.system("cp INCAR POSCAR OSZICAR OUTCAR vasprun.xml {0}/".format(dname))
         vol= get_vol(al,hmat)
         print(' {0:10.4f} {1:10.4f} {2:15.7f}'.format(al,vol,erg))
         outfile1.write(' {0:10.4f} {1:10.4f} {2:15.7f}\n'.format(al,vol,erg))

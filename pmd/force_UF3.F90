@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-18 16:25:54 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-20 20:58:27 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -1454,6 +1454,13 @@ contains
       stop
     endif
 
+    if( .not. has_solo ) then
+      print *,'ERROR(set_params_uf3): .not.has_solo which should not happen.'
+    endif
+    if( .not. has_trios ) then
+      print *,'ERROR(set_params_uf3): .not.has_trio which should not happen.'
+    endif
+
 !.....Count num of coeffs in force_uf3
     ncoef = 0
     do i1b=1,n1b
@@ -1487,9 +1494,9 @@ contains
       enddo
     enddo
     do i3b=1,n3b
-      do icfjk=1,prm3s(i3b)%ncfjk
+      do icfij=1,prm3s(i3b)%ncfij
         do icfik=1,prm3s(i3b)%ncfik
-          do icfij=1,prm3s(i3b)%ncfij
+          do icfjk=1,prm3s(i3b)%ncfjk
             inc = inc +1
             prm3s(i3b)%coefs(icfij,icfik,icfjk) = params_in(inc)
           enddo

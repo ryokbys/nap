@@ -20,6 +20,8 @@ Options:
 import os
 
 from docopt import docopt
+from prms2fp import read_params_uf3
+from datetime import datetime
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "rev211111"
@@ -220,7 +222,59 @@ def write_params_angular(outfname,triplets,angular_prms):
             rc3,alp,bet,gmm = angular_prms[tuple(t)]
             f.write(' angular1   {0:3s}   {1:3s}   {2:3s} '.format(*t))
             f.write(' {0:6.2f}  {1:7.3f} {2:7.3f} {3:7.3f}\n'.format(rc3,alp,bet,gmm))
-    
+    return None
+
+def write_params_uf3(outfname, uf3_prms):
+    now = datetime.now()
+    header = f'#UF3 POT UNITS: metal DATE: '+now.strftime('%Y-%m-%d') \
+        +' AUTHOR: RYO KOBAYASHI CITATION:\n'
+    footer = '#\n'
+    with open(outfname, 'w') as f:
+        d1b = uf3_prms['1B']
+        for k,v in d1b.items():
+            f.write(header)
+            f.write(f'1B  {k}  {v}\n')
+            f.write(footer)
+        d2b = uf3_prms['2B']
+        for pair in d2b.keys():
+            d = d2b[pair]
+            f.write(header)
+            spi, spj = pair
+            f.write(f"2B  {spi}  {spj}  {d['nlead']}  {d['ntrail']}  {d['spacing']}\n")
+            f.write(f"{d['rc2b']:.2f}  {d['nknot']}\n")
+            for i,v in enumerate(d['knots']):
+                f.write(f"{v} ")
+            f.write('\n')
+            f.write(f"{d['ncoef']}\n")
+            for i,v in enumerate(d['coefs']):
+                f.write(f"{v} ")
+            f.write('\n')
+            f.write(footer)
+        d3b = uf3_prms['3B']
+        for trio in d3b.keys():
+            d = d3b[trio]
+            f.write(header)
+            spi, spj, spk = trio
+            f.write(f"3B  {spi}  {spj}  {spk}  {d['nlead']}  {d['ntrail']}  {d['spacing']}\n")
+            f.write(f"{d['rcjk']}  {d['rcik']}  {d['rcij']}  {d['nkjk']}  {d['nkik']}  {d['nkij']}\n")
+            for i,v in enumerate(d['knotsjk']):
+                f.write(f"{v} ")
+            f.write('\n')
+            for i,v in enumerate(d['knotsik']):
+                f.write(f"{v} ")
+            f.write('\n')
+            for i,v in enumerate(d['knotsij']):
+                f.write(f"{v} ")
+            f.write('\n')
+            f.write(f"{d['ncij']}  {d['ncik']}  {d['ncjk']}\n")
+            for i in range(d['ncij']):
+                for j in range(d['ncik']):
+                    for k in range(d['ncjk']):
+                        f.write(f"{d['coefs'][i,j,k]} ")
+                    f.write('\n')
+            f.write(footer)
+    return None
+            
 def sort_pairs(pairs,specorder):
 
     sorted_pairs = []
@@ -376,6 +430,35 @@ def fp2BVSx(varsfp, **kwargs):
 
     return None
 
+def fp2uf3(outfname, vs, uf3_prms, **kwargs):
+
+    iv = -1
+    for spi in uf3_prms['1B'].keys():
+        iv += 1
+        uf3_prms['1B'][spi] = vs[iv]
+
+    for pair in uf3_prms['2B'].keys():
+        dic = uf3_prms['2B'][pair]
+        for i in range(len(dic['coefs'])):
+            iv += 1
+            dic['coefs'][i] = vs[iv]
+        uf3_prms['2B'][pair] = dic
+
+    for trio in uf3_prms['3B'].keys():
+        dic = uf3_prms['3B'][trio]
+        ncij = dic['ncij']
+        ncik = dic['ncik']
+        ncjk = dic['ncjk']
+        for i in range(ncij):
+            for j in range(ncik):
+                for k in range(ncjk):
+                    iv += 1
+                    dic['coefs'][i,j,k] = vs[iv]
+        uf3_prms['3B'][trio] = dic
+
+    write_params_uf3(outfname, uf3_prms)
+    return None
+
 def fp2params(vs,**kwargs):
     """
     Conversion from fp-vars to files specified in param_files in in.fitpot.
@@ -441,7 +524,7 @@ def main():
                     pairs.append(i)
                 elif len(i) == 3:
                     triplets.append(i)
-            print(' Loaded some inifo from in.fitpot')
+            print(' Loaded some info from in.fitpot')
         except:
             raise Exception('Something wrong with reading in.fitpot.')
     else:
@@ -466,6 +549,11 @@ def main():
         for pfile in param_files:
             print(f'   - {pfile}')
         print('')
+
+    elif pot_type in ('UF3', 'uf3'):
+        uf3_prms = read_params_uf3('in.params.uf3')
+        outfname = 'in.params.uf3_'+datetime.now().strftime('%y%m%d')
+        fp2uf3(outfname, varsfp['variables'], uf3_prms, **kwargs)
     else:
         if len(pairs) == 0:
             raise ValueError('Pairs must be specified.')

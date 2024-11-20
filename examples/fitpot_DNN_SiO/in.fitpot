@@ -31,8 +31,6 @@ stress_denom_type  abs2rel
 force_limit       50.0
 stress_limit      50.0
 
-sample_error   1
-   smpl_    0.002    0.01   0.3
 
 # compos_weight  T
 # compos_weight_scale  1.0

@@ -4,22 +4,27 @@ Convert pmd param file `in.params.XXX` to fitpot var file `in.vars.fitpot`.
 By default `in.vars.fitpot` includes hard-limit of parameters.
 
 Usage:
-  prms2fp.py (Morse|BVSx|BVS) [options]
+  prms2fp.py [options] POTENTIAL
 
 Options:
   -h, --help  Show this message and exit.
+  -v          Verbose output using icecream.
   --rc RC     Cutoff radius for pair interaction. [default: 6.0]
   --rc3 RC3   Cutoff radius for angular interaction. [default: 3.0]
   -o OUTFNAME
-              Output file name. [default: in.vars.fitpot]
+              Output file name. [default: in.vars.fitpot_YYMMDD]
   --specorder SPECORDER
               Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
 """
 import os
 from docopt import docopt
+import numpy as np
+from datetime import datetime
+from icecream import ic
+ic.disable()
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "200425"
+__version__ = "241119"
 
 def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
     with open(outfname,'w') as f:
@@ -33,9 +38,9 @@ def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
             vr = vranges[i]
             if hardlim is not None:
                 hl = hardlim[i]
-                f.write('  {0:9.4f}  {1:9.4f}  {2:9.4f} {3:8.3f} {4:8.3f}\n'.format(v,*vr,*hl))
+                f.write('  {0:9.4f}  {1:12.4e}  {2:12.4e} {3:12.4e} {4:12.4e}\n'.format(v,*vr,*hl))
             else:
-                f.write('  {0:9.4f}  {1:9.4f}  {2:9.4f}\n'.format(v,*vr))
+                f.write('  {0:9.4f}  {1:12.4e}  {2:12.4e}\n'.format(v,*vr))
     print(' Wrote '+outfname)
     return None
 
@@ -125,6 +130,98 @@ def read_params_angular(infname):
         else:
             continue
     return angular_prms
+    
+def read_params_uf3(infname):
+
+    if not os.path.exists(infname):
+        raise FileNotFoundError(infname)
+    
+    uf3_prms = {'1B':{},
+                '2B':{},
+                '3B':{}}
+    mode = 'none'
+    body = 'none'
+    with open(infname,'r') as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            if line[0] == '#':
+                if len(line) > 3:
+                    mode = 'read'
+                    continue
+                else:
+                    mode = 'none'
+                    body = 'none'
+                    continue
+            data = line.split()
+            if data[0] in ('1B','2B','3B'):
+                body = data[0]
+                if body == '1B':
+                    spi = data[1]
+                    epot = float(data[2])
+                    uf3_prms[body][spi] = epot
+                    continue
+                elif body == '2B':
+                    spi = data[1]
+                    spj = data[2]
+                    uf3_prms[body][(spi,spj)] = {}
+                    uf3_prms[body][(spi,spj)]['nlead'] = int(data[3])
+                    uf3_prms[body][(spi,spj)]['ntrail'] = int(data[4])
+                    uf3_prms[body][(spi,spj)]['spacing'] = data[5]
+                    d = f.readline().split()
+                    uf3_prms[body][(spi,spj)]['rc2b'] = float(d[0])
+                    uf3_prms[body][(spi,spj)]['nknot'] = int(d[1])
+                    d = f.readline().split()
+                    uf3_prms[body][(spi,spj)]['knots'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    uf3_prms[body][(spi,spj)]['ncoef'] = int(d[0])
+                    d = f.readline().split()
+                    uf3_prms[body][(spi,spj)]['coefs'] = \
+                        np.array([ float(x) for x in d])
+                    continue
+                elif body == '3B':
+                    spi = data[1]
+                    spj = data[2]
+                    spk = data[3]
+                    d3b = {}
+                    d3b['nlead'] = int(data[4])
+                    d3b['ntrail'] = int(data[5])
+                    d3b['spacing'] = data[6]
+                    d = f.readline().split()
+                    rcjk,rcij,rcik = (float(d[0]), float(d[1]), float(d[2]))
+                    nkjk,nkij,nkik = (int(d[3]), int(d[4]), int(d[5]))
+                    d3b['rcij'] = rcij
+                    d3b['rcik'] = rcik
+                    d3b['rcjk'] = rcjk
+                    d3b['nkij'] = nkij
+                    d3b['nkik'] = nkik
+                    d3b['nkjk'] = nkjk
+                    d = f.readline().split()
+                    d3b['knotsjk'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    d3b['knotsik'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    d3b['knotsij'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    ncij,ncik,ncjk = (int(d[0]), int(d[1]), int(d[2]))
+                    d3b['ncij'] = ncij
+                    d3b['ncik'] = ncik
+                    d3b['ncjk'] = ncjk
+                    d3b['coefs'] = np.zeros((ncij,ncik, ncjk))
+                    nline3b = ncij*ncik
+                    for icij in range(ncij):
+                        for icik in range(ncik):
+                            d = f.readline().split()
+                            d3b['coefs'][icij,icik,:] = \
+                                [ float(x) for x in d]
+                    uf3_prms[body][(spi,spj,spk)] = d3b
+                        
+    return uf3_prms
     
 def prms_to_fpvars(specorder,prms):
     """
@@ -288,34 +385,75 @@ def BVSx2fp(outfname,specorder,rc,rc3):
 
     return None
 
+def uf32fp(outfname,specorder):
+    """
+    Create in.vars.fitpot file from parameter file for uf3 potential.
+    Cut-off radii for 2- and 3-body are given in the parameter file.
+    """
+    uf3_prms = read_params_uf3('in.params.uf3')
 
+    fpvars = []
+    vranges= []
+
+    for spi,erg in uf3_prms['1B'].items():
+        fpvars.append(erg)
+        vranges.append((-1e+10, 1e+10))
+
+    rc2max = 0.0
+    d2b = uf3_prms['2B']
+    for pair in d2b.keys():
+        ncoef = d2b[pair]['ncoef']
+        coefs = d2b[pair]['coefs']
+        rc2max = max(rc2max, d2b[pair]['rc2b'])
+        for i in range(ncoef):
+            fpvars.append(coefs[i])
+            vranges.append((-1e+10, 1e+10))
+
+    rc3max = 0.0
+    d3b = uf3_prms['3B']
+    for trio in d3b.keys():
+        ncij = d3b[trio]['ncij']
+        ncik = d3b[trio]['ncik']
+        ncjk = d3b[trio]['ncjk']
+        rc3max = max(rc3max, d3b[trio]['rcij'], d3b[trio]['rcik'])
+        coefs = d3b[trio]['coefs']
+        for i in range(ncij):
+            for j in range(ncik):
+                for k in range(ncjk):
+                    fpvars.append(coefs[i,j,k])
+                    vranges.append((-1e+10, 1e+10))
+    write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
+    return None
 
 if __name__ == "__main__":
 
     args = docopt(__doc__)
+    if args['-v']:
+        ic.enable()
+    potname = args['POTENTIAL']
     outfname = args['-o']
+    outfname = outfname.replace('YYMMDD', datetime.now().strftime('%y%m%d'))
     rc = float(args['--rc'])
     rc3 = float(args['--rc3'])
     specorder = args['--specorder'].split(',')
     if specorder[0] == 'None':
         raise Exception('specorder must be specified.')
 
-    if args['Morse']:
+    ic(args)
+    if potname == 'Morse':
         Morse2fp(outfname,specorder,rc,rc3)
 
-    elif args['BVS']:
+    elif potname in ('BVS', 'BVSx'):
         """
         The term 'BVS' means that the in.var.fitpot file contains 
-        fbvs, species radius and Morse parameters.
+        fbvs, species radius and Morse parameters,
         Thus in this case, specorder should be specified.
+        In case of 'BVSx' contains angular parameters, so triplets should be specified.
         """
         BVS2fp(outfname,specorder,rc,rc3)
         
-    elif args['BVSx']:
+    elif potname in ('UF3','uf3'):
         """
-        The term 'BVSx' means that the in.var.fitpot file contains 
-        fbvs, species radius, Morse and angular parameters.
-        Thus in this case, specorder, pairs and triplets should be specified.
+        Ultra-fast force-field.
         """
-        BVSx2fp(outfname,specorder,rc,rc3)
-        
+        uf32fp(outfname,specorder)

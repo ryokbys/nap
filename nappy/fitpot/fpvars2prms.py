@@ -17,8 +17,8 @@ Options:
 import os
 from docopt import docopt
 
-__author__ = "RYO KOBAYASHI"
-__version__ = "rev180412"
+__author__ = "Ryo KOBAYASHI"
+__version__ = "241120"
 
 def ndat2nsp(ndat):
     #...Detect number of species assumed in FITPOT_VAR_FILE

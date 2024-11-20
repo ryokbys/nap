@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-19 15:40:04 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-20 21:00:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1745,22 +1745,32 @@ subroutine write_stats(iter)
     natm= smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
-        do l=1,3
-          df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
-!!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia) -smpl%fsub(l,ia)))
-          dfmaxl_trn= max(dfmaxl_trn,df)
-          dfsuml_trn=dfsuml_trn +df*df
-          ntrnl=ntrnl +1
-          tmp = smpl%fref(l,ia)
-          fref1l = fref1l +tmp
-          fref2l = fref2l +tmp*tmp
-        enddo
+        if( smpl%lfrc_eval(ia) ) then
+          do l=1,3
+            df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
+            dfmaxl_trn= max(dfmaxl_trn,df)
+            dfsuml_trn=dfsuml_trn +df*df
+            ntrnl=ntrnl +1
+            tmp = smpl%fref(l,ia)
+            fref1l = fref1l +tmp
+            fref2l = fref2l +tmp*tmp
+          enddo
+        else
+          do l=1,3
+            df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
+            dfmaxl_tst= max(dfmaxl_tst,df)
+            dfsuml_tst=dfsuml_tst +df*df
+            ntstl=ntstl +1
+            tmp = smpl%fref(l,ia)
+            fref1l = fref1l +tmp
+            fref2l = fref2l +tmp*tmp
+          enddo
+        endif
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
         do l=1,3
           df= abs(smpl%fa(l,ia)+smpl%fsub(l,ia) -smpl%fref(l,ia))
-!!$          df= abs(smpl%fa(l,ia) -(smpl%fref(l,ia)) -smpl%fsub(l,ia))
           dfmaxl_tst= max(dfmaxl_tst,df)
           dfsuml_tst=dfsuml_tst +df*df
           ntstl=ntstl +1
@@ -1795,7 +1805,6 @@ subroutine write_stats(iter)
          ,mpi_real8,mpi_sum,0,mpi_world,ierr)
     fvar = fref2/(ntrn+ntst) -(fref1/(ntrn+ntst))**2 
   endif
-!!$  print *,'dfsum_trn,ntrn = ',dfsum_trn,dfsuml_trn,ntrn,rmse_trn
   if( ntst.ne.0 ) then
     rmse_tst= sqrt(dfsum_tst/ntst)
   else
@@ -1995,19 +2004,25 @@ subroutine get_data_stats()
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
-        if( .not. smpl%lfrc_eval(ia) ) cycle
-        do l=1,3
-!!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
-          tmp = smpl%fref(l,ia)
-          fsumltrn = fsumltrn +tmp
-          f2sumltrn= f2sumltrn +tmp*tmp
-          ntrnl=ntrnl +1
-        enddo
+        if( smpl%lfrc_eval(ia) ) then
+          do l=1,3
+            tmp = smpl%fref(l,ia)
+            fsumltrn = fsumltrn +tmp
+            f2sumltrn= f2sumltrn +tmp*tmp
+            ntrnl=ntrnl +1
+          enddo
+        else
+          do l=1,3
+            tmp = smpl%fref(l,ia)
+            fsumltst = fsumltst +tmp
+            f2sumltst= f2sumltst +tmp*tmp
+            ntstl=ntstl +1
+          enddo
+        endif
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
         do l=1,3
-!!$          tmp = smpl%fref(l,ia)-smpl%fsub(l,ia)
           tmp = smpl%fref(l,ia)
           fsumltst = fsumltst +tmp
           f2sumltst= f2sumltst +tmp*tmp
