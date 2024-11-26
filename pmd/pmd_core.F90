@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-18 13:29:24 KOBAYASHI Ryo>
+!                     Last-modified: <2024-11-24 10:04:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -3583,7 +3583,7 @@ subroutine set_cauxarr()
   use Coulomb,only: chgopt_method
   use clrchg,only: lclrchg
 !!$  use dspring,only: ldspring
-
+  
   integer:: inc
 
   call set_use_charge()
@@ -3640,6 +3640,37 @@ subroutine set_cauxarr()
   
 end subroutine set_cauxarr
 !=======================================================================
+subroutine get_shortest_distances(dshort)
+!
+!  Compute shortest distances of each species pair which would be used
+!  in fitpot.
+!
+  use pmdvars,only: natm,tag,ra,lspr,h,nspmax
+  implicit none
+  real(8),intent(inout):: dshort(nspmax,nspmax)
+  
+  integer:: ia,is,jj,ja,js
+  real(8):: xi(3),xj(3),xij(3),rij(3),dij2,dij
+
+  do ia=1,natm
+    is = int(tag(ia))
+    xi(:) = ra(:,ia)
+    do jj=1,lspr(0,ia)
+      ja = lspr(jj,ia)
+      js = int(tag(ja))
+      xj(:) = ra(:,ja)
+      xij(:) = xj(:) -xi(:)
+      rij(1:3) = h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
+      dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+      dij = sqrt(dij2)
+      if( dij < dshort(is,js) ) then
+        dshort(is,js) = dij
+        dshort(js,is) = dij
+      endif
+    enddo
+  end do
+  return
+end subroutine get_shortest_distances
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

@@ -17,6 +17,7 @@ import gzip
 from nappy.napsys import NAPSystem
 from nappy.util import get_tag, decode_tag, pbc, \
     scaled_to_cartesian, cartesian_to_scaled
+from icecream import ic
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "240903"
@@ -324,9 +325,12 @@ def read_POSCAR(fname='POSCAR',specorder=None,):
         nsys.a3= np.array([float(x) for x in f.readline().split()])
         # 6th: species names or number of each species
         buff= f.readline().split()
+        ic(buff)
         if not buff[0].isdigit():
             spcs = copy.deepcopy(buff)
             buff= f.readline().split()
+            assert buff[0].isdigit, f'buff[0] is not digits, buff={buff[0]}'
+            ic(spcs,buff,specorder)
             if specorder is None:
                 nsys.specorder = spcs
             else:
@@ -334,7 +338,9 @@ def read_POSCAR(fname='POSCAR',specorder=None,):
                 for s in spcs:
                     if s not in nsys.specorder:
                         nsys.specorder.append(s)
+            ic(nsys.specorder, specorder)
         num_species= np.array([ int(n) for n in buff])
+        ic(num_species)
         try:
             spcs
         except NameError:
@@ -347,6 +353,7 @@ er of species in POSCAR = {0:d}
 need to specify the species order correctly with --specorder option.
             '''.format(len(num_species))
             raise ValueError(msg)
+        ic(nsys.specorder)
         natm = np.sum(num_species)
         sids = [ 0 for i in range(natm) ]
         # poss = [ np.zeros(3) for i in range(natm) ]

@@ -1,6 +1,6 @@
 module ZBL
 !-----------------------------------------------------------------------
-!                     Last modified: <2021-11-24 11:48:08 Ryo KOBAYASHI>
+!                     Last modified: <2024-11-23 22:06:16 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of ZBL repulsive potential with switching
 !  function zeta(x).
@@ -572,6 +572,41 @@ contains
     lprmset_zbl = .true.
     return
   end subroutine set_params_ZBL
+!=======================================================================
+  subroutine set_qnucl_ZBL(qnuclin,interactin)
+!
+!  Accessor routine to set ZBL parameters from outside (fitpot).
+!  Curretnly this routine is supposed to be called only on serial run.
+!
+    real(8),intent(in):: qnuclin(nspmax)
+    logical,intent(in):: interactin(nspmax,nspmax)
+
+    qnucl(:) = qnuclin(:)
+    interact(:,:) = interactin(:,:)
+  end subroutine set_qnucl_ZBL
+!=======================================================================
+  subroutine get_dvnucl(is,js,npnts,rijs,dvnucls)
+!
+!  Accessor routine to set ZBL parameters from outside (fitpot).
+!  Curretnly this routine is supposed to be called only on serial run.
+!
+    integer,intent(in):: is,js,npnts
+    real(8),intent(in):: rijs(npnts)
+    real(8),intent(out):: dvnucls(npnts)
+    integer:: i
+    real(8):: qi,qj,rs,rij
+
+    qi = qnucl(is)
+    qj = qnucl(js)
+
+    do i=1,npnts
+      rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
+      rij = rijs(i)
+      dvnucls(i) = -acc *qi*qj/rij &
+           *( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
+    enddo
+    return
+  end subroutine get_dvnucl
 end module ZBL
 !-----------------------------------------------------------------------
 !     Local Variables:

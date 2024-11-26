@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-07-13 12:01:58 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-24 09:25:33 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -359,7 +359,7 @@ contains
     
   end subroutine calc_nfmv
 !=======================================================================
-  function lowcase(instr) result(outstr)
+  function to_lower(instr) result(outstr)
 !-----------------------------------------------------------------------
 !   Ref. pg 80, "Upgrading to Fortran 90", by Cooper Redwine,
 !   1995 Springer-Verlag, New York.
@@ -376,9 +376,9 @@ contains
       if( n.ne.0 ) outstr(i:i) = LOWER_CASE(n:n)
     enddo
     return
-  end function lowcase
+  end function to_lower
 !=======================================================================
-  function upcase(instr) result(outstr)
+  function to_upper(instr) result(outstr)
     character(len=*),intent(in):: instr
     character(len=len(instr)):: outstr
     integer:: i,n
@@ -391,7 +391,7 @@ contains
       if( n.ne.0 ) outstr(i:i) = UPPER_CASE(n:n)
     enddo
     return
-  end function upcase
+  end function to_upper
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:

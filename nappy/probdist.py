@@ -8,6 +8,7 @@ Usage:
 
 Options:
   -h, --help  Show this message and exit.
+  -v          Verbose output for debugging.
   -w WIDTH    Mesh width in Ang. [default: 0.2]
   --sigma SIGMA
               Sigma value of the gaussian smearing. If it is positive,
@@ -20,13 +21,17 @@ Options:
 import os
 from docopt import docopt
 import numpy as np
+from scipy import stats
 
 from nappy.common import get_key
 #from nappy.napsys import NAPSystem
 from nappy.io import read, write
 
+from icecream import ic
+ic.disable()
+
 __author__ = "RYO KOBAYASHI"
-__version__ = "181225"
+__version__ = "241126"
 
 def get_num_division(nsys,width):
     ndivs = np.zeros(3,dtype=int)
@@ -36,6 +41,30 @@ def get_num_division(nsys,width):
     ndivs[2] = lc/width +1
     return ndivs
 
+def get_prob_dist_kde(ndivs,nsys,sid,sgm):
+    tsgm2 = 2.0 *sgm *sgm
+    tsgm2i = 1.0 /tsgm2
+    la,lb,lc = nsys.get_lattice_lengths()
+    ra = 1.0/ndivs[0]
+    rb = 1.0/ndivs[1]
+    rc = 1.0/ndivs[2]
+    dv = la*ra *lb*rb *lc*rc
+    prefactor = dv / (np.pi*tsgm2)**1.5
+    poss = nsys.get_scaled_positions()
+    symbols = np.array(nsys.get_symbols(), dtype=str)
+    to_consider = symbols == nsys.specorder[sid]
+    xr = np.linspace(0.0, 1.0, ndivs[0])
+    yr = np.linspace(0.0, 1.0, ndivs[1])
+    zr = np.linspace(0.0, 1.0, ndivs[2])
+    ic(xr.shape, yr.shape, zr.shape)
+    X,Y,Z = np.meshgrid(xr,yr,zr)
+    grid_points= np.vstack([X.ravel(), Y.ravel(), Z.ravel()])
+    kde = stats.gaussian_kde(poss[to_consider].T)
+    pdist = kde(grid_points).reshape(X.shape)
+    ic(X.shape, Y.shape, Z.shape)
+    ic(pdist.shape)
+    return pdist
+
 def get_prob_dist(ndivs,nsys,sid,sgm):
     tsgm2 = 2.0 *sgm *sgm
     tsgm2i = 1.0 /tsgm2
@@ -44,12 +73,15 @@ def get_prob_dist(ndivs,nsys,sid,sgm):
     ra = 1.0/ndivs[0]
     rb = 1.0/ndivs[1]
     rc = 1.0/ndivs[2]
-    dv = la*ra*lb*rb*lc*rc
+    dv = la*ra *lb*rb *lc*rc
     prefactor = dv / (np.pi*tsgm2)**1.5
+    poss = nsys.get_scaled_positions()
+    symbols = np.array(nsys.get_symbols(), dtype=str)
+    to_consider = symbols == nsys.specorder[sid]
     for ia in range(nsys.num_atoms()):
-        if nsys.get_atom_attr(ia,'sid') != sid:
+        if not to_consider[ia]:
             continue
-        pi = nsys.get_atom_attr(ia,'pos')
+        pi = poss[ia]
         for i in range(ndivs[0]):
             rai = ra*i -pi[0]
             rai = rai if abs(rai) < 0.5 else rai -1.0*np.sign(rai)
@@ -99,9 +131,10 @@ def write_CHGCAR(nsys,pdist,fname='CHGCAR'):
 
 def normalize_pdist(pdist,nsys,sid):
     print(' Normalize pdist...')
-    s = 0.0
     s = np.sum(pdist)
     na = nsys.num_atoms(sid=sid)
+    ic(na,s,sid)
+    assert s > 1.0e-14, f"np.sum(pdist) is too small, {s}"
     pdist *= float(na)/s
     #print('   Max in pdist = ',np.max(pdist))
     #print('   Sum of pdist = ',np.sum(pdist))
@@ -111,6 +144,8 @@ def normalize_pdist(pdist,nsys,sid):
 if __name__ == "__main__":
 
     args = docopt(__doc__)
+    if args['-v']:
+        ic.enable()
     files = args['FILES']
     sid = int(args['--sid'])
     width = float(args['-w'])
@@ -118,7 +153,10 @@ if __name__ == "__main__":
     if sgm < 0.0:
         sgm = abs(sgm)*width
     specorder = args['--specorder'].split(',')
-    if 'None' in specorder and not files[0].find('POSCAR') > -1:
+    if 'None' in specorder:
+        specorder = None
+    if specorder == None and not (files[0].find('POSCAR') > -1 or
+                                  files[0].find('pmd') > -1 ):
         raise ValueError('ERROR: specorder must be specified, unless files are POSCAR format.')
 
     if sid == 0:
@@ -144,7 +182,12 @@ if __name__ == "__main__":
         #nsys = NAPSystem(fname=f,specorder=specorder)
         nsys = read(fname=f,specorder=specorder)
         pdist += get_prob_dist(ndivs,nsys,sid,sgm)
+        # if 'pdist' in locals():
+        #     pdist += get_prob_dist_kde(ndivs,nsys,sid,sgm)
+        # else:
+        #     pdist = get_prob_dist_kde(ndivs,nsys,sid,sgm)
     pdist = normalize_pdist(pdist,nsys0,sid)
     write_CHGCAR(nsys0,pdist)
+    ic(nsys0.atoms)
     print(' Wrote CHGCAR')
     

@@ -234,6 +234,69 @@ module variables
   real(8):: zbl_rc
   real(8):: zbl_ri(1:nspmax) = -1d0
   real(8):: zbl_ro(1:nspmax) = -1d0
+
+!.....Penalty is moved from minimize module
+  character(len=128):: cpenalty = 'none'
+  real(8):: penalty = 1d-15
+!.....Repulsion correction for short distances in UF3 potential
+  real(8):: pwgt2b = 0d0
+  real(8):: pwgt2bd= 0d0
+  real(8):: pwgt2bs= 0d0
+  real(8):: pwgt3b = 0d0
+  real(8):: pwgt3bd= 0d0
+  
+  real(8):: pwgt_repul = 1d-15  ! penalty for repulsion
+  real(8):: valence_chgs(nspmax), core_chgs(nspmax)
+  real(8):: repul_radii(nspmax,nspmax)
+  integer:: n_repul_pnts = 0  ! # of points incl. 0 (orig.) and end
+  real(8),allocatable:: drepul_tbl(:,:,:)  ! Repulsion gradient table
+
+!------- MINIMIZATION PARAMETERS ---------------------------
+!.....number of convergence criteria achieved
+  integer:: numtol = 1
+
+!.....penalty: lasso or ridge or smooth
+  character(len=128):: cpena= 'none'
+  character(len=128):: clinmin= 'backtrack'
+  character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
+  real(8):: pwgt = 1d-15
+
+!.....SGD parameters
+  integer:: nsgdbsize = 1
+  integer:: nsgdbsnode = 1
+  integer,allocatable:: ismask(:)
+  character(len=128):: csgdupdate = 'normal'
+  real(8):: sgd_rate_ini = 0.001d0
+  real(8):: sgd_rate_fin = -0.001d0
+  real(8):: sgd_eps = 1.0d-8
+!.....Parameters for ADAM and AdaBound
+  real(8):: adam_b1 = 0.9d0
+  real(8):: adam_b2 = 0.999d0
+
+!.....Group FS inner loop
+  integer:: ninnergfs=100
+  character(len=128):: cread_fsmask = ''
+  character(len=128):: cfs_xrefresh = 'random' ! [zero, random, none]
+  integer:: maxfsrefresh = 2
+
+!.....Max iteration for line minimization
+  integer:: niter_linmin   = 15
+!.....Decreasing factor, should be < 1.0
+  real(8):: fac_dec        = 0.2d0
+!.....Increasing factor, should be > 1.0
+  real(8):: fac_inc        = 5.0d0
+!.....Armijo parameters
+  real(8):: armijo_xi      = 1.0d-4
+  real(8):: armijo_tau     = 0.5d0
+  integer:: armijo_maxiter = 15
+
+!.....CG
+  integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
+
+!.....L-BFGS
+  integer:: m_lbfgs   = 10
+
+  real(8):: fupper_lim = 1d+5
   
 contains
   subroutine init_variables()

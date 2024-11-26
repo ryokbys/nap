@@ -1,12 +1,12 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-20 21:00:43 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-26 14:14:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
 !!$  use NNd,only:NN_init,NN_func,NN_grad
   use fp_common,only: func_w_pmd, grad_w_pmd, write_dsgnmats &
-       ,subtract_FF, restore_FF, normalize
+       ,subtract_FF, restore_FF, normalize, wrap_ranges
   use composition
   use minimize
   use version
@@ -16,7 +16,7 @@ program fitpot
   use DNN,only: write_tgrads_DNN
   use pmdvars,only: specorder_pmd => specorder
   implicit none
-  integer:: ismpl,ihour,imin,isec
+  integer:: ismpl,ihour,imin,isec,isp,jsp
   real(8):: tmp,ftrn0,ftst0
 
   call mpi_init(ierr)
@@ -154,16 +154,14 @@ program fitpot
     cffs(1) = trim(cpot)
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
-       trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
+       trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
     lnormalize = .true.
   endif
 
 !.....Initial computations of all samples
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
-       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
+       .or. trim(cpot).eq.'uf3' ) then
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
-!!$    if( lnormalize ) call normalize()
-!!$    if( lgdw ) call compute_gdw()
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
     stop
@@ -289,7 +287,6 @@ subroutine write_initial_setting()
   use minimize
   use random
   use composition
-  use fp_common,only: cpenalty, penalty
   implicit none 
   integer:: i
 
@@ -342,8 +339,16 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
   
   write(6,'(a)') ''
-  write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
-  write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
+  if( trim(cpenalty).ne.'none' ) write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
+  if( trim(cpenalty).eq.'ridge' ) then
+    write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
+  else if( trim(cpenalty).eq.'uf3' ) then
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_diff',pwgt2bd
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_short',pwgt2bs
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b',pwgt3b
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b_diff',pwgt3bd
+  endif
 !!$  write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
@@ -382,7 +387,7 @@ subroutine write_initial_setting()
   if( len(trim(crefstrct)).gt.5 ) then
     print *,''
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
-  else if( trim(cpot).ne.'DNN' ) then
+  else if( trim(cpot).ne.'dnn' ) then
     do i=1,nspmax
       if( trim(specorder(i)).ne.'x' ) then
         write(6,'(2x,a25,2x,i2,a4,es15.7)') 'atom_energy',i,specorder(i),eatom(i)
@@ -1122,9 +1127,9 @@ subroutine qn_wrapper(ftrn0,ftst0)
   external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
-       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
+!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
+       .or. trim(cpot).eq.'uf3' ) then
     call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1171,9 +1176,9 @@ subroutine cg_wrapper(ftrn0,ftst0)
   external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'DNN' &
-       .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'UF3' ) then
+!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
+  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
+       .or. trim(cpot).eq.'uf3' ) then
     call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1210,7 +1215,7 @@ subroutine check_grad(ftrn0,ftst0)
   use variables
 !!$  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
-  use fp_common,only: func_w_pmd, grad_w_pmd
+  use fp_common,only: func_w_pmd, grad_w_pmd, wrap_ranges
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: iv
@@ -1218,9 +1223,11 @@ subroutine check_grad(ftrn0,ftst0)
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-8
+  real(8):: vtmp1,vtmp2
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
- 
+
+  call wrap_ranges(nvars,vars,vranges)
   call grad_w_pmd(nvars,vars,ganal)
 
   vars0(1:nvars)= vars(1:nvars)
@@ -1245,11 +1252,15 @@ subroutine check_grad(ftrn0,ftst0)
     vars(1:nvars)= vars0(1:nvars)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
+    call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftmp1,ftst)
+    vtmp1 = vars(iv)
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
+    call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftmp2,ftst)
     gnumer(iv)= (ftmp1-ftmp2)/dv
+    vtmp2 = vars(iv)
     if( myid.eq.0 ) then
       absgnum = abs(gnumer(iv))
       absgana = abs(ganal(iv))
@@ -2169,7 +2180,6 @@ subroutine sync_input()
   use random
   use pmdvars,only: nnmax
   use composition
-  use fp_common,only: cpenalty, penalty
   implicit none
   
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -2201,6 +2211,11 @@ subroutine sync_input()
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(penalty,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt2bd,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt2bs,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt3b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt3bd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(force_limit,1,mpi_real8,0,mpi_world,ierr)
@@ -2286,6 +2301,16 @@ subroutine sync_input()
   endif
 !.....TODO: check what happens if numff==0...
   if( nsubff.gt.0 ) call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
+
+!!$!.....Repulsion correction
+!!$  call mpi_bcast(n_repul_pnts,1,mpi_integer,0,mpi_world,ierr)
+!!$  if( n_repul_pnts > 0 ) then
+!!$    if( .not.allocated(drepul_tbl) ) &
+!!$         allocate(drepul_tbl(n_repul_pnts,nspmax,nspmax))
+!!$    call mpi_bcast(valence_chgs,nspmax,mpi_real8,0,mpi_world,ierr)
+!!$    call mpi_bcast(core_chgs,nspmax,mpi_real8,0,mpi_world,ierr)
+!!$    call mpi_bcast(pwgt_repul,1,mpi_real8,0,mpi_world,ierr)
+!!$  endif
 
 !.....pmdio related
   call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)

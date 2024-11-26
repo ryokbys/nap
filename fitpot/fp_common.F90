@@ -1,10 +1,13 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-20 21:51:13 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-26 14:15:32 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
 !
+  use variables,only: cpenalty,penalty,pwgt2b,pwgt2bd,pwgt2bs, &
+       pwgt3b,pwgt3bd,repul_radii
+  use pmdvars,only: nspmax
   implicit none
   save
   real(8),allocatable:: fdiff(:,:),frcs(:,:),fref(:,:),fsub(:,:),gtrnl(:)
@@ -18,10 +21,6 @@ module fp_common
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
-
-!.....Penalty is moved from minimize module
-  character(len=128):: cpenalty = 'none'
-  real(8):: penalty = 1d-15
 
 !.....Store loverlay and r_inner/outer arrays
   logical:: overlay
@@ -108,29 +107,75 @@ contains
     return
   end subroutine calc_swgts
 !=======================================================================
+  subroutine wrap_ranges(ndim,x,xranges)
+    implicit none
+    integer,intent(in):: ndim
+    real(8),intent(in):: xranges(2,ndim)
+    real(8),intent(inout):: x(ndim)
+
+    integer:: i
+
+    do i=1,ndim
+      if( x(i).lt.xranges(1,i) ) then
+        x(i) = xranges(1,i)
+      else if( x(i).gt.xranges(2,i) ) then
+        x(i) = xranges(2,i)
+      endif
+    enddo
+    return
+  end subroutine wrap_ranges
+!=======================================================================
+  subroutine mask_grad(ndim,vranges,grad)
+!
+!  Set grad 0.0 if vranges is super narrow so that the var to be fixed.
+!
+    integer,intent(in):: ndim
+    real(8),intent(in):: vranges(2,ndim)
+    real(8),intent(inout):: grad(ndim)
+
+    integer:: i
+    logical,save,allocatable:: lfix(:)
+
+    if( .not.allocated(lfix) ) then
+      allocate(lfix(ndim))
+      lfix(:) = .false.
+      do i=1,ndim
+        if( abs(vranges(1,i)-vranges(2,i)) < 1d-14 ) lfix(i) = .true.
+      enddo
+    endif
+
+    do i=1,ndim
+      if( lfix(i) ) grad(i) = 0d0
+    enddo
+    return
+  end subroutine mask_grad
+!=======================================================================
   subroutine func_w_pmd(ndim,x,ftrn,ftst)
 !
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
     use variables,only:samples,tfunc, &
          lematch,lfmatch,lsmatch,nfunc,tcomm,twait,mdsys, &
-         swgt2trn,swgt2tst,cpot, &
+         swgt2trn,swgt2tst,cpot,ismask, &
          nff,cffs,maxna,rcut,force_limit,stress_limit, &
          crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
          ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom, &
          lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs, &
          nn_nl, nn_nhl, nn_sigtype, nn_asig, &
-         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn, &
+         repul_radii,nsp,specorder
     use parallel
-    use minimize
     use descriptor,only: lupdate_gsf,get_descs,get_ints
     use DNN,only: nlayer, nhl, itypesig, asig
+    use UF3,only: calc_short_lossfunc
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,jfcal
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,jfcal,ir
+    integer:: isp,jsp
+    character(len=3):: csi,csj
     real(8):: ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
@@ -144,6 +189,7 @@ contains
     logical,parameter:: lgrad_done = .false.
     logical:: lfdsgnmat
     character(len=128):: csmplname
+    real(8),allocatable,save:: rs(:)
 
     logical,external:: string_in_arr
 
@@ -175,6 +221,10 @@ contains
       stop
     endif
 
+    if( trim(cpot).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+      repul_radii(:,:) = 1d+10
+    endif
+    
     do ismpl=isid0,isid1
       tsmp0 = mpi_wtime()
       if( allocated(ismask) ) then
@@ -203,7 +253,7 @@ contains
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
-      if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
+      if( trim(cpot).eq.'linreg' .or. index(cpot,'nn').ne.0 ) then
         if( .not. allocated(samples(ismpl)%gsf) ) then
           call get_ints(nsf,nal,nnl)
           samples(ismpl)%nsf = nsf
@@ -216,10 +266,13 @@ contains
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
+      if( trim(cpot).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+        call get_shortest_distances(repul_radii)  ! in pmd_core
+      endif
 !!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl=',myid,ismpl,mpi_wtime()-tsmp0
     enddo  ! ismpl
 
-    if( l1st .and. index(cpot,'NN').ne.0 ) then
+    if( l1st .and. index(cpot,'nn').ne.0 ) then
       nn_nl = nlayer -1
       if( .not.allocated(nn_nhl) ) allocate(nn_nhl(0:nn_nl))
       nn_nhl(0:nn_nl) = nhl(0:nlayer-1)
@@ -388,6 +441,7 @@ contains
         ftstl = ftstl +fetmp*fac_etst +fftmp*fac_ftst +fstmp*fac_stst
       endif
     enddo  ! ismpl
+
     terg = terg + tergl
     tfrc = tfrc + tfrcl
     tstrs = tstrs + tstrsl
@@ -409,9 +463,46 @@ contains
 !!$      ftst = ftst /swgt2tst
 !!$    endif
 
+!.....Compute repulsion gradient
+    if( l1st .and. trim(cpot).eq.'uf3' .and. abs(pwgt2bs)>1d-14 ) then
+!.....Merge minimum distances in all nodes
+      call mpi_allreduce(mpi_in_place,repul_radii,nspmax*nspmax, &
+           mpi_real8,mpi_min,mpi_world,ierr)
+!.....Print out repul_radii
+      if( myid==0 ) print '(a)',' Shortest distances of pairs in dataset:'
+      do isp=1,nsp
+!!$        call set_charges(isp, valence_chgs(isp), core_chgs(isp))
+        csi = specorder(isp)
+        do jsp=isp,nsp
+          csj = specorder(jsp)
+          if( myid==0 ) then
+            print '(a,f10.4)','  '//trim(csi)//'-'//trim(csj)//': ', repul_radii(isp,jsp)
+          endif
+        enddo
+      enddo
+!!$      drepul_tbl(:,:,:) = 0d0
+!!$      if( .not.allocated(rs) ) allocate(rs(n_repul_pnts))
+!!$      do isp=1,nsp
+!!$        do jsp=isp,nsp
+!!$          do ir=1,n_repul_pnts
+!!$!.....rs -- r-points to be evaluated as mid-points of sections
+!!$            rs(ir) = repul_radii(isp,jsp)/n_repul_pnts *(dble(ir)-0.5d0)
+!!$          enddo
+!!$          call calc_repul_grad(isp,jsp,n_repul_pnts,rs, &
+!!$               drepul_tbl(:,isp,jsp))
+!!$          drepul_tbl(:,jsp,isp) = drepul_tbl(:,isp,jsp)
+!!$        enddo
+!!$      enddo
+    endif
+
 !.....Penalty to function
     call func_penalty(ndim,x,fpena)
     ftrn = ftrn +fpena
+!.....Repulsion correction
+!!$    if( trim(cpot).eq.'uf3' .and. n_repul_pnts > 0 ) then
+!!$      call calc_short_lossfunc(n_repul_pnts,repul_radii,drepul_tbl,frepul)
+!!$      ftrn = ftrn +pwgt_repul*frepul
+!!$    endif
 
 !.....only the bottle-neck times are taken into account
     tcg = tcl
@@ -442,10 +533,11 @@ contains
          maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
          rcut,myidrefsub,isidrefsub,iprint, &
          ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
-         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot, &
+         vranges,ismask, repul_radii
     use parallel
-    use minimize
-    use UF3,only: get_mem_uf3, dealloc_gwx_uf3
+!!$    use minimize
+    use UF3,only: get_mem_uf3, dealloc_gwx_uf3, calc_short_lossgrad
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -527,7 +619,7 @@ contains
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
       
-      if( (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') &
+      if( (trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') &
            .and. (allocated(samples(ismpl)%gwe) .or. allocated(samples(ismpl)%gwf) &
            .or. allocated(samples(ismpl)%gws) ) ) then
         if( lematch ) gwe(:) = smpl%gwe(:)
@@ -540,7 +632,7 @@ contains
 !.....Note: since lgrad==.true., epot, frcs, strs are not calculated in this run_pmd.
         call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
              ,lfdsgnmat,gwe,gwf,gws)
-        if( (trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') ) then
+        if( (trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') ) then
 !!$          allocate(samples(ismpl)%gwe(ndim), samples(ismpl)%gwf(3,ndim,maxnf), &
 !!$               samples(ismpl)%gws(6,ndim))
 !!$          dmem = dmem +4d0*(size(gwe) +size(gwf) +size(gws))
@@ -709,6 +801,7 @@ contains
 !!$      print '(a,3i5,f8.4)','grad: myid,ismpl,nfcal,tsmpl=',myid,ismpl,smpl%nfcal,mpi_wtime()-tsmp0
     enddo  ! ismpl
 
+
     terg = terg +tergl
     tfrc = tfrc +tfrcl
     tstrs = tstrs +tstrsl
@@ -728,9 +821,17 @@ contains
 !!$    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn
 
 !.....Penalty
+!!$    print '(a,20f10.4)','  gtrn=',gtrn(4:21)
     if( .not.allocated(gpena) ) allocate(gpena(ndim))
     call grad_penalty(ndim,x,gpena)
     gtrn(:) = gtrn(:) +gpena(:)
+!!$    if( trim(cpot).eq.'uf3' .and. n_repul_pnts > 0 ) then
+!!$      if( .not.allocated(grepul) ) allocate(grepul(ndim))
+!!$      call calc_short_lossgrad(n_repul_pnts,repul_radii,drepul_tbl, &
+!!$           ndim,grepul)
+!!$      gtrn(:) = gtrn(:) +pwgt_repul*grepul(:)
+!!$    endif
+    call mask_grad(ndim,vranges,gtrn)
 
 !.....only the bottle-neck times are taken into account
     tcg = tcl
@@ -744,12 +845,12 @@ contains
     twait= twait +twg
 
     if( l1st ) then
-      if( trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') then
+      if( trim(cpot).eq.'uf3') then
         dmem = dmem + get_mem_uf3()
       endif
     endif
     
-    if( trim(cpot).eq.'UF3' .or. trim(cpot).eq.'uf3') then
+    if( trim(cpot).eq.'uf3') then
       call dealloc_gwx_uf3()
     endif
     l1st = .false.
@@ -863,11 +964,11 @@ contains
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
         lfitpot_desc = .true.
         call set_params_linreg(ndim,x)
-      else if( trim(cffs(i)).eq.'DNN' ) then
+      else if( trim(cffs(i)).eq.'dnn' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
         lfitpot_desc = .true.
         call set_params_DNN(ndim,x)
-      else if( trim(cffs(i)).eq.'UF3' .or. trim(cffs(i)).eq.'uf3' ) then
+      else if( trim(cffs(i)).eq.'uf3' ) then
         call set_params_uf3(ndim,x)
 !!$        call print_1b()
 !!$        call print_2b(prm2s(1))
@@ -907,7 +1008,7 @@ contains
 !  Run pmd and get energy and forces of the system.
 !
     use variables,only: mdsys,maxna,iprint,lematch,lfmatch,lsmatch, &
-         maxisp,maxnf
+         maxisp,maxnf,nsp
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
     use force
     use descriptor,only: get_dsgnmat_force
@@ -957,6 +1058,7 @@ contains
   end subroutine run_pmd
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
+    use UF3,only: calc_penalty_uf3
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
@@ -969,11 +1071,15 @@ contains
         fp = fp +x(i)*x(i)
       enddo
       fp = fp *penalty
+    else if( trim(cpenalty).eq.'uf3' ) then
+      call calc_penalty_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+           pwgt3b,pwgt3bd,repul_radii,fp)
     endif
     return
   end subroutine func_penalty
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
+    use UF3,only: calc_penalty_grad_uf3
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gp(ndim)
@@ -983,6 +1089,9 @@ contains
     gp(:) = 0d0
     if( trim(cpenalty).eq.'ridge' ) then
       gp(:) = 2d0*penalty*x(:)
+    else if( trim(cpenalty).eq.'uf3' ) then
+      call calc_penalty_grad_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+           pwgt3b,pwgt3bd,repul_radii,gp)
     endif
     return
   end subroutine grad_penalty
@@ -1542,7 +1651,7 @@ contains
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-    else if( trim(cpot).eq.'DNN' ) then
+    else if( trim(cpot).eq.'dnn' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
         do ihl0=0,nn_nhl(0)
@@ -1624,7 +1733,7 @@ contains
 !!$          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
 !!$        enddo
 !!$      enddo
-    else if( trim(cpot).eq.'DNN' ) then
+    else if( trim(cpot).eq.'dnn' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
         do ihl0=0,nn_nhl(0)
@@ -1671,7 +1780,7 @@ contains
 !!$            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
 !!$          enddo
 !!$        enddo
-      else if( trim(cpot).eq.'DNN' ) then
+      else if( trim(cpot).eq.'dnn' ) then
         iv = 0
         do ihl1=1,nn_nhl(1)
           do ihl0=0,nn_nhl(0)

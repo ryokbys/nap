@@ -69,6 +69,7 @@ subroutine read_vars_fitpot()
   use variables
   use parallel
   use random
+  use fp_common,only: wrap_ranges
   implicit none
   integer,parameter:: ionum = 15
   integer:: i
@@ -109,6 +110,7 @@ subroutine read_vars_fitpot()
   endif
   call mpi_bcast(vars,nvars,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(vranges,2*nvars,mpi_real8,0,mpi_world,ierr)
+  call wrap_ranges(nvars,vars,vranges)
 
 end subroutine read_vars_fitpot
 !=======================================================================

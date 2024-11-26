@@ -37,17 +37,17 @@ end subroutine read_infitpot
 subroutine set_variable(ionum,cname)
   use variables
   use random
-  use minimize
+!!$  use minimize
   use pmdvars,only: nnmax
   use composition
-  use fp_common,only: cpenalty,penalty
+  use util,only: csp2isp, to_lower
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cname
 
   character(len=128):: ctmp
-  character(len=3):: csp 
-  integer:: nrow
+  character(len=3):: csp, csi, csj
+  integer:: nrow, isp, jsp
   real(8):: tmp
 
   if( trim(cname).eq.'num_samples' ) then
@@ -70,6 +70,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'fitting_method' ) then
     call read_c1(ionum,cfmethod)
+    cfmethod = to_lower(cfmethod)
     return
   elseif( trim(cname).eq.'main_directory' .or. &
        trim(cname).eq.'sample_directory' .or. &
@@ -84,6 +85,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'evaluation_type' ) then
     call read_c1(ionum,cevaltype)
+    cevaltype = to_lower(cevaltype)
     return
   elseif( trim(cname).eq.'xtol' ) then
     call read_r1(ionum,xtol)
@@ -123,22 +125,42 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'loss_function' ) then
     call read_c1(ionum,ctype_loss)
+    ctype_loss = to_lower(ctype_loss)
     return
   elseif( trim(cname).eq.'force_denom_type' ) then
     call read_c1(ionum,cfrc_denom)
+    cfrc_denom = to_lower(cfrc_denom)
     return
   elseif( trim(cname).eq.'stress_denom_type' ) then
     call read_c1(ionum,cstrs_denom)
+    cstrs_denom = to_lower(cstrs_denom)
     return
   elseif( trim(cname).eq.'penalty' ) then
     call read_c1(ionum,cpenalty)
+    cpenalty = to_lower(cpenalty)
     return
   elseif( trim(cname).eq.'penalty_weight' ) then
     call read_r1(ionum,penalty)
     return
+  elseif( trim(cname).eq.'pwgt_2b' ) then
+    call read_r1(ionum,pwgt2b)
+    return
+  elseif( trim(cname).eq.'pwgt_2b_diff' ) then
+    call read_r1(ionum,pwgt2bd)
+    return
+  elseif( trim(cname).eq.'pwgt_2b_short' ) then
+    call read_r1(ionum,pwgt2bs)
+    return
+  elseif( trim(cname).eq.'pwgt_3b' ) then
+    call read_r1(ionum,pwgt3b)
+    return
+  elseif( trim(cname).eq.'pwgt_3b_diff' ) then
+    call read_r1(ionum,pwgt3bd)
+    return
   elseif( trim(cname).eq.'potential' .or. &
        trim(cname).eq.'force_field' ) then
     call read_c1(ionum,cpot)
+    cpot = to_lower(cpot)
     return
   elseif( trim(cname).eq.'rcut' ) then
     call read_r1(ionum,rcut)
@@ -164,6 +186,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'normalize_input' ) then
     call read_c1(ionum,cnormalize)
+    cnormalize = to_lower(cnormalize)
     return
   elseif( trim(cname).eq.'num_forces' ) then
     call read_i1(ionum,nfpsmpl)
@@ -179,6 +202,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'line_minimization' ) then
     call read_c1(ionum,clinmin)
+    clinmin = to_lower(clinmin)
     return
   elseif( trim(cname).eq.'test_ratio' ) then
     call read_r1(ionum,ratio_test)
@@ -188,12 +212,15 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'fs_mode' ) then
     call read_c1(ionum,cfsmode)
+    cfsmode = to_lower(cfsmode)
     return
   elseif( trim(cname).eq.'fs_read_mask' ) then
     call read_c1(ionum,cread_fsmask)
+    cread_fsmask = to_lower(cread_fsmask)
     return
   elseif( trim(cname).eq.'fs_xrefresh' ) then
     call read_c1(ionum,cfs_xrefresh)
+    cfs_xrefresh = to_lower(cfs_xrefresh)
     return
   elseif( trim(cname).eq.'fs_max_num_refresh' ) then
     call read_i1(ionum,maxfsrefresh)
@@ -221,6 +248,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'sgd_update' ) then
     call read_c1(ionum,csgdupdate)
+    csgdupdate = to_lower(csgdupdate)
     return
   elseif( trim(cname).eq.'batchsize_per_node' ) then
     call read_i1(ionum,nsgdbsnode)
@@ -242,6 +270,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'init_params' ) then
     call read_c1(ionum,cinitv)
+    cinitv = to_lower(cinitv)
     return
   elseif( trim(cname).eq.'init_params_sgm' ) then
     call read_r1(ionum,vinitsgm)
@@ -321,6 +350,28 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'specorder' ) then
     call read_specorder(ionum)
+    return
+!.....Repulsion correction for short distances
+  elseif( trim(cname).eq.'valence_charges' ) then
+    call read_vals_nsp(ionum,valence_chgs)
+    return
+  elseif( trim(cname).eq.'core_charges' ) then
+    call read_vals_nsp(ionum,core_chgs)
+    return
+  elseif( trim(cname).eq.'num_repul_points' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp, n_repul_pnts
+    return
+  elseif( trim(cname).eq.'pwgt_repul' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp, pwgt_repul
+    return
+  elseif( trim(cname).eq.'repul_radius' ) then
+    backspace(ionum)
+    read(ionum,'(a)') ctmp, csi, csj, tmp
+    isp = csp2isp(csi)
+    jsp = csp2isp(csj)
+    repul_radii(isp,jsp) = tmp
     return
 !      elseif( trim(cname).eq.'' ) then
 !        call read_i1(ionum,nz)
@@ -621,6 +672,28 @@ subroutine read_specorder(ionum)
   read(ctmp,*) c1, (specorder(i),i=1,nsp)
   
 end subroutine read_specorder
+!=======================================================================
+subroutine read_vals_nsp(ionum,vals)
+!
+!  Read valence_ion
+!
+  use util,only: num_data
+  use variables,only: nspmax
+  implicit none 
+  integer,intent(in):: ionum
+  real(8),intent(out):: vals(nspmax)
+
+  character(len=1024):: ctmp
+  character(len=128):: c1
+  integer:: ndat,i,nsp
+
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  nsp = ndat -1
+  read(ctmp,*) c1, (vals(i),i=1,nsp)
+  
+end subroutine read_vals_nsp
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"

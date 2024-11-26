@@ -41,6 +41,8 @@ import nappy
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
 from nappy.util import pbc
 
+from icecream import ic
+
 __author__ = "RYO KOBAYASHI"
 __version__ = "240323"
 
@@ -878,9 +880,9 @@ class NAPSystem(object):
 
         #...Determine possible max of num of neighbors
         nnmax = 0
-        for ic in range(len(lshd)):
+        for icell in range(len(lshd)):
             inc = 0
-            i = lshd[ic]
+            i = lshd[icell]
             if i == -1: continue
             while i >= 0:
                 inc += 1

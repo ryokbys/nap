@@ -1,93 +1,14 @@
 module minimize
-  use variables,only: dmem
+  use variables,only: dmem,numtol,cpena,clinmin,cfsmode,pwgt, &
+       nsgdbsize,nsgdbsnode,ismask,csgdupdate,sgd_rate_ini,sgd_rate_fin, &
+       sgd_eps,adam_b1,adam_b2,ninnergfs,cread_fsmask,cfs_xrefresh, &
+       maxfsrefresh,niter_linmin,fac_dec,fac_inc,armijo_xi,armijo_tau, &
+       armijo_maxiter,icgbtype,m_lbfgs,fupper_lim
+  use fp_common,only: wrap_ranges
   implicit none 
   save
-!.....number of convergence criteria achieved
-  integer:: numtol = 1
-
-!.....penalty: lasso or ridge or smooth
-  character(len=128):: cpena= 'none'
-  character(len=128):: clinmin= 'backtrack'
-  character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
-  real(8):: pwgt = 1d-15
-
-!.....SGD parameters
-  integer:: nsgdbsize = 1
-  integer:: nsgdbsnode = 1
-  integer,allocatable:: ismask(:)
-  character(len=128):: csgdupdate = 'normal'
-  real(8):: sgd_rate_ini = 0.001d0
-  real(8):: sgd_rate_fin = -0.001d0
-  real(8):: sgd_eps = 1.0d-8
-!.....Parameters for ADAM and AdaBound
-  real(8):: adam_b1 = 0.9d0
-  real(8):: adam_b2 = 0.999d0
-
-!.....Group FS inner loop
-  integer:: ninnergfs=100
-  character(len=128):: cread_fsmask = ''
-  character(len=128):: cfs_xrefresh = 'random' ! [zero, random, none]
-  integer:: maxfsrefresh = 2
-
-!.....Max iteration for line minimization
-  integer:: niter_linmin   = 15
-!.....Decreasing factor, should be < 1.0
-  real(8):: fac_dec        = 0.2d0
-!.....Increasing factor, should be > 1.0
-  real(8):: fac_inc        = 5.0d0
-!.....Armijo parameters
-  real(8):: armijo_xi      = 1.0d-4
-  real(8):: armijo_tau     = 0.5d0
-  integer:: armijo_maxiter = 15
-
-!.....CG
-  integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY
-
-!.....L-BFGS
-  integer:: m_lbfgs   = 10
-
-  real(8):: fupper_lim = 1d+5
-  real(8),allocatable:: ranges(:,:)
 
 contains
-!=======================================================================
-  subroutine set_ranges(ndim,xranges)
-    implicit none
-    integer,intent(in):: ndim
-    real(8),intent(in):: xranges(2,ndim)
-
-    if( .not. allocated(ranges) ) allocate(ranges(2,ndim))
-    if( size(ranges).ne.2*ndim ) then
-      deallocate(ranges)
-      allocate(ranges(2,ndim))
-    endif
-    
-    ranges(1:2,1:ndim) = xranges(1:2,1:ndim)
-    return
-  end subroutine set_ranges
-!=======================================================================
-  subroutine wrap_ranges(ndim,x,xranges)
-    implicit none
-    integer,intent(in):: ndim
-    real(8),intent(in):: xranges(2,ndim)
-    real(8),intent(inout):: x(ndim)
-
-    integer:: i
-
-!!$    if( .not.allocated(ranges) ) then
-!!$      print *,'ERROR: ranges is not allocated yet...'
-!!$      stop
-!!$    endif
-
-    do i=1,ndim
-      if( x(i).lt.xranges(1,i) ) then
-        x(i) = xranges(1,i)
-      else if( x(i).gt.xranges(2,i) ) then
-        x(i) = xranges(2,i)
-      endif
-    enddo
-    return
-  end subroutine wrap_ranges
 !=======================================================================
   subroutine write_status(ionum,myid,iprint,cpena,iter,ninner &
        ,ftrn,ftst,pval,xnorm,gnorm,dxnorm,fprev)

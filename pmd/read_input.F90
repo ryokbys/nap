@@ -37,7 +37,7 @@ end subroutine read_inpmd
 subroutine set_variable(ionum,cname)
   use pmdvars
   use pmdmpi
-  use util,only: csp2isp, lowcase
+  use util,only: csp2isp, to_lower
   use force,only: ol_type, ol_force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
   use clrchg,only: lclrchg,cspc_clrchg,clrfield,clrregion,clr_set
@@ -151,7 +151,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'temperature_control' ) then
     call read_c1(ionum,ctctl)
-    ctctl = lowcase(ctctl)
+    ctctl = to_lower(ctctl)
     return
   elseif( trim(cname).eq.'flag_multi_temp' ) then
     call read_l1(ionum,lmultemps)
@@ -234,7 +234,7 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'stress_control' ) then
     call read_c1(ionum,cpctl)
-    cpctl = lowcase(cpctl)
+    cpctl = to_lower(cpctl)
     return
   elseif( trim(cname).eq.'flag_compute_stress' ) then
     call read_l1(ionum,lstrs0)

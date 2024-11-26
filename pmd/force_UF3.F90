@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-20 20:58:27 KOBAYASHI Ryo>
+!                     Last modified: <2024-11-26 14:08:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -290,10 +290,10 @@ contains
     read(ioprms,*) (ps%knik(i), i=1,ps%nknik)
     read(ioprms,*) ps%ncfij, ps%ncfik, ps%ncfjk
     if( allocated(ps%coefs) ) deallocate(ps%coefs)
-    allocate(ps%coefs(ps%ncfij, ps%ncfik, ps%ncfjk))
+    allocate(ps%coefs(ps%ncfjk, ps%ncfik, ps%ncfij))
     do i=1, ps%ncfij
       do j=1, ps%ncfik
-        read(ioprms,*) (ps%coefs(i,j,k), k=1,ps%ncfjk)
+        read(ioprms,*) (ps%coefs(k,j,i), k=1,ps%ncfjk)
       enddo
     enddo
 
@@ -376,7 +376,7 @@ contains
         if( .not.allocated(p3%knij) ) allocate(p3%knij(p3%nknij))
         if( .not.allocated(p3%knik) ) allocate(p3%knik(p3%nknik))
         if( .not.allocated(p3%knjk) ) allocate(p3%knjk(p3%nknjk))
-        if( .not.allocated(p3%coefs)) allocate(p3%coefs(p3%ncfij, p3%ncfik, p3%ncfjk))
+        if( .not.allocated(p3%coefs)) allocate(p3%coefs(p3%ncfjk, p3%ncfik, p3%ncfij))
         call mpi_bcast(p3%knij,p3%nknij,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(p3%knik,p3%nknik,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(p3%knjk,p3%nknjk,mpi_real8,0,mpi_world,ierr)
@@ -592,10 +592,14 @@ contains
                     nij = nij3 +lij
                     if( nij < 1 .or. nij > p3%nknij-4 ) cycle
 !.....Energy
-                    c3t = p3%coefs(nij,nik,njk)
+                    c3t = p3%coefs(njk,nik,nij)
                     tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
+!!$                    if( i3b==1 .and. nij==9 .and. nik==3 .and. njk==11 ) then
+!!$                      print '(a,4i5,5es17.9)',' ia,ja,ka,i3b,c3t,tmp=', &
+!!$                           ia,ja,ka,i3b,c3t,tmp
+!!$                    endif
 !.....Force
                     tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
                     tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
@@ -656,6 +660,7 @@ contains
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
          print '(a,3es12.4)',' force_uf3 epot1,epot2,epot3 = ',epot1,epot2,epot3
+!!$    print '(a,3es24.14)',' force_uf3 epot1,epot2,epot3 = ',epot1,epot2,epot3
 
     return
   end subroutine force_uf3
@@ -838,7 +843,7 @@ contains
                     l = l +1
                     if( nij < 1 .or. nij > p3%nknij-4 ) cycle
 !.....Energy
-                    c3t = p3%coefs(nij,nik,njk)
+                    c3t = p3%coefs(njk,nik,nij)
                     tmp = c3t*bij3(l)*bik3*bjk3
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
@@ -977,17 +982,17 @@ contains
         p3 = prm3s(i3b)
         if( lematch ) then
           if( allocated(prm3s(i3b)%gwe) ) deallocate(prm3s(i3b)%gwe)
-          allocate(prm3s(i3b)%gwe(p3%ncfij,p3%ncfik,p3%ncfjk))
+          allocate(prm3s(i3b)%gwe(p3%ncfjk,p3%ncfik,p3%ncfij))
           tmp = tmp +size(prm3s(i3b)%gwe)*8d0
         endif
         if( lfmatch ) then
           if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
-          allocate(prm3s(i3b)%gwf(3,p3%ncfij,p3%ncfik,p3%ncfjk,nfcal))
+          allocate(prm3s(i3b)%gwf(3,p3%ncfjk,p3%ncfik,p3%ncfij,nfcal))
           tmp = tmp +size(prm3s(i3b)%gwf)*8d0
         endif
         if( lsmatch ) then
           if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
-          allocate(prm3s(i3b)%gws(6,p3%ncfij,p3%ncfik,p3%ncfjk))
+          allocate(prm3s(i3b)%gws(6,p3%ncfjk,p3%ncfik,p3%ncfij))
           tmp = tmp +size(prm3s(i3b)%gws)*8d0
         endif
       enddo
@@ -1150,7 +1155,11 @@ contains
 !!$                    c3t = p3%coefs(nij,nik,njk)
                     if( lematch ) then
                       tmp = bij3(lij)*bik3(lik)*bjk3(ljk)
-                      prm3s(i3b)%gwe(nij,nik,njk) = prm3s(i3b)%gwe(nij,nik,njk) +tmp
+                      prm3s(i3b)%gwe(njk,nik,nij) = prm3s(i3b)%gwe(njk,nik,nij) +tmp
+!!$                      if( i3b==1 .and. nij==9 .and. nik==3 .and. njk==11 ) then
+!!$                        print '(a,4i5,2es24.14)',' ia,ja,ka,i3b,tmp,gwe=', &
+!!$                             ia,ja,ka,i3b,tmp,prm3s(i3b)%gwe(njk,nik,nij)
+!!$                      endif
                     endif
 !.....Force
                     if( lfmatch ) then
@@ -1160,12 +1169,12 @@ contains
                       ifcal = ia2ifcal(ia)
                       jfcal = ia2ifcal(jra)
                       kfcal = ia2ifcal(kra)
-                      if( ifcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,ifcal) &
-                           = prm3s(i3b)%gwf(:,nij,nik,njk,ifcal)+(tmpij(:) +tmpik(:))
-                      if( jfcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,jfcal) &
-                           = prm3s(i3b)%gwf(:,nij,nik,njk,jfcal)+(-tmpij(:)+tmpjk(:))
-                      if( kfcal.ne.0 ) prm3s(i3b)%gwf(:,nij,nik,njk,kfcal) &
-                           = prm3s(i3b)%gwf(:,nij,nik,njk,kfcal)+(-tmpik(:)-tmpjk(:))
+                      if( ifcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,ifcal) &
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,ifcal)+(tmpij(:) +tmpik(:))
+                      if( jfcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,jfcal) &
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,jfcal)+(-tmpij(:)+tmpjk(:))
+                      if( kfcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,kfcal) &
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,kfcal)+(-tmpik(:)-tmpjk(:))
 !!$                      prm3s(i3b)%gwf(:,nij,nik,njk,ia )= prm3s(i3b)%gwf(:,nij,nik,njk,ia)+(tmpij(:) +tmpik(:))
 !!$                      prm3s(i3b)%gwf(:,nij,nik,njk,jra)= prm3s(i3b)%gwf(:,nij,nik,njk,jra)+(-tmpij(:)+tmpjk(:))
 !!$                      prm3s(i3b)%gwf(:,nij,nik,njk,kra)= prm3s(i3b)%gwf(:,nij,nik,njk,kra)+(-tmpik(:)-tmpjk(:))
@@ -1175,17 +1184,17 @@ contains
                       tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
                       tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
                       tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
-                      prm3s(i3b)%gws(1,nij,nik,njk) = prm3s(i3b)%gws(1,nij,nik,njk) &
+                      prm3s(i3b)%gws(1,njk,nik,nij) = prm3s(i3b)%gws(1,njk,nik,nij) &
                            -rij(1)*tmpij(1) -rik(1)*tmpik(1) -rjk(1)*tmpjk(1)
-                      prm3s(i3b)%gws(2,nij,nik,njk) = prm3s(i3b)%gws(2,nij,nik,njk) &
+                      prm3s(i3b)%gws(2,njk,nik,nij) = prm3s(i3b)%gws(2,njk,nik,nij) &
                            -rij(2)*tmpij(2) -rik(2)*tmpik(2) -rjk(2)*tmpjk(2)
-                      prm3s(i3b)%gws(3,nij,nik,njk) = prm3s(i3b)%gws(3,nij,nik,njk) &
+                      prm3s(i3b)%gws(3,njk,nik,nij) = prm3s(i3b)%gws(3,njk,nik,nij) &
                            -rij(3)*tmpij(3) -rik(3)*tmpik(3) -rjk(3)*tmpjk(3)
-                      prm3s(i3b)%gws(4,nij,nik,njk) = prm3s(i3b)%gws(4,nij,nik,njk) &
+                      prm3s(i3b)%gws(4,njk,nik,nij) = prm3s(i3b)%gws(4,njk,nik,nij) &
                            -rij(2)*tmpij(3) -rik(2)*tmpik(3) -rjk(2)*tmpjk(3)
-                      prm3s(i3b)%gws(5,nij,nik,njk) = prm3s(i3b)%gws(5,nij,nik,njk) &
+                      prm3s(i3b)%gws(5,njk,nik,nij) = prm3s(i3b)%gws(5,njk,nik,nij) &
                            -rij(1)*tmpij(3) -rik(1)*tmpik(3) -rjk(1)*tmpjk(3)
-                      prm3s(i3b)%gws(6,nij,nik,njk) = prm3s(i3b)%gws(6,nij,nik,njk) &
+                      prm3s(i3b)%gws(6,njk,nik,nij) = prm3s(i3b)%gws(6,njk,nik,nij) &
                            -rij(1)*tmpij(2) -rik(1)*tmpik(2) -rjk(1)*tmpjk(2)
                     endif
                     
@@ -1218,11 +1227,11 @@ contains
       enddo
       do i3b=1,n3b
         p3 = prm3s(i3b)
-        do k=1,p3%ncfjk
+        do i=1,p3%ncfij
           do j=1,p3%ncfik
-            do i=1,p3%ncfij
+            do k=1,p3%ncfjk
               ip = ip +1
-              gwe(ip) = gwe(ip) +p3%gwe(i,j,k)
+              gwe(ip) = gwe(ip) +p3%gwe(k,j,i)
             enddo
           enddo
         enddo
@@ -1240,17 +1249,15 @@ contains
           do i=1,p2%ncoef
             ip = ip +1
             gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal)  +p2%gwf(1:3,i,ifcal)
-!!$            gwf(1:3,ip,ia) = gwf(1:3,ip,ia)  +p2%gwf(1:3,i,ia)
           enddo
         enddo  ! i2b
         do i3b=1,n3b
           p3 = prm3s(i3b)
-          do k=1,p3%ncfjk
+          do i=1,p3%ncfij
             do j=1,p3%ncfik
-              do i=1,p3%ncfij
+              do k=1,p3%ncfjk
                 ip = ip +1
-                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,i,j,k,ifcal)
-!!$                gwf(1:3,ip,ia) = gwf(1:3,ip,ia) +p3%gwf(1:3,i,j,k,ia)
+                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,k,j,i,ifcal)
               enddo
             enddo
           enddo
@@ -1269,11 +1276,11 @@ contains
       enddo  ! i2b
       do i3b=1,n3b
         p3 = prm3s(i3b)
-        do k=1,p3%ncfjk
+        do i=1,p3%ncfij
           do j=1,p3%ncfik
-            do i=1,p3%ncfij
+            do k=1,p3%ncfjk
               ip = ip +1
-              gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,i,j,k)
+              gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,k,j,i)
             enddo
           enddo
         enddo
@@ -1454,12 +1461,12 @@ contains
       stop
     endif
 
-    if( .not. has_solo ) then
-      print *,'ERROR(set_params_uf3): .not.has_solo which should not happen.'
-    endif
-    if( .not. has_trios ) then
-      print *,'ERROR(set_params_uf3): .not.has_trio which should not happen.'
-    endif
+!!$    if( .not. has_solo ) then
+!!$      print *,'ERROR(set_params_uf3): .not.has_solo which should not happen.'
+!!$    endif
+!!$    if( .not. has_trios ) then
+!!$      print *,'ERROR(set_params_uf3): .not.has_trio which should not happen.'
+!!$    endif
 
 !.....Count num of coeffs in force_uf3
     ncoef = 0
@@ -1498,7 +1505,9 @@ contains
         do icfik=1,prm3s(i3b)%ncfik
           do icfjk=1,prm3s(i3b)%ncfjk
             inc = inc +1
-            prm3s(i3b)%coefs(icfij,icfik,icfjk) = params_in(inc)
+            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
+!!$            if( inc==2560 ) print '(a,4i5)',' inc,icfij,icfik,icfjk,coefs=', &
+!!$                 inc,icfij,icfik,icfjk,
           enddo
         enddo
       enddo
@@ -1506,6 +1515,395 @@ contains
 
     return
   end subroutine set_params_uf3
+!=======================================================================
+  subroutine calc_penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
+       pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
+!
+!  Accesor routine to set uf3 parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+         repul_radii(nspmax,nspmax)
+    real(8),intent(out):: penalty
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp
+    type(prm2):: p2
+    type(prm3):: p3
+    real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
+    logical:: ledge
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    p2b = 0d0
+    p2bd= 0d0
+    p2bs= 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+!.....variables only for short-distance penalty
+      isp = p2%isp
+      jsp = p2%jsp
+      rc = repul_radii(isp,jsp)
+      nr2 = knot_index(rc,p2%nknot,p2%knots)
+      
+      do ic=1,p2%ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
+        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
+      enddo
+      if( abs(pwgt2bs)>1d-14 ) then
+        do ic=1,nr2-1
+          dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
+          if( dc1 < 0d0 ) p2bs = p2bs +dc1**2
+          if( ic-2 < 1 ) cycle
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
+               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0d0 ) p2bs = p2bs +dc2**2
+        enddo
+      endif
+      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      do ic=2,p2%ncoef-1
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2 ) cycle
+        tmp = 0d0
+        do k=-1,1,2
+          tmp = tmp +(prm2s(i2b)%coefs(ic+k) -prm2s(i2b)%coefs(ic))
+        enddo
+        p2bd = p2bd +tmp**2
+      enddo
+      
+    enddo
+    p2b = p2b*pwgt2b
+    p2bd = p2bd*pwgt2bd
+    p2bs = p2bs*pwgt2bs
+
+!.....3-body
+    p3b = 0d0
+    p3bd= 0d0
+    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+      do i3b=1,n3b
+        do icfij=1,prm3s(i3b)%ncfij
+          do icfik=1,prm3s(i3b)%ncfik
+            do icfjk=1,prm3s(i3b)%ncfjk
+              inc = inc +1
+              prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
+              p3b = p3b +prm3s(i3b)%coefs(icfjk,icfik,icfij)**2
+            enddo
+          enddo
+        enddo
+        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        p3 = prm3s(i3b)
+        do icfij=1,p3%ncfij
+          do icfik=1,p3%ncfik
+            do icfjk=1,p3%ncfjk
+!.....ij
+              if( icfij-1 > 0 .and. icfij+1 <= p3%ncfij ) p3bd = p3bd + &
+                   (p3%coefs(icfjk,icfik,icfij-1) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   +p3%coefs(icfjk,icfik,icfij+1))**2
+!.....ik
+              if( icfik-1 > 0 .and. icfik+1 <= p3%ncfik ) p3bd = p3bd + &
+                   (p3%coefs(icfjk,icfik-1,icfij) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   +p3%coefs(icfjk,icfik+1,icfij))**2
+!.....jk
+              if( icfjk-1 > 0 .and. icfjk+1 <= p3%ncfjk ) p3bd = p3bd + &
+                   (p3%coefs(icfjk-1,icfik,icfij) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   +p3%coefs(icfjk+1,icfik,icfij))**2
+            enddo
+          enddo
+        enddo
+      enddo
+    endif
+    p3b = p3b *pwgt3b
+    p3bd= p3bd*pwgt3bd
+    penalty = p2b +p2bd +p2bs +p3b +p3bd
+
+    return
+  end subroutine calc_penalty_uf3
+!=======================================================================
+  subroutine calc_penalty_grad_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
+       pwgt2bs,pwgt3b,pwgt3bd,repul_radii,grad)
+!
+!  Accesor routine to get gradient of uf3 ridge penalty.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+         repul_radii(nspmax,nspmax)
+    real(8),intent(out):: grad(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,ip, &
+         nr2,isp,jsp
+    type(prm2):: p2
+    type(prm3):: p3
+    real(8):: tmp,dc1,dc2,rc
+    logical:: ledge
+    real(8),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
+    integer,save:: nc2max, ncfijmax, ncfikmax, ncfjkmax
+    integer,save,allocatable:: ic2ip(:),ic3ip(:,:,:)
+
+    if( .not.allocated(gp2b) ) then
+      allocate(gp2b(ndimp),gp2bd(ndimp),gp2bs(ndimp), &
+           gp3b(ndimp),gp3bd(ndimp))
+      nc2max = 0
+      do i2b=1,n2b
+        nc2max = max(nc2max, prm2s(i2b)%ncoef)
+      enddo
+      allocate(ic2ip(nc2max))
+      ncfijmax = 0
+      ncfikmax = 0
+      ncfjkmax = 0
+      do i3b=1,n3b
+        ncfijmax = max(ncfijmax, prm3s(i3b)%ncfij)
+        ncfikmax = max(ncfikmax, prm3s(i3b)%ncfik)
+        ncfjkmax = max(ncfjkmax, prm3s(i3b)%ncfjk)
+      enddo
+      allocate(ic3ip(ncfjkmax,ncfikmax,ncfijmax))
+    endif
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    gp2b(:) = 0d0
+    gp2bd(:)= 0d0
+    gp2bs(:)= 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+!.....variables only for short-distance penalty
+      isp = p2%isp
+      jsp = p2%jsp
+      rc = repul_radii(isp,jsp)
+      nr2 = knot_index(rc,p2%nknot,p2%knots)
+      
+      ic2ip(:) = 0
+      do ic=1,prm2s(i2b)%ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params_in(inc)
+        ic2ip(ic) = inc
+        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2) ) gp2b(inc) = &
+             gp2b(inc) +2d0*pwgt2b*prm2s(i2b)%coefs(ic)
+      enddo
+      if( abs(pwgt2bs)>1d-14 ) then
+        do ic=1,nr2-1
+          dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
+          ip = ic2ip(ic)
+          if( dc1 < 0d0 ) then
+            gp2bs(ip  )= gp2bs(ip  ) +2d0*dc1 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc1 *pwgt2bs
+          endif
+          if( ic-2 < 1 ) cycle
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
+               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0d0 ) then
+            gp2bs(ip-2)= gp2bs(ip-2) +2d0*dc2 *pwgt2bs
+            gp2bs(ip-1)= gp2bs(ip-1) -6d0*dc2 *pwgt2bs
+            gp2bs(ip  )= gp2bs(ip  ) +6d0*dc2 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc2 *pwgt2bs
+          endif
+        enddo
+      endif
+      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      do ic=1,p2%ncoef
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2 ) cycle
+        ip = ic2ip(ic)
+        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+             *(p2%coefs(ic-2) &
+             -2d0*p2%coefs(ic-1) &
+             +p2%coefs(ic))
+        if( ic-1 > 0 .and. ic+1 <= p2%ncoef ) &
+             gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd*(-2d0) &
+             *(p2%coefs(ic-1) &
+             -2d0*p2%coefs(ic) &
+             +p2%coefs(ic+1))
+        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+             *(p2%coefs(ic) &
+             -2d0*p2%coefs(ic+1) &
+             +p2%coefs(ic+2))
+        enddo
+      enddo
+
+!.....3-body
+    gp3b(:) = 0d0
+    gp3bd(:)= 0d0
+    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+      do i3b=1,n3b
+        ic3ip(:,:,:) = 0
+        do icfij=1,prm3s(i3b)%ncfij
+          do icfik=1,prm3s(i3b)%ncfik
+            do icfjk=1,prm3s(i3b)%ncfjk
+              inc = inc +1
+              prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
+              gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3s(i3b)%coefs(icfjk,icfik,icfij)
+              ic3ip(icfjk,icfik,icfij) = inc
+            enddo
+          enddo
+        enddo
+        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        p3 = prm3s(i3b)
+        do icfij=1,p3%ncfij
+          do icfik=1,p3%ncfik
+            do icfjk=1,p3%ncfjk
+              ip = ic3ip(icfjk,icfik,icfij)
+!.....ij
+              if( icfij-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk,icfik,icfij-2) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij-1) &
+                   +    p3%coefs(icfjk,icfik,icfij))
+              if( icfij-1 > 0 .and. icfij+1 <= p3%ncfij ) &
+                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   *(   p3%coefs(icfjk,icfik,icfij-1) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   +    p3%coefs(icfjk,icfik,icfij+1))
+              if( icfij+2 <= p3%ncfij ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk,icfik,icfij) &
+                   -2d0*p3%coefs(icfjk,icfik,icfij+1) &
+                   +    p3%coefs(icfjk,icfik,icfij+2))
+!.....ik
+              if( icfik-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk,icfik-2,icfij) &
+                   -2d0*p3%coefs(icfjk,icfik-1,icfij) &
+                   +    p3%coefs(icfjk,icfik,  icfij))
+              if( icfik-1 > 0 .and. icfik+1 <= p3%ncfik ) &
+                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   *(   p3%coefs(icfjk,icfik-1,icfij) &
+                   -2d0*p3%coefs(icfjk,icfik,  icfij) &
+                   +    p3%coefs(icfjk,icfik+1,icfij))
+              if( icfik+2 <= p3%ncfik ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk,icfik,  icfij) &
+                   -2d0*p3%coefs(icfjk,icfik+1,icfij) &
+                   +    p3%coefs(icfjk,icfik+2,icfij))
+!.....jk
+              if( icfjk-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk-2,icfik,icfij) &
+                   -2d0*p3%coefs(icfjk-1,icfik,icfij) &
+                   +    p3%coefs(icfjk,  icfik,icfij))
+              if( icfjk-1 > 0 .and. icfjk+1 <= p3%ncfjk ) &
+                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   *(   p3%coefs(icfjk-1,icfik,icfij) &
+                   -2d0*p3%coefs(icfjk,  icfik,icfij) &
+                   +    p3%coefs(icfjk+1,icfik,icfij))
+              if( icfjk+2 <= p3%ncfjk ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+                   *(   p3%coefs(icfjk,  icfik,icfij) &
+                   -2d0*p3%coefs(icfjk+1,icfik,icfij) &
+                   +    p3%coefs(icfjk+2,icfik,icfij))
+            enddo  ! icfjk
+          enddo  ! icfik
+        enddo  ! icfij
+      enddo  ! i3b
+    endif
+    grad(:) = gp2b(:) +gp2bd(:) +gp2bs(:) +gp3b(:) +gp3bd(:)
+
+    return
+  end subroutine calc_penalty_grad_uf3
+!=======================================================================
+  subroutine calc_short_lossfunc(npnts,radii,drepul,floss)
+!
+!  Compute loss function for short-distance repulsion correction.
+!
+    integer,intent(in):: npnts
+    real(8),intent(in):: radii(nspmax,nspmax),drepul(npnts,nspmax,nspmax)
+    real(8),intent(out):: floss
+
+    integer:: i2b,isp,jsp,ir,lij,n,nr2
+    real(8):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
+    type(prm2):: p2
+    
+    floss = 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      isp = csp2isp(p2%csi)
+      jsp = csp2isp(p2%csj)
+      fli = 0d0
+      do ir=1,npnts
+!.....r-point to be evaluated as mid-point of the section
+        ri = radii(isp,jsp)/npnts *(dble(ir)-0.5d0)
+        call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
+        tmp = 0d0
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          c2t = p2%coefs(n)
+          tmp = tmp +c2t *dbij(lij)
+        enddo
+        fli = fli +(tmp -drepul(ir,isp,jsp))**2
+      enddo
+      floss = floss +fli/npnts
+    enddo
+    floss = floss/n2b *0.5d0
+    return
+  end subroutine calc_short_lossfunc
+!=======================================================================
+  subroutine calc_short_lossgrad(npnts,radii,drepul,ndimp,gloss)
+!
+!  Compute loss function gradient for short-distance repulsion correction.
+!
+    integer,intent(in):: npnts,ndimp
+    real(8),intent(in):: radii(nspmax,nspmax),drepul(npnts,nspmax,nspmax)
+    real(8),intent(out):: gloss(ndimp)
+
+    integer:: i2b,isp,jsp,ir,lij,n,i1b,inc,ic,ip,nr2
+    real(8):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
+    type(prm2):: p2
+    integer,save:: nc2max
+    integer,save,allocatable:: ic2ip(:)
+
+    if( .not.allocated(ic2ip) ) then
+      nc2max = 0
+      do i2b=1,n2b
+        nc2max = max(nc2max, prm2s(i2b)%ncoef)
+      enddo
+      allocate(ic2ip(nc2max))
+    endif
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+    enddo
+    
+    gloss(:) = 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      isp = csp2isp(p2%csi)
+      jsp = csp2isp(p2%csj)
+      ic2ip(:) = 0
+      do ic=1,p2%ncoef
+        inc = inc +1
+        ic2ip(ic) = inc
+      enddo
+      
+      do ir=1,npnts
+!.....r-point to be evaluated as mid-point of the section
+        ri = radii(isp,jsp)/npnts *(dble(ir)-0.5d0)
+        call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
+        tmp = 0d0
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          c2t = p2%coefs(n)
+          tmp = tmp +c2t *dbij(lij)
+        enddo  ! lij
+        fli = tmp -drepul(ir,isp,jsp)
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          ip = ic2ip(n)
+          gloss(ip) = gloss(ip) +fli*dbij(lij)/npnts/n2b
+        enddo  ! lij
+      enddo  ! ir
+    enddo  ! i2b
+    return
+    
+  end subroutine calc_short_lossgrad
 !=======================================================================
   subroutine print_1b()
     integer:: i

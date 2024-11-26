@@ -404,10 +404,15 @@ def uf32fp(outfname,specorder):
     for pair in d2b.keys():
         ncoef = d2b[pair]['ncoef']
         coefs = d2b[pair]['coefs']
+        nlead = d2b[pair]['nlead']
+        ntrail= d2b[pair]['ntrail']
         rc2max = max(rc2max, d2b[pair]['rc2b'])
         for i in range(ncoef):
             fpvars.append(coefs[i])
-            vranges.append((-1e+10, 1e+10))
+            if i < nlead or i >= ncoef -ntrail:
+                vranges.append((0.0, 0.0))
+            else:
+                vranges.append((-1e+10, 1e+10))
 
     rc3max = 0.0
     d3b = uf3_prms['3B']
@@ -417,11 +422,18 @@ def uf32fp(outfname,specorder):
         ncjk = d3b[trio]['ncjk']
         rc3max = max(rc3max, d3b[trio]['rcij'], d3b[trio]['rcik'])
         coefs = d3b[trio]['coefs']
+        nlead = d3b[trio]['nlead']
+        ntrail= d3b[trio]['ntrail']
         for i in range(ncij):
             for j in range(ncik):
                 for k in range(ncjk):
                     fpvars.append(coefs[i,j,k])
-                    vranges.append((-1e+10, 1e+10))
+                    if i<nlead or i>=ncij-ntrail \
+                       or j<nlead or j>=ncik-ntrail \
+                       or k<nlead or k>=ncjk-ntrail:
+                        vranges.append((0.0, 0.0))
+                    else:
+                        vranges.append((-1e+10, 1e+10))
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 

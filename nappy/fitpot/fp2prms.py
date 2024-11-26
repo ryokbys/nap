@@ -24,7 +24,7 @@ from prms2fp import read_params_uf3
 from datetime import datetime
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "rev211111"
+__version__ = "241120"
 
 def read_in_fitpot2(infname='in.fitpot'):
     """
@@ -273,6 +273,7 @@ def write_params_uf3(outfname, uf3_prms):
                         f.write(f"{d['coefs'][i,j,k]} ")
                     f.write('\n')
             f.write(footer)
+    print(f' Wrote {outfname}')
     return None
             
 def sort_pairs(pairs,specorder):
@@ -502,16 +503,7 @@ def main():
     triplets = [ t.split('-') for t in triplets ]
     specorder = args['--specorder'].split(',')
 
-    if pot_type == 'map':
-        try:
-            #specorder, interact, param_files = read_in_fitpot('in.fitpot')
-            infp = read_in_fitpot('in.fitpot')
-            # if specorder[0] == 'None':
-            #     specorder = infp['specorder']
-            print(' Loaded some info from in.fitpot')
-        except:
-            raise Exception('Something wrong with reading in.fitpot.')
-    elif specorder[0] == 'None':
+    if specorder[0] == 'None':
         try:
             #specorder, interact, param_files = read_in_fitpot('in.fitpot')
             infp = read_in_fitpot('in.fitpot')
@@ -528,7 +520,14 @@ def main():
         except:
             raise Exception('Something wrong with reading in.fitpot.')
     else:
-        print(' in.fitpot was not loaded.')
+        try:
+            #specorder, interact, param_files = read_in_fitpot('in.fitpot')
+            infp = read_in_fitpot('in.fitpot')
+            # if specorder[0] == 'None':
+            #     specorder = infp['specorder']
+            print(' Loaded some info from in.fitpot')
+        except:
+            raise Exception('Something wrong with reading in.fitpot.')
 
     # pairs = sort_pairs(pairs,specorder)
 

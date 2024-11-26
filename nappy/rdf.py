@@ -326,7 +326,9 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
 
     return rd,nadr
 
-def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=100,fortran=False):
+def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
+                pairwise=False,nnmax=100,fortran=False,
+                format=None):
     nspcs = len(specorder)
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
@@ -336,7 +338,8 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,pairwise=False,nnmax=
         if not os.path.exists(infname):
             print("[Error] File, {0}, does not exist !!!".format(infname))
             sys.exit()
-        nsys = nappy.io.read(fname=infname,specorder=specorder)
+        nsys = nappy.io.read(fname=infname,specorder=specorder,
+                             format=format)
         print(' File =',infname)
         rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
                    pairwise=pairwise,nnmax=nnmax,fortran=fortran)
