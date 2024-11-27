@@ -346,6 +346,14 @@ class NAPSystem(object):
 
         return None
 
+    def species2sid(self, spc:str) -> int:
+        """Convert species name to sid using specorder.
+        """
+        try:
+            return self.specorder.index(spc) +1
+        except:
+            return -1
+    
     def num_atoms(self,sid=0):
         if sid == 0:
             return len(self.atoms)

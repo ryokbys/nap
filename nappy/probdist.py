@@ -13,8 +13,9 @@ Options:
   --sigma SIGMA
               Sigma value of the gaussian smearing. If it is positive,
               use this value in Ang. If it is negative, adopt |SIGMA|*WIDTH. [default: -2.0]
-  --sid SID   ID of species whose distributions are computed.
-              If it is 0, all the atoms are to be taken into account. [default: 0]
+  --species SPC
+              Secies name whose distributions are computed.
+              If it is not given, all the atoms are to be taken into account. [default: None]
   --specorder SPECORDER
               Species order separated by comma. [default: None]
 """
@@ -41,7 +42,7 @@ def get_num_division(nsys,width):
     ndivs[2] = lc/width +1
     return ndivs
 
-def get_prob_dist_kde(ndivs,nsys,sid,sgm):
+def get_prob_dist_kde(ndivs,nsys,spc,sgm):
     tsgm2 = 2.0 *sgm *sgm
     tsgm2i = 1.0 /tsgm2
     la,lb,lc = nsys.get_lattice_lengths()
@@ -52,7 +53,7 @@ def get_prob_dist_kde(ndivs,nsys,sid,sgm):
     prefactor = dv / (np.pi*tsgm2)**1.5
     poss = nsys.get_scaled_positions()
     symbols = np.array(nsys.get_symbols(), dtype=str)
-    to_consider = symbols == nsys.specorder[sid]
+    to_consider = symbols == spc
     xr = np.linspace(0.0, 1.0, ndivs[0])
     yr = np.linspace(0.0, 1.0, ndivs[1])
     zr = np.linspace(0.0, 1.0, ndivs[2])
@@ -65,7 +66,7 @@ def get_prob_dist_kde(ndivs,nsys,sid,sgm):
     ic(pdist.shape)
     return pdist
 
-def get_prob_dist(ndivs,nsys,sid,sgm):
+def get_prob_dist(ndivs,nsys,spc,sgm):
     tsgm2 = 2.0 *sgm *sgm
     tsgm2i = 1.0 /tsgm2
     pdist = np.zeros(ndivs,dtype=float)
@@ -77,7 +78,7 @@ def get_prob_dist(ndivs,nsys,sid,sgm):
     prefactor = dv / (np.pi*tsgm2)**1.5
     poss = nsys.get_scaled_positions()
     symbols = np.array(nsys.get_symbols(), dtype=str)
-    to_consider = symbols == nsys.specorder[sid]
+    to_consider = symbols == spc
     for ia in range(nsys.num_atoms()):
         if not to_consider[ia]:
             continue
@@ -129,9 +130,11 @@ def write_CHGCAR(nsys,pdist,fname='CHGCAR'):
     os.system('rm '+poscar)
     return None
 
-def normalize_pdist(pdist,nsys,sid):
+def normalize_pdist(pdist,nsys,spc):
     print(' Normalize pdist...')
     s = np.sum(pdist)
+    sid = nsys.species2sid(spc)
+    assert sid > 0, "something is wrong with species2sid..."
     na = nsys.num_atoms(sid=sid)
     ic(na,s,sid)
     assert s > 1.0e-14, f"np.sum(pdist) is too small, {s}"
@@ -147,7 +150,9 @@ if __name__ == "__main__":
     if args['-v']:
         ic.enable()
     files = args['FILES']
-    sid = int(args['--sid'])
+    spc = args['--species']
+    if spc == 'None':
+        spc = None
     width = float(args['-w'])
     sgm = float(args['--sigma'])
     if sgm < 0.0:
@@ -158,9 +163,6 @@ if __name__ == "__main__":
     if specorder == None and not (files[0].find('POSCAR') > -1 or
                                   files[0].find('pmd') > -1 ):
         raise ValueError('ERROR: specorder must be specified, unless files are POSCAR format.')
-
-    if sid == 0:
-        raise ValueError('ERROR: sid should be specified and should not be 0.')
 
     files.sort(key=get_key,reverse=True)
 
@@ -181,13 +183,12 @@ if __name__ == "__main__":
         print(' Reading {0:s}...'.format(f))
         #nsys = NAPSystem(fname=f,specorder=specorder)
         nsys = read(fname=f,specorder=specorder)
-        pdist += get_prob_dist(ndivs,nsys,sid,sgm)
+        pdist += get_prob_dist(ndivs,nsys,spc,sgm)
         # if 'pdist' in locals():
         #     pdist += get_prob_dist_kde(ndivs,nsys,sid,sgm)
         # else:
         #     pdist = get_prob_dist_kde(ndivs,nsys,sid,sgm)
-    pdist = normalize_pdist(pdist,nsys0,sid)
+    pdist = normalize_pdist(pdist,nsys0,spc)
     write_CHGCAR(nsys0,pdist)
-    ic(nsys0.atoms)
     print(' Wrote CHGCAR')
     

@@ -8,6 +8,8 @@ Usage:
 
 Options:
   -h, --help  Show this help message and exit.
+  --format FORMAT
+              Input file format. [default: None]
   -d DR       Width of the bin. [default: 0.1]
   -r,--rmax RMAX
               Cutoff radius of radial distribution. [default: 5.0]
@@ -684,6 +686,9 @@ def main():
     sigma = int(args['--gsmear'])
     nnmax = int(args['--nnmax'])
     ofname = args['-o']
+    fmt = args['--format']
+    if fmt == 'None':
+        fmt = None
 
     if nnmax < int(rmax**3):
         newnnmax = int(rmax**3)
@@ -748,7 +753,7 @@ def main():
     rd, agr = rdf_average(infiles, specorder, dr=dr,
                           rmin=rmin, rmax=rmax,
                           pairwise=pairwise, nnmax=nnmax,
-                          fortran=fortran)
+                          fortran=fortran,format=fmt)
 
     if not sigma == 0:
         # print(' Gaussian smearing...')
