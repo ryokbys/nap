@@ -29,7 +29,7 @@ from nappy.common import get_key
 from nappy.io import read, write
 
 from icecream import ic
-ic.disable()
+#ic.disable()
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "241126"
@@ -58,12 +58,14 @@ def get_prob_dist_kde(ndivs,nsys,spc,sgm):
     yr = np.linspace(0.0, 1.0, ndivs[1])
     zr = np.linspace(0.0, 1.0, ndivs[2])
     ic(xr.shape, yr.shape, zr.shape)
-    X,Y,Z = np.meshgrid(xr,yr,zr)
+    X,Y,Z = np.meshgrid(xr,yr,zr,indexing='ij')
     grid_points= np.vstack([X.ravel(), Y.ravel(), Z.ravel()])
     kde = stats.gaussian_kde(poss[to_consider].T)
-    pdist = kde(grid_points).reshape(X.shape)
+    pdist0 = kde(grid_points)
+    pdist = pdist0.reshape(ndivs)
+    ic(grid_points.shape)
     ic(X.shape, Y.shape, Z.shape)
-    ic(pdist.shape)
+    ic(pdist0.shape, pdist.shape)
     return pdist
 
 def get_prob_dist(ndivs,nsys,spc,sgm):
@@ -183,7 +185,7 @@ if __name__ == "__main__":
         print(' Reading {0:s}...'.format(f))
         #nsys = NAPSystem(fname=f,specorder=specorder)
         nsys = read(fname=f,specorder=specorder)
-        pdist += get_prob_dist(ndivs,nsys,spc,sgm)
+        pdist += get_prob_dist_kde(ndivs,nsys,spc,sgm)
         # if 'pdist' in locals():
         #     pdist += get_prob_dist_kde(ndivs,nsys,sid,sgm)
         # else:

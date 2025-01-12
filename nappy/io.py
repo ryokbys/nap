@@ -56,7 +56,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
         import ase.io
         ase.io.write(filename=fname,images=nsys.to_ase_atoms(),
                      format='proteindatabank')
-    elif format in ('extxyz'):
+    elif format in ('extxyz',):
         with open(fname,'w') as f:
             write_extxyz(f,nsys)
     else:
