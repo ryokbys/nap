@@ -286,7 +286,7 @@ subroutine read_params_desc()
 !
   use variables
   use parallel
-  use util, only: num_data, csp2isp
+  use util, only: num_data
   implicit none
 
   integer,parameter:: ionum = 16
@@ -544,7 +544,7 @@ subroutine read_params_ZBL()
   use variables
   use parallel
   use force, only: loverlay
-  use util, only: num_data, csp2isp
+  use util, only: num_data
   implicit none
 
   integer,parameter:: ionum = 17

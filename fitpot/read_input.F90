@@ -40,7 +40,7 @@ subroutine set_variable(ionum,cname)
 !!$  use minimize
   use pmdvars,only: nnmax
   use composition
-  use util,only: csp2isp, to_lower
+  use util,only: to_lower
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cname
@@ -352,6 +352,17 @@ subroutine set_variable(ionum,cname)
     call read_specorder(ionum)
     return
 !.....Repulsion correction for short distances
+  elseif( trim(cname).eq.'correct_short' ) then
+    call read_l1(ionum,l_correct_short)
+    return
+  elseif( trim(cname).eq.'short_radii' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp, csi, csj, tmp
+    isp = csp2isp(csi)
+    jsp = csp2isp(csj)
+    short_radii(isp,jsp) = tmp
+    short_radii(jsp,isp) = tmp
+    return
   elseif( trim(cname).eq.'valence_charges' ) then
     call read_vals_nsp(ionum,valence_chgs)
     return
@@ -365,13 +376,6 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pwgt_repul' ) then
     backspace(ionum)
     read(ionum,*) ctmp, pwgt_repul
-    return
-  elseif( trim(cname).eq.'repul_radius' ) then
-    backspace(ionum)
-    read(ionum,'(a)') ctmp, csi, csj, tmp
-    isp = csp2isp(csi)
-    jsp = csp2isp(csj)
-    repul_radii(isp,jsp) = tmp
     return
 !      elseif( trim(cname).eq.'' ) then
 !        call read_i1(ionum,nz)

@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-26 14:15:32 KOBAYASHI Ryo>
+!                     Last modified: <2024-12-02 16:57:16 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -11,6 +11,7 @@ module fp_common
   implicit none
   save
   real(8),allocatable:: fdiff(:,:),frcs(:,:),fref(:,:),fsub(:,:),gtrnl(:)
+  logical,allocatable:: ldcover(:)  ! whether the parameter is data covered
   real(8),allocatable:: gwe(:),gwf(:,:,:),gws(:,:)
   real(8),allocatable:: gwesub(:)
   real(8):: pdiff(6), ptnsr(3,3)
@@ -27,14 +28,20 @@ module fp_common
 
 contains
 !=======================================================================
-  subroutine init()
+  subroutine init_fp_common()
 !!$    use variables,only: swgt2trn,swgt2tst,lematch,lfmatch,lsmatch
     use variables,only: lematch,lfmatch,lsmatch,wgte,wgtf,wgts, &
          evtrn,fvtrn,svtrn,netrn,nftrn,nstrn, &
-         evtst,fvtst,svtst,netst,nftst,nstst
+         evtst,fvtst,svtst,netst,nftst,nstst, &
+         nspmax,rcut,iprint,nff,cffs
     use parallel,only: myid
+    use pmdvars, only: naux,nstp,nx,ny,nz,dt,rbuf,rc1nn,lvc
+    use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
+    use element,only: init_element
+    use force,only: num_forces, force_list, loverlay
 
-    integer:: nterms
+    integer:: nterms,i
+    logical:: update_force_list
 
     fac_etrn = wgte
     fac_ftrn = wgtf
@@ -54,27 +61,56 @@ contains
       write(6,'(a,2e14.3)') '   Force:  ', fac_ftrn, fac_ftst
       write(6,'(a,2e14.3)') '   Stress: ', fac_strn, fac_stst
     endif
-    
-    
-!!$
-!!$    call calc_swgts(swgt2trn,swgt2tst)
-!!$
-!!$    nterms = 0
-!!$    if( lematch ) nterms = nterms + 1
-!!$    if( lfmatch ) nterms = nterms + 1
-!!$    if( lsmatch ) nterms = nterms + 1
-!!$    swgt2trn = swgt2trn*nterms
-!!$    swgt2tst = swgt2tst*nterms
-!!$    if( myid.eq.0 ) then
-!!$      print *,''
-!!$      write(6,'(a)') ' Weights to divide loss function:'
-!!$      write(6,'(a,f10.1)') '   for training: ',swgt2trn
-!!$      write(6,'(a,f10.1)') '   for test:     ',swgt2tst
-!!$    endif
+
+!.....Create MPI COMM for pmd only for the 1st time
+    call create_mpi_comm_pmd()
+    call init_element()
+
+    nstp = 0
+    dt = 1d0
+    rbuf = 0.0d0
+    rc1nn = 3.0d0
+    rc_pmd = rcut
+
+    nx = 1
+    ny = 1
+    nz = 1
+    iprint_pmd = max(0,iprint-10)
+
+    lvc = .false.
+
+!.....Set force_list in the force module
+    update_force_list = .false.
+    if( nff.ne.num_forces ) then
+      update_force_list = .true.
+    else
+      do i=1,nff
+        if( trim(cffs(i)).ne.trim(force_list(i)) ) then
+          update_force_list = .true.
+          exit
+        endif
+      enddo
+    endif
+!.....Update force_list if needed
+    if( update_force_list ) then
+      num_forces = nff
+      do i=1,num_forces
+        force_list(i) = trim(cffs(i))
+      enddo
+    endif
+!.....Overlay setting
+    if( overlay ) then
+!.....Set loverlay variable in force module
+      loverlay = overlay
+    endif
+
+!.....init_force would perform read_params_XXX for force_XXX.F90 in it.
+    call init_force(.true.)
+    call set_cauxarr()  ! pmd_core.F90
 
     fp_common_initialized = .true.
 
-  end subroutine init
+  end subroutine init_fp_common
 !=======================================================================
   subroutine calc_swgts(swgts_trn,swgts_tst)
 !
@@ -108,12 +144,21 @@ contains
   end subroutine calc_swgts
 !=======================================================================
   subroutine wrap_ranges(ndim,x,xranges)
+    use variables,only: cpot, nsp, short_radii, l_correct_short
+    use uf3,only: uf3_short_correction
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: xranges(2,ndim)
     real(8),intent(inout):: x(ndim)
 
     integer:: i
+
+!.....Short-range correction for uf3
+    if( trim(cpot).eq.'uf3' .and. l_correct_short ) then
+      if( allocated(ldcover) ) then
+        call uf3_short_correction(ndim,x,nsp,short_radii,ldcover)
+      endif
+    endif
 
     do i=1,ndim
       if( x(i).lt.xranges(1,i) ) then
@@ -190,7 +235,6 @@ contains
     logical:: lfdsgnmat
     character(len=128):: csmplname
     real(8),allocatable,save:: rs(:)
-
     logical,external:: string_in_arr
 
     call flush(6)
@@ -204,7 +248,6 @@ contains
     lfdsgnmat = .false.  ! Initialize lfdsgnmat
 
     if( l1st ) then
-      if( .not.fp_common_initialized ) call init()
       if( .not.allocated(fdiff) ) then
         allocate(fdiff(3,maxna),frcs(3,maxna),fref(3,maxna),fsub(3,maxna))
         dmem = dmem +8d0*size(fdiff) +8d0*size(frcs)*3
@@ -833,6 +876,15 @@ contains
 !!$    endif
     call mask_grad(ndim,vranges,gtrn)
 
+    if( .not.allocated(ldcover) ) then
+      allocate(ldcover(ndim))
+      dmem = dmem +4d0*size(ldcover)
+      ldcover(:) = .false.
+      do i=1,ndim
+        if( abs(gtrn(i)) > 1d-14 ) ldcover(i) = .true.
+      enddo
+    endif
+
 !.....only the bottle-neck times are taken into account
     tcg = tcl
     tgg = tgl
@@ -867,10 +919,7 @@ contains
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
          lcheby,cnst,wgtsp_desc,nspmax
     use parallel,only: myid_pmd,mpi_comm_pmd,nnode_pmd
-    use force,only: num_forces, force_list, loverlay
-    use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
-         rc1nn,lvc
-    use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
+    use pmdvars, only: specorder, am, naux
     use element,only: init_element, atom, get_element
     use DNN,only: set_paramsdir_DNN,set_params_DNN,set_actfunc_DNN
     use linreg,only: set_paramsdir_linreg,set_params_linreg
@@ -889,19 +938,12 @@ contains
     character(len=128):: csmplname,ctype
 
     logical,external:: string_in_arr
-    logical,save:: l1st_local = .true.
     type(atom):: elem
     logical:: update_force_list
     real(8):: ptnsr(3,3),ekin
     character:: csp*3
 
-    if( l1st_local ) then
-!.....Create MPI COMM for pmd only for the 1st time
-      call create_mpi_comm_pmd()
-      call init_element()
-    endif
-
-    nstp = 0
+!.....Sample dependent information
 !.....Since at least one of FF requires mass infomation,
 !     set mass info from specorder anyways.
     am(:) = 12d0
@@ -913,51 +955,8 @@ contains
         am(is) = elem%mass
       endif
     enddo
-    dt = 1d0
-    rbuf = 0.0d0
-    rc1nn = 3.0d0
-    rc_pmd = rc
 
-    nx = 1
-    ny = 1
-    nz = 1
-    iprint_pmd = max(0,iprint-10)
-
-    lvc = .false.
-
-!.....Set force_list in the force module
-    update_force_list = .false.
-    if( nff.ne.num_forces ) then
-      update_force_list = .true.
-    else
-      do i=1,nff
-        if( trim(cffs(i)).ne.trim(force_list(i)) ) then
-          update_force_list = .true.
-          exit
-        endif
-      enddo
-    endif
-!.....Update force_list if needed
-    if( update_force_list ) then
-      num_forces = nff
-      do i=1,num_forces
-        force_list(i) = trim(cffs(i))
-      enddo
-    endif
-!.....Overlay setting
-    if( overlay ) then
-!.....Set loverlay variable in force module
-      loverlay = overlay
-    endif
-
-!.....init_force would perform read_params_XXX for force_XXX.F90 in it.
-    if( l1st ) then
-      call init_force(.true.)
-      call set_cauxarr()
-      if( .not.allocated(smpl%aux) ) then
-        allocate(smpl%aux(naux,smpl%natm))
-      endif
-    endif
+    if( l1st .and. .not.allocated(smpl%aux) ) allocate(smpl%aux(naux,smpl%natm))
 
     do i=1,nff
       if( trim(cffs(i)).eq.'linreg' ) then
@@ -970,21 +969,9 @@ contains
         call set_params_DNN(ndim,x)
       else if( trim(cffs(i)).eq.'uf3' ) then
         call set_params_uf3(ndim,x)
-!!$        call print_1b()
-!!$        call print_2b(prm2s(1))
       endif
     
       if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then
-!!$      if( l1st ) then
-!!$!.....Set descriptor parameters read from in.params.desc only at the first time
-!!$        if( lcheby ) then
-!!$          call set_params_desc_new(descs,nsf_desc,nsf2_desc,nsf3_desc, &
-!!$               nsff_desc,ilsf2,ilsf3,lcheby,cnst,wgtsp_desc)
-!!$        else
-!!$          call set_params_desc_new(descs,nsf_desc,nsf2_desc,nsf3_desc, &
-!!$               nsff_desc,ilsf2,ilsf3,lcheby,cnst)
-!!$        endif
-!!$      endif
 !.....Some potentials use descriptors already computed in the previous steps
 !.....and stored in samples (and normalized if specified so.)
         if( .not. lupdate_gsf ) then
@@ -998,7 +985,6 @@ contains
       endif
     enddo  ! i=1,nff
     
-    l1st_local = .false.
     return
   end subroutine pre_pmd
 !=======================================================================

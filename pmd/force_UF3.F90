@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-26 14:08:59 KOBAYASHI Ryo>
+!                     Last modified: <2024-12-02 22:37:04 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -430,13 +430,6 @@ contains
 
     type(prm2):: p2
     type(prm3):: p3
-
-!.....Do not use l1st to detect memory allocation check.
-!!$    if( l1st ) then
-!!$      if( allocated(aal2) ) deallocate(aal2,aal3,strsl,ls3b)
-!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
-!!$      
-!!$    endif
 
     if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
@@ -1290,7 +1283,7 @@ contains
     return
   end subroutine gradw_uf3
 !=======================================================================
-  subroutine b_spl(r,ts,nmax,nr,b,db)
+  subroutine b_spl(r,ts,nmax,nr,b,db,ddb)
 !
 !  Non-recursive implementation of B-spline function at R.
 !  Assuming maximum order (d) = 3.
@@ -1304,14 +1297,16 @@ contains
 !    nr: index n in ts of position r
 !    b: B array
 !    db: dB array (derivative of B)
+!    ddb: ddB array (2nd derivative of B) (optional)
 !
     integer,intent(in):: nmax
     real(8),intent(in):: r,ts(nmax)
     integer,intent(out):: nr
     real(8),intent(out):: b(-3:0), db(-3:0)
+    real(8),intent(out),optional:: ddb(-3:0)
 !.....local variables
     real(8):: btmp(-3:+1,0:3)  ! Temporal B(n,d) array with n in (-3,+1)
-    real(8):: dbtmp(-3:0)
+    real(8):: dbtmp(-3:0), ddbtmp(-3:0)
     integer:: id, n, l
     real(8):: tn0,tn1,tn2,tn3,tn4,dt1,dt2,tmp1,tmp2
     real(8),parameter:: teps = 1d-8  ! epsilon for neighboring knot distance
@@ -1356,6 +1351,34 @@ contains
 
     b(-3:0) = btmp(-3:0,3)
     db(-3:0) = dbtmp(-3:0)
+
+    if( .not.present(ddb) ) return
+!.....Optional: 2nd derivative
+    dbtmp(:) = 0d0
+!.....Compute dB_{n,d-1} and dB_{n+1,d-1} first
+    do l= -3,0
+      n = nr +l
+      tn0 = ts(n)
+      tn1 = ts(n+1)
+      tn2 = ts(n+2)
+      tn3 = ts(n+3)
+      if( abs(tn2-tn0) > teps ) tmp1 = btmp(l,1)/(tn2 -tn0)
+      if( abs(tn3-tn1) > teps ) tmp2 = btmp(l+1,1)/(tn3 -tn1)
+      dbtmp(l) = 2d0 *(tmp1 -tmp2)
+    enddo
+!.....Then, compute ddB_{n,d} using dBs
+    ddbtmp(:) = 0d0
+    do l= -3,0
+      n = nr +l
+      tn0 = ts(n)
+      tn1 = ts(n+1)
+      tn3 = ts(n+3)
+      tn4 = ts(n+1+3)
+      if( abs(tn3-tn0) > teps ) tmp1 = dbtmp(l)/(tn3 -tn0)
+      if( abs(tn4-tn1) > teps ) tmp2 = dbtmp(l+1)/(tn4 -tn1)
+      ddbtmp(l) = 3d0 *(tmp1 -tmp2)
+    enddo
+    ddb(-3:0) = ddbtmp(-3:0)
 
     return
   end subroutine b_spl
@@ -1533,6 +1556,7 @@ contains
     type(prm3):: p3
     real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
     logical:: ledge
+    real(8),parameter:: tiny = 1d-8
 
     inc = 0
     do i1b=1,n1b
@@ -1554,10 +1578,10 @@ contains
       do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
-        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
+        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
       enddo
       if( abs(pwgt2bs)>1d-14 ) then
-        do ic=1,nr2-1
+        do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
           if( dc1 < 0d0 ) p2bs = p2bs +dc1**2
           if( ic-2 < 1 ) cycle
@@ -1568,7 +1592,7 @@ contains
       endif
       if( abs(pwgt2bd).lt.1d-14 ) cycle
       do ic=2,p2%ncoef-1
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2 ) cycle
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
         tmp = 0d0
         do k=-1,1,2
           tmp = tmp +(prm2s(i2b)%coefs(ic+k) -prm2s(i2b)%coefs(ic))
@@ -1690,11 +1714,11 @@ contains
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)
         ic2ip(ic) = inc
-        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2) ) gp2b(inc) = &
+        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) gp2b(inc) = &
              gp2b(inc) +2d0*pwgt2b*prm2s(i2b)%coefs(ic)
       enddo
       if( abs(pwgt2bs)>1d-14 ) then
-        do ic=1,nr2-1
+        do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
           ip = ic2ip(ic)
           if( dc1 < 0d0 ) then
@@ -1714,7 +1738,7 @@ contains
       endif
       if( abs(pwgt2bd).lt.1d-14 ) cycle
       do ic=1,p2%ncoef
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2 ) cycle
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
         ip = ic2ip(ic)
         if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
              *(p2%coefs(ic-2) &
@@ -1904,6 +1928,102 @@ contains
     return
     
   end subroutine calc_short_lossgrad
+!=======================================================================
+  subroutine uf3_short_correction(ndimp,params,nsp,radii,ldcover)
+!
+!  Modify some coefficients to correct short-range repulsive potential.
+!
+    integer,intent(in):: ndimp,nsp
+    real(8),intent(inout):: params(ndimp),radii(nspmax,nspmax)
+    logical,intent(in):: ldcover(ndimp)
+
+    integer:: inc,i1b,i2b,isp,jsp,ic,nr2,ip,min_ic_data,l,n
+    real(8):: ri,tgt,bij(-3:0),dbij(-3:0),ddbij(-3:0),dr,rc, &
+         val,dval,ddval,c
+    type(prm2):: p2
+    integer,save:: nc2max
+    integer,allocatable,save:: ic2ip(:)
+    integer,parameter:: nbuf = 3
+
+    if( .not.allocated(ic2ip) ) then
+      nc2max = 0
+      do i2b=1,n2b
+        nc2max = max(nc2max, prm2s(i2b)%ncoef)
+      enddo
+      allocate(ic2ip(nc2max))
+    endif
+    
+!.....Replace coefficients with params given from outside
+!     so that easily capture the relationshiop between neighboring parameters.
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params(inc)
+    enddo
+    do i2b=1,n2b
+      ic2ip(:) = 0
+      do ic=1,prm2s(i2b)%ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params(inc)
+        ic2ip(ic) = inc
+      enddo
+      min_ic_data = 0
+      do ic=prm2s(i2b)%ncoef,1,-1
+        ip = ic2ip(ic)
+        if( ldcover(ip) ) min_ic_data = ic
+      enddo
+!!$      print '(a,2i5,2f10.3)','i2b,min_ic_data,r,rr=',i2b,min_ic_data,&
+!!$           prm2s(i2b)%knots(min_ic_data),prm2s(i2b)%knots(min_ic_data+4)
+
+!.....Short-range correction
+      p2 = prm2s(i2b)
+      isp = csp2isp(p2%csi)
+      jsp = csp2isp(p2%csj)
+      if( isp < 1 .or. isp > nsp .or. jsp < 1 .or. jsp > nsp ) cycle
+      ri = radii(isp,jsp)
+      if( ri < p2%knots(min_ic_data) ) ri = (p2%knots(min_ic_data)+p2%knots(min_ic_data+1))/2
+      nr2 = knot_index(ri, p2%nknot, p2%knots)
+      call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij,ddbij)
+      val  = 0d0
+      dval = 0d0
+      ddval= 0d0
+      do l= -3,0
+        n = nr2 +l
+        c = p2%coefs(n)
+        val  = val   +c*bij(l)
+        dval = dval  +c*dbij(l)
+        ddval= ddval +c*ddbij(l)
+      enddo
+!.....There must be some condition to dval and/or ddval
+!     to achieve decent repulsion to the pair...
+      dval = min(dval, 0d0)
+      ddval= max(ddval, 1d0)
+!!$      print '(a,3i3,f6.3,i3,3es12.3)','i2b,isp,jsp,ri,nr2,v,dv,ddv=', &
+!!$           i2b,isp,jsp,ri,nr2,val,dval,ddval
+!.....Correct coefs using above information
+      do ic= min_ic_data-1,1,-1
+        rc = p2%knots(ic+2)  ! peak position of B_{ic,3} as t_{ic+2}
+        dr = rc -ri
+        tgt = val +dval*dr +0.5d0*ddval*dr**2
+        ip = ic2ip(ic)
+        params(ip) = max(tgt,0d0)
+!!$        print '(a,i3,4es12.3)','  ic,ri,rc,dr,tgt=',ic,ri,rc,dr,tgt
+      enddo
+      
+!!$      ri = radii(isp,jsp)
+!!$      nr2 = knot_index(ri, p2%nknot, p2%knots)
+!!$      do ic=nr2-nbuf,1,-1
+!!$        if( ic < 1 ) exit
+!!$      do ic=min_ic_data-1,1,-1
+!!$        ip = ic2ip(ic)
+!!$        tgt = 3d0*(p2%coefs(ic+1)-p2%coefs(ic+2)) +p2%coefs(ic+3)
+!!$        params(ip) = max(params(ip+1),tgt,0d0)
+!!$        print '(a,3i5,2es12.3)', '   i2b,ic,ip,tgt,prm=',&
+!!$             i2b,ic,ip,tgt,params(ip)
+!!$      enddo
+    enddo
+    return
+  end subroutine uf3_short_correction
 !=======================================================================
   subroutine print_1b()
     integer:: i

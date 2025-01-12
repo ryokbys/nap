@@ -239,12 +239,14 @@ module variables
   character(len=128):: cpenalty = 'none'
   real(8):: penalty = 1d-15
 !.....Repulsion correction for short distances in UF3 potential
+  logical:: l_correct_short = .false.
+  real(8):: short_radii(nspmax,nspmax)
   real(8):: pwgt2b = 0d0
   real(8):: pwgt2bd= 0d0
   real(8):: pwgt2bs= 0d0
   real(8):: pwgt3b = 0d0
   real(8):: pwgt3bd= 0d0
-  
+
   real(8):: pwgt_repul = 1d-15  ! penalty for repulsion
   real(8):: valence_chgs(nspmax), core_chgs(nspmax)
   real(8):: repul_radii(nspmax,nspmax)
@@ -303,6 +305,7 @@ contains
 
     interact(:,:) = .true.
     cspcs_neglect(:) = 'x'
+    short_radii(:,:) = 0d0
     
   end subroutine init_variables
 !=======================================================================
@@ -356,4 +359,25 @@ contains
     endif
     return
   end function num_interact
+!=======================================================================
+  function csp2isp(csp) result(isp)
+!
+!  Convert csp to isp.
+!  If not found, return -1.
+!
+    character(len=*),intent(in):: csp
+    integer:: isp
+
+    integer:: i
+
+    isp = -1
+    do i=1,nspmax
+      if( trim(csp).eq.trim(specorder(i)) ) then
+        isp = i
+        return
+      endif
+    enddo
+    return
+  end function csp2isp
+!=======================================================================
 end module variables

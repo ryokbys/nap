@@ -1,12 +1,12 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-26 14:14:01 KOBAYASHI Ryo>
+!                     Last modified: <2024-12-02 16:38:07 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
 !!$  use NNd,only:NN_init,NN_func,NN_grad
   use fp_common,only: func_w_pmd, grad_w_pmd, write_dsgnmats &
-       ,subtract_FF, restore_FF, normalize, wrap_ranges
+       ,subtract_FF, restore_FF, normalize, wrap_ranges, init_fp_common
   use composition
   use minimize
   use version
@@ -158,9 +158,12 @@ program fitpot
     lnormalize = .true.
   endif
 
+  call init_fp_common()
+  
 !.....Initial computations of all samples
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
+    call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
@@ -288,7 +291,7 @@ subroutine write_initial_setting()
   use random
   use composition
   implicit none 
-  integer:: i
+  integer:: i,isp,jsp
 
   write(6,*) ''
   write(6,'(a)') '------------------------------------------------------------------------'
@@ -353,7 +356,7 @@ subroutine write_initial_setting()
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
 !!$  write(6,'(2x,a25,2x,es12.3)') 'gscale_factor',gscl
   write(6,'(2x,a25,2x,a)') 'normalize_input',trim(cnormalize)
-  
+
   if( nspcs_neglect.gt.0 ) then
     write(6,'(2x,a25,9(2x,4a))') 'force_neglect_species',(cspcs_neglect(i),i=1,nspcs_neglect)
   endif
@@ -395,6 +398,19 @@ subroutine write_initial_setting()
     enddo
   endif
   write(6,'(a)') ''
+
+  if( l_correct_short ) then
+    write(6,'(2x,a25,2x,l3)') 'correct_short', l_correct_short
+    do isp=1,nsp
+      do jsp=isp,nsp
+        write(6,'(2x,a25,2x,a,f7.3)') 'short_radii', &
+             trim(specorder(isp))//' '//trim(specorder(jsp)), &
+             short_radii(isp,jsp)
+      enddo
+    enddo
+    write(6,'(a)') ''
+  endif
+  
   write(6,'(a)') '------------------------------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -1227,26 +1243,28 @@ subroutine check_grad(ftrn0,ftst0)
 
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
-  call wrap_ranges(nvars,vars,vranges)
-  call grad_w_pmd(nvars,vars,ganal)
-
   vars0(1:nvars)= vars(1:nvars)
   vmax= 0d0
   do iv=1,nvars
     vmax= max(vmax,abs(vars0(iv)))
   enddo
   dv= vmax *dev
+
   if( myid.eq.0 ) then
     print *,''
-    print '(a,es12.4)',' Deviation for numerical derivative =',dv
-  endif
-  if( myid.eq.0 ) then
     write(6,'(a)') '------------------------------ check_grad '&
          //'------------------------------'
+    print '(a,es12.4)',' Deviation for numerical derivative =',dv
+    print *,''
     write(6,'(a)') '     #,          x,    analytical,'// &
          '     numerical,'// &
          '      error [%]'
   endif
+  call flush(6)
+  
+  call wrap_ranges(nvars,vars,vranges)
+  call grad_w_pmd(nvars,vars,ganal)
+
 !.....Loop over variables for numerical derivative
   do iv=1,nvars
     vars(1:nvars)= vars0(1:nvars)
@@ -1637,11 +1655,11 @@ subroutine write_stats(iter)
 
   if( l1st ) then
     if( myid.eq.0 ) then
-      write(6,*) '# ENERGY: ITER, TIME, ' &
+      write(6,*) '# ENERGY:  ITER, TIME, ' &
            //'RMSE(TRAINING), RMSE(TEST), ' &
            //'MAX(TRAINING), MAX(TEST), ' &
-           //'R^2(TRAINING), R^2(TEST), ' 
-      write(6,*) '# FORCE:  ITER, TIME, ' &
+           //'R^2(TRAINING), R^2(TEST)' 
+      write(6,*) '# FORCE:   ITER, TIME, ' &
            //'RMSE(TRAINING), RMSE(TEST), ' &
            //'MAX(TRAINING), MAX(TEST), ' &
            //'R^2(TRAINING), R^2(TEST)'
@@ -2302,6 +2320,9 @@ subroutine sync_input()
 !.....TODO: check what happens if numff==0...
   if( nsubff.gt.0 ) call mpi_bcast(csubffs,20*nsubff,mpi_character,0,mpi_world,ierr)
 
+!.....Short correction
+  call mpi_bcast(l_correct_short,1,mpi_logical,0,mpi_world,ierr)
+  call mpi_bcast(short_radii,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
 !!$!.....Repulsion correction
 !!$  call mpi_bcast(n_repul_pnts,1,mpi_integer,0,mpi_world,ierr)
 !!$  if( n_repul_pnts > 0 ) then
@@ -2469,7 +2490,6 @@ end subroutine set_sample_weights
 subroutine subtract_atomic_energy()
   use variables
   use parallel
-  use util,only: csp2isp
   implicit none
   integer:: ismpl,is,i,isp
   type(mdsys):: smpl
