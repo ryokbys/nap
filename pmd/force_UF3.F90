@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-12-02 22:37:04 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-24 11:39:51 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -2085,15 +2085,17 @@ contains
     do i2b=1,n2b
       p2 = prm2s(i2b)
       dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
-      if( allocated(p2%gwe) ) dmem = dmem +8d0*(size(p2%gwe) &
-           +size(p2%gwf) +size(p2%gws) )
+      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
     enddo
     do i3b=1,n3b
       p3 = prm3s(i3b)
       dmem = dmem +8d0*( size(p3%knij) +size(p3%knik) +size(p3%knjk) &
            +size(p3%coefs) )
-      if( allocated(p3%gwe) ) dmem = dmem +8d0*( size(p3%gwe) &
-           +size(p3%gwf) +size(p3%gws) )
+      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
     enddo
     return
   end function get_mem_uf3
@@ -2117,5 +2119,5 @@ contains
 end module UF3
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

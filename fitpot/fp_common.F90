@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-12-02 16:57:16 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-24 11:44:21 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -611,6 +611,7 @@ contains
     if( .not.allocated(gwe) ) then
       allocate(gwe(ndim),gwf(3,ndim,maxnf),gws(6,ndim))
       dmem = dmem +8d0*size(gwe) +8d0*size(gwf) +8d0*size(gws)
+!!$      if( myid.eq.0 ) print *,'grad_w_pmd: dmem,size(gwf)=',dmem,size(gwf)
     endif
     if( len(trim(crefstrct)).gt.5 ) then
       if( .not.allocated(gwesub) ) then
@@ -692,7 +693,7 @@ contains
           if( lsmatch ) then
             if( .not.allocated(samples(ismpl)%gws) ) allocate(samples(ismpl)%gws(6,ndim))
             samples(ismpl)%gws(:,:)= gws(:,:)
-            dmem = dmem +4d0*size(gwf)
+            dmem = dmem +4d0*size(gws)
           endif
         endif
       endif
@@ -899,6 +900,7 @@ contains
     if( l1st ) then
       if( trim(cpot).eq.'uf3') then
         dmem = dmem + get_mem_uf3()
+!!$        if( myid.eq.0 ) print *,'get_mem_uf3: dmem=',dmem
       endif
     endif
     
@@ -1339,11 +1341,13 @@ contains
     if( .not.allocated(gsfml) ) then
       allocate(gsfml(nsf),gsfvl(nsf),gsfcl(nsf,nsf),&
            gsfvsq(nsf),gsfsl(nsf))
+!!$      if( myid.eq.0 ) print *,'get_mean_gsf: dmem=',dmem
     endif
     if( .not. allocated(gsfms) ) then
       allocate(gsfms(nsf),gsfvs(nsf),gsfss(nsf),gsfcorr(nsf,nsf))
       dmem = dmem +8d0*size(gsfms) +8d0*size(gsfvs) +8d0*size(gsfss) &
            +8d0*size(gsfcorr)
+!!$      if( myid.eq.0 ) print *,'get_mean_gsf: dmem=',dmem
     endif
 
 !.....compute mean value

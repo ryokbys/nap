@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-12-02 16:38:07 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-24 11:45:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -78,6 +78,7 @@ program fitpot
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
   dmem = dmem +8d0*size(gvar) +8d0*size(dvar)
+!!$  if( myid.eq.0 ) print *,'after read_vars, dmem=',dmem
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -2574,9 +2575,9 @@ subroutine set_max_num_atoms()
   call mpi_allreduce(maxninl,maxnin,1,mpi_integer,mpi_max,mpi_world,ierr)
   call mpi_allreduce(maxninl,natot,1,mpi_integer,mpi_sum,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ne.0 ) then
-    write(6,'(a,i0)') ' Max num of atoms among samples   = ',maxna
-    write(6,'(a,i0)') ' Max num of atoms among nodes     = ',maxnin
-    write(6,'(a,i0)') ' Total num of atoms among samples = ',natot
+    write(6,'(a,i0)') ' Max num of atoms in samples   = ',maxna
+    write(6,'(a,i0)') ' Max num of atoms in nodes     = ',maxnin
+    write(6,'(a,i0)') ' Total num of atoms in dataset = ',natot
     if( lfmatch ) write(6,'(a,i0)') ' Max num of atoms whose forces' &
          //' are used for force-matching = ',maxnf
   endif
