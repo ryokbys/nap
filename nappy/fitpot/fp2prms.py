@@ -516,7 +516,7 @@ def main():
                     pairs.append(i)
                 elif len(i) == 3:
                     triplets.append(i)
-            print(' Loaded some info from in.fitpot')
+            print(' Loaded some information from in.fitpot')
         except:
             raise Exception('Something wrong with reading in.fitpot.')
     else:
@@ -550,8 +550,11 @@ def main():
         print('')
 
     elif pot_type in ('UF3', 'uf3'):
-        uf3_prms = read_params_uf3('in.params.uf3')
-        outfname = 'in.params.uf3_'+datetime.now().strftime('%y%m%d')
+        prmfname = 'in.params.uf3'
+        if not os.path.exists(prmfname):
+            raise Exception(f'Cannot find {prmfname}.')
+        uf3_prms = read_params_uf3(prmfname)
+        outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
         fp2uf3(outfname, varsfp['variables'], uf3_prms, **kwargs)
     else:
         if len(pairs) == 0:

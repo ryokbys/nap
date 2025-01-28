@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-24 11:39:51 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-27 17:07:31 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -422,7 +422,7 @@ contains
          ixyz,jxyz,lij,lik,ljk
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t,epotl1,epot1
+         c2t,c3t,epotl1,epot1,fac3b
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -471,7 +471,7 @@ contains
 !$omp      reduction(+:epotl2,epotl3)
     do ia=1,natm
       is = int(tag(ia))
-      epi(ia) = epi(ia) +erg1s(is)
+!!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
       ls3b(0) = 0
@@ -504,7 +504,7 @@ contains
           c2t = p2%coefs(n)
           tmp = c2t *bij(lij)
 !.....Energy
-          epi(ia) = epi(ia) +tmp
+!!$          epi(ia) = epi(ia) +tmp
           epotl2 = epotl2 +tmp
 !.....Forces
           tmp2 = c2t *dbij(lij)
@@ -526,7 +526,18 @@ contains
             enddo
           enddo
         enddo  ! lij
-      enddo
+      enddo  ! jj
+!!$      if( ia==13 ) then
+!!$        write(6,fmt='(a,i4)',advance='no') 'ia,ls3b(:)=',ia
+!!$        do jj=1,ls3b(0)
+!!$          ja = ls3b(jj)
+!!$          jtot = itotOf(tag(ja))
+!!$          js = int(tag(ja))
+!!$          write(6,fmt="(2x,i3,'[',i2,',',i1']')",advance='no') ja,jtot,js
+!!$        enddo
+!!$        write(6,*) ''
+!!$      endif
+      
 
 !.....Trio part is separated from pair part,
 !.....which may be slower because of double computation of dij,
@@ -537,12 +548,11 @@ contains
           i3b = interact3(is,jsp,ksp)
           if( i3b <= 0 ) cycle
           p3 = prm3s(i3b)
-!!$          do jj=1,lspr(0,ia)
-!!$            ja = lspr(jj,ia)
           do jj=1,ls3b(0)
             ja = ls3b(jj)
             js = int(tag(ja))
             if( js /= jsp ) cycle
+            jtot = itotOf(tag(ja))
             xj(1:3) = ra(1:3,ja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -552,13 +562,14 @@ contains
             drijj(1:3) = rij(1:3)/dij
             call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
             
-!!$            do kk=1,lspr(0,ia)
-!!$              ka = lspr(kk,ia)
             do kk=1,ls3b(0)
               ka = ls3b(kk)
-              if( jsp == ksp .and. ka <= ja ) cycle
+              ktot = itotOf(tag(ka))
+!!$              if( jsp == ksp .and. ka <= ja ) cycle
+              if( jsp == ksp .and. ktot <= jtot ) cycle
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
+!!$              if( ia==13 .and. iprint>1 ) print *,'ja,js,ka,ks=',ja,js,ka,ks
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
               xjk(1:3) = xk(1:3) -xj(1:3)
@@ -594,9 +605,9 @@ contains
 !!$                           ia,ja,ka,i3b,c3t,tmp
 !!$                    endif
 !.....Force
-                    tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
-                    tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
-                    tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
+                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk)*drijj(1:3)
+                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk)*drikk(1:3)
+                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk)*drjkk(1:3)
                     do ixyz=1,3
 !$omp atomic
                       aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
@@ -623,6 +634,13 @@ contains
                   enddo  ! lij
                 enddo  ! ljk
               enddo  ! lik
+!!$              if( ia==13 .and. iprint>1 ) then
+!!$                jtot = itotOf(tag(ja))
+!!$                ktot = itotOf(tag(ka))
+!!$                print '(a,i3,"(",i2,x,i1,")",i3,"(",i2,x,i1,")",es14.6)',&
+!!$                     'ja(jtot,js),ka(ktot,ks),epi=', &
+!!$                     ja,jtot,js,ka,ktot,ks,epi(ia)
+!!$              endif
 
             enddo  ! kk
           enddo  ! jj
@@ -1115,10 +1133,11 @@ contains
             
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
-              if( jsp == ksp .and. ka <= ja ) cycle
+!!$              if( jsp == ksp .and. ka <= ja ) cycle
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
               kra = itotOf(tag(ka))
+              if( jsp == ksp .and. kra <= jra ) cycle
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
               xjk(1:3) = xk(1:3) -xj(1:3)
@@ -1224,7 +1243,12 @@ contains
           do j=1,p3%ncfik
             do k=1,p3%ncfjk
               ip = ip +1
-              gwe(ip) = gwe(ip) +p3%gwe(k,j,i)
+!.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
+              if( p3%jsp==p3%ksp ) then
+                gwe(ip) = gwe(ip) +(p3%gwe(k,j,i)+p3%gwe(k,i,j))/2
+              else
+                gwe(ip) = gwe(ip) +p3%gwe(k,j,i)
+              endif
             enddo
           enddo
         enddo
@@ -1250,7 +1274,13 @@ contains
             do j=1,p3%ncfik
               do k=1,p3%ncfjk
                 ip = ip +1
-                gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,k,j,i,ifcal)
+!.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
+                if( p3%jsp==p3%ksp ) then
+                  gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) &
+                       +(p3%gwf(1:3,k,j,i,ifcal)+p3%gwf(1:3,k,i,j,ifcal))/2
+                else
+                  gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,k,j,i,ifcal)
+                endif
               enddo
             enddo
           enddo
@@ -1273,7 +1303,13 @@ contains
           do j=1,p3%ncfik
             do k=1,p3%ncfjk
               ip = ip +1
-              gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,k,j,i)
+!.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
+              if( p3%jsp==p3%ksp ) then
+                gws(1:6,ip) = gws(1:6,ip) &
+                       +(p3%gws(1:6,k,j,i)+p3%gws(1:6,k,i,j))/2
+              else
+                gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,k,j,i)
+              endif
             enddo
           enddo
         enddo
@@ -1465,17 +1501,19 @@ contains
     return
   end subroutine set_paramsdir_uf3
 !=======================================================================
-  subroutine set_params_uf3(ndimp,params_in)
+  subroutine set_params_uf3(ndimp,params)
 !
 !  Accesor routine to set uf3 parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
 !  This will compare num of parameters given from outside
 !  and num of coefficients already read in read_params_uf3().
+!  Also it takes into account the symmetry of 3-body term 
+!  when species of j and k are identical.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(inout):: params(ndimp)
 
-    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
     type(prm2):: p2
     type(prm3):: p3
 
@@ -1515,20 +1553,34 @@ contains
     inc = 0
     do i1b=1,n1b
       inc = inc +1
-      erg1s(i1b) = params_in(inc)
+      erg1s(i1b) = params(inc)
     enddo
     do i2b=1,n2b
       do ic=1,prm2s(i2b)%ncoef
         inc = inc +1
-        prm2s(i2b)%coefs(ic) = params_in(inc)
+        prm2s(i2b)%coefs(ic) = params(inc)
       enddo
     enddo
     do i3b=1,n3b
+      itmp = inc
       do icfij=1,prm3s(i3b)%ncfij
         do icfik=1,prm3s(i3b)%ncfik
           do icfjk=1,prm3s(i3b)%ncfjk
             inc = inc +1
-            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
+            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params(inc)
+!!$            if( inc==2560 ) print '(a,4i5)',' inc,icfij,icfik,icfjk,coefs=', &
+!!$                 inc,icfij,icfik,icfjk,
+          enddo
+        enddo
+      enddo
+      inc = itmp
+      do icfij=1,prm3s(i3b)%ncfij
+        do icfik=1,prm3s(i3b)%ncfik
+          do icfjk=1,prm3s(i3b)%ncfjk
+            inc = inc +1
+            params(inc) = (prm3s(i3b)%coefs(icfjk,icfik,icfij) &
+                 +prm3s(i3b)%coefs(icfjk,icfij,icfik))/2
+!!$            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
 !!$            if( inc==2560 ) print '(a,4i5)',' inc,icfij,icfik,icfjk,coefs=', &
 !!$                 inc,icfij,icfik,icfjk,
           enddo
