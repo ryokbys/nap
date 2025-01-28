@@ -169,7 +169,7 @@ module variables
   integer:: nsmpl_trn,nsmpl_tst
   type(mdsys),allocatable:: samples(:)
   integer:: nvars
-  real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
+  real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:),vbest(:)
 
   integer:: netrn,netst,nftrn,nftst,nstrn,nstst
   real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst

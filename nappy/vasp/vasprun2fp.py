@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """
-Convert from vasprun.xml in DIR direcotry
-to erg.ref, frc.ref, and pos files.
-Note that reading a lot of vasprun.xml takes a lot of time.
+Convert from vasprun.xml in the current working direcotry to pmd-format smpl_#### file.
 
 Usage:
   vasprun2fp.py [options]
@@ -10,7 +8,7 @@ Usage:
 Options:
   -h,--help  Show this message and exit.
   --specorder=SPECORDER
-             Specify the order of species needed to convert POSCAR to pos. [default: None]
+             Specify the order of species written in the pmd-format smpl_#### file. [default: None]
   --index=INDEX
              Convert a snapshot of INDEX. Comma separated indices can be specified. 
              If three digits are separated by colons like 0:1000:10, indices of slices 

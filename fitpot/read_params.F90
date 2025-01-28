@@ -14,12 +14,12 @@ subroutine read_vars()
 
 end subroutine read_vars
 !=======================================================================
-subroutine write_vars(cadd)
-  use variables
-  use parallel
-!!$  use NNd, only: NN_standardize, NN_restore_standard
+subroutine write_vars(nvars,vars,vranges,cadd)
+  use variables,only: cnormalize, lnormalize, cparfile
   use fp_common,only: normalize, restore_normalize
   implicit none
+  integer,intent(in):: nvars
+  real(8),intent(in):: vars(nvars),vranges(2,nvars)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
@@ -44,7 +44,7 @@ subroutine write_vars(cadd)
 !!$    call write_vars_fitpot(cfname)
 !!$  endif
 !.....Always call write_vars_fitpot
-  call write_vars_fitpot(cfname)
+  call write_vars_fitpot(nvars,vars,vranges,cfname)
 
   if( cnormalize(1:4).ne.'none' ) then
 !!$    if( trim(cpot).eq.'NN' .and. .not. &
@@ -87,7 +87,7 @@ subroutine read_vars_fitpot()
   call mpi_bcast(nvars,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rc3,1,mpi_real8,0,mpi_world,ierr)
-  allocate(vars(nvars),vranges(2,nvars))
+  allocate(vars(nvars),vranges(2,nvars),vbest(nvars))
   if( myid.eq.0 ) then
     print '(a,i0)',' Number of variables to be optimized = ',nvars
     do i=1,nvars
@@ -114,13 +114,15 @@ subroutine read_vars_fitpot()
 
 end subroutine read_vars_fitpot
 !=======================================================================
-subroutine write_vars_fitpot(cfname)
+subroutine write_vars_fitpot(nvars,vars,vranges,cfname)
 !
 !  Write params in original fitpot format.
 !
-  use variables
-  use parallel
+  use variables,only: rcut, rc3
+  use parallel,only: myid
   implicit none
+  integer,intent(in):: nvars
+  real(8),intent(in):: vars(nvars), vranges(2,nvars)
   character(len=128),intent(in):: cfname
   integer,parameter:: ionum = 16
   integer:: i

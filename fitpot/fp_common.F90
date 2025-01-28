@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-24 11:44:21 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-28 14:40:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1028,6 +1028,7 @@ contains
     logical,external:: string_in_arr
 
 !.....one_shot force calculation
+!.....NOTE: unit of forces is eV/Ang. (not scaled by h-mat)
     call oneshot4fp(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &

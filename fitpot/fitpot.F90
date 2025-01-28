@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-24 11:45:00 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-28 16:38:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -14,6 +14,7 @@ program fitpot
   use linreg,only: set_iglid_linreg
   use time,only: time_stamp
   use DNN,only: write_tgrads_DNN
+  use UF3,only: symmetrize_params_uf3
   use pmdvars,only: specorder_pmd => specorder
   implicit none
   integer:: ismpl,ihour,imin,isec,isp,jsp
@@ -164,6 +165,8 @@ program fitpot
 !.....Initial computations of all samples
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
+!.....Some restriction to parameters in case of UF3 potential
+    if( trim(cpot)=='uf3' ) call symmetrize_params_uf3(nvars,vars)
     call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
   else
@@ -231,7 +234,8 @@ program fitpot
 !!$    call restore_FF()
 !!$  endif
 
-  call write_vars('fin')
+  call write_vars(nvars,vbest,vranges,'best')
+  call write_vars(nvars,vars,vranges,'fin')
   call write_energy_relation('fin')
   if( nsmpl.lt.nsmpl_outfrc ) then
     call write_force_relation('fin')
@@ -801,7 +805,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   type(mdsys),intent(inout):: smpl
 
   integer:: i,natm,num,ia,l
-  real(8):: tmp,stmp(3,3)
+  real(8):: tmp,stmp(3,3),ftmp(3)
   character(len=128):: cline
   character(len=10):: c1,copt,ctmp1,ctmp2,ctmp3,ctmp
   logical:: ltmp
@@ -872,9 +876,12 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   smpl%fsub(1:3,1:natm)= 0d0
   smpl%ssub(1:3,1:3) = 0d0
   if( smpl%lfref_given ) then
+!.....NOTE: unit of original forces in smpl files is eV/A/A (scaled by h-mat),
+!           thus we need to revert them to eV/A unit.
     do i=1,smpl%natm
-      read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp, &
-           smpl%fref(1:3,i)
+      read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp,ftmp(1:3)
+      smpl%fref(1:3,i) = smpl%h(1:3,1,0)*ftmp(1) &
+           +smpl%h(1:3,2,0)*ftmp(2) +smpl%h(1:3,3,0)*ftmp(3)
       smpl%fabs(i) = sqrt(smpl%fref(1,i)**2 +smpl%fref(2,i)**2 &
            +smpl%fref(3,i)**2)
     enddo
@@ -1147,7 +1154,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call qn(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call qn(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1174,7 +1181,7 @@ subroutine sd_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  call steepest_descent(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol &
+  call steepest_descent(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol &
        ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
        ,niter_eval,write_stats)
 
@@ -1196,7 +1203,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call cg(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call cg(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1222,7 +1229,7 @@ subroutine sgd_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  call sgd(nvars,vars,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+  call sgd(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1,func_w_pmd &
        ,grad_w_pmd,cfmethod,niter_eval,write_stats)
 
@@ -1637,6 +1644,7 @@ subroutine write_stats(iter)
 !!$  use NNd
   implicit none
   integer,intent(in):: iter
+  
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
   type(mdsys)::smpl
   real(8):: de,df,ds
@@ -1756,8 +1764,8 @@ subroutine write_stats(iter)
 !!$      call write_vars('best')
 !!$    endif
   endif
-  write(cnum,'(i0)') iter
-  call write_vars(cnum)
+!!$  write(cnum,'(i0)') iter
+!!$  call write_vars(nvars,vars,vranges,cnum)
 
 !.....force
   dfmaxl_trn= 0d0
@@ -1850,7 +1858,6 @@ subroutine write_stats(iter)
          ,rmse_trn,rmse_tst &
          ,dfmax_trn,dfmax_tst &
          ,fr2trn,fr2tst
-!    call write_vars('tmp')
   endif
 
 !.....stress

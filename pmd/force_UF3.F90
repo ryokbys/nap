@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-27 17:07:31 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-28 12:54:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -1511,7 +1511,7 @@ contains
 !  when species of j and k are identical.
 !
     integer,intent(in):: ndimp
-    real(8),intent(inout):: params(ndimp)
+    real(8),intent(in):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
     type(prm2):: p2
@@ -1573,7 +1573,79 @@ contains
           enddo
         enddo
       enddo
-      inc = itmp
+    enddo
+
+    return
+  end subroutine set_params_uf3
+!=======================================================================
+  subroutine symmetrize_params_uf3(ndimp,params)
+!
+!  Accesor routine to set uf3 parameters from outside.
+!  Make the 3-body parameters symmetric when species of j and k are identical.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: params(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
+    type(prm2):: p2
+    type(prm3):: p3
+
+    if( .not. lprms_read_uf3 ) then
+      print *,'ERROR(set_params_uf3): read_params_uf3 has not been called yet.'
+      stop
+    endif
+
+!!$    if( .not. has_solo ) then
+!!$      print *,'ERROR(set_params_uf3): .not.has_solo which should not happen.'
+!!$    endif
+!!$    if( .not. has_trios ) then
+!!$      print *,'ERROR(set_params_uf3): .not.has_trio which should not happen.'
+!!$    endif
+
+!.....Count num of coeffs in force_uf3
+    ncoef = 0
+    do i1b=1,n1b
+      ncoef = ncoef +1
+    enddo
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      ncoef = ncoef +p2%ncoef
+    enddo
+    do i3b=1,n3b
+      p3 = prm3s(i3b)
+      ncoef = ncoef +p3%ncfij *p3%ncfik *p3%ncfjk
+    enddo
+    if( ncoef.ne.ndimp ) then
+      print *,'ERROR(set_params_uf3): ncoef != ndimp'
+      print *,'    This error may be caused when in.vars.fitpot and ' &
+           //'in.params.uf3 are not consistent.'
+      stop
+    endif
+
+!.....Replace coefficients with params given from outside.
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+!.....pass
+!!$      erg1s(i1b) = params(inc)
+    enddo
+    do i2b=1,n2b
+      do ic=1,prm2s(i2b)%ncoef
+        inc = inc +1
+!.....pass
+!!$        prm2s(i2b)%coefs(ic) = params(inc)
+      enddo
+    enddo
+    do i3b=1,n3b
+!!$      do icfij=1,prm3s(i3b)%ncfij
+!!$        do icfik=1,prm3s(i3b)%ncfik
+!!$          do icfjk=1,prm3s(i3b)%ncfjk
+!!$            inc = inc +1
+!!$            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params(inc)
+!!$          enddo
+!!$        enddo
+!!$      enddo
+!!$      inc = itmp
       do icfij=1,prm3s(i3b)%ncfij
         do icfik=1,prm3s(i3b)%ncfik
           do icfjk=1,prm3s(i3b)%ncfjk
@@ -1589,7 +1661,7 @@ contains
     enddo
 
     return
-  end subroutine set_params_uf3
+  end subroutine symmetrize_params_uf3
 !=======================================================================
   subroutine calc_penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
