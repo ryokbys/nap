@@ -20,7 +20,8 @@ Options:
 import os
 
 from docopt import docopt
-from prms2fp import read_params_uf3
+#from prms2fp import read_params_uf3
+from uf3util import read_params_uf3, write_params_uf3
 from datetime import datetime
 
 __author__ = "Ryo KOBAYASHI"
@@ -224,58 +225,6 @@ def write_params_angular(outfname,triplets,angular_prms):
             f.write(' {0:6.2f}  {1:7.3f} {2:7.3f} {3:7.3f}\n'.format(rc3,alp,bet,gmm))
     return None
 
-def write_params_uf3(outfname, uf3_prms):
-    now = datetime.now()
-    header = f'#UF3 POT UNITS: metal DATE: '+now.strftime('%Y-%m-%d') \
-        +' AUTHOR: RYO KOBAYASHI CITATION:\n'
-    footer = '#\n'
-    with open(outfname, 'w') as f:
-        d1b = uf3_prms['1B']
-        for k,v in d1b.items():
-            f.write(header)
-            f.write(f'1B  {k}  {v}\n')
-            f.write(footer)
-        d2b = uf3_prms['2B']
-        for pair in d2b.keys():
-            d = d2b[pair]
-            f.write(header)
-            spi, spj = pair
-            f.write(f"2B  {spi}  {spj}  {d['nlead']}  {d['ntrail']}  {d['spacing']}\n")
-            f.write(f"{d['rc2b']:.2f}  {d['nknot']}\n")
-            for i,v in enumerate(d['knots']):
-                f.write(f"{v} ")
-            f.write('\n')
-            f.write(f"{d['ncoef']}\n")
-            for i,v in enumerate(d['coefs']):
-                f.write(f"{v} ")
-            f.write('\n')
-            f.write(footer)
-        d3b = uf3_prms['3B']
-        for trio in d3b.keys():
-            d = d3b[trio]
-            f.write(header)
-            spi, spj, spk = trio
-            f.write(f"3B  {spi}  {spj}  {spk}  {d['nlead']}  {d['ntrail']}  {d['spacing']}\n")
-            f.write(f"{d['rcjk']}  {d['rcik']}  {d['rcij']}  {d['nkjk']}  {d['nkik']}  {d['nkij']}\n")
-            for i,v in enumerate(d['knotsjk']):
-                f.write(f"{v} ")
-            f.write('\n')
-            for i,v in enumerate(d['knotsik']):
-                f.write(f"{v} ")
-            f.write('\n')
-            for i,v in enumerate(d['knotsij']):
-                f.write(f"{v} ")
-            f.write('\n')
-            f.write(f"{d['ncij']}  {d['ncik']}  {d['ncjk']}\n")
-            for i in range(d['ncij']):
-                for j in range(d['ncik']):
-                    for k in range(d['ncjk']):
-                        f.write(f"{d['coefs'][i,j,k]} ")
-                    f.write('\n')
-            f.write(footer)
-    print(f' Wrote {outfname}')
-    return None
-            
 def sort_pairs(pairs,specorder):
 
     sorted_pairs = []
@@ -457,7 +406,10 @@ def fp2uf3(outfname, vs, uf3_prms, **kwargs):
                     dic['coefs'][i,j,k] = vs[iv]
         uf3_prms['3B'][trio] = dic
 
-    write_params_uf3(outfname, uf3_prms)
+    write_params_uf3(uf3_prms,
+                     outfname=outfname,
+                     overwrite=True)
+    print(f' Wrote {outfname}')
     return None
 
 def fp2params(vs,**kwargs):

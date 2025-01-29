@@ -23,6 +23,8 @@ from datetime import datetime
 from icecream import ic
 ic.disable()
 
+from uf3util import read_params_uf3
+
 __author__ = "Ryo KOBAYASHI"
 __version__ = "241119"
 
@@ -131,97 +133,6 @@ def read_params_angular(infname):
             continue
     return angular_prms
     
-def read_params_uf3(infname):
-
-    if not os.path.exists(infname):
-        raise FileNotFoundError(infname)
-    
-    uf3_prms = {'1B':{},
-                '2B':{},
-                '3B':{}}
-    mode = 'none'
-    body = 'none'
-    with open(infname,'r') as f:
-        while True:
-            line = f.readline()
-            if not line:
-                break
-            if line[0] == '#':
-                if len(line) > 3:
-                    mode = 'read'
-                    continue
-                else:
-                    mode = 'none'
-                    body = 'none'
-                    continue
-            data = line.split()
-            if data[0] in ('1B','2B','3B'):
-                body = data[0]
-                if body == '1B':
-                    spi = data[1]
-                    epot = float(data[2])
-                    uf3_prms[body][spi] = epot
-                    continue
-                elif body == '2B':
-                    spi = data[1]
-                    spj = data[2]
-                    uf3_prms[body][(spi,spj)] = {}
-                    uf3_prms[body][(spi,spj)]['nlead'] = int(data[3])
-                    uf3_prms[body][(spi,spj)]['ntrail'] = int(data[4])
-                    uf3_prms[body][(spi,spj)]['spacing'] = data[5]
-                    d = f.readline().split()
-                    uf3_prms[body][(spi,spj)]['rc2b'] = float(d[0])
-                    uf3_prms[body][(spi,spj)]['nknot'] = int(d[1])
-                    d = f.readline().split()
-                    uf3_prms[body][(spi,spj)]['knots'] = \
-                        np.array([ float(x) for x in d])
-                    d = f.readline().split()
-                    uf3_prms[body][(spi,spj)]['ncoef'] = int(d[0])
-                    d = f.readline().split()
-                    uf3_prms[body][(spi,spj)]['coefs'] = \
-                        np.array([ float(x) for x in d])
-                    continue
-                elif body == '3B':
-                    spi = data[1]
-                    spj = data[2]
-                    spk = data[3]
-                    d3b = {}
-                    d3b['nlead'] = int(data[4])
-                    d3b['ntrail'] = int(data[5])
-                    d3b['spacing'] = data[6]
-                    d = f.readline().split()
-                    rcjk,rcij,rcik = (float(d[0]), float(d[1]), float(d[2]))
-                    nkjk,nkij,nkik = (int(d[3]), int(d[4]), int(d[5]))
-                    d3b['rcij'] = rcij
-                    d3b['rcik'] = rcik
-                    d3b['rcjk'] = rcjk
-                    d3b['nkij'] = nkij
-                    d3b['nkik'] = nkik
-                    d3b['nkjk'] = nkjk
-                    d = f.readline().split()
-                    d3b['knotsjk'] = \
-                        np.array([ float(x) for x in d])
-                    d = f.readline().split()
-                    d3b['knotsik'] = \
-                        np.array([ float(x) for x in d])
-                    d = f.readline().split()
-                    d3b['knotsij'] = \
-                        np.array([ float(x) for x in d])
-                    d = f.readline().split()
-                    ncij,ncik,ncjk = (int(d[0]), int(d[1]), int(d[2]))
-                    d3b['ncij'] = ncij
-                    d3b['ncik'] = ncik
-                    d3b['ncjk'] = ncjk
-                    d3b['coefs'] = np.zeros((ncij,ncik, ncjk))
-                    nline3b = ncij*ncik
-                    for icij in range(ncij):
-                        for icik in range(ncik):
-                            d = f.readline().split()
-                            d3b['coefs'][icij,icik,:] = \
-                                [ float(x) for x in d]
-                    uf3_prms[body][(spi,spj,spk)] = d3b
-                        
-    return uf3_prms
     
 def prms_to_fpvars(specorder,prms):
     """
@@ -437,8 +348,7 @@ def uf32fp(outfname,specorder):
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 
-if __name__ == "__main__":
-
+def main():
     args = docopt(__doc__)
     if args['-v']:
         ic.enable()
@@ -469,3 +379,9 @@ if __name__ == "__main__":
         Ultra-fast force-field.
         """
         uf32fp(outfname,specorder)
+
+    return None
+
+if __name__ == "__main__":
+
+    main()

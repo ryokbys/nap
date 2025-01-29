@@ -148,7 +148,7 @@ def write_params_uf3(uf3prms,
             f.write('\n')
             f.write(f'{ncoef}\n')
             for i in range(ncoef):
-                f.write(f'{coefs[i]:0.4e} ')
+                f.write(f'{coefs[i]:11.4e} ')
             f.write('\n')
             f.write('#\n')
     if data3B is not None:
@@ -188,7 +188,7 @@ def write_params_uf3(uf3prms,
             for icij in range(ncij):
                 for icik in range(ncik):
                     for icjk in range(ncjk):
-                        f.write(f'{coefs[icij,icik,icjk]:0.4e} ')
+                        f.write(f'{coefs[icij,icik,icjk]:11.4e} ')
                     f.write('\n')
             f.write('#\n')
     f.close()
