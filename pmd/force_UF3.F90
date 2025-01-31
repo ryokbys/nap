@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-28 12:54:43 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-30 12:41:47 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -422,7 +422,7 @@ contains
          ixyz,jxyz,lij,lik,ljk
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t,epotl1,epot1,fac3b
+         c2t,c3t,epotl1,epot1,fac3b,tmp3
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -475,6 +475,7 @@ contains
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
       ls3b(0) = 0
+      tmp3 = 0d0
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
@@ -527,22 +528,12 @@ contains
           enddo
         enddo  ! lij
       enddo  ! jj
-!!$      if( ia==13 ) then
-!!$        write(6,fmt='(a,i4)',advance='no') 'ia,ls3b(:)=',ia
-!!$        do jj=1,ls3b(0)
-!!$          ja = ls3b(jj)
-!!$          jtot = itotOf(tag(ja))
-!!$          js = int(tag(ja))
-!!$          write(6,fmt="(2x,i3,'[',i2,',',i1']')",advance='no') ja,jtot,js
-!!$        enddo
-!!$        write(6,*) ''
-!!$      endif
-      
 
 !.....Trio part is separated from pair part,
 !.....which may be slower because of double computation of dij,
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
+      tmp3 = 0d0
       do jsp=1,nspmax
         do ksp=jsp,nspmax
           i3b = interact3(is,jsp,ksp)
@@ -569,7 +560,7 @@ contains
               if( jsp == ksp .and. ktot <= jtot ) cycle
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
-!!$              if( ia==13 .and. iprint>1 ) print *,'ja,js,ka,ks=',ja,js,ka,ks
+!!$              if( ia==13 ) print *,'ja,js,ka,ks=',ja,js,ka,ks
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
               xjk(1:3) = xk(1:3) -xj(1:3)
@@ -600,47 +591,36 @@ contains
                     tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
-!!$                    if( i3b==1 .and. nij==9 .and. nik==3 .and. njk==11 ) then
-!!$                      print '(a,4i5,5es17.9)',' ia,ja,ka,i3b,c3t,tmp=', &
-!!$                           ia,ja,ka,i3b,c3t,tmp
-!!$                    endif
 !.....Force
-                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk)*drijj(1:3)
-                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk)*drikk(1:3)
-                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk)*drjkk(1:3)
+                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk) *drijj(1:3) *c3t
+                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk) *drikk(1:3) *c3t
+                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk) *drjkk(1:3) *c3t
                     do ixyz=1,3
 !$omp atomic
-                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
+                      aal3(ixyz,ia)= aal3(ixyz,ia) +(tmpij(ixyz) +tmpik(ixyz))
 !$omp atomic
-                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
+                      aal3(ixyz,ja)= aal3(ixyz,ja) +(-tmpij(ixyz) +tmpjk(ixyz))
 !$omp atomic
-                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
+                      aal3(ixyz,ka)= aal3(ixyz,ka) +(-tmpik(ixyz) -tmpjk(ixyz))
                     enddo
 !.....Stresses
-                    do jxyz=1,3
-                      do ixyz=1,3
+                    do ixyz=1,3
+                      do jxyz=1,3
 !$omp atomic
                         strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                             -0.5d0 *c3t *(rij(jxyz)*tmpij(ixyz) +rik(jxyz)*tmpik(ixyz))
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) +rik(ixyz)*tmpik(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                             -0.5d0 *c3t *(rij(jxyz)*tmpij(ixyz) +rjk(jxyz)*tmpjk(ixyz))
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) +rjk(ixyz)*tmpjk(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
-                             -0.5d0 *c3t *(rik(jxyz)*tmpik(ixyz) +rjk(jxyz)*tmpjk(ixyz))
+                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
                     
                   enddo  ! lij
                 enddo  ! ljk
               enddo  ! lik
-!!$              if( ia==13 .and. iprint>1 ) then
-!!$                jtot = itotOf(tag(ja))
-!!$                ktot = itotOf(tag(ka))
-!!$                print '(a,i3,"(",i2,x,i1,")",i3,"(",i2,x,i1,")",es14.6)',&
-!!$                     'ja(jtot,js),ka(ktot,ks),epi=', &
-!!$                     ja,jtot,js,ka,ktot,ks,epi(ia)
-!!$              endif
 
             enddo  ! kk
           enddo  ! jj

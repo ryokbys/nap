@@ -109,11 +109,12 @@ contains
     return
   end subroutine check_converge
 !=======================================================================
-  subroutine steepest_descent(ndim,x0,xbest,f,g,d,xranges,xtol,gtol,ftol,maxiter &
+  subroutine steepest_descent(ndim,x0,xbest,ibest,f,g,d,xranges,xtol,gtol,ftol,maxiter &
        ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
     implicit none
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
+    integer,intent(out):: ibest
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),d(ndim)
     real(8),intent(out):: xbest(ndim)
@@ -163,6 +164,7 @@ contains
          ,f,ftst,pval,vnorm,gnorm,dxnorm,f)
     ftstbest = ftst
     xbest(:)= x0(:)
+    ibest = 0
     
     alpha = 1d0
     do iter=1,maxiter
@@ -218,7 +220,7 @@ contains
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
+        if( iter.ne.maxiter ) call sub_eval(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
 !.....Update x
@@ -240,6 +242,7 @@ contains
            ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
       if( ftst < ftstbest ) then
         xbest(:) = x(:)
+        ibest = iter
         ftstbest = ftst
       endif
       call check_converge(myid,iprint,'SD',xtol,gtol,ftol &
@@ -255,7 +258,7 @@ contains
     return
   end subroutine steepest_descent
 !=======================================================================
-  subroutine sgd(ndim,x0,xbest,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint &
+  subroutine sgd(ndim,x0,xbest,ibest,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint &
        ,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1 &
        ,func,grad,cfmethod,niter_eval,sub_eval)
 !
@@ -264,6 +267,7 @@ contains
     integer,intent(in):: ndim,iprint,niter_eval,myid,mpi_world, &
          mynsmpl,myntrn,isid0,isid1
     integer,intent(inout):: iflag,maxiter
+    integer,intent(out):: ibest
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
@@ -353,6 +357,7 @@ contains
     call func(ndim,x0,f,ftst)
     ftstbest = ftst
     xbest(:) = x0(:)
+    ibest = 0
     call grad(ndim,x0,g)
     gnorm= sqrt(sprod(ndim,g,g))
     xnorm= sqrt(sprod(ndim,x,x))
@@ -450,13 +455,14 @@ contains
         call func(ndim,x,ftmp,ftst)
         call grad(ndim,x,gtmp)
         gnorm= sqrt(sprod(ndim,gtmp,gtmp))
-        call sub_eval(iter)
+        if( iter.ne.maxiter ) call sub_eval(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
       call write_status(6,myid,iprint,cpena,iter,ninnerstp &
            ,f,ftst,pval,xnorm,gnorm,dxnorm,fp)
       if( ftst < ftstbest ) then
         xbest(:) = x(:)
+        ibest = iter
         ftstbest = ftst
       endif
       call check_converge(myid,iprint,'SGD',xtol,gtol,ftol &
@@ -538,13 +544,14 @@ contains
     return
   end subroutine get_uniq_iarr
 !=======================================================================
-  subroutine cg(ndim,x0,xbest,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
+  subroutine cg(ndim,x0,xbest,ibest,f,g,u,xranges,xtol,gtol,ftol,maxiter,iprint,iflag,myid &
        ,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Conjugate gradient minimization
 !
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
+    integer,intent(out):: ibest
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
@@ -603,6 +610,7 @@ contains
     call func(ndim,x,f,ftst)
     ftstbest = ftst
     xbest(:) = x0(:)
+    ibest = 0
     call grad(ndim,x,g)
     gnorm= sprod(ndim,g,g)
     sgnorm= sqrt(gnorm)
@@ -673,7 +681,7 @@ contains
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
+        if( iter.ne.maxiter ) call sub_eval(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
 !.....Update x
@@ -716,6 +724,7 @@ contains
            ,f,ftst,pval,vnorm,sgnorm,dxnorm,fp)
       if( ftst < ftstbest ) then
         xbest(:) = x(:)
+        ibest = iter
         ftstbest = ftst
       endif
       call check_converge(myid,iprint,'CG',xtol,gtol,ftol &
@@ -731,7 +740,7 @@ contains
     return
   end subroutine cg
 !=======================================================================
-  subroutine qn(ndim,x0,xbest,f,g,u,xranges,xtol,gtol,ftol,maxiter, &
+  subroutine qn(ndim,x0,xbest,ibest,f,g,u,xranges,xtol,gtol,ftol,maxiter, &
        iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
 !
 !  Limited-memory Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
@@ -740,6 +749,7 @@ contains
 !
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
+    integer,intent(out):: ibest
     real(8),intent(in):: xtol,gtol,ftol,xranges(2,ndim)
     real(8),intent(inout):: f,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
@@ -832,6 +842,7 @@ contains
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
     ftstbest = ftst
+    ibest = 0
     xbest(:) = x0(:)
     vnorm= sqrt(sprod(ndim,x,x))
     dxnorm = 0d0
@@ -928,11 +939,12 @@ contains
            ,f,ftst,pval,vnorm,gnorm,dxnorm,fp)
       if( ftst < ftstbest ) then
         xbest(:) = x0(:)
+        ibest = iter
         ftstbest = ftst
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        call sub_eval(iter)
+        if( iter.ne.maxiter ) call sub_eval(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
       call check_converge(myid,iprint,'QN',xtol,gtol,ftol &

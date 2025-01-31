@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-01-27 15:38:04 KOBAYASHI Ryo>
+!                     Last-modified: <2025-01-30 12:58:20 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -1281,7 +1281,6 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     gws(:,:) = gws(:,:) /vol *up2gpa
   endif
 
-!      print *,'one_shot: 07'
   if( iprint.ge.ipl_basic ) print *,'sa2stnsr...'
   eki(:,:,:) = 0d0
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)

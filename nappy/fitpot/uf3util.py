@@ -194,49 +194,6 @@ def write_params_uf3(uf3prms,
     f.close()
     return None
 
-def uf3_to_fpvars(uf3prms,
-                  outfname='in.vars.fitpot',
-                  overwrite=False):
-    if os.path.exists(outfname) and not overwrite:
-        raise Exception(f'{outfname} already exists.')
-
-    data1B = uf3prms.get('1B',None)
-    data2B = uf3prms.get('2B',None)
-    data3B = uf3prms.get('3B',None)
-
-    coefs = []
-
-    if data1B is not None:
-        spcs = data1B.keys()
-        for spi in spcs:
-            epot = data1B[spi]
-            coefs += [epot]
-
-    rc2 = 0.0
-    if data2B is not None:
-        pairs = data2B.keys()
-        for p in pairs:
-            spi,spj = p
-            coefs += to_list(data2B[p]['coefs'])
-            rc2 = max(rc2, data2B[p]['rc2b'])
-
-    rc3 = 0.0
-    if data3B is not None:
-        trios = data3B.keys()
-        for t in trios:
-            spi,spj,spk = t
-            coefs += data3B[t]['coefs'].flatten().tolist()
-            rc3 = max(rc3, data3B[t]['rcij'])
-
-    with open(outfname, 'w') as f:
-        f.write('#  in.vars.fitpot via uf3util.uf3_to_fitpot().\n')
-        nctot = len(coefs)
-        f.write(f'  {nctot}  {rc2:0.3f}  {rc3:0.3f}\n')
-        for ic in range(nctot):
-            f.write(f'  {coefs[ic]:0.4f}   -1.0e+10   1.0e+10\n')
-    print(' Wrote '+outfname)
-    return None
-
 def to_list(variable):
     if isinstance(variable, np.ndarray):
         return variable.tolist()
@@ -277,60 +234,6 @@ def handle_combine(args):
     write_params_uf3(prms, outfname=args.output,
                      author=args.author)
     print(f' wrote {args.output}')
-    return None
-    
-def handle_pmd2fp(args):
-    prms = read_params_uf3(args.infile)
-    uf3_to_fpvars(prms, outfname=args.outfile)
-    return None
-    
-def handle_fp2pmd(args):
-    #...uf3 param-file format is obtained from output file,
-    #   this may sound a bit weird but it is necessary to get uf3 information from somewhere.
-    prms = read_params_uf3(args.outfile)
-    with open(args.infile, 'r') as f:
-        lines = f.readlines()
-        for line in lines:
-            data = line.split()
-            nctot = int(data[0])
-            rc2 = float(data[1])
-            rc3 = float(data[2])
-            coefs = []
-            for ic in range(nctot):
-                data = f.readline().split()
-                coefs.append(float(data[0]))
-    assert len(coefs)==nctot, "Num of coefs not correct. Check in.vars.fitpot."
-
-    #...assign vars to uf3 coefs
-    data1B = prms.get('1B',None)
-    data2B = prms.get('2B',None)
-    data3B = prms.get('3B',None)
-    inc = 0
-    if data1B is not None:
-        spcs =  data1B.keys()
-        for spi in spcs:
-            prms['1B'][spi] = coefs[inc]
-            inc += 1
-
-    if data2B is not None:
-        pairs = data2B.keys()
-        for p in pairs:
-            c2 = to_list(data2B[p]['coefs'])
-            for ic in range(len(c2)):
-                prms['2B'][p]['coefs'][ic] = coefs[inc]
-                inc += 1
-
-    if data3B is not None:
-        trios = data3B.keys()
-        for t in trios:
-            c3i,c3j,c3k = data3B[t]['coefs'].shape
-            for ic in range(c3i):
-                for jc in range(c3j):
-                    for kc in range(c3k):
-                        prms['3B'][t]['coefs'][ic,jc,kc] = coefs[inc]
-                        inc += 1
-
-    write_params_uf3(prms, outfname=args.outfile, overwrite=True)
     return None
     
 def merge_dicts(dict1, dict2):
@@ -382,19 +285,6 @@ def main():
                          default="")
     combine.set_defaults(func=handle_combine)
 
-    pmd2fp = subparsers.add_parser('pmd2fp', help="Convert from in.params.uf3 to in.vars.fitpot.")
-    pmd2fp.add_argument("infile", help="input file [default: in.params.uf3]",
-                        default="in.params.uf3")
-    pmd2fp.add_argument("outfile", help="output file [default: in.vars.fitpot]",
-                        default="in.vars.fitpot")
-    pmd2fp.set_defaults(func=handle_pmd2fp)
-    
-    fp2pmd = subparsers.add_parser('fp2pmd', help="Convert from in.vars.fitpot to in.params.uf3.")
-    fp2pmd.add_argument("infile", help="input file [default: in.vars.fitpot]",
-                        default="in.vars.fitpot")
-    fp2pmd.add_argument("outfile", help="output file [default: in.params.uf3]",
-                        default="in.params.uf3")
-    fp2pmd.set_defaults(func=handle_fp2pmd)
     
     # Analyze argument
     args = parser.parse_args()

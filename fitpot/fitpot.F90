@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-28 16:38:59 KOBAYASHI Ryo>
+!                     Last modified: <2025-01-31 23:40:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -221,7 +221,10 @@ program fitpot
     endif
   endif
 
-  call write_stats(niter)
+!.....Compute func value of the best vars
+  call func_w_pmd(nvars,vbest,ftrn0,ftst0)
+  if( myid.eq.0 ) print '(a,i0)', ' Best result at ',ibest
+  call write_stats(ibest)
 
 !!$  call write_energy_relation('subtracted')
 !!$  if( nsmpl.lt.nsmpl_outfrc ) then
@@ -1154,7 +1157,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call qn(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call qn(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1181,7 +1184,7 @@ subroutine sd_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  call steepest_descent(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol &
+  call steepest_descent(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol &
        ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
        ,niter_eval,write_stats)
 
@@ -1203,7 +1206,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call cg(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call cg(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1229,7 +1232,7 @@ subroutine sgd_wrapper(ftrn0,ftst0)
   real(8):: fval
   external:: write_stats
 
-  call sgd(nvars,vars,vbest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+  call sgd(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1,func_w_pmd &
        ,grad_w_pmd,cfmethod,niter_eval,write_stats)
 
@@ -2176,9 +2179,12 @@ subroutine get_data_stats()
   call mpi_bcast(nstst,1,mpi_integer,0,mpi_world,ierr)
   if( myid.eq.0 .and. iprint.ge.1 ) then
     print '(/a)',' Number of data (total,train,test), standard deviations (train, test):'
-    print '(a,3i10,2es12.3)', '   Energy: ',netrn+netst,netrn,netst,sqrt(evtrn),sqrt(evtst)
-    print '(a,3i10,2es12.3)', '   Force:  ',nftrn+nftst,nftrn,nftst,sqrt(fvtrn),sqrt(fvtst)
-    print '(a,3i10,2es12.3)', '   Stress: ',nstrn+nstst,nstrn,nstst,sqrt(svtrn),sqrt(svtst)
+    print '(a,3i10,2es12.3)', '   Energy: ',netrn+netst,netrn,netst,&
+         sqrt(evtrn),sqrt(evtst)
+    print '(a,3i10,2es12.3)', '   Force:  ',nftrn+nftst,nftrn,nftst,&
+         sqrt(fvtrn),sqrt(fvtst)
+    print '(a,3i10,2es12.3)', '   Stress: ',nstrn+nstst,nstrn,nstst,&
+         sqrt(svtrn),sqrt(svtst)
   endif
   
   return
