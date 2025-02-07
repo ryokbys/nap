@@ -301,6 +301,9 @@ module variables
   integer:: m_lbfgs   = 10
 
   real(8):: fupper_lim = 1d+5
+
+!-----DEBUGGING------------------------------------------------------
+  integer:: id_check_grad = 0
   
 contains
   subroutine init_variables()
@@ -308,6 +311,7 @@ contains
     interact(:,:) = .true.
     cspcs_neglect(:) = 'x'
     short_radii(:,:) = 0d0
+    nsubff = 0
     
   end subroutine init_variables
 !=======================================================================

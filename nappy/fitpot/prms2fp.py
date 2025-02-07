@@ -328,6 +328,7 @@ def uf32fp(outfname,specorder):
     rc3max = 0.0
     d3b = uf3_prms['3B']
     for trio in d3b.keys():
+        print(trio)
         ncij = d3b[trio]['ncij']
         ncik = d3b[trio]['ncik']
         ncjk = d3b[trio]['ncjk']

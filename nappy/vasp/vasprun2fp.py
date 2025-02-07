@@ -54,6 +54,9 @@ def output_for_fitpot(nsys, fname='smpl',
                        auxs=['fx','fy','fz'])
     return None
 
+def slice_to_indices(slc, sequence_length):
+    return list(range(*slc.indices(sequence_length)))
+
 def main():
     args=docopt(__doc__)
     # dirs= args['DIR']
@@ -69,28 +72,25 @@ def main():
     
     index= args['--index']
     if ',' in index:
-        index = [ int(x) for x in index.split(',') ]
+        indices = [ int(x) for x in index.split(',') ]
     elif ':' in index:
-        index = [ int(x) for x in index.split(':') ]
-        index = slice(*index)
+        indices = [ int(x) for x in index.split(':') ]
+        indices = slice(*indices)
     else:
-        index = int(index)
+        indices = int(index)
 
-    if type(index) is list:
+    if type(indices) is list:
         print(' The following steps are to be extracted: ',end='')
-        for i in index:
+        for i in indices:
             print(i,end='')
         print('')
-        ase_index = ':'
-    elif type(index) is slice:
+    elif type(indices) is slice:
         print(' The sliced steps are to be extracted, '+args['--index'])
-        ase_index = index
     elif sequence:
         print(' All the sequence are to be extracted.')
-        ase_index = ':'
+        indices = ':'
     else:
-        ase_index = index
-        print(' index   = ',ase_index)
+        print(' indices   = ',indices)
 
     if not os.path.exists('vasprun.xml'):
         raise FileNotFoundError(' No vasprun.xml found!')
@@ -106,18 +106,25 @@ def main():
             os.system("sed -i -e 's|<c>r </c>|<c>Zr</c>|g' vasprun.xml")
         #atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         #...read_vasprun_xml always returns a list object
-        nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml', velocity=velocity)
+        nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml',
+                                          velocity=velocity)
     except Exception as e:
         print(f' Failed to read vasprun.xml because of {e}.')
         raise
 
-    if type(index) is list:
+    if indices == ':':
+        indices = [ i for i in range(len(nsyss)) ]
+    elif type(indices) is slice:
+        indices = slice_to_indices(indices, len(nsyss))
+
+    if type(indices) is list:
         print(' Extracting specified steps from ',len(nsyss),' steps in total')
         n = 0
         for j,nsys in enumerate(nsyss):
-            if j not in index:
+            if j not in indices:
                 continue
             fname = f'smpl_{j:05d}'
+            print('.',end='',flush=True)
             output_for_fitpot(nsys,fname=fname,
                               specorder=specorder)
             n += 1
@@ -127,25 +134,18 @@ def main():
         # for j,nsys in enumerate(nsyss):
         for j,nsys in enumerate(nsyss):
             fname = f'smpl_{j:05d}'
+            print('.',end='',flush=True)
             output_for_fitpot(nsys, fname=fname,
                               specorder=specorder)
-    elif type(index) is slice:
-        indices = index.indices(len(nsyss))
-        print(' Extracting indiecs by the slice:', indices)
-        inc = 0
-        for nsys in nsyss[indices]:
-            fname = f'smpl_{inc:05d}'
-            output_for_fitpot(nsys, fname=fname,
-                              specorder=specorder)
-            inc += 1
     else:   # snapshot
-        if index < 0:
-            fname = f'smpl_{len(nsyss)+index}'
+        if indices < 0:
+            fname = f'smpl_{len(nsyss)+indices}'
         else:
-            fname = f'pmd_{index}'
-        output_for_fitpot(nsyss[index],
+            fname = f'pmd_{indices}'
+        output_for_fitpot(nsyss[indices],
                           fname=fname,
                           specorder=specorder)
+    print('\n vasprun2fp.py done')
     return None
 
 if __name__ == "__main__":

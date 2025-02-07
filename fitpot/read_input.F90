@@ -72,6 +72,9 @@ subroutine set_variable(ionum,cname)
     call read_c1(ionum,cfmethod)
     cfmethod = to_lower(cfmethod)
     return
+  elseif( trim(cname).eq.'check_grad_id' ) then
+    call read_i1(ionum,id_check_grad)
+    return
   elseif( trim(cname).eq.'main_directory' .or. &
        trim(cname).eq.'sample_directory' .or. &
        trim(cname).eq.'dataset_directory' ) then

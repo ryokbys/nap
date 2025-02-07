@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-28 14:40:19 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-07 11:08:09 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -57,9 +57,9 @@ contains
     if( nstst > 1 ) fac_stst = wgts /(svtst*nstst)
     if( myid.eq.0 ) then
       write(6,'(/a)') ' Prefactors for loss function by terms (train,test):'
-      write(6,'(a,2e14.3)') '   Energy: ', fac_etrn, fac_etst
-      write(6,'(a,2e14.3)') '   Force:  ', fac_ftrn, fac_ftst
-      write(6,'(a,2e14.3)') '   Stress: ', fac_strn, fac_stst
+      write(6,'(a,2es14.3)') '   Energy: ', fac_etrn, fac_etst
+      write(6,'(a,2es14.3)') '   Force:  ', fac_ftrn, fac_ftst
+      write(6,'(a,2es14.3)') '   Stress: ', fac_strn, fac_stst
     endif
 
 !.....Create MPI COMM for pmd only for the 1st time

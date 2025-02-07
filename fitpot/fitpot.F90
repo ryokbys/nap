@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-31 23:40:00 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-07 12:07:14 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1278,6 +1278,8 @@ subroutine check_grad(ftrn0,ftst0)
 
 !.....Loop over variables for numerical derivative
   do iv=1,nvars
+    if( id_check_grad > 0 .and. id_check_grad <= nvars &
+         .and. iv.ne.id_check_grad ) cycle
     vars(1:nvars)= vars0(1:nvars)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
@@ -1306,6 +1308,7 @@ subroutine check_grad(ftrn0,ftst0)
          //'--------------------------------'
     print *, 'Finished check_grad'
   endif
+
 end subroutine check_grad
 !=======================================================================
 subroutine test(ftrn0,ftst0)
@@ -2308,7 +2311,7 @@ subroutine sync_input()
   
   call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
   if( myid.ne.0 ) then
-    allocate(cswgt(nserr),swgt0(nserr))
+    allocate(cswgt(nswgt),swgt0(nswgt))
   endif
   call mpi_bcast(cswgt,128*nswgt,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(swgt0,nswgt,mpi_real8,0,mpi_world,ierr)
@@ -2349,6 +2352,9 @@ subroutine sync_input()
 
 !.....pmdio related
   call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)
+
+!.....Debugging
+  call mpi_bcast(id_check_grad,1,mpi_integer,0,mpi_world,ierr)
   
 end subroutine sync_input
 !=======================================================================
@@ -2497,7 +2503,7 @@ subroutine set_sample_weights()
 !!$         ,samples(ismpl)%wgt,samples(ismpl)%eref,erg
   enddo
   if( myid.eq.0 ) then
-    write(6,'(a)') ' Set sample weights of Botlzmann factor.'
+    write(6,'(a)') ' Set sample weights provided in in.fitpot.'
   endif
 end subroutine set_sample_weights
 !=======================================================================

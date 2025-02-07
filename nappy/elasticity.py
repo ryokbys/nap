@@ -351,9 +351,9 @@ def some_moduli(cij):
     prto2 = (3.0*kvrh -2.0*gvrh)/(6.0*kvrh +2.0*gvrh)
 
     print('')
-    print(' Bulk modulus (K)      = {0:10.3f} GPa'.format(kvrh))
-    print(' shear modulus (G)     = {0:10.3f} GPa'.format(gvrh))
-    print(' Poisson\'s ratio (nu) = {0:10.3f}'.format(prto2))
+    print(f' Bulk modulus (K)     = {kvrh:10.3f} GPa')
+    print(f' shear modulus (G)    = {gvrh:10.3f} GPa')
+    print(f" Poisson's ratio (nu) = {prto2:10.3f}")
     print('')
     print(' Definition of elastic moduli, see ' \
         +'https://materialsproject.org/wiki/index.php/Elasticity_calculations')

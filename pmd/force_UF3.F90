@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-01-30 12:41:47 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-07 11:13:29 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -421,8 +421,8 @@ contains
          nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lij,lik,ljk
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
-         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t,epotl1,epot1,fac3b,tmp3
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
+         dbjk3(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -444,16 +444,17 @@ contains
     endif
 
     if( .not.allocated(aal2) ) then
-      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
     endif
     if( size(aal2) < 3*namax ) then
       deallocate(aal2,aal3,strsl)
       allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
     endif
-    if( size(ls3b) < nnmax+1 ) then
-      deallocate(ls3b)
-      allocate(ls3b(0:nnmax))
-    endif
+!!$    if( size(ls3b) < nnmax+1 ) then
+!!$      deallocate(ls3b)
+!!$      allocate(ls3b(0:nnmax))
+!!$    endif
 
     aal2(:,:) = 0d0
     aal3(:,:) = 0d0
@@ -462,8 +463,8 @@ contains
     epotl2 = 0d0
     epotl3 = 0d0
 !$omp parallel
-!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij,drijj,nr2, &
-!$omp      n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
+!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij, &
+!$omp      drijj,nr2,n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
 !$omp      jsp,ksp,i3b,p3,nij3,inc,bij3,dbij3, &
 !$omp      kk,ka,ks,xk,xik,xjk,rik,dik2,dik,rjk,djk2,djk, &
 !$omp      drikk,drjkk,nik3,njk3,nik,bik3,dbik3,njk,bjk3,dbjk3, &
@@ -474,7 +475,7 @@ contains
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
-      ls3b(0) = 0
+!!$      ls3b(0) = 0
       tmp3 = 0d0
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -490,13 +491,16 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2 > p2%rc2 ) cycle
         dij = sqrt(dij2)
-!.....Make short-distance pair-list for 3-body term
-        if( has_trios ) then
-          if( dij2 < rc2_3b(is,js) ) then
-            ls3b(0) = ls3b(0) +1
-            ls3b(ls3b(0)) = ja
-          endif
-        endif
+!.....NOTE: ls3b could be source of bugs and stop using ls3b.
+!           To speed up by reducing pairs for 3-body, use other way
+!           that is safer than this approach.
+!!$!.....Make short-distance pair-list for 3-body term
+!!$        if( has_trios ) then
+!!$          if( dij2 < rc2_3b(is,js) ) then
+!!$            ls3b(0) = ls3b(0) +1
+!!$            ls3b(ls3b(0)) = ja
+!!$          endif
+!!$        endif
         drijj(1:3) = rij(1:3)/dij
         call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
         do lij = -3,0
@@ -505,7 +509,7 @@ contains
           c2t = p2%coefs(n)
           tmp = c2t *bij(lij)
 !.....Energy
-!!$          epi(ia) = epi(ia) +tmp
+          epi(ia) = epi(ia) +tmp
           epotl2 = epotl2 +tmp
 !.....Forces
           tmp2 = c2t *dbij(lij)
@@ -539,8 +543,8 @@ contains
           i3b = interact3(is,jsp,ksp)
           if( i3b <= 0 ) cycle
           p3 = prm3s(i3b)
-          do jj=1,ls3b(0)
-            ja = ls3b(jj)
+          do jj=1,lspr(0,ia)
+            ja = lspr(jj,ia)
             js = int(tag(ja))
             if( js /= jsp ) cycle
             jtot = itotOf(tag(ja))
@@ -553,14 +557,15 @@ contains
             drijj(1:3) = rij(1:3)/dij
             call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
             
-            do kk=1,ls3b(0)
-              ka = ls3b(kk)
+            do kk=1,lspr(0,ia)
+              ka = lspr(kk,ia)
+              if( ka == ja ) cycle
               ktot = itotOf(tag(ka))
-!!$              if( jsp == ksp .and. ka <= ja ) cycle
-              if( jsp == ksp .and. ktot <= jtot ) cycle
+!.....Taking into account the double counting of symmetric terms
+              fac3b = 1d0
+              if( jsp == ksp ) fac3b = 0.5d0
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
-!!$              if( ia==13 ) print *,'ja,js,ka,ks=',ja,js,ka,ks
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
               xjk(1:3) = xk(1:3) -xj(1:3)
@@ -587,34 +592,43 @@ contains
                     nij = nij3 +lij
                     if( nij < 1 .or. nij > p3%nknij-4 ) cycle
 !.....Energy
-                    c3t = p3%coefs(njk,nik,nij)
+                    c3t = p3%coefs(njk,nik,nij) *fac3b
                     tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
 !.....Force
-                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk) *drijj(1:3) *c3t
-                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk) *drikk(1:3) *c3t
-                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk) *drjkk(1:3) *c3t
+                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk) &
+                         *drijj(1:3) *c3t
+                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk) &
+                         *drikk(1:3) *c3t
+                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk) &
+                         *drjkk(1:3) *c3t
                     do ixyz=1,3
 !$omp atomic
-                      aal3(ixyz,ia)= aal3(ixyz,ia) +(tmpij(ixyz) +tmpik(ixyz))
+                      aal3(ixyz,ia)= aal3(ixyz,ia) &
+                           +(tmpij(ixyz) +tmpik(ixyz))
 !$omp atomic
-                      aal3(ixyz,ja)= aal3(ixyz,ja) +(-tmpij(ixyz) +tmpjk(ixyz))
+                      aal3(ixyz,ja)= aal3(ixyz,ja) &
+                           +(-tmpij(ixyz) +tmpjk(ixyz))
 !$omp atomic
-                      aal3(ixyz,ka)= aal3(ixyz,ka) +(-tmpik(ixyz) -tmpjk(ixyz))
+                      aal3(ixyz,ka)= aal3(ixyz,ka) &
+                           +(-tmpik(ixyz) -tmpjk(ixyz))
                     enddo
 !.....Stresses
                     do ixyz=1,3
                       do jxyz=1,3
 !$omp atomic
                         strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) +rik(ixyz)*tmpik(jxyz))
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             +rik(ixyz)*tmpik(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) +rjk(ixyz)*tmpjk(jxyz))
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             +rjk(ixyz)*tmpjk(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
-                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) +rjk(ixyz)*tmpjk(jxyz))
+                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) &
+                             +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
                     
@@ -633,8 +647,8 @@ contains
 
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,aal2,3)
-    if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,aal3,3)
+    if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex, &
+         lsrc,myparity,nn,mpi_world,aal3,3)
     aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
 
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -646,12 +660,14 @@ contains
     epot2 = 0d0
     epot3 = 0d0
     call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+         mpi_sum,mpi_world,ierr)
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+         mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
-         print '(a,3es12.4)',' force_uf3 epot1,epot2,epot3 = ',epot1,epot2,epot3
-!!$    print '(a,3es24.14)',' force_uf3 epot1,epot2,epot3 = ',epot1,epot2,epot3
+         print '(a,3es12.4)',' force_uf3 epot1,epot2,epot3 = ', &
+         epot1,epot2,epot3
 
     return
   end subroutine force_uf3
@@ -923,11 +939,11 @@ contains
 !.....local
     integer:: i,j,k,ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
          nik,njk,nij,itot,jtot,ktot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
-         ixyz,jxyz,lij,lik,ljk,ip,jra,kra
+         ixyz,jxyz,lij,lik,ljk,ip,jra,kra,ij,ik,jk
     integer:: ifcal,jfcal,kfcal
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
-         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0),dbjk3(-3:0), &
-         c2t,c3t,epotl1,epot1,ttmp
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
+         dbjk3(-3:0),c2t,c3t,epotl1,epot1,ttmp,fac3b
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
@@ -987,13 +1003,12 @@ contains
           tmp = tmp +size(prm3s(i3b)%gws)*8d0
         endif
       enddo
-!!$      print '(a,f10.3,a)','gradw_uf3: allocate, tmp=',tmp/1000/1000,'MB'
     endif
 
-    if( size(ls3b) < nnmax+1 ) then
-      deallocate(ls3b)
-      allocate(ls3b(0:nnmax))
-    endif
+!!$    if( size(ls3b) < nnmax+1 ) then
+!!$      deallocate(ls3b)
+!!$      allocate(ls3b(0:nnmax))
+!!$    endif
     if( size(ia2ifcal) < namax ) then
       deallocate(ia2ifcal)
       allocate(ia2ifcal(namax))
@@ -1043,7 +1058,8 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2 > p2%rc2 ) cycle
         dij = sqrt(dij2)
-!!$!.....Pair-list for 3-body cannot be used for gwf
+!!$!.....Pair-list for 3-body cannot be used for gwf 
+!!$!     because it uses ia2ifcal
 !!$        if( has_trios ) then
 !!$          if( dij2 < rc2_3b(is,js) ) then
 !!$            ls3b(0) = ls3b(0) +1
@@ -1063,27 +1079,22 @@ contains
             tmp2 = dbij(lij)
             ifcal = ia2ifcal(ia)
             jfcal = ia2ifcal(jra)
-            if( ifcal.ne.0 ) prm2s(i2b)%gwf(:,n,ifcal) = prm2s(i2b)%gwf(:,n,ifcal) +drijj(:)*tmp2
-            if( jfcal.ne.0 ) prm2s(i2b)%gwf(:,n,jfcal) = prm2s(i2b)%gwf(:,n,jfcal) -drijj(:)*tmp2
+            if( ifcal.ne.0 ) prm2s(i2b)%gwf(:,n,ifcal) &
+                 = prm2s(i2b)%gwf(:,n,ifcal) +drijj(:)*tmp2
+            if( jfcal.ne.0 ) prm2s(i2b)%gwf(:,n,jfcal) &
+                 = prm2s(i2b)%gwf(:,n,jfcal) -drijj(:)*tmp2
 !!$            prm2s(i2b)%gwf(:,n,ia)  = prm2s(i2b)%gwf(:,n,ia) +drijj(:)*tmp2
 !!$            prm2s(i2b)%gwf(:,n,jra) = prm2s(i2b)%gwf(:,n,jra) -drijj(:)*tmp2
           endif
 !.....Stresses
           if( lsmatch ) then
             tmp2 = dbij(lij)
-            prm2s(i2b)%gws(1,n) = prm2s(i2b)%gws(1,n) -rij(1)*drijj(1)*tmp2
-            prm2s(i2b)%gws(2,n) = prm2s(i2b)%gws(2,n) -rij(2)*drijj(2)*tmp2
-            prm2s(i2b)%gws(3,n) = prm2s(i2b)%gws(3,n) -rij(3)*drijj(3)*tmp2
-            prm2s(i2b)%gws(4,n) = prm2s(i2b)%gws(4,n) -rij(2)*drijj(3)*tmp2
-            prm2s(i2b)%gws(5,n) = prm2s(i2b)%gws(5,n) -rij(1)*drijj(3)*tmp2
-            prm2s(i2b)%gws(6,n) = prm2s(i2b)%gws(6,n) -rij(1)*drijj(2)*tmp2
-!!$            do ixyz=1,3
-!!$              do jxyz=1,3
-!!$                k = ivoigt(ixyz,jxyz)
-!!$                prm2s(i2b)%gws(k,n) = prm2s(i2b)%gws(k,n) &
-!!$                     -rij(ixyz)*drijj(jxyz)*tmp2
-!!$              enddo
-!!$            enddo
+            prm2s(i2b)%gws(1,n)=prm2s(i2b)%gws(1,n) -rij(1)*drijj(1)*tmp2
+            prm2s(i2b)%gws(2,n)=prm2s(i2b)%gws(2,n) -rij(2)*drijj(2)*tmp2
+            prm2s(i2b)%gws(3,n)=prm2s(i2b)%gws(3,n) -rij(3)*drijj(3)*tmp2
+            prm2s(i2b)%gws(4,n)=prm2s(i2b)%gws(4,n) -rij(2)*drijj(3)*tmp2
+            prm2s(i2b)%gws(5,n)=prm2s(i2b)%gws(5,n) -rij(1)*drijj(3)*tmp2
+            prm2s(i2b)%gws(6,n)=prm2s(i2b)%gws(6,n) -rij(1)*drijj(2)*tmp2
           endif
         enddo  ! lij
       enddo
@@ -1113,11 +1124,13 @@ contains
             
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
-!!$              if( jsp == ksp .and. ka <= ja ) cycle
+              if( ka == ja ) cycle
+              kra = itotOf(tag(ka))
+!.....Taking into account the double counting of symmetric terms
+              fac3b = 1d0
+              if( jsp == ksp ) fac3b = 0.5d0
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
-              kra = itotOf(tag(ka))
-              if( jsp == ksp .and. kra <= jra ) cycle
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
               xjk(1:3) = xk(1:3) -xj(1:3)
@@ -1146,48 +1159,57 @@ contains
 !.....Energy
 !!$                    c3t = p3%coefs(nij,nik,njk)
                     if( lematch ) then
-                      tmp = bij3(lij)*bik3(lik)*bjk3(ljk)
-                      prm3s(i3b)%gwe(njk,nik,nij) = prm3s(i3b)%gwe(njk,nik,nij) +tmp
-!!$                      if( i3b==1 .and. nij==9 .and. nik==3 .and. njk==11 ) then
-!!$                        print '(a,4i5,2es24.14)',' ia,ja,ka,i3b,tmp,gwe=', &
-!!$                             ia,ja,ka,i3b,tmp,prm3s(i3b)%gwe(njk,nik,nij)
-!!$                      endif
+                      tmp = bij3(lij)*bik3(lik)*bjk3(ljk)*fac3b
+                      prm3s(i3b)%gwe(njk,nik,nij) = &
+                           prm3s(i3b)%gwe(njk,nik,nij) +tmp
                     endif
 !.....Force
+                    tmpij(1:3)= dbij3(lij)* bik3(lik)* bjk3(ljk) &
+                         *drijj(1:3)*fac3b
+                    tmpik(1:3)=  bij3(lij)*dbik3(lik)* bjk3(ljk) &
+                         *drikk(1:3)*fac3b
+                    tmpjk(1:3)=  bij3(lij)* bik3(lik)*dbjk3(ljk) &
+                         *drjkk(1:3)*fac3b
                     if( lfmatch ) then
-                      tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
-                      tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
-                      tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
                       ifcal = ia2ifcal(ia)
                       jfcal = ia2ifcal(jra)
                       kfcal = ia2ifcal(kra)
                       if( ifcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,ifcal) &
-                           = prm3s(i3b)%gwf(:,njk,nik,nij,ifcal)+(tmpij(:) +tmpik(:))
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,ifcal) &
+                           +(tmpij(:) +tmpik(:))
                       if( jfcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,jfcal) &
-                           = prm3s(i3b)%gwf(:,njk,nik,nij,jfcal)+(-tmpij(:)+tmpjk(:))
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,jfcal) &
+                           +(-tmpij(:)+tmpjk(:))
                       if( kfcal.ne.0 ) prm3s(i3b)%gwf(:,njk,nik,nij,kfcal) &
-                           = prm3s(i3b)%gwf(:,njk,nik,nij,kfcal)+(-tmpik(:)-tmpjk(:))
-!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,ia )= prm3s(i3b)%gwf(:,nij,nik,njk,ia)+(tmpij(:) +tmpik(:))
-!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,jra)= prm3s(i3b)%gwf(:,nij,nik,njk,jra)+(-tmpij(:)+tmpjk(:))
-!!$                      prm3s(i3b)%gwf(:,nij,nik,njk,kra)= prm3s(i3b)%gwf(:,nij,nik,njk,kra)+(-tmpik(:)-tmpjk(:))
+                           = prm3s(i3b)%gwf(:,njk,nik,nij,kfcal) &
+                           +(-tmpik(:)-tmpjk(:))
                     endif
 !.....Stresses
                     if( lsmatch ) then
-                      tmpij(1:3) = dbij3(lij)*bik3(lik)*bjk3(ljk)*drijj(1:3)
-                      tmpik(1:3) = bij3(lij)*dbik3(lik)*bjk3(ljk)*drikk(1:3)
-                      tmpjk(1:3) = bij3(lij)*bik3(lik)*dbjk3(ljk)*drjkk(1:3)
-                      prm3s(i3b)%gws(1,njk,nik,nij) = prm3s(i3b)%gws(1,njk,nik,nij) &
-                           -rij(1)*tmpij(1) -rik(1)*tmpik(1) -rjk(1)*tmpjk(1)
-                      prm3s(i3b)%gws(2,njk,nik,nij) = prm3s(i3b)%gws(2,njk,nik,nij) &
-                           -rij(2)*tmpij(2) -rik(2)*tmpik(2) -rjk(2)*tmpjk(2)
-                      prm3s(i3b)%gws(3,njk,nik,nij) = prm3s(i3b)%gws(3,njk,nik,nij) &
-                           -rij(3)*tmpij(3) -rik(3)*tmpik(3) -rjk(3)*tmpjk(3)
-                      prm3s(i3b)%gws(4,njk,nik,nij) = prm3s(i3b)%gws(4,njk,nik,nij) &
-                           -rij(2)*tmpij(3) -rik(2)*tmpik(3) -rjk(2)*tmpjk(3)
-                      prm3s(i3b)%gws(5,njk,nik,nij) = prm3s(i3b)%gws(5,njk,nik,nij) &
-                           -rij(1)*tmpij(3) -rik(1)*tmpik(3) -rjk(1)*tmpjk(3)
-                      prm3s(i3b)%gws(6,njk,nik,nij) = prm3s(i3b)%gws(6,njk,nik,nij) &
-                           -rij(1)*tmpij(2) -rik(1)*tmpik(2) -rjk(1)*tmpjk(2)
+                      prm3s(i3b)%gws(1,njk,nik,nij) = &
+                           prm3s(i3b)%gws(1,njk,nik,nij) &
+                           -(rij(1)*tmpij(1) +rik(1)*tmpik(1) &
+                           +rjk(1)*tmpjk(1))
+                      prm3s(i3b)%gws(2,njk,nik,nij) = &
+                           prm3s(i3b)%gws(2,njk,nik,nij) &
+                           -(rij(2)*tmpij(2) +rik(2)*tmpik(2) &
+                           +rjk(2)*tmpjk(2))
+                      prm3s(i3b)%gws(3,njk,nik,nij) = &
+                           prm3s(i3b)%gws(3,njk,nik,nij) &
+                           -(rij(3)*tmpij(3) +rik(3)*tmpik(3) &
+                           +rjk(3)*tmpjk(3))
+                      prm3s(i3b)%gws(4,njk,nik,nij) = &
+                           prm3s(i3b)%gws(4,njk,nik,nij) &
+                           -(rij(2)*tmpij(3) +rik(2)*tmpik(3) &
+                           +rjk(2)*tmpjk(3))
+                      prm3s(i3b)%gws(5,njk,nik,nij) = &
+                           prm3s(i3b)%gws(5,njk,nik,nij) &
+                           -(rij(1)*tmpij(3) +rik(1)*tmpik(3) &
+                           +rjk(1)*tmpjk(3))
+                      prm3s(i3b)%gws(6,njk,nik,nij) = &
+                           prm3s(i3b)%gws(6,njk,nik,nij) &
+                           -(rij(1)*tmpij(2) +rik(1)*tmpik(2) &
+                           +rjk(1)*tmpjk(2))
                     endif
                     
                   enddo  ! lij
@@ -1219,16 +1241,19 @@ contains
       enddo
       do i3b=1,n3b
         p3 = prm3s(i3b)
-        do i=1,p3%ncfij
-          do j=1,p3%ncfik
-            do k=1,p3%ncfjk
+        do ij=1,p3%ncfij
+          do ik=1,p3%ncfik
+            do jk=1,p3%ncfjk
               ip = ip +1
+!!$              if( (ip>=14520 .and. ip<=14530)  )&
+!!$                  print '(a,4i4,i7,4es11.3)','i3b,ij,ik,jk,ip,gwe(ik,ij),gwe(ij,ik)=',&
+!!$                   i3b,ij,ik,jk,ip,p3%gwe(jk,ik,ij),p3%gwe(jk,ij,ik)
 !.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
-              if( p3%jsp==p3%ksp ) then
-                gwe(ip) = gwe(ip) +(p3%gwe(k,j,i)+p3%gwe(k,i,j))/2
-              else
-                gwe(ip) = gwe(ip) +p3%gwe(k,j,i)
-              endif
+!!$              if( p3%jsp==p3%ksp .and. ij.ne.ik ) then
+!!$                gwe(ip) = gwe(ip) +(p3%gwe(jk,ik,ij)+p3%gwe(jk,ij,ik)) !/2
+!!$              else
+                gwe(ip) = gwe(ip) +p3%gwe(jk,ik,ij)
+!!$              endif
             enddo
           enddo
         enddo
@@ -1250,17 +1275,19 @@ contains
         enddo  ! i2b
         do i3b=1,n3b
           p3 = prm3s(i3b)
-          do i=1,p3%ncfij
-            do j=1,p3%ncfik
-              do k=1,p3%ncfjk
+          do ij=1,p3%ncfij
+            do ik=1,p3%ncfik
+              do jk=1,p3%ncfjk
                 ip = ip +1
 !.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
-                if( p3%jsp==p3%ksp ) then
+!!$                if( p3%jsp==p3%ksp .and. ij.ne.ik ) then
+!!$                  gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) &
+!!$                       +(p3%gwf(1:3,jk,ik,ij,ifcal) &
+!!$                       +p3%gwf(1:3,jk,ij,ik,ifcal)) !/2
+!!$                else
                   gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) &
-                       +(p3%gwf(1:3,k,j,i,ifcal)+p3%gwf(1:3,k,i,j,ifcal))/2
-                else
-                  gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,k,j,i,ifcal)
-                endif
+                       +p3%gwf(1:3,jk,ik,ij,ifcal)
+!!$                endif
               enddo
             enddo
           enddo
@@ -1279,17 +1306,18 @@ contains
       enddo  ! i2b
       do i3b=1,n3b
         p3 = prm3s(i3b)
-        do i=1,p3%ncfij
-          do j=1,p3%ncfik
-            do k=1,p3%ncfjk
+        do ij=1,p3%ncfij
+          do ik=1,p3%ncfik
+            do jk=1,p3%ncfjk
               ip = ip +1
 !.....if jsp==ksp, coef should be symmetric such that c_lmn=c_mln.
-              if( p3%jsp==p3%ksp ) then
-                gws(1:6,ip) = gws(1:6,ip) &
-                       +(p3%gws(1:6,k,j,i)+p3%gws(1:6,k,i,j))/2
-              else
-                gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,k,j,i)
-              endif
+!!$              if( p3%jsp==p3%ksp .and. ij.ne.ik ) then
+!!$                gws(1:6,ip) = gws(1:6,ip) &
+!!$                       +(p3%gws(1:6,jk,ik,ij) &
+!!$                       +p3%gws(1:6,jk,ij,ik)) !/2
+!!$              else
+                gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,jk,ik,ij)
+!!$              endif
             enddo
           enddo
         enddo
@@ -1548,8 +1576,6 @@ contains
           do icfjk=1,prm3s(i3b)%ncfjk
             inc = inc +1
             prm3s(i3b)%coefs(icfjk,icfik,icfij) = params(inc)
-!!$            if( inc==2560 ) print '(a,4i5)',' inc,icfij,icfik,icfjk,coefs=', &
-!!$                 inc,icfij,icfik,icfjk,
           enddo
         enddo
       enddo
@@ -1617,24 +1643,17 @@ contains
       enddo
     enddo
     do i3b=1,n3b
-!!$      do icfij=1,prm3s(i3b)%ncfij
-!!$        do icfik=1,prm3s(i3b)%ncfik
-!!$          do icfjk=1,prm3s(i3b)%ncfjk
-!!$            inc = inc +1
-!!$            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params(inc)
-!!$          enddo
-!!$        enddo
-!!$      enddo
-!!$      inc = itmp
-      do icfij=1,prm3s(i3b)%ncfij
-        do icfik=1,prm3s(i3b)%ncfik
-          do icfjk=1,prm3s(i3b)%ncfjk
+      p3 = prm3s(i3b)
+      do icfij=1,p3%ncfij
+        do icfik=1,p3%ncfik
+          do icfjk=1,p3%ncfjk
             inc = inc +1
-            params(inc) = (prm3s(i3b)%coefs(icfjk,icfik,icfij) &
-                 +prm3s(i3b)%coefs(icfjk,icfij,icfik))/2
-!!$            prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
-!!$            if( inc==2560 ) print '(a,4i5)',' inc,icfij,icfik,icfjk,coefs=', &
-!!$                 inc,icfij,icfik,icfjk,
+            if( p3%jsp == p3%ksp ) then
+              params(inc) = (p3%coefs(icfjk,icfik,icfij) &
+                   +p3%coefs(icfjk,icfij,icfik))/2
+            else
+              params(inc) = p3%coefs(icfjk,icfik,icfij)
+            endif
           enddo
         enddo
       enddo
@@ -2184,7 +2203,7 @@ contains
     dmem = 0d0
 
     dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
-    dmem = dmem +4d0*size(ls3b)
+!!$    dmem = dmem +4d0*size(ls3b)
     
     do i2b=1,n2b
       p2 = prm2s(i2b)

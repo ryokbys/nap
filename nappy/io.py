@@ -144,6 +144,7 @@ def read_pmd(fname:str = 'pmdini',
         iline = 0
         symbol = None
         lines = f.readlines()
+        aux_names = []
         for line in lines:
             if line[0] in ('#','!'):  # comment line
                 values = line.split()
@@ -170,9 +171,12 @@ def read_pmd(fname:str = 'pmdini',
                     stensor[0,2] = stensor[2,0] = strs[4]
                     stensor[0,1] = stensor[1,0] = strs[5]
                     nsys.set_stress_tensor(stensor)
-                elif option in ('forces:','force:'):
-                    if values[2] not in ('False', 'false', 'F'):
-                        forces = True
+                # elif option in ('forces:','force:'):
+                #     if values[2] not in ('False', 'false', 'F'):
+                #         forces = True
+                elif option == 'auxiliary_data:':
+                    for v in values[2:]:
+                        aux_names.append(v)
             else:
                 if nsys.specorder is None or len(nsys.specorder) == 0:
                     raise ValueError('Specorder must be specified via the file or an argument.')
@@ -208,6 +212,14 @@ def read_pmd(fname:str = 'pmdini',
                     frcs = np.zeros((natm,3))
                     ifmvs= np.zeros((natm))
                     sids = np.zeros((natm))
+                    auxs = {}
+                    for aux in aux_names:
+                        if aux in ('fx','fy','fz'):
+                            auxs[aux] = np.zeros(natm, dtype=float)
+                        elif aux[0] in ('i','j','k','l','m','n'):
+                            auxs[aux] = np.zeros(natm, dtype=int)
+                        else:
+                            auxs[aux] = np.zeros(natm, dtype=float)
                 # 9th-: atom positions
                 else:
                     if incatm >= natm:
@@ -215,13 +227,14 @@ def read_pmd(fname:str = 'pmdini',
                     fdata = [float(x) for x in data]
                     tag = fdata[0]
                     sid,ifmv,num = decode_tag(tag)
+                    
                     # poss[incatm][:] = fdata[1:4]
                     # vels[incatm][:] = fdata[4:7]
                     poss[incatm,:] = fdata[1:4]
                     vels[incatm,:] = fdata[4:7]
-                    #...Read forces, only if forces exist and the forces-flag is on.
-                    if forces:
-                        frcs[incatm,:] = fdata[7:10]
+                    #...Read auxiliary data
+                    for i,aux in enumerate(aux_names):
+                        auxs[aux][incatm] = fdata[7+i]
                     sids[incatm] = sid
                     ifmvs[incatm]= ifmv
                     incatm += 1
@@ -232,9 +245,8 @@ def read_pmd(fname:str = 'pmdini',
     nsys.atoms['vx']= vels[:,0]
     nsys.atoms['vy']= vels[:,1]
     nsys.atoms['vz']= vels[:,2]
-    nsys.atoms['fx']= frcs[:,0]
-    nsys.atoms['fy']= frcs[:,1]
-    nsys.atoms['fz']= frcs[:,2]
+    for aux in aux_names:
+        nsys.atoms[aux]= auxs[aux]
     nsys.atoms['sid'] = sids
     nsys.atoms['ifmv']= ifmvs
     return nsys
@@ -1639,6 +1651,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     dt = -1.0
     specorder = []
     try:
+        inc = 0
         for event, elem in tree:
             if event == 'end':
                 if elem.tag == 'atominfo':
@@ -1671,10 +1684,13 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     for calc in calcs:
         nsys = NAPSystem(specorder=specorder)
 
-        lastscf = calc.findall('scstep/energy')[-1]
-        de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
-              float(lastscf.find('i[@name="e_fr_energy"]').text))
-        e_free = float(calc.find('energy/i[@name="e_fr_energy"]').text)
+        try:
+            lastscf = calc.findall('scstep/energy')[-1]
+            de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
+                  float(lastscf.find('i[@name="e_fr_energy"]').text))
+            e_free = float(calc.find('energy/i[@name="e_fr_energy"]').text)
+        except:
+            continue
         epot = e_free + de
         nsys.set_potential_energy(epot)
         
