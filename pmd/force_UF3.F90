@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-07 11:13:29 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-08 22:07:38 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -329,61 +329,72 @@ contains
     call mpi_bcast(n1b, 1, mpi_integer, 0, mpi_world, ierr)
     if( .not. allocated(prm2s) ) allocate(prm2s(n2b))
     call mpi_bcast(ncoef, 1, mpi_integer, 0, mpi_world, ierr)
-    
+
     do i2b=1,n2b
-      p2 = prm2s(i2b)
-      call mpi_bcast(p2%cb,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p2%csi,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p2%csj,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p2%isp,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%jsp,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%cknot,2,mpi_character,0,mpi_world,ierr)
-      call mpi_bcast(p2%nklead,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%nktrail,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%nknot,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%ncoef,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(p2%rc,1,mpi_real8,0,mpi_world,ierr)
-      if( .not.allocated(p2%knots) ) allocate(p2%knots(p2%nknot))
-      if( .not.allocated(p2%coefs) ) allocate(p2%coefs(p2%ncoef))
-      call mpi_bcast(p2%knots,p2%nknot,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(p2%coefs,p2%ncoef,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%cb,2,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%csi,2,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%csj,2,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%isp,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%jsp,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%cknot,2,mpi_character,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%nklead,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%nknot,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real8,0,mpi_world,ierr)
+      if( .not.allocated(prm2s(i2b)%knots) ) &
+           allocate(prm2s(i2b)%knots(prm2s(i2b)%nknot))
+      if( .not.allocated(prm2s(i2b)%coefs) ) &
+           allocate(prm2s(i2b)%coefs(prm2s(i2b)%ncoef))
+      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real8,0,mpi_world,ierr)
     enddo
 
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
     if( has_trios ) then
       if( .not. allocated(prm3s) ) allocate(prm3s(n3b))
       do i3b=1,n3b
-        p3 = prm3s(i3b)
-        call mpi_bcast(p3%cb,2,mpi_character,0,mpi_world,ierr)
-        call mpi_bcast(p3%csi,2,mpi_character,0,mpi_world,ierr)
-        call mpi_bcast(p3%csj,2,mpi_character,0,mpi_world,ierr)
-        call mpi_bcast(p3%csk,2,mpi_character,0,mpi_world,ierr)
-        call mpi_bcast(p3%isp,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%jsp,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%ksp,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%cknot,2,mpi_character,0,mpi_world,ierr)
-        call mpi_bcast(p3%nklead,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%nktrail,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%nknij,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%nknik,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%nknjk,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%ncfij,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%ncfik,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%ncfjk,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(p3%rcij,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(p3%rcik,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(p3%rcjk,1,mpi_real8,0,mpi_world,ierr)
-        if( .not.allocated(p3%knij) ) allocate(p3%knij(p3%nknij))
-        if( .not.allocated(p3%knik) ) allocate(p3%knik(p3%nknik))
-        if( .not.allocated(p3%knjk) ) allocate(p3%knjk(p3%nknjk))
-        if( .not.allocated(p3%coefs)) allocate(p3%coefs(p3%ncfjk, p3%ncfik, p3%ncfij))
-        call mpi_bcast(p3%knij,p3%nknij,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(p3%knik,p3%nknik,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(p3%knjk,p3%nknjk,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(p3%coefs,p3%ncfjk*p3%ncfik*p3%ncfij,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%cb,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%csi,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%csj,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%csk,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%isp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%jsp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%ksp,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%cknot,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%nklead,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%nknij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%nknik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%nknjk,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%ncfij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%ncfik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%ncfjk,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcij,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcjk,1,mpi_real8,0,mpi_world,ierr)
+        if( .not.allocated(prm3s(i3b)%knij) ) &
+             allocate(prm3s(i3b)%knij(prm3s(i3b)%nknij))
+        if( .not.allocated(prm3s(i3b)%knik) ) &
+             allocate(prm3s(i3b)%knik(prm3s(i3b)%nknik))
+        if( .not.allocated(prm3s(i3b)%knjk) ) &
+             allocate(prm3s(i3b)%knjk(prm3s(i3b)%nknjk))
+        if( .not.allocated(prm3s(i3b)%coefs)) &
+             allocate(prm3s(i3b)%coefs(prm3s(i3b)%ncfjk, &
+             prm3s(i3b)%ncfik, prm3s(i3b)%ncfij))
+        call mpi_bcast(prm3s(i3b)%knij,prm3s(i3b)%nknij, &
+             mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%knik,prm3s(i3b)%nknik, &
+             mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%knjk,prm3s(i3b)%nknjk, &
+             mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%coefs,&
+             prm3s(i3b)%ncfjk*prm3s(i3b)%ncfik*prm3s(i3b)%ncfij,&
+             mpi_real8,0,mpi_world,ierr)
       enddo
     endif  ! has_trios
 
+    call mpi_bcast(has_solo, 1, mpi_logical, 0,mpi_world,ierr)
     if( has_solo ) then
       if( .not. allocated(prm1s) ) allocate(prm1s(n1b))
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
