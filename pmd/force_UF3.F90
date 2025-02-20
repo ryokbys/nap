@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-08 22:07:38 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-11 17:51:39 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -61,6 +61,8 @@ module UF3
   logical:: has_trios = .false.
   logical:: has_solo = .false.
   real(8):: rcmax = 0.0d0
+  real(8):: rc3max = 0.0d0
+  real(8):: rc3max2 = 0.0d0
 
   real(8),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
   integer,allocatable:: ls3b(:)
@@ -306,8 +308,10 @@ contains
     ps%ksp = ksp
     interact3(isp,jsp,ksp) = i3b
     interact3(isp,ksp,jsp) = i3b
-    rcmax = max(ps%rcij,rcmax)
-    rcmax = max(ps%rcik,rcmax)
+    rc3max = max(ps%rcij,rc3max)
+    rc3max = max(ps%rcik,rc3max)
+    rcmax  = max(rcmax, rc3max)
+    rc3max2 = rc3max**2
     rc2_3b(isp,jsp) = max(ps%rcij2, rc2_3b(isp,jsp))
     rc2_3b(isp,ksp) = max(ps%rcik2, rc2_3b(isp,ksp))
     rc2_3b(jsp,isp) = rc2_3b(isp,jsp)
@@ -406,7 +410,7 @@ contains
     
   end subroutine bcast_uf3_params
 !=======================================================================
-  subroutine force_uf3(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_uf3_tmp(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
@@ -455,17 +459,17 @@ contains
     endif
 
     if( .not.allocated(aal2) ) then
-!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
-      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
     endif
     if( size(aal2) < 3*namax ) then
       deallocate(aal2,aal3,strsl)
       allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
     endif
-!!$    if( size(ls3b) < nnmax+1 ) then
-!!$      deallocate(ls3b)
-!!$      allocate(ls3b(0:nnmax))
-!!$    endif
+    if( size(ls3b) < nnmax+1 ) then
+      deallocate(ls3b)
+      allocate(ls3b(0:nnmax))
+    endif
 
     aal2(:,:) = 0d0
     aal3(:,:) = 0d0
@@ -486,7 +490,6 @@ contains
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
-!!$      ls3b(0) = 0
       tmp3 = 0d0
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -548,6 +551,314 @@ contains
 !.....which may be slower because of double computation of dij,
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
+!!$!.....Compute ls3b before going to main 3b part
+!!$      ls3b(0) = 0
+!!$      do jj=1,lspr(0,ia)
+!!$        ja = lspr(jj,ia)
+!!$        xj(1:3) = ra(1:3,ja)
+!!$        xij(1:3) = xj(1:3) -xi(1:3)
+!!$        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+!!$        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+!!$        if( dij2 > rc3max2 ) cycle
+!!$        ls3b(0) = ls3b(0) +1
+!!$        ls3b(ls3b(0)) = ja
+!!$      enddo
+      
+      tmp3 = 0d0
+!!$      do jsp=1,nspmax
+!!$        do ksp=jsp,nspmax
+!!$          i3b = interact3(is,jsp,ksp)
+!!$          if( i3b <= 0 ) cycle
+!!$          p3 = prm3s(i3b)
+          do jj=1,lspr(0,ia)
+            ja = lspr(jj,ia)
+            js = int(tag(ja))
+!!$            if( js /= jsp ) cycle
+            jtot = itotOf(tag(ja))
+            xj(1:3) = ra(1:3,ja)
+            xij(1:3) = xj(1:3) -xi(1:3)
+            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+            dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+!!$            if( dij2 > p3%rcij2 ) cycle
+            if( dij2 > rc3max2 ) cycle
+            dij = sqrt(dij2)
+            drijj(1:3) = rij(1:3)/dij
+!!$            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+            
+            do kk=jj+1,lspr(0,ia)
+              ka = lspr(kk,ia)
+!!$              if( ka == ja ) cycle
+              ktot = itotOf(tag(ka))
+!.....Taking into account the double counting of symmetric terms
+              fac3b = 1d0
+!!$              if( jsp == ksp ) fac3b = 0.5d0
+              ks = int(tag(ka))
+!!$              if( ks /= ksp ) cycle
+              i3b = interact3(is,js,ks)
+              if( i3b <= 0 ) cycle
+              p3 = prm3s(i3b)
+              if( dij2 > p3%rcij2 ) cycle
+              xk(1:3) = ra(1:3,ka)
+              xik(1:3) = xk(1:3) -xi(1:3)
+              xjk(1:3) = xk(1:3) -xj(1:3)
+              rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+              dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
+              if( dik2 > p3%rcik2 ) cycle
+              dik = sqrt(dik2)
+              rjk(1:3) = h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
+              djk2 = rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
+              if( djk2 > p3%rcjk2 ) cycle
+              djk = sqrt(djk2)
+              drikk(1:3) = rik(1:3)/dik
+              drjkk(1:3) = rjk(1:3)/djk
+!.....B-spline part
+              call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+              call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
+              call b_spl(djk, p3%knjk, p3%nknjk, njk3, bjk3, dbjk3)
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+                do ljk = -3,0
+                  njk = njk3 +ljk
+                  if( njk < 1 .or. njk > p3%nknjk-4 ) cycle
+                  do lij = -3,0
+                    nij = nij3 +lij
+                    if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+!.....Energy
+                    c3t = p3%coefs(njk,nik,nij) *fac3b
+                    tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
+                    epi(ia) = epi(ia) +tmp
+                    epotl3 = epotl3 +tmp
+!.....Force
+                    tmpij(1:3) = dbij3(lij)* bik3(lik)* bjk3(ljk) &
+                         *drijj(1:3) *c3t
+                    tmpik(1:3) =  bij3(lij)*dbik3(lik)* bjk3(ljk) &
+                         *drikk(1:3) *c3t
+                    tmpjk(1:3) =  bij3(lij)* bik3(lik)*dbjk3(ljk) &
+                         *drjkk(1:3) *c3t
+                    do ixyz=1,3
+!$omp atomic
+                      aal3(ixyz,ia)= aal3(ixyz,ia) &
+                           +(tmpij(ixyz) +tmpik(ixyz))
+!$omp atomic
+                      aal3(ixyz,ja)= aal3(ixyz,ja) &
+                           +(-tmpij(ixyz) +tmpjk(ixyz))
+!$omp atomic
+                      aal3(ixyz,ka)= aal3(ixyz,ka) &
+                           +(-tmpik(ixyz) -tmpjk(ixyz))
+                    enddo
+!.....Stresses
+                    do ixyz=1,3
+                      do jxyz=1,3
+!$omp atomic
+                        strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             +rik(ixyz)*tmpik(jxyz))
+!$omp atomic
+                        strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             +rjk(ixyz)*tmpjk(jxyz))
+!$omp atomic
+                        strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
+                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) &
+                             +rjk(ixyz)*tmpjk(jxyz))
+                      enddo
+                    enddo
+                    
+                  enddo  ! lij
+                enddo  ! ljk
+              enddo  ! lik
+
+            enddo  ! kk
+          enddo  ! jj
+!!$        enddo  ! ksp
+!!$      enddo  ! jsp
+
+    enddo ! ia
+!$omp end do
+!$omp end parallel
+
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,aal2,3)
+    if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex, &
+         lsrc,myparity,nn,mpi_world,aal3,3)
+    aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
+
+    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
+         ,nn,mpi_world,strsl,9)
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
+
+!-----gather epot
+    epot1 = 0d0
+    epot2 = 0d0
+    epot3 = 0d0
+    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+         mpi_sum,mpi_world,ierr)
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+         mpi_sum,mpi_world,ierr)
+    epot= epot +epot1 +epot2 +epot3
+    if( myid == 0 .and. iprint > 2 ) &
+         print '(a,3es12.4)',' force_uf3 epot1,epot2,epot3 = ', &
+         epot1,epot2,epot3
+
+    return
+  end subroutine force_uf3_tmp
+!=======================================================================
+  subroutine force_uf3(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
+       ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
+!
+!  UF3 implementation without using recursive function of b-spline.
+!  
+!  TODO: More efficient B-spline implementation is available (see, lammps src/ML-UF3/pair_uf3.cpp).
+!        But that is a bit complicated, use simple b_spl() routine for now.
+!
+    use util, only: itotOf
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint
+    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
+         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
+    real(8),intent(in):: ra(3,namax),tag(namax) &
+         ,h(3,3),hi(3,3),sv(3,6)
+    real(8),intent(inout):: rcin
+    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    logical,intent(in):: l1st 
+    logical:: lstrs
+
+!.....local
+    integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
+         nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
+         ixyz,jxyz,lij,lik,ljk
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
+         dbjk3(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
+    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+         rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
+         drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
+    real(8),save:: rcin2 = -1d0
+
+    type(prm2):: p2
+    type(prm3):: p3
+
+    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
+      if( rcin < rcmax ) then
+        if( myid == 0 ) then
+          write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
+          write(6,'(1x,a,f0.3)') "  rc should be longer than ", rcmax
+        endif
+        call mpi_finalize(ierr)
+        stop
+      endif
+      rcin2 = rcin*rcin
+    endif
+
+    if( .not.allocated(aal2) ) then
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax),ls3b(0:nnmax))
+!!$      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
+    endif
+    if( size(aal2) < 3*namax ) then
+      deallocate(aal2,aal3,strsl)
+      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
+    endif
+    if( size(ls3b) < nnmax+1 ) then
+      deallocate(ls3b)
+      allocate(ls3b(0:nnmax))
+    endif
+
+    aal2(:,:) = 0d0
+    aal3(:,:) = 0d0
+    strsl(:,:,:) = 0d0
+    epotl1 = 0d0
+    epotl2 = 0d0
+    epotl3 = 0d0
+!$omp parallel
+!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij, &
+!$omp      drijj,nr2,n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
+!$omp      jsp,ksp,i3b,p3,nij3,inc,bij3,dbij3, &
+!$omp      kk,ka,ks,xk,xik,xjk,rik,dik2,dik,rjk,djk2,djk, &
+!$omp      drikk,drjkk,nik3,njk3,nik,bik3,dbik3,njk,bjk3,dbjk3, &
+!$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
+!$omp      reduction(+:epotl2,epotl3)
+    do ia=1,natm
+      is = int(tag(ia))
+!!$      epi(ia) = epi(ia) +erg1s(is)
+      epotl1 = epotl1 +erg1s(is)
+      xi(1:3) = ra(1:3,ia)
+      tmp3 = 0d0
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+!!$        if( ja <= ia ) cycle
+        js = int(tag(ja))
+!.....Pair terms
+        i2b = interact2(is,js)
+        if( i2b <= 0 ) cycle
+        p2 = prm2s(i2b)
+        xj(1:3) = ra(1:3,ja)
+        xij(1:3) = xj(1:3) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2 > p2%rc2 ) cycle
+        dij = sqrt(dij2)
+!.....NOTE: ls3b could be source of bugs and stop using ls3b.
+!           To speed up by reducing pairs for 3-body, use other way
+!           that is safer than this approach.
+!!$!.....Make short-distance pair-list for 3-body term
+!!$        if( has_trios ) then
+!!$          if( dij2 < rc2_3b(is,js) ) then
+!!$            ls3b(0) = ls3b(0) +1
+!!$            ls3b(ls3b(0)) = ja
+!!$          endif
+!!$        endif
+        drijj(1:3) = rij(1:3)/dij
+        call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          c2t = p2%coefs(n)
+          tmp = c2t *bij(lij)
+!.....Energy
+          epi(ia) = epi(ia) +tmp
+          epotl2 = epotl2 +tmp
+!.....Forces
+          tmp2 = c2t *dbij(lij)
+          do ixyz=1,3
+!$omp atomic
+            aal2(ixyz,ia) = aal2(ixyz,ia) +drijj(ixyz)*tmp2
+!$omp atomic
+            aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
+          enddo
+!.....Stresses
+          do ixyz=1,3
+            do jxyz=1,3
+!$omp atomic
+              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+!$omp atomic
+              strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
+                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+            enddo
+          enddo
+        enddo  ! lij
+      enddo  ! jj
+
+!.....Trio part is separated from pair part,
+!.....which may be slower because of double computation of dij,
+!.....but this code is a bit simpler.
+      if( .not.has_trios ) cycle
+!!$!.....Compute ls3b before going to main 3b part
+!!$      ls3b(0) = 0
+!!$      do jj=1,lspr(0,ia)
+!!$        ja = lspr(jj,ia)
+!!$        xj(1:3) = ra(1:3,ja)
+!!$        xij(1:3) = xj(1:3) -xi(1:3)
+!!$        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+!!$        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+!!$        if( dij2 > rc3max2 ) cycle
+!!$        ls3b(0) = ls3b(0) +1
+!!$        ls3b(ls3b(0)) = ja
+!!$      enddo
+      
       tmp3 = 0d0
       do jsp=1,nspmax
         do ksp=jsp,nspmax

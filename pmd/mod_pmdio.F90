@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-16 22:40:24 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-14 17:48:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use util, only: num_data
   implicit none
@@ -166,7 +166,7 @@ contains
     write(ionum,'(a,6es11.3)') '#  stress:   ',  &
            stnsr(1,1), stnsr(2,2), stnsr(3,3), &
            stnsr(3,2), stnsr(1,3), stnsr(1,2)
-    write(ionum,'(a,l1)') '#  forces:  ',lforce
+    if(lforce) write(ionum,'(a,l1)') '#  auxiliary_data:  fx fy fz'
     write(ionum,'(a)') '#'
     write(ionum,'(es23.14e3)') hunit
 !!$    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &

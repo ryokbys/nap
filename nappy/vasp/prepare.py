@@ -243,7 +243,8 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         else:
             raise ValueError('mode is wrong, mode = ',mode)
 
-        f.write("# What to relax, ISIF: 2) ion-only,  3) ion & cell,  4) ion & cell-shape (vol conserving) \n")
+        f.write("# What to relax, ISIF: 2) ion-only,  3) ion & cell,  4) ion & cell-shape (vol conserving) \n"
+                +"#                     6) cell-only (not ion), 8) ion & vol (not cell-shape)\n")
         if 'ion' in mode:
             f.write("ISIF   = {0:4d}\n".format(2))
         elif 'cell' in mode:
@@ -255,10 +256,11 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
 
         f.write("\n")
 
-        ncore = estimate_ncore(nbands)
-        f.write("NCORE  = {0:4d}\n".format(ncore))
-        kpar = estimate_kpar(kpnts)
-        f.write("KPAR   = {0:4d}\n".format(kpar))
+        f.write("NPAR  = 8\n")
+        # ncore = estimate_ncore(nbands)
+        # f.write("NCORE  = {0:4d}\n".format(ncore))
+        # kpar = estimate_kpar(kpnts)
+        # f.write("KPAR   = {0:4d}\n".format(kpar))
         f.write("\n")
         f.close()
 
