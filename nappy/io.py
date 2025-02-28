@@ -105,7 +105,14 @@ def read(fname="pmdini",format=None, specorder=None, index=None):
         except Exception as e:
             print(' Failed to load input file even with ase.')
             raise
-    nsys._reset_atoms_dtypes()
+    if type(nsys) is list and len(nsys) == 1:
+        nsys = nsys[0]
+
+    if type(nsys) is list:
+        for ns in nsys:
+            ns._reset_atoms_dtypes()
+    else:
+        nsys._reset_atoms_dtypes()
     return nsys
 
 def read_pmd(fname:str = 'pmdini',
@@ -1032,9 +1039,9 @@ def write_extxyz(fileobj, nsys):
     fileobj.write('{0:d}\n'.format(len(nsys)))
     hmat = nsys.get_hmat()
     epot = nsys.get_potential_energy()
-    fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[0,:]))
-    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[1,:]))
-    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[2,:]))
+    fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[:,0]))
+    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[:,1]))
+    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[:,2]))
     fileobj.write('Properties=species:S:1:pos:R:3:forces:R:3 ')
     fileobj.write(f'energy={epot} ')
     try:

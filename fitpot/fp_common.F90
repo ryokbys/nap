@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-07 11:08:09 KOBAYASHI Ryo>
+!                     Last modified: <2025-02-20 23:33:36 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -662,7 +662,11 @@ contains
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
       if( smpl%iclass.ne.1 ) cycle
-      
+
+!.....Since the derivative of linear regression does not change
+!     even after the variables change, we dont need to recalculate gwx().
+!     And thus only copy them calculated at the 1st step,
+!     which will reduce a lot of computational cost but require a lot of memory.
       if( (trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') &
            .and. (allocated(samples(ismpl)%gwe) .or. allocated(samples(ismpl)%gwf) &
            .or. allocated(samples(ismpl)%gws) ) ) then
