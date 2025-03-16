@@ -1044,11 +1044,12 @@ def write_extxyz(fileobj, nsys):
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[:,2]))
     fileobj.write('Properties=species:S:1:pos:R:3:forces:R:3 ')
     fileobj.write(f'energy={epot} ')
+    #...Stress information in eV/Ang^3 (GPa in napsys)
     try:
-        stnsr = nsys.get_stress_tensor()
-        fileobj.write(f'stress="{stnsr[0,0]:.3f} {stnsr[0,1]:.3f} {stnsr[0,2]:.3f} '+
-                      f'{stnsr[1,0]:.3f} {stnsr[1,1]:.3f} {stnsr[1,2]:.3f} '+
-                      f'{stnsr[2,0]:.3f} {stnsr[2,1]:.3f} {stnsr[2,2]:.3f}" ')
+        stnsr = nsys.get_stress_tensor() /160.2
+        fileobj.write(f'stress="{stnsr[0,0]:.3e} {stnsr[0,1]:.3e} {stnsr[0,2]:.3e} '+
+                      f'{stnsr[1,0]:.3e} {stnsr[1,1]:.3e} {stnsr[1,2]:.3e} '+
+                      f'{stnsr[2,0]:.3e} {stnsr[2,1]:.3e} {stnsr[2,2]:.3e}" ')
     except:
         pass
     fileobj.write('\n')

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-10 18:09:50 KOBAYASHI Ryo>
+!                     Last modified: <2025-03-14 15:42:30 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -223,7 +223,10 @@ program fitpot
 
 !.....Compute func value of the best vars
   call func_w_pmd(nvars,vbest,ftrn0,ftst0)
-  if( myid.eq.0 ) print '(a,i0)', ' Best result at ',ibest
+  if( myid.eq.0 ) then
+    print '(a,i0,f8.4)', ' Best of test loss (iter,loss): ', &
+         ibest,fbest
+  endif
   call write_stats(ibest)
 
 !!$  call write_energy_relation('subtracted')
@@ -1150,14 +1153,13 @@ subroutine qn_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
   external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call qn(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call qn(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1181,10 +1183,9 @@ subroutine sd_wrapper(ftrn0,ftst0)
   use minimize
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
   external:: write_stats
 
-  call steepest_descent(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol &
+  call steepest_descent(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol &
        ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
        ,niter_eval,write_stats)
 
@@ -1199,14 +1200,13 @@ subroutine cg_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
   external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. trim(cpot).eq.'uf3' ) then
-    call cg(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+    call cg(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
   else
@@ -1229,10 +1229,9 @@ subroutine sgd_wrapper(ftrn0,ftst0)
   use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  real(8):: fval
   external:: write_stats
 
-  call sgd(nvars,vars,vbest,ibest,fval,gvar,dvar,vranges,xtol,gtol,ftol,niter &
+  call sgd(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
        ,iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1,func_w_pmd &
        ,grad_w_pmd,cfmethod,niter_eval,write_stats)
 

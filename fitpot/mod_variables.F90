@@ -171,6 +171,7 @@ module variables
   integer:: nvars
   real(8),allocatable:: vars(:),vranges(:,:),gvar(:),dvar(:)
   integer:: ibest
+  real(8):: fbest
   real(8),allocatable:: vbest(:)
 
   integer:: netrn,netst,nftrn,nftst,nstrn,nstst
