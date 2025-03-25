@@ -45,10 +45,10 @@ $ make test
 ```
 
 If it works, you can use this program in your system.
-To install the python package *nappy*,
+To install the python package *nappy*, run the following commands on `nap/` top directory,
 
 ```shell
-$ python setup.py sdist
+$ python -m build
 $ pip install -e .
 ```
 

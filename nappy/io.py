@@ -1046,7 +1046,7 @@ def write_extxyz(fileobj, nsys):
     fileobj.write(f'energy={epot} ')
     #...Stress information in eV/Ang^3 (GPa in napsys)
     try:
-        stnsr = nsys.get_stress_tensor() /160.2
+        stnsr = nsys.get_stress_tensor() /160.218
         fileobj.write(f'stress="{stnsr[0,0]:.3e} {stnsr[0,1]:.3e} {stnsr[0,2]:.3e} '+
                       f'{stnsr[1,0]:.3e} {stnsr[1,1]:.3e} {stnsr[1,2]:.3e} '+
                       f'{stnsr[2,0]:.3e} {stnsr[2,1]:.3e} {stnsr[2,2]:.3e}" ')
@@ -1069,7 +1069,7 @@ def write_extxyz(fileobj, nsys):
     return None
 
 
-def read_extxyz(fname, specorder=None):
+def read_extxyz(fname, specorder=None,):
     """
     Read an extxyz format using ASE package.
     NOTE: extxyz file could contain multiple structures.
@@ -1095,7 +1095,9 @@ def read_extxyz(fname, specorder=None):
         if type(atoms) == list:
             nsyss = []
             for a in atoms:
-                nsyss.append(from_ase(a))
+                #...Since usually, stress unit in extxyz is in eV/Ang^3,
+                #...convert it to GPa 
+                nsyss.append(from_ase(a, stress_factor=160.218))
         else:
             nsys = from_ase(atoms)
     except Exception as e:

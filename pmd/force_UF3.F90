@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-11 17:51:39 KOBAYASHI Ryo>
+!                     Last modified: <2025-03-13 13:56:43 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -916,6 +916,7 @@ contains
 !.....Energy
                     c3t = p3%coefs(njk,nik,nij) *fac3b
                     tmp = c3t*bij3(lij)*bik3(lik)*bjk3(ljk)
+                    tmp3 = tmp3 + tmp
                     epi(ia) = epi(ia) +tmp
                     epotl3 = epotl3 +tmp
 !.....Force
@@ -958,10 +959,17 @@ contains
                 enddo  ! ljk
               enddo  ! lik
 
+!!$              if( ia==39 .or. ia==55 ) then
+!!$                print '(a,7i5,2es12.3)','  ia,ja,ka,i3b,nik,njk,nij,c3t,tmp3=',&
+!!$                     ia,ja,ka,i3b,nik,njk,nij,c3t,tmp3
+!!$              endif
             enddo  ! kk
           enddo  ! jj
         enddo  ! ksp
       enddo  ! jsp
+!!$      if( ia==8 .or. ia==39 .or. ia==55 ) then
+!!$        print '(a,i5,2es12.3)',' ia,tmp2,tmp3=',ia,epi(ia)-tmp3,tmp3
+!!$      endif
 
     enddo ! ia
 !$omp end do

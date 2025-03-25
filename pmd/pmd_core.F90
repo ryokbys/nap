@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-01-30 12:58:20 KOBAYASHI Ryo>
+!                     Last-modified: <2025-03-23 23:13:22 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -906,6 +906,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !---------decide pmd-file name
       iocntpmd=iocntpmd+1
       write(cnum,'(i0)') istp
+!.....vtot and atot are scaled by hmat in space_comp
       call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
            ekitot,epitot,auxtot)
       call accum_time('space_comp',mpi_wtime()-tmp)
@@ -954,6 +955,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( .not. ltot_updated ) then
     tmp = mpi_wtime()
+!.....vtot and atot are scaled by hmat in space_comp
     call space_comp(ntot0,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
          auxtot)
     call accum_time('space_comp',mpi_wtime()-tmp)

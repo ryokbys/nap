@@ -219,15 +219,24 @@ class NAPSystem(object):
         #...Operation could be different case by case
         if self.specorder is None:
             self.specorder = copy.copy(specorder)
-        elif set(self.specorder) == set(specorder):  # Only re-ordering
+        # elif set(self.specorder) == set(specorder):  # Only re-ordering
+        #     newsids = np.zeros(len(self.atoms),dtype=int)
+        #     for i,sid in enumerate(self.atoms.sid):
+        #         symbol = self.specorder[sid-1]
+        #         sidnew = specorder.index(symbol)+1
+        #         newsids[i] = sidnew
+        #     self.atoms.sid = newsids
+        #     self.specorder = specorder
+        else:  # Re-define specorder even if specorder and sids are inconsistent...
             newsids = np.zeros(len(self.atoms),dtype=int)
             for i,sid in enumerate(self.atoms.sid):
                 symbol = self.specorder[sid-1]
-                sidnew = specorder.index(symbol)+1
+                try:
+                    sidnew = specorder.index(symbol)+1
+                except:
+                    raise
                 newsids[i] = sidnew
             self.atoms.sid = newsids
-            self.specorder = specorder
-        else:  # Re-define specorder even if specorder and sids are inconsistent...
             self.specorder = specorder
         return None
                 

@@ -18,7 +18,7 @@ URL = 'https://github.com/ryokbys/nap'
 EMAIL = 'ryo.kbys@gmail.com'
 AUTHOR = 'Ryo KOBAYASHI'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.10.12'
+VERSION = '0.12.2'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
