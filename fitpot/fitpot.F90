@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-03-14 15:42:30 KOBAYASHI Ryo>
+!                     Last modified: <2025-03-25 14:01:10 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -716,7 +716,7 @@ subroutine read_samples()
       cspmd = samples(is)%specorder(isp)
       cspfp = specorder(isp)
       if( trim(cspfp).ne.trim(cspmd) .and. trim(cspmd).ne.'x' ) then
-        print '(a)','ERROR: specorder in the sample is different from that in fitpot.'
+        print '(a)','ERROR: specorder in the sample is different from that in in.fitpot.'
         print '(a,2a5)','   failed species in fitpot and the sample: ',trim(cspfp),trim(cspmd)
         print '(a)','   specorder in fitpot and the sample, '//trim(cdir)
         do jsp=1,nspmax
@@ -817,6 +817,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   logical:: ltmp
 
   open(ionum,file=trim(fname),status='old')
+!.....First, parse options
   do while(.true.)
     read(ionum,'(a)') cline
     if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) then
@@ -852,6 +853,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
       exit
     endif
   enddo
+!.....Read cell information
   smpl%h(:,:,:) = 0d0
   read(ionum,*) smpl%h0
   read(ionum,*) ((smpl%h(ia,1,l),ia=1,3),l=0,1)
@@ -861,8 +863,10 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
 !!$  read(ionum,*) tmp,tmp,tmp
 !!$  read(ionum,*) tmp,tmp,tmp
   smpl%h(1:3,1:3,0) = smpl%h(1:3,1:3,0)*smpl%h0
+!.....Read num of atoms
   read(ionum,*) natm
   smpl%natm= natm
+!.....Allocate arrays with length of num of atoms.
   allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
        ,smpl%tag(natm) &
        ,smpl%fref(3,natm), smpl%fabs(natm) &
@@ -911,7 +915,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
     do i=1,smpl%natm
       if( smpl%lfrc_eval(i) ) smpl%nfcal = smpl%nfcal +1
     enddo
-  else
+  else  ! if forces are not given (does this happen?)
     do i=1,smpl%natm
       read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp
     enddo

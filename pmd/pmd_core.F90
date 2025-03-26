@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-03-23 23:13:22 KOBAYASHI Ryo>
+!                     Last-modified: <2025-03-25 15:38:44 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -436,7 +436,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              tagtot,rtot,vtot)
       elseif( trim(ciofmt).eq.'ascii' ) then
         if( lcomb_pos ) then
-          call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+          call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
                tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,0)
         else
           call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
@@ -926,7 +926,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
                  tagtot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
             if( lcomb_pos ) then
-              call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+              call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
                    tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
             else
               call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
@@ -1520,7 +1520,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         elseif( trim(ciofmt).eq.'ascii' ) then
           sth(:,:) = stnsr(:,:)*up2gpa
           if( lcomb_pos ) then
-            call write_pmdtot_ascii(20,"pmdsnap",ntot,hunit,h, &
+            call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
                  tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
           else            
             call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &

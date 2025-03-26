@@ -1,6 +1,6 @@
 module pmdio
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-14 17:48:49 KOBAYASHI Ryo>
+!                     Last modified: <2025-03-26 23:17:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use util, only: num_data
   implicit none
@@ -176,14 +176,15 @@ contains
     write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,2,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,3,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(i10)') ntot
+!.....All the length values (r,v,a) are scaled by h-mat in pmd format
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
-        write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
+        write(ionum,'(f17.14,3es22.14,14es12.4)') tagtot(i) &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
-        write(ionum,'(f17.14,6es23.14e3,11es13.4e3)') tagtot(i) &
+        write(ionum,'(f17.14,3es22.14,14es12.4)') tagtot(i) &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif

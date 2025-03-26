@@ -142,18 +142,37 @@ def read_pmd(fname:str = 'pmdini',
     """
     global myopen
     forces = False
-    nsys = NAPSystem()
-    if specorder is not None:
-        nsys.specorder = specorder
-    incatm = 0
+    #...Assuming that the file contains several snapshots
+    nsyss = []
     myopen, mode = get_open_func(fname,'r')
     with myopen(fname,mode) as f:
-        iline = 0
-        symbol = None
-        lines = f.readlines()
-        aux_names = []
-        for line in lines:
+        # lines = f.readlines()
+        state = None
+        for line in f:
             if line[0] in ('#','!'):  # comment line
+                #...state-dependent
+                if state == None or state == 'atoms':
+                    #...in case, the file contains several snapshots
+                    #...and this is not the 1st one, store the previous one
+                    if state == 'atoms':
+                        nsys.atoms['x'] = poss[:,0]
+                        nsys.atoms['y'] = poss[:,1]
+                        nsys.atoms['z'] = poss[:,2]
+                        nsys.atoms['vx']= vels[:,0]
+                        nsys.atoms['vy']= vels[:,1]
+                        nsys.atoms['vz']= vels[:,2]
+                        nsys.atoms['sid'] = sids
+                        nsys.atoms['ifmv']= ifmvs
+                        for aux in aux_names:
+                            nsys.atoms[aux]= auxs[aux]
+                        nsyss.append(nsys)
+                    #...create new system here
+                    nsys = NAPSystem()
+                    if specorder is not None: nsys.specorder = specorder
+                    aux_names = []
+                    iline = 0
+                    incatm = 0
+                    state = 'option'
                 values = line.split()
                 if len(values) < 2:
                     continue
@@ -184,7 +203,10 @@ def read_pmd(fname:str = 'pmdini',
                 elif option == 'auxiliary_data:':
                     for v in values[2:]:
                         aux_names.append(v)
-            else:
+            else:  # line starts without # nor !
+                #...state-dependent procedure
+                if state == 'option':
+                    state = 'atoms'
                 if nsys.specorder is None or len(nsys.specorder) == 0:
                     raise ValueError('Specorder must be specified via the file or an argument.')
                 iline = iline +1
@@ -229,8 +251,7 @@ def read_pmd(fname:str = 'pmdini',
                             auxs[aux] = np.zeros(natm, dtype=float)
                 # 9th-: atom positions
                 else:
-                    if incatm >= natm:
-                        break
+                    if incatm >= natm: continue
                     fdata = [float(x) for x in data]
                     tag = fdata[0]
                     sid,ifmv,num = decode_tag(tag)
@@ -245,18 +266,23 @@ def read_pmd(fname:str = 'pmdini',
                     sids[incatm] = sid
                     ifmvs[incatm]= ifmv
                     incatm += 1
-
-    nsys.atoms['x'] = poss[:,0]
-    nsys.atoms['y'] = poss[:,1]
-    nsys.atoms['z'] = poss[:,2]
-    nsys.atoms['vx']= vels[:,0]
-    nsys.atoms['vy']= vels[:,1]
-    nsys.atoms['vz']= vels[:,2]
-    for aux in aux_names:
-        nsys.atoms[aux]= auxs[aux]
-    nsys.atoms['sid'] = sids
-    nsys.atoms['ifmv']= ifmvs
-    return nsys
+        if state == 'atoms':
+            nsys.atoms['x'] = poss[:,0]
+            nsys.atoms['y'] = poss[:,1]
+            nsys.atoms['z'] = poss[:,2]
+            nsys.atoms['vx']= vels[:,0]
+            nsys.atoms['vy']= vels[:,1]
+            nsys.atoms['vz']= vels[:,2]
+            for aux in aux_names:
+                nsys.atoms[aux]= auxs[aux]
+            nsys.atoms['sid'] = sids
+            nsys.atoms['ifmv']= ifmvs
+            nsyss.append(nsys)
+    assert len(nsyss) > 0, 'len(nsyss)==0, which should not happen.'
+    if len(nsyss) == 1:
+        return nsyss[0]
+    else:
+        return nsyss
 
 def write_pmd(nsys,fname='pmdini', auxs=[], **kwargs):
     myopen, mode = get_open_func(fname,'w')
