@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 15:30:41 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 16:46:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -1062,7 +1062,8 @@ contains
   end subroutine run_pmd
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
-    use UF3,only: calc_penalty_uf3
+    use variables,only: cpot
+    use UF3,only: calc_penalty_uf3, calc_penalty_uf3l
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
@@ -1076,14 +1077,19 @@ contains
       enddo
       fp = fp *penalty
     else if( trim(cpenalty).eq.'uf3' ) then
+      if( trim(cpot).ne.'uf3' ) stop 'potential and penalty is not consistent !'
       call calc_penalty_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+           pwgt3b,pwgt3bd,repul_radii,fp)
+    else if( trim(cpenalty).eq.'uf3l' ) then
+      if( trim(cpot).ne.'uf3l' ) stop 'potential and penalty is not consistent !'
+      call calc_penalty_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,fp)
     endif
     return
   end subroutine func_penalty
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
-    use UF3,only: calc_penalty_grad_uf3
+    use UF3,only: calc_penalty_grad_uf3,calc_penalty_grad_uf3l
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gp(ndim)
@@ -1095,6 +1101,9 @@ contains
       gp(:) = 2d0*penalty*x(:)
     else if( trim(cpenalty).eq.'uf3' ) then
       call calc_penalty_grad_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+           pwgt3b,pwgt3bd,repul_radii,gp)
+    else if( trim(cpenalty).eq.'uf3l' ) then
+      call calc_penalty_grad_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,gp)
     endif
     return

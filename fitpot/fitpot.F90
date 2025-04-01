@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 14:51:08 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 16:38:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -42,7 +42,6 @@ program fitpot
     write(6,'(a)') '========================================================================'
     write(6,*) ''
     call time_stamp(' Job started')
-
     write(6,*) ''
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_infitpot(10,'in.fitpot')
@@ -227,7 +226,7 @@ program fitpot
   call func_w_pmd(nvars,vbest,ftrn0,ftst0)
   if( myid.eq.0 ) then
     print '(a,i0,f8.4)', ' Best of test loss (iter,loss): ', &
-         ibest,fbest
+         ibest,ftst0
   endif
   call write_stats(ibest)
 

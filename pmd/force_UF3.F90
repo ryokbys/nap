@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 15:29:44 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 16:38:13 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -3305,6 +3305,249 @@ contains
 
     return
   end subroutine calc_penalty_grad_uf3
+!=======================================================================
+  subroutine calc_penalty_uf3l(ndimp,params_in,pwgt2b,pwgt2bd, &
+       pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+         repul_radii(nspmax,nspmax)
+    real(8),intent(out):: penalty
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp
+    type(prm2):: p2
+    type(prm3l):: p3
+    real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
+    logical:: ledge
+    real(8),parameter:: tiny = 1d-8
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    p2b = 0d0
+    p2bd= 0d0
+    p2bs= 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+!.....variables only for short-distance penalty
+      isp = p2%isp
+      jsp = p2%jsp
+      rc = repul_radii(isp,jsp)
+      nr2 = knot_index(rc,p2%nknot,p2%knots)
+      
+      do ic=1,p2%ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
+        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
+      enddo
+      if( abs(pwgt2bs)>1d-14 ) then
+        do ic=1,nr2-3
+          dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
+          if( dc1 < 0d0 ) p2bs = p2bs +dc1**2
+          if( ic-2 < 1 ) cycle
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
+               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0d0 ) p2bs = p2bs +dc2**2
+        enddo
+      endif
+      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      do ic=2,p2%ncoef-1
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
+        tmp = 0d0
+        do k=-1,1,2
+          tmp = tmp +(prm2s(i2b)%coefs(ic+k) -prm2s(i2b)%coefs(ic))
+        enddo
+        p2bd = p2bd +tmp**2
+      enddo
+      
+    enddo
+    p2b = p2b*pwgt2b
+    p2bd = p2bd*pwgt2bd
+    p2bs = p2bs*pwgt2bs
+
+!.....3-body
+    p3b = 0d0
+    p3bd= 0d0
+    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+      do i3b=1,n3b
+        inc = inc +1
+        prm3ls(i3b)%betj = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%betj**2
+        inc = inc +1
+        prm3ls(i3b)%betk = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%betk**2
+        do ic=1,prm3ls(i3b)%ncoef
+          inc = inc +1
+          prm3ls(i3b)%coefs(ic) = params_in(inc)
+          p3b = p3b +prm3ls(i3b)%coefs(ic)**2
+        enddo
+!.....penalty to derivative
+        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        p3 = prm3ls(i3b)
+        do ic=1,p3%ncoef
+          if( ic-1 > 0 .and. ic+1 <= p3%ncoef ) p3bd = p3bd + &
+               (p3%coefs(ic-1) -2d0*p3%coefs(ic) +p3%coefs(ic+1))**2
+        enddo
+      enddo
+    endif
+    p3b = p3b *pwgt3b
+    p3bd= p3bd*pwgt3bd
+    penalty = p2b +p2bd +p2bs +p3b +p3bd
+
+    return
+  end subroutine calc_penalty_uf3l
+!=======================================================================
+  subroutine calc_penalty_grad_uf3l(ndimp,params_in,pwgt2b,pwgt2bd, &
+       pwgt2bs,pwgt3b,pwgt3bd,repul_radii,grad)
+!
+!  Accesor routine to get gradient of uf3 ridge penalty.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+         repul_radii(nspmax,nspmax)
+    real(8),intent(out):: grad(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,ip, &
+         nr2,isp,jsp
+    type(prm2):: p2
+    type(prm3l):: p3
+    real(8):: tmp,dc1,dc2,rc
+    logical:: ledge
+    real(8),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
+    integer,save:: nc2max, nc3max
+    integer,save,allocatable:: ic2ip(:),ic3ip(:)
+
+    if( .not.allocated(gp2b) ) then
+      allocate(gp2b(ndimp),gp2bd(ndimp),gp2bs(ndimp), &
+           gp3b(ndimp),gp3bd(ndimp))
+      nc2max = 0
+      do i2b=1,n2b
+        nc2max = max(nc2max, prm2s(i2b)%ncoef)
+      enddo
+      allocate(ic2ip(nc2max))
+      nc3max = 0
+      do i3b=1,n3b
+        nc3max = max(nc3max, prm3ls(i3b)%ncoef)
+      enddo
+      allocate(ic3ip(nc3max))
+    endif
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    gp2b(:) = 0d0
+    gp2bd(:)= 0d0
+    gp2bs(:)= 0d0
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+!.....variables only for short-distance penalty
+      isp = p2%isp
+      jsp = p2%jsp
+      rc = repul_radii(isp,jsp)
+      nr2 = knot_index(rc,p2%nknot,p2%knots)
+
+      ic2ip(:) = 0
+      do ic=1,prm2s(i2b)%ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params_in(inc)
+        ic2ip(ic) = inc
+        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) gp2b(inc) = &
+             gp2b(inc) +2d0*pwgt2b*prm2s(i2b)%coefs(ic)
+      enddo
+      if( abs(pwgt2bs)>1d-14 ) then
+        do ic=1,nr2-3
+          dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
+          ip = ic2ip(ic)
+          if( dc1 < 0d0 ) then
+            gp2bs(ip  )= gp2bs(ip  ) +2d0*dc1 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc1 *pwgt2bs
+          endif
+          if( ic-2 < 1 ) cycle
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
+               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0d0 ) then
+            gp2bs(ip-2)= gp2bs(ip-2) +2d0*dc2 *pwgt2bs
+            gp2bs(ip-1)= gp2bs(ip-1) -6d0*dc2 *pwgt2bs
+            gp2bs(ip  )= gp2bs(ip  ) +6d0*dc2 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc2 *pwgt2bs
+          endif
+        enddo
+      endif
+      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      do ic=1,p2%ncoef
+        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
+        ip = ic2ip(ic)
+        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+             *(p2%coefs(ic-2) &
+             -2d0*p2%coefs(ic-1) &
+             +p2%coefs(ic))
+        if( ic-1 > 0 .and. ic+1 <= p2%ncoef ) &
+             gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd*(-2d0) &
+             *(p2%coefs(ic-1) &
+             -2d0*p2%coefs(ic) &
+             +p2%coefs(ic+1))
+        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+             *(p2%coefs(ic) &
+             -2d0*p2%coefs(ic+1) &
+             +p2%coefs(ic+2))
+      enddo
+    enddo
+
+!.....3-body
+    gp3b(:) = 0d0
+    gp3bd(:)= 0d0
+    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+      do i3b=1,n3b
+        ic3ip(:) = 0
+        inc = inc +1
+        prm3ls(i3b)%betj = params_in(inc)
+        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%betj
+        inc = inc +1
+        prm3ls(i3b)%betk = params_in(inc)
+        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%betk
+        do ic=1,prm3ls(i3b)%ncoef
+          inc = inc +1
+          prm3ls(i3b)%coefs(ic) = params_in(inc)
+          gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%coefs(ic)
+          ic3ip(ic) = inc
+        enddo
+        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        p3 = prm3ls(i3b)
+        do ic=1,p3%ncoef
+          ip = ic3ip(ic)
+!.....ij
+          if( ic-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+               *(   p3%coefs(ic-2) &
+               -2d0*p3%coefs(ic-1) &
+               +    p3%coefs(ic))
+          if( ic-1 > 0 .and. ic+1 <= p3%ncoef ) &
+               gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+               *(   p3%coefs(ic-1) &
+               -2d0*p3%coefs(ic) &
+               +    p3%coefs(ic+1))
+          if( ic+2 <= p3%ncoef ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+               *(   p3%coefs(ic) &
+               -2d0*p3%coefs(ic+1) &
+               +    p3%coefs(ic+2))
+        enddo  ! ic
+      enddo  ! i3b
+    endif
+    grad(:) = gp2b(:) +gp2bd(:) +gp2bs(:) +gp3b(:) +gp3bd(:)
+
+    return
+  end subroutine calc_penalty_grad_uf3l
 !=======================================================================
   subroutine calc_short_lossfunc(npnts,radii,drepul,floss)
 !
