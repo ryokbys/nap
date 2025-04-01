@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-03-25 14:01:10 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 13:56:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -161,11 +161,12 @@ program fitpot
   endif
 
   call init_fp_common()
-  
+
 !.....Initial computations of all samples
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. trim(cpot).eq.'uf3' ) then
-!.....Some restriction to parameters in case of UF3 potential
+       .or. cpot(1:3).eq.'uf3' ) then
+!.....Some restriction to parameters in case of UF3 potential.
+!.....No need for UF3L.
     if( trim(cpot)=='uf3' ) call symmetrize_params_uf3(nvars,vars)
     call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
@@ -1162,7 +1163,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. trim(cpot).eq.'uf3' ) then
+       .or. cpot(1:3).eq.'uf3' ) then
     call qn(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)
@@ -1209,7 +1210,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. trim(cpot).eq.'uf3' ) then
+       .or. cpot(1:3).eq.'uf3' ) then
     call cg(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
          ,niter_eval,write_stats)

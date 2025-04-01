@@ -23,7 +23,7 @@ from datetime import datetime
 from icecream import ic
 ic.disable()
 
-from uf3util import read_params_uf3
+from uf3util import read_params_uf3, read_params_uf3l
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "241119"
@@ -349,6 +349,57 @@ def uf32fp(outfname,specorder):
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 
+def uf3l2fp(outfname,specorder):
+    """
+    Create in.vars.fitpot file from parameter file for uf3l potential.
+    Cut-off radii for 2- and 3-body are given in the parameter file.
+    """
+    uf3l_prms = read_params_uf3l('in.params.uf3l')
+
+    fpvars = []
+    vranges= []
+
+    for spi,erg in uf3l_prms['1B'].items():
+        fpvars.append(erg)
+        vranges.append((-1e+10, 1e+10))
+
+    rc2max = 0.0
+    d2b = uf3l_prms['2B']
+    for pair in d2b.keys():
+        ncoef = d2b[pair]['ncoef']
+        coefs = d2b[pair]['coefs']
+        nlead = d2b[pair]['nlead']
+        ntrail= d2b[pair]['ntrail']
+        rc2max = max(rc2max, d2b[pair]['rc2b'])
+        for i in range(ncoef):
+            fpvars.append(coefs[i])
+            if i < nlead or i >= ncoef -ntrail:
+                vranges.append((0.0, 0.0))
+            else:
+                vranges.append((-1e+10, 1e+10))
+
+    rc3max = 0.0
+    d3b = uf3l_prms['3B']
+    for trio in d3b.keys():
+        print(trio)
+        ncoef = d3b[trio]['ncoef']
+        rc3max = max(rc3max, d3b[trio]['rc'])
+        coefs = d3b[trio]['coefs']
+        nlead = d3b[trio]['nlead']
+        ntrail= d3b[trio]['ntrail']
+        fpvars.append(d3b[trio]['betj'])
+        vranges.append((-1e+1, 1e+1))
+        fpvars.append(d3b[trio]['betk'])
+        vranges.append((-1e+1, 1e+1))
+        for i in range(ncoef):
+            fpvars.append(coefs[i])
+            if i < nlead or i >= ncoef -ntrail:
+                vranges.append((0.0, 0.0))
+            else:
+                vranges.append((-1e+10, 1e+10))
+    write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
+    return None
+
 def main():
     args = docopt(__doc__)
     if args['-v']:
@@ -379,7 +430,15 @@ def main():
         """
         Ultra-fast force-field.
         """
+        print(' rc, rc3 are given from in.params.uf3, not by this options.')
         uf32fp(outfname,specorder)
+
+    elif potname in ('UF3L','uf3l'):
+        """
+        UF3L (light)
+        """
+        print(' rc, rc3 are given from in.params.uf3l, not by this options.')
+        uf3l2fp(outfname,specorder)
 
     return None
 

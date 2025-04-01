@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-02-20 23:33:36 KOBAYASHI Ryo>
+!                     Last modified: <2025-03-31 21:07:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -687,17 +687,17 @@ contains
           if( lematch ) then
             if( .not.allocated(samples(ismpl)%gwe) ) allocate(samples(ismpl)%gwe(ndim))
             samples(ismpl)%gwe(:)= gwe(:)
-            dmem = dmem +4d0*size(gwe)
+            dmem = dmem +8d0*size(gwe)
           endif
           if( lfmatch ) then
             if( .not.allocated(samples(ismpl)%gwf) ) allocate(samples(ismpl)%gwf(3,ndim,maxnf))
             samples(ismpl)%gwf(:,:,1:nfcal)= gwf(:,:,1:nfcal)
-            dmem = dmem +4d0*size(gwf)
+            dmem = dmem +8d0*size(gwf)
           endif
           if( lsmatch ) then
             if( .not.allocated(samples(ismpl)%gws) ) allocate(samples(ismpl)%gws(6,ndim))
             samples(ismpl)%gws(:,:)= gws(:,:)
-            dmem = dmem +4d0*size(gws)
+            dmem = dmem +8d0*size(gws)
           endif
         endif
       endif
@@ -902,7 +902,7 @@ contains
     twait= twait +twg
 
     if( l1st ) then
-      if( trim(cpot).eq.'uf3') then
+      if( trim(cpot).eq.'uf3' .or. trim(cpot).eq.'uf3l') then
         dmem = dmem + get_mem_uf3()
 !!$        if( myid.eq.0 ) print *,'get_mem_uf3: dmem=',dmem
       endif
@@ -931,7 +931,8 @@ contains
     use linreg,only: set_paramsdir_linreg,set_params_linreg
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf,set_params_desc_new, lfitpot_desc => lfitpot
-    use UF3,only: set_params_uf3, print_1b, print_2b, prm2s, n2b
+    use UF3,only: set_params_uf3, print_1b, print_2b, prm2s, n2b, &
+         set_params_uf3l
     implicit none
     type(mdsys),intent(inout):: smpl
     integer,intent(in):: ndim, nff
@@ -975,6 +976,8 @@ contains
         call set_params_DNN(ndim,x)
       else if( trim(cffs(i)).eq.'uf3' ) then
         call set_params_uf3(ndim,x)
+      else if( trim(cffs(i)).eq.'uf3l' ) then
+        call set_params_uf3l(ndim,x)
       endif
     
       if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then

@@ -3,11 +3,11 @@ import os,sys
 import numpy as np
 
 __description__="""
-Utility functions for UF3 potential.
+Utility functions for UF3, UF3L potential.
 """
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250122"
+__version__ = "250331"
 
 def read_params_uf3(infname):
 
@@ -100,6 +100,82 @@ def read_params_uf3(infname):
                     uf3_prms[body][(spi,spj,spk)] = d3b
                         
     return uf3_prms
+
+def read_params_uf3l(infname):
+
+    if not os.path.exists(infname):
+        raise FileNotFoundError(infname)
+    
+    uf3l_prms = {'1B':{},
+                 '2B':{},
+                 '3B':{}}
+    mode = 'none'
+    body = 'none'
+    with open(infname,'r') as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            if line[0] == '#':
+                if len(line) > 3:
+                    mode = 'read'
+                    continue
+                else:
+                    mode = 'none'
+                    body = 'none'
+                    continue
+            data = line.split()
+            if data[0] in ('1B','2B','3B'):
+                body = data[0]
+                if body == '1B':
+                    spi = data[1]
+                    epot = float(data[2])
+                    uf3l_prms[body][spi] = epot
+                    continue
+                elif body == '2B':
+                    spi = data[1]
+                    spj = data[2]
+                    uf3l_prms[body][(spi,spj)] = {}
+                    uf3l_prms[body][(spi,spj)]['nlead'] = int(data[3])
+                    uf3l_prms[body][(spi,spj)]['ntrail'] = int(data[4])
+                    uf3l_prms[body][(spi,spj)]['spacing'] = data[5]
+                    d = f.readline().split()
+                    uf3l_prms[body][(spi,spj)]['rc2b'] = float(d[0])
+                    uf3l_prms[body][(spi,spj)]['nknot'] = int(d[1])
+                    d = f.readline().split()
+                    uf3l_prms[body][(spi,spj)]['knots'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    uf3l_prms[body][(spi,spj)]['ncoef'] = int(d[0])
+                    d = f.readline().split()
+                    uf3l_prms[body][(spi,spj)]['coefs'] = \
+                        np.array([ float(x) for x in d])
+                    continue
+                elif body == '3B':
+                    spi = data[1]
+                    spj = data[2]
+                    spk = data[3]
+                    d3b = {}
+                    d3b['nlead'] = int(data[4])
+                    d3b['ntrail'] = int(data[5])
+                    d3b['spacing'] = data[6]
+                    d = f.readline().split()
+                    rc, nknot, betj, betk = (float(d[0]), int(d[1]), float(d[2]), float(d[3]))
+                    d3b['rc'] = rc
+                    d3b['nknot'] = nknot
+                    d3b['betj'] = betj
+                    d3b['betk'] = betk
+                    d = f.readline().split()
+                    d3b['knots'] = np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    ncoef = int(d[0])
+                    d3b['ncoef'] = ncoef
+                    d3b['coefs'] = np.zeros(ncoef)
+                    d = f.readline().split()
+                    d3b['coefs'] = [ float(x) for x in d ]
+                    uf3l_prms[body][(spi,spj,spk)] = d3b
+                        
+    return uf3l_prms
 
 def write_params_uf3(uf3prms,
                      outfname='in.params.uf3',

@@ -46,7 +46,7 @@ subroutine get_force(l1st,epot,stnsr)
   use RFMEAM,only: force_RFMEAM
   use Pellenq,only: force_Pellenq
   use repel,only: force_repel
-  use UF3,only: force_uf3
+  use UF3,only: force_uf3, force_uf3l
   use fdesc, only: force_fdesc
   use time, only: accum_time
   implicit none
@@ -437,6 +437,14 @@ subroutine get_force(l1st,epot,stnsr)
     call accum_time('force_UF3',mpi_wtime() -tmp)
   endif
 
+  if( use_force('UF3L').or.use_force('uf3l') ) then
+    tmp = mpi_wtime()
+    call force_uf3l(namax,natm,tag,ra,nnmax,aa,strs &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,lstrs,iprint,l1st)
+    call accum_time('force_UF3L',mpi_wtime() -tmp)
+  endif
+
   if( use_force('fdesc') ) then
     call force_fdesc(namax,natm,nnmax,lspr,rc,h,hi,tag,ra, &
          aa,epot,aux(iaux_edesc,:),strs, &
@@ -481,7 +489,8 @@ subroutine init_force(linit)
   use angular,only: read_params_angular, lprmset_angular
   use RFMEAM, only: read_params_RFMEAM, lprmset_RFMEAM
   use Pellenq,only: read_params_Pellenq, lprmset_Pellenq
-  use UF3,only: read_params_uf3, lprmset_uf3, lprms_read_uf3
+  use UF3,only: read_params_uf3, lprms_read_uf3, &
+       read_params_uf3l, lprms_read_uf3l
   use repel,only: read_params_repel, lprmset_repel
   use fdesc, only: init_fdesc
   implicit none
@@ -666,6 +675,13 @@ subroutine init_force(linit)
   if( use_force('UF3') .or. use_force('uf3') ) then
     if( .not.lprms_read_uf3 ) then
       call read_params_uf3(myid_md,mpi_md_world,iprint)
+    endif
+  endif
+
+!.....UF3L
+  if( use_force('UF3L') .or. use_force('uf3l') ) then
+    if( .not.lprms_read_uf3l ) then
+      call read_params_uf3l(myid_md,mpi_md_world,iprint)
     endif
   endif
 

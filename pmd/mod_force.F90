@@ -1,6 +1,6 @@
 module force
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-06 21:18:51 KOBAYASHI Ryo>
+!                     Last-modified: <2025-03-31 11:57:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   implicit none
@@ -13,7 +13,7 @@ module force
        ol_type, ol_force, ol_ranges, ol_alphas, ol_dalphas, ol_pair
   
 !.....Force index list
-  integer,parameter:: N_FORCES = 36
+  integer,parameter:: N_FORCES = 37
   character(len=128):: force_index_list(N_FORCES)
 
   integer:: num_forces = -1
@@ -72,6 +72,7 @@ contains
     force_index_list(34) =  "DNN"
     force_index_list(35) =  "fdesc"
     force_index_list(36) =  "UF3"
+    force_index_list(37) =  "UF3L"
 
     luse_force(:) = .false.
 
