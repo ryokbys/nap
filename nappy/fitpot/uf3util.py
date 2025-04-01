@@ -7,7 +7,7 @@ Utility functions for UF3, UF3L potential.
 """
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250331"
+__version__ = "250401"
 
 def read_params_uf3(infname):
 
@@ -266,6 +266,85 @@ def write_params_uf3(uf3prms,
                     for icjk in range(ncjk):
                         f.write(f'{coefs[icij,icik,icjk]:11.4e} ')
                     f.write('\n')
+            f.write('#\n')
+    f.close()
+    return None
+
+def write_params_uf3l(uf3lprms,
+                      outfname='in.params.uf3l',
+                      author=None,
+                      overwrite=False):
+    from datetime import datetime
+    if os.path.exists(outfname) and not overwrite:
+        raise Exception(f'{outfname} already exists.')
+
+    f = open(outfname, 'w')
+
+    data1B = uf3lprms.get('1B',None)
+    data2B = uf3lprms.get('2B',None)
+    data3B = uf3lprms.get('3B',None)
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    if author is None:
+        author = __author__
+
+    entry_comment = f'#UF3 POT UNITS: metal DATE: {today} AUTHOR: {author} CITATION:\n'
+    if data1B is not None:
+        spcs = data1B.keys()
+        for spi in spcs:
+            epot = data1B[spi]
+            f.write(entry_comment)
+            f.write(f'1B  {spi}  {epot:0.4f}\n')
+            f.write('#\n')
+    if data2B is not None:
+        pairs = data2B.keys()
+        for pair in pairs:
+            spi,spj = pair
+            dp = data2B[pair]
+            nlead = dp['nlead']
+            ntrail= dp['ntrail']
+            spacing = dp['spacing']
+            rc2b = dp['rc2b']
+            nknot = dp['nknot']
+            knots = dp['knots']
+            ncoef = dp['ncoef']
+            coefs = dp['coefs']
+            f.write(entry_comment)
+            f.write(f'2B  {spi}  {spj}  {nlead}  {ntrail}  {spacing}\n')
+            f.write(f'{rc2b:0.2f}  {nknot}\n')
+            for i in range(nknot):
+                f.write(f'{knots[i]:0.4f} ')
+            f.write('\n')
+            f.write(f'{ncoef}\n')
+            for i in range(ncoef):
+                f.write(f'{coefs[i]:11.4e} ')
+            f.write('\n')
+            f.write('#\n')
+    if data3B is not None:
+        trios = data3B.keys()
+        for trio in trios:
+            spi,spj,spk = trio
+            d3b = data3B[trio]
+            nlead = d3b['nlead']
+            ntrail= d3b['ntrail']
+            spacing = d3b['spacing']
+            rc = d3b['rc']
+            nknot = d3b['nknot']
+            knots = d3b['knots']
+            ncoef = d3b['ncoef']
+            coefs = d3b['coefs']
+            betj = d3b['betj']
+            betk = d3b['betk']
+            f.write(entry_comment)
+            f.write(f'3B  {spi}  {spj}  {spk}  {nlead}  {ntrail}  {spacing}\n')
+            f.write(f'{rc:0.2f}  {nknot}  {betj:0.2f}  {betk:0.2f}\n')
+            for i in range(nknot):
+                f.write(f'{knots[i]:0.4f} ')
+            f.write('\n')
+            f.write(f'{ncoef}\n')
+            for ic in range(ncoef):
+                f.write(f'{coefs[ic]:11.4e} ')
+            f.write('\n')
             f.write('#\n')
     f.close()
     return None

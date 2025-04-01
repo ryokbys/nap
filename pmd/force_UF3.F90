@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 13:56:45 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 15:29:44 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -401,10 +401,10 @@ contains
       enddo  ! while(.true.)
 20    continue  ! when the file reached the end
       if( iprint >= ipl_basic ) print '(/,a,i0)', &
-           '   Total num of UF3 coefficients =  ',ncoef
+           '   Total num of UF3L coefficients =  ',ncoef
     endif
 
-    call bcast_uf3_params(mpi_world,myid)
+    call bcast_uf3l_params(mpi_world,myid)
     lprms_read_uf3l = .true.
     return
   end subroutine read_params_uf3l
@@ -3591,6 +3591,37 @@ contains
     enddo
     return
   end function get_mem_uf3
+!=======================================================================
+  function get_mem_uf3l() result(dmem)
+!
+!  Compute and return memory usage in this module.
+!
+    real(8):: dmem
+    integer:: i2b, i3b
+    type(prm2):: p2
+    type(prm3l):: p3
+
+    dmem = 0d0
+
+    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+!!$    dmem = dmem +4d0*size(ls3b)
+    
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
+    enddo
+    do i3b=1,n3b
+      p3 = prm3ls(i3b)
+      dmem = dmem +8d0*( size(p3%knots) +size(p3%coefs) )
+      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
+    enddo
+    return
+  end function get_mem_uf3l
 !=======================================================================
   subroutine dealloc_gwx_uf3()
 !

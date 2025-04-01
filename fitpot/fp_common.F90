@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-03-31 21:07:12 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 15:30:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -580,7 +580,8 @@ contains
          vranges,ismask, repul_radii
     use parallel
 !!$    use minimize
-    use UF3,only: get_mem_uf3, dealloc_gwx_uf3, calc_short_lossgrad
+    use UF3,only: get_mem_uf3, get_mem_uf3l, dealloc_gwx_uf3, &
+         calc_short_lossgrad
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -657,7 +658,8 @@ contains
       natm= smpl%natm
       nfcal = smpl%nfcal
       csmplname = smpl%csmplname
-      if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,csmplname=',myid,ismpl,trim(csmplname)
+      if( iprint.gt.10 ) print *,'grad_w_pmd: myid,ismpl,iclass,csmplname=', &
+           myid,ismpl,smpl%iclass,trim(csmplname)
 
 !.....Since g calc is time consuming,
 !.....not calculate g for test set.
@@ -674,6 +676,7 @@ contains
         if( lfmatch ) gwf(:,:,1:nfcal) = smpl%gwf(:,:,1:nfcal)
         if( lsmatch ) gws(:,:) = smpl%gws(:,:)
       else
+        if( iprint.gt.10 ) print *,'grad_w_pmd: pre_pmd for csmplname: ',trim(csmplname)
         call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,.false.)
         if( iprint.gt.10 ) print *,'grad_w_pmd: run_pmd for csmplname: ',trim(csmplname)
         lgrad_done = smpl%lgrad_done
@@ -718,6 +721,7 @@ contains
       swgt= smpl%wgt
 !.....Derivative of energy term w.r.t. weights
       if( lematch ) then
+        if( iprint > 10 ) print *,'(grad_w_pmd) in lematch'
         ttmp = mpi_wtime()
         eref= smpl%eref
         esub= smpl%esub
@@ -902,9 +906,10 @@ contains
     twait= twait +twg
 
     if( l1st ) then
-      if( trim(cpot).eq.'uf3' .or. trim(cpot).eq.'uf3l') then
+      if( trim(cpot).eq.'uf3' ) then
         dmem = dmem + get_mem_uf3()
-!!$        if( myid.eq.0 ) print *,'get_mem_uf3: dmem=',dmem
+      else if( trim(cpot).eq.'uf3l') then
+        dmem = dmem + get_mem_uf3l()
       endif
     endif
     
@@ -912,6 +917,7 @@ contains
       call dealloc_gwx_uf3()
     endif
     l1st = .false.
+    if( iprint > 10 ) print *,'(grad_w_pmd) done'
     return
   end subroutine grad_w_pmd
 !=======================================================================
@@ -977,6 +983,7 @@ contains
       else if( trim(cffs(i)).eq.'uf3' ) then
         call set_params_uf3(ndim,x)
       else if( trim(cffs(i)).eq.'uf3l' ) then
+        if( iprint > 10 ) print *,'pre_pmd: into set_params_uf3l...'
         call set_params_uf3l(ndim,x)
       endif
     
@@ -1036,6 +1043,7 @@ contains
 
 !.....one_shot force calculation
 !.....NOTE: unit of forces is eV/Ang. (not scaled by h-mat)
+    if( iprint.gt.10 ) print *,'rum_pmd: into oneshot4fp...'
     call oneshot4fp(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &

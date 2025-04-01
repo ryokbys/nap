@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 13:56:54 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-01 14:51:08 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -42,6 +42,7 @@ program fitpot
     write(6,'(a)') '========================================================================'
     write(6,*) ''
     call time_stamp(' Job started')
+
     write(6,*) ''
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_infitpot(10,'in.fitpot')
