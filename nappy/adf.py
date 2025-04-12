@@ -25,6 +25,8 @@ Options:
               Skip first NSKIP steps from the statistics. [default: 0]
   --plot      Plot figures. [default: False]
   --fortran   Try using fortran routine for ADF calculation.
+  --format FORMAT
+              Input file format. [default: None]
 """
 
 import os,sys
@@ -162,7 +164,8 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
     return angd,anda
 
 def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
-                specorder=None,fortran=False,nnmax=100):
+                specorder=None,fortran=False,nnmax=100,
+                format=None):
     na= int(180.0/dang)
     aadf= np.zeros((len(triplets),na),dtype=float)
     nsum= 0
@@ -172,7 +175,7 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
             sys.exit()
         #nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File = ',infname)
-        nsys = read(fname=infname,specorder=specorder)
+        nsys = read(fname=infname,specorder=specorder,format=format)
         angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
         #...NOTE that df is not averaged over the atoms in nsys
         aadf += df
@@ -274,6 +277,9 @@ def main():
     nnmax= int(args['--nnmax'])
     sigma= int(args['--gsmear'])
     fortran = args['--fortran']
+    fmt = args['--format']
+    if fmt == 'None':
+        fmt = None
     ofname= args['-o']
     if ofname == 'None':
         ofname = None
@@ -294,7 +300,8 @@ def main():
     na= int(180.0/dang)
     angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,triplets=triplets,
-                          specorder=specorder,fortran=fortran,nnmax=nnmax)
+                          specorder=specorder,fortran=fortran,nnmax=nnmax,
+                          format=fmt)
 
     if not sigma == 0:
         print(' Gaussian smearing...')

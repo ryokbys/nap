@@ -21,7 +21,7 @@ import os
 
 from docopt import docopt
 #from prms2fp import read_params_uf3
-from uf3util import read_params_uf3, write_params_uf3
+from uf3util import read_params_uf3, write_params_uf3, read_params_uf3l, write_params_uf3l
 from datetime import datetime
 
 __author__ = "Ryo KOBAYASHI"
@@ -412,6 +412,41 @@ def fp2uf3(outfname, vs, uf3_prms, **kwargs):
     print(f' Wrote {outfname}')
     return None
 
+def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
+
+    iv = -1
+    for spi in uf3l_prms['1B'].keys():
+        iv += 1
+        uf3l_prms['1B'][spi] = vs[iv]
+
+    for pair in uf3l_prms['2B'].keys():
+        dic = uf3l_prms['2B'][pair]
+        ncoef = dic['ncoef']
+        nlead = dic['nlead']
+        ntrail= dic['ntrail']
+        for i in range(ncoef):
+            iv += 1
+            dic['coefs'][i] = vs[iv]
+        uf3l_prms['2B'][pair] = dic
+
+    for trio in uf3l_prms['3B'].keys():
+        dic = uf3l_prms['3B'][trio]
+        ncoef = dic['ncoef']
+        iv += 1
+        dic['gmj'] = vs[iv]
+        iv += 1
+        dic['gmk'] = vs[iv]
+        for i in range(ncoef):
+            iv += 1
+            dic['coefs'][i] = vs[iv]
+        uf3l_prms['3B'][trio] = dic
+
+    write_params_uf3l(uf3l_prms,
+                      outfname=outfname,
+                      overwrite=True)
+    print(f' Wrote {outfname}')
+    return None
+
 def fp2params(vs,**kwargs):
     """
     Conversion from fp-vars to files specified in param_files in in.fitpot.
@@ -508,6 +543,13 @@ def main():
         uf3_prms = read_params_uf3(prmfname)
         outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
         fp2uf3(outfname, varsfp['variables'], uf3_prms, **kwargs)
+    elif pot_type in ('UF3L', 'uf3l'):
+        prmfname = 'in.params.uf3l'
+        if not os.path.exists(prmfname):
+            raise Exception(f'Cannot find {prmfname}.')
+        uf3l_prms = read_params_uf3l(prmfname)
+        outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
+        fp2uf3l(outfname, varsfp['variables'], uf3l_prms, **kwargs)
     else:
         if len(pairs) == 0:
             raise ValueError('Pairs must be specified.')

@@ -10,7 +10,8 @@ Usage:
 Options:
   -h, --help  Show this help message and exit.
   -e, --even  Set even number to the k-points in a direction.
-  -p PITCH    PITCH of k in a direction. [default: 0.2]
+  -p, --pitch PITCH
+              PITCH of k in a direction. [default: 0.2]
   --encut ENCUT
               Cutoff energy. [default: None]
   --ediff EDIFF
@@ -371,7 +372,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
 def main():
     args= docopt(__doc__)
 
-    pitch= float(args['-p'])
+    pitch= float(args['--pitch'])
     leven= args['--even']
     spin_polarized= args['--spin-polarize']
     high_spin = args['--high-spin']

@@ -1,6 +1,6 @@
 module SW
 !-----------------------------------------------------------------------
-!                     Last modified: <2023-01-23 17:23:28 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-02 22:04:51 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use pmdvars,only: nspmax
   include "./const.h"
@@ -79,7 +79,7 @@ contains
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
     real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
-    real(8):: epotl,epotl2,epotl3,epott
+    real(8):: epotl,epotl2,epotl3,epott,epot2,epot3
     real(8),save:: swli,a8d3r3,rcmax2
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),allocatable,save:: strsl(:,:,:)
@@ -296,11 +296,15 @@ contains
     endif
 
 !-----gather epot
-    epotl= epotl2 +epotl3
-!!$    epotl= epotl3
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot= epot +epott
-    if( iprint.ge.ipl_info ) print *,'SW epot = ',epott
+!!$    epotl= epotl2 +epotl3
+    epot2 = 0d0
+    epot3 = 0d0
+    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
+!!$    epot= epot +epott
+    epot = epot +epot2 +epot3
+    if( iprint.ge.ipl_info ) print '(a,3es12.3)','SW epot2,epot3,epot = ', &
+         epot2,epot3,(epot2+epot3)
     return
   end subroutine force_SW
 !=======================================================================
@@ -474,5 +478,5 @@ contains
 end module SW
 !-----------------------------------------------------------------------
 !     Local Variables:
-!     compile-command: "make pmd"
+!     compile-command: "make pmd lib"
 !     End:

@@ -7,11 +7,12 @@ module variables
   integer:: niter= 1
   integer:: niter_eval= 1
   character(len=128):: cfmethod= 'BFGS'
-  character(len=128):: cdatasetdir= 'dataset'
-  character(len=128):: csubstractdir= 'dataset_substract'
   character(len=128):: cparfile= 'in.vars.fitpot'
   character(len=128):: crunmode= 'serial'
   character(len=128):: cevaltype= 'absolute' ! (absolute|relative)
+!.....Sample file
+  character(len=128):: csmplfile= ''  ! used since 250412
+  character(len=128):: cdatasetdir= 'dataset'  ! obsolete since 250412
   character(len=128):: csmplistfile= ''
   character(len=128):: csmplftype= 'dir'  ! (dir|file)
   integer:: nprcs= 1

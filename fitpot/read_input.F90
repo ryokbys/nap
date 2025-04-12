@@ -56,6 +56,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'sample_list' ) then
     call read_c1(ionum,csmplistfile)
     return
+  elseif( trim(cname).eq.'sample_file' ) then
+    call read_c1(ionum,csmplfile)
+    return
   elseif( trim(cname).eq.'sample_file_type' ) then
     call read_c1(ionum,csmplftype)
     return
@@ -75,11 +78,11 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'check_grad_id' ) then
     call read_i1(ionum,id_check_grad)
     return
-  elseif( trim(cname).eq.'main_directory' .or. &
-       trim(cname).eq.'sample_directory' .or. &
-       trim(cname).eq.'dataset_directory' ) then
-    call read_c1(ionum,cdatasetdir)
-    return
+!!$  elseif( trim(cname).eq.'main_directory' .or. &
+!!$       trim(cname).eq.'sample_directory' .or. &
+!!$       trim(cname).eq.'dataset_directory' ) then
+!!$    call read_c1(ionum,cdatasetdir)
+!!$    return
   elseif( trim(cname).eq.'param_file' ) then
     call read_c1(ionum,cparfile)
     return

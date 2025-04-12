@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 16:46:15 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-12 23:16:54 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -925,7 +925,7 @@ contains
 !
 !  Preprocesses before running pmd
 !
-    use variables,only: cdatasetdir,cpot,nsubff,csubffs,mdsys, &
+    use variables,only: csmplfile,cpot,nsubff,csubffs,mdsys, &
          maxisp,nn_nl,nn_nhl,nn_sigtype,nn_asig,rc3, &
          interact,interact3,num_interact,iprint, &
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
@@ -1235,61 +1235,9 @@ contains
         dmem = dmem +8d0*size(frcs)
       endif
 
-      
-!!$      do i=1,nsubff
-! !!$        if( index(trim(csubffs(i)),'Morse').ne.0 ) then
-! !!$          luse_Morse = .true.
-! !!$        else if( index(trim(csubffs(i)),'Morse_repul').ne.0 ) then
-! !!$          luse_Morse_repul = .true.
-! !!$        else if( index(trim(csubffs(i)),'Ewald').ne.0 .or. &
-! !!$             index(trim(csubffs(i)),'Coulomb').ne.0 .or. &
-! !!$             index(trim(csubffs(i)),'vcGaussian').ne.0 ) then
-! !!$          luse_Coulomb = .true.
-! !!$        else if( index(trim(csubffs(i)),'LJ_repul').ne.0 ) then
-! !!$          luse_LJ_repul = .true.
-! !!$        else if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
-!!$        if( index(trim(csubffs(i)),'ZBL').ne.0 ) then
-!!$          luse_ZBL = .true.
-!!$          call read_params_ZBL()
-! !!$        else if( index(trim(csubffs(i)),'Bonny_WRe').ne.0 ) then
-! !!$          luse_Bonny_WRe = .true.
-! !!$        else if( index(trim(csubffs(i)),'cspline').ne.0 ) then
-! !!$          luse_cspline = .true.
-! !!$        else if( index(trim(csubffs(i)),'dipole').ne.0 ) then
-! !!$          luse_dipole = .true.
-!!$        endif
-!!$      enddo  ! i=1,nsubff
-
 !.....Only at the 1st call, perform pmd to get (esub,fsub,ssub)
       do ismpl=isid0,isid1
         natm = samples(ismpl)%natm
-!!$        if( luse_Morse .or. luse_Morse_repul ) then
-!!$          call set_paramsdir_Morse(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
-!!$        if( luse_Coulomb ) then
-!!$          call set_paramsdir_Coulomb(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
-!!$        if( luse_dipole ) then
-!!$          call set_paramsdir_dipole(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
-!!$        if( luse_LJ_repul ) then
-!!$          call set_paramsdir_LJ(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
-!!$        if( luse_ZBL ) then
-!!$          call set_params_ZBL(zbl_rc,zbl_qnucl,zbl_ri,zbl_ro,zbl_interact)
-!!$        endif
-!!$        if( luse_Bonny_WRe ) then
-!!$          call set_paramsdir_Bonny(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
-!!$        if( luse_cspline ) then
-!!$          call set_paramsdir_cspline(trim(cdatasetdir)//'/'&
-!!$               //trim(samples(ismpl)%csmplname)//'/pmd')
-!!$        endif
         call pre_pmd(samples(ismpl),nvars,vars,nsubff,csubffs,&
              rc_other,.true.)
         call run_pmd(samples(ismpl),lgrad,lgrad_done,nvars,&

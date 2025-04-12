@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-01 16:38:13 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-07 18:02:19 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -63,7 +63,7 @@ module UF3
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
     integer:: nklead, nktrail
     integer:: nknot, ncoef
-    real(8):: rc, rc2, betj, betk
+    real(8):: rc, rc2, gmj, gmk
     real(8),allocatable:: knots(:), coefs(:)
     real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm3l
@@ -281,7 +281,7 @@ contains
 !-----------------------------------------------------------------------
 !  Each pair or trio is sandwitched with lines beginning with "#".
 !  For trios, the value range spans from -1.0 to 1.0 corresponding to cos.
-!  The two values after "3.5  19" in 3B are the betj and betk (numerators in exp).
+!  The two values after "3.5  19" in 3B are the gmj and gmk (numerators in exp).
 !
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
@@ -420,7 +420,8 @@ contains
     integer:: i, isp, jsp
     
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%nklead, ps%nktrail, ps%cknot
-    if( ps%cb /= '2B' ) stop 'ERROR: CB should be 2B.'
+    if( ps%cb /= '2B' ) stop 'ERROR@read_2b: CB should be 2B.'
+    if( ps%nktrail /= 3 ) stop 'ERROR@read_2b: nktrail must be 2 !'
     read(ioprms,*) ps%rc, ps%nknot
     ps%rc2 = ps%rc**2
     if( allocated(ps%knots) ) deallocate(ps%knots)
@@ -501,11 +502,11 @@ contains
     integer:: i,j,k,isp,jsp,ksp
     
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%csk, ps%nklead, ps%nktrail, ps%cknot
-    if( ps%cb /= '3B' ) stop 'ERROR: CB should be 3B.'
-    read(ioprms,*) ps%rc, ps%nknot, ps%betj, ps%betk
+    if( ps%cb /= '3B' ) stop 'ERROR@read_3bl: CB should be 3B.'
+    read(ioprms,*) ps%rc, ps%nknot, ps%gmj, ps%gmk
     ps%rc2 = ps%rc**2
-    if( ps%csj.eq.ps%csk .and. abs(ps%betj-ps%betk).gt.1d-10 ) &
-         stop 'ERROR@read_3bl: must be betj==betk for csj==csk in 3BL.'
+    if( ps%csj.eq.ps%csk .and. abs(ps%gmj-ps%gmk).gt.1d-10 ) &
+         stop 'ERROR@read_3bl: must be gmj==gmk for csj==csk in 3BL.'
     if( allocated(ps%knots) ) deallocate(ps%knots)
     allocate(ps%knots(ps%nknot))
     read(ioprms,*) (ps%knots(i), i=1,ps%nknot)
@@ -1300,6 +1301,7 @@ contains
 !
     use util, only: itotOf
     implicit none
+    real(8),parameter:: tiny = 1d-8
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
@@ -1319,7 +1321,7 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),betj,betk,csn,vexp
+    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
     real(8),save:: rcin2 = -1d0
 
     type(prm2):: p2
@@ -1464,15 +1466,16 @@ contains
           drijc = 1d0/(dij-p3%rc)
           drikc = 1d0/(dik-p3%rc)
 !.....parameters
-          betj = p3%betj
-          betk = p3%betk
+          gmj = p3%gmj
+          gmk = p3%gmk
           if( js==ks ) then
-            betj = (betj+betk) /2
-            betk = betj
+            gmj = (gmj+gmk) /2
+            gmk = gmj
           endif
 !.....common terms
-          vexp = dexp(betj*drijc +betk*drikc)
+          vexp = dexp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
+          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
           call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
           sumcb = 0d0
           sumcdb= 0d0
@@ -1489,8 +1492,8 @@ contains
           epi(ia) = epi(ia) +tmp
           epotl3 = epotl3 +tmp
 !.....force
-          dv3rij = -drijc*drijc *betj *tmp
-          dv3rik = -drikc*drikc *betk *tmp
+          dv3rij = -drijc*drijc *gmj *tmp
+          dv3rik = -drikc*drikc *gmk *tmp
           dv3csn = -vexp *sumcdb
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
@@ -2234,7 +2237,7 @@ contains
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),betj,betk,csn,vexp
+    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
     real(8):: dv3rijbj,dv3rijbk,dv3rijc, dv3rikbj,dv3rikbk,dv3rikc, &
          dv3csnbj,dv3csnbk,dv3csnc
     real(8),save:: rcin2 = -1d0
@@ -2279,17 +2282,17 @@ contains
         p3 = prm3ls(i3b)
         if( lematch ) then
           if( allocated(prm3ls(i3b)%gwe) ) deallocate(prm3ls(i3b)%gwe)
-          allocate(prm3ls(i3b)%gwe(p3%ncoef+2))  ! ncoef +2 (betj & betk)
+          allocate(prm3ls(i3b)%gwe(p3%ncoef+2))  ! ncoef +2 (gmj & gmk)
           tmp = tmp +size(prm3ls(i3b)%gwe)*8d0
         endif
         if( lfmatch ) then
           if( allocated(prm3ls(i3b)%gwf) ) deallocate(prm3ls(i3b)%gwf)
-          allocate(prm3ls(i3b)%gwf(3,p3%ncoef+2,nfcal))  ! ncoef +2 (betj & betk)
+          allocate(prm3ls(i3b)%gwf(3,p3%ncoef+2,nfcal))  ! ncoef +2 (gmj & gmk)
           tmp = tmp +size(prm3ls(i3b)%gwf)*8d0
         endif
         if( lsmatch ) then
           if( allocated(prm3ls(i3b)%gws) ) deallocate(prm3ls(i3b)%gws)
-          allocate(prm3ls(i3b)%gws(6,p3%ncoef+2))  ! ncoef +2 (betj & betk)
+          allocate(prm3ls(i3b)%gws(6,p3%ncoef+2))  ! ncoef +2 (gmj & gmk)
           tmp = tmp +size(prm3ls(i3b)%gws)*8d0
         endif
       enddo
@@ -2408,14 +2411,14 @@ contains
           drijc = 1d0/(dij-p3%rc)
           drikc = 1d0/(dik-p3%rc)
 !.....parameters
-          betj = p3%betj
-          betk = p3%betk
+          gmj = p3%gmj
+          gmk = p3%gmk
           if( js==ks ) then
-            betj = (betj+betk) /2
-            betk = betj
+            gmj = (gmj+gmk) /2
+            gmk = gmj
           endif
 !.....common terms
-          vexp = dexp(betj*drijc +betk*drikc)
+          vexp = dexp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
           call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
           sumcb = 0d0
@@ -2440,18 +2443,18 @@ contains
           endif
 !.....force
           if( .not.lfmatch .and. .not.lsmatch ) cycle
-          dv3rij = -drijc*drijc *betj *tmp
-          dv3rik = -drikc*drikc *betk *tmp
+          dv3rij = -drijc*drijc *gmj *tmp
+          dv3rik = -drikc*drikc *gmk *tmp
           dv3csn = -vexp *sumcdb
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
 !!$          dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
-          dv3rijbj= -drijc*drijc*(1d0+betj*drijc)*tmp
-          dv3rijbk= -drijc*drijc*(    betk*drikc)*tmp
-          dv3rijc = -drijc*drijc*betj*vexp !*bcs(lcs)
-          dv3rikbj= -drikc*drikc*(    betj*drijc)*tmp
-          dv3rikbk= -drikc*drikc*(1d0+betk*drikc)*tmp
-          dv3rikc = -drikc*drikc*betk*vexp !*bcs(lcs)
+          dv3rijbj= -drijc*drijc*(1d0+gmj*drijc)*tmp
+          dv3rijbk= -drijc*drijc*(    gmk*drikc)*tmp
+          dv3rijc = -drijc*drijc*gmj*vexp !*bcs(lcs)
+          dv3rikbj= -drikc*drikc*(    gmj*drijc)*tmp
+          dv3rikbk= -drikc*drikc*(1d0+gmk*drikc)*tmp
+          dv3rikc = -drikc*drikc*gmk*vexp !*bcs(lcs)
           dv3csnbj = dv3csn *drijc
           dv3csnbk = dv3csn *drikc
           dv3csnc  = -vexp !*dbcs(lcs)
@@ -2460,11 +2463,11 @@ contains
             jfcal = ia2ifcal(jra)
             kfcal = ia2ifcal(kra)
             if( ifcal.ne.0 ) then
-!.....deriv. wrt betj
+!.....deriv. wrt gmj
               prm3ls(i3b)%gwf(:,1,ifcal)= prm3ls(i3b)%gwf(:,1,ifcal) & 
                    +drijj(:)*dv3rijbj +dcsnj(:)*dv3csnbj &
                    +drikk(:)*dv3rikbj +dcsnk(:)*dv3csnbj
-!.....deriv. wrt betk
+!.....deriv. wrt gmk
               prm3ls(i3b)%gwf(:,2,ifcal)= prm3ls(i3b)%gwf(:,2,ifcal) &
                    +drijj(:)*dv3rijbk +dcsnj(:)*dv3csnbk &
                    +drikk(:)*dv3rikbk +dcsnk(:)*dv3csnbk
@@ -2552,9 +2555,9 @@ contains
           p3%gwe(2) = p3%gwe(1)
         endif
         ip = ip +1
-        gwe(ip) = gwe(ip) +p3%gwe(1)  ! betj
+        gwe(ip) = gwe(ip) +p3%gwe(1)  ! gmj
         ip = ip +1
-        gwe(ip) = gwe(ip) +p3%gwe(2)  ! betk
+        gwe(ip) = gwe(ip) +p3%gwe(2)  ! gmk
         do i=1,p3%ncoef
           ip = ip +1
           gwe(ip) = gwe(ip) +p3%gwe(2+i)
@@ -2889,7 +2892,8 @@ contains
     integer,intent(in):: ndimp
     real(8),intent(in):: params(ndimp)
 
-    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp, &
+         nklead, nktrail
     type(prm2):: p2
     type(prm3l):: p3
 
@@ -2925,17 +2929,21 @@ contains
       erg1s(i1b) = params(inc)
     enddo
     do i2b=1,n2b
-      do ic=1,prm2s(i2b)%ncoef
+      ncoef = prm2s(i2b)%ncoef
+      nklead = prm2s(i2b)%nklead
+      nktrail = prm2s(i2b)%nktrail
+      do ic=1,ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params(inc)
       enddo
     enddo
     do i3b=1,n3b
+      ncoef = prm3ls(i3b)%ncoef
       inc = inc +1
-      prm3ls(i3b)%betj = params(inc)
+      prm3ls(i3b)%gmj = params(inc)
       inc = inc +1
-      prm3ls(i3b)%betk = params(inc)
-      do ic=1,prm3ls(i3b)%ncoef
+      prm3ls(i3b)%gmk = params(inc)
+      do ic=1,ncoef
         inc = inc +1
         prm3ls(i3b)%coefs(ic) = params(inc)
       enddo
@@ -3318,7 +3326,8 @@ contains
          repul_radii(nspmax,nspmax)
     real(8),intent(out):: penalty
 
-    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
+         nklead, nktrail
     type(prm2):: p2
     type(prm3l):: p3
     real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
@@ -3339,6 +3348,8 @@ contains
 !.....variables only for short-distance penalty
       isp = p2%isp
       jsp = p2%jsp
+      nklead = p2%nklead
+      nktrail= p2%nktrail
       rc = repul_radii(isp,jsp)
       nr2 = knot_index(rc,p2%nknot,p2%knots)
       
@@ -3377,23 +3388,25 @@ contains
     p3bd= 0d0
     if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
       do i3b=1,n3b
+        p3 = prm3ls(i3b)
         inc = inc +1
-        prm3ls(i3b)%betj = params_in(inc)
-        p3b = p3b + prm3ls(i3b)%betj**2
+        prm3ls(i3b)%gmj = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%gmj**2
         inc = inc +1
-        prm3ls(i3b)%betk = params_in(inc)
-        p3b = p3b + prm3ls(i3b)%betk**2
-        do ic=1,prm3ls(i3b)%ncoef
+        prm3ls(i3b)%gmk = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%gmk**2
+        do ic=1,p3%ncoef
           inc = inc +1
           prm3ls(i3b)%coefs(ic) = params_in(inc)
           p3b = p3b +prm3ls(i3b)%coefs(ic)**2
         enddo
+        
 !.....penalty to derivative
         if( abs(pwgt3bd).lt.1d-14 ) cycle
-        p3 = prm3ls(i3b)
         do ic=1,p3%ncoef
           if( ic-1 > 0 .and. ic+1 <= p3%ncoef ) p3bd = p3bd + &
-               (p3%coefs(ic-1) -2d0*p3%coefs(ic) +p3%coefs(ic+1))**2
+               (prm3ls(i3b)%coefs(ic-1) -2d0*prm3ls(i3b)%coefs(ic) &
+               +prm3ls(i3b)%coefs(ic+1))**2
         enddo
       enddo
     endif
@@ -3417,7 +3430,7 @@ contains
     real(8),intent(out):: grad(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,ip, &
-         nr2,isp,jsp
+         nr2,isp,jsp, nklead, nktrail
     type(prm2):: p2
     type(prm3l):: p3
     real(8):: tmp,dc1,dc2,rc
@@ -3459,7 +3472,7 @@ contains
       nr2 = knot_index(rc,p2%nknot,p2%knots)
 
       ic2ip(:) = 0
-      do ic=1,prm2s(i2b)%ncoef
+      do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)
         ic2ip(ic) = inc
@@ -3510,22 +3523,24 @@ contains
     gp3bd(:)= 0d0
     if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
       do i3b=1,n3b
+        ncoef = prm3ls(i3b)%ncoef
         ic3ip(:) = 0
         inc = inc +1
-        prm3ls(i3b)%betj = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%betj
+        prm3ls(i3b)%gmj = params_in(inc)
+        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%gmj
         inc = inc +1
-        prm3ls(i3b)%betk = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%betk
-        do ic=1,prm3ls(i3b)%ncoef
+        prm3ls(i3b)%gmk = params_in(inc)
+        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%gmk
+        do ic=1, ncoef
           inc = inc +1
           prm3ls(i3b)%coefs(ic) = params_in(inc)
           gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%coefs(ic)
           ic3ip(ic) = inc
         enddo
+        
         if( abs(pwgt3bd).lt.1d-14 ) cycle
         p3 = prm3ls(i3b)
-        do ic=1,p3%ncoef
+        do ic=1,ncoef
           ip = ic3ip(ic)
 !.....ij
           if( ic-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
