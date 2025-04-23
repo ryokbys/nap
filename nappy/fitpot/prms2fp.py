@@ -390,7 +390,7 @@ def uf3l2fp(outfname,specorder):
         vranges.append((0.0, 2.0))
         for i in range(ncoef):
             fpvars.append(coefs[i])
-            vranges.append((-1e+10, 1e+10))
+            vranges.append((0.0, 1e+10))
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 

@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-13 00:00:05 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-13 23:03:24 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -40,6 +40,7 @@ program fitpot
     call write_revision()
     call write_authors()
     write(6,'(a)') '========================================================================'
+
     write(6,*) ''
     call time_stamp(' Job started')
     write(6,*) ''
@@ -683,51 +684,6 @@ subroutine read_samples()
   return
 end subroutine read_samples
 !=======================================================================
-subroutine read_samples_old()
-  use variables
-  use parallel
-  implicit none
-
-  integer:: is,isp,jsp
-  character:: cdir*128, cspmd*3, cspfp*3
-  integer,allocatable:: nal(:)
-
-  if( .not. allocated(nalist) ) allocate(nalist(nsmpl))
-  allocate(nal(nsmpl))
-  nalist(1:nsmpl)= 0
-  nal(1:nsmpl)= 0
-
-  do is=isid0,isid1
-    cdir= samples(is)%cdirname
-    call read_pos(12,trim(cdir) &
-         //'/pos',is,samples(is))
-    nal(is)= samples(is)%natm
-!.....Specorder in fitpot and that in sample should be the same
-    do isp=1,nspmax
-      cspmd = samples(is)%specorder(isp)
-      cspfp = specorder(isp)
-      if( trim(cspfp).ne.trim(cspmd) .and. trim(cspmd).ne.'x' ) then
-        print '(a)','ERROR: specorder in the sample is different from that in fitpot.'
-        print '(a,2a5)','   failed species in fitpot and the sample: ',trim(cspfp),trim(cspmd)
-        print '(a)','   specorder in fitpot and the sample, '//trim(cdir)
-        do jsp=1,nspmax
-          print '(i5,2a5)',jsp,specorder(jsp), samples(is)%specorder(jsp)
-        enddo
-        stop
-      endif
-    enddo
-  enddo
-  call mpi_reduce(nal,nalist,nsmpl,mpi_integer,mpi_sum &
-       ,0,mpi_world,ierr)
-
-  call mpi_barrier(mpi_world,ierr)
-  if( myid.eq.0 .and. iprint.gt.1 ) then
-    write(6,'(/,a)') ' Finished read_samples'
-  endif
-  deallocate(nal)
-  return
-end subroutine read_samples_old
-!=======================================================================
 subroutine read_smpl(ionum,fname,ismpl,smpl)
 !
 !  Read a sample from smpl_XXX file which is a new format since 2024-11-07
@@ -855,68 +811,6 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   close(ionum)
   
 end subroutine read_smpl
-!=======================================================================
-subroutine read_pos(ionum,fname,ismpl,smpl)
-  use variables
-  use util,only: num_data
-  implicit none 
-  integer,intent(in):: ionum,ismpl
-  character(len=*),intent(in):: fname
-  type(mdsys),intent(inout):: smpl
-
-  integer:: i,natm,num
-  real(8):: tmp
-  character(len=128):: cline
-  character(len=10):: c1,copt
-
-  open(ionum,file=trim(fname),status='old')
-  do while(.true.)
-    read(ionum,'(a)') cline
-    if( cline(1:1).eq.'!' .or. cline(1:1).eq.'#' ) then
-      if( index(cline,'specorder:').ne.0 ) then
-        num = num_data(trim(cline),' ')
-        if( num.gt.11 ) stop 'ERROR: number of species exceeds the limit.'
-        read(cline,*) c1, copt, smpl%specorder(1:num-2)
-!!$        print *,'specorder = ',smpl%specorder(1:num-2)
-      endif
-    else
-      backspace(ionum)
-      exit
-    endif
-  enddo
-  smpl%h(:,:,:) = 0d0
-  read(ionum,*) smpl%h0
-  read(ionum,*) smpl%h(1:3,1,0)
-  read(ionum,*) smpl%h(1:3,2,0)
-  read(ionum,*) smpl%h(1:3,3,0)
-!!$  read(ionum,*) tmp,tmp,tmp
-!!$  read(ionum,*) tmp,tmp,tmp
-!!$  read(ionum,*) tmp,tmp,tmp
-  read(ionum,*) natm
-  smpl%h(1:3,1:3,0) = smpl%h(1:3,1:3,0)*smpl%h0
-  smpl%natm= natm
-  allocate(smpl%ra(3,natm),smpl%fa(3,natm) &
-       ,smpl%tag(natm) &
-       ,smpl%fref(3,natm),smpl%fabs(natm) &
-       ,smpl%va(3,natm),smpl%strsi(3,3,natm) &
-       ,smpl%eki(3,3,natm),smpl%epi(natm) &
-       ,smpl%fsub(3,natm),smpl%eatm(natm) )
-  dmem = dmem +8d0*size(smpl%ra) +8d0*size(smpl%fa) +8d0*size(smpl%tag) &
-       +8d0*size(smpl%fref) +8d0*size(smpl%fabs) &
-       +8d0*size(smpl%va) +8d0*size(smpl%strsi) +8d0*size(smpl%eki) +8d0*size(smpl%epi) &
-       +8d0*size(smpl%fsub) +8d0*size(smpl%eatm)
-  if( lgdw ) then
-    allocate(smpl%gdf(natm),smpl%gdw(natm))
-    dmem = dmem +8d0*size(smpl%gdf) +8d0*size(smpl%gdw)
-  endif
-  smpl%esub= 0d0
-  smpl%fsub(1:3,1:natm)= 0d0
-  smpl%ssub(1:3,1:3) = 0d0
-  do i=1,smpl%natm
-    read(ionum,*) smpl%tag(i),smpl%ra(1:3,i), tmp,tmp,tmp
-  enddo
-  close(ionum)
-end subroutine read_pos
 !=======================================================================
 subroutine get_base_energies()
 !

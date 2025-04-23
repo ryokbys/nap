@@ -1364,7 +1364,6 @@ def analyze(nsys):
 
 def main():
     import os,sys
-    import nappy.io
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
 
     infmt= args['--in-format']
@@ -1384,32 +1383,42 @@ def main():
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    nsys = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
-
-    nsys.shift_atoms(*shift)
-    if ncycle > 0:
-        nsys.cycle_coord(ncycle)
-    
-    #...Periodic copy if needed
-    copy_needed = False
-    divide_needed = False
-    for c in copies:
-        if c > 1.5:
-            copy_needed = True
-        elif c < 0.9:
-            divide_needed = True
-    if copy_needed:
-        nsys.repeat(*copies)
-    if divide_needed:
-        nsys.divide(*copies)
+    nsyss = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
+    if type(nsyss) != list:
+        nsyss = [nsyss,]
 
     if args['analyze']:
-        analyze(nsys)
-    elif args['convert']:
-        if scalefactor != "None":
-            nsys.alc *= float(scalefactor)
+        analyze(nsyss[0])
 
-        nappy.io.write(nsys,fname=outfname,format=outfmt)
+    elif args['convert']:
+        postfix_num = False
+        if len(nsyss) > 1:
+            postfix_num = True
+            print(' Since the input file contains more than 1 system,'
+                  +' files with numbers are to be written.')
+        for i in range(len(nsyss)):
+            if scalefactor != "None":
+                nsyss[i].alc *= float(scalefactor)
+            nsyss[i].shift_atoms(*shift)
+            if ncycle > 0:
+                nsyss[i].cycle_coord(ncycle)
+        
+            #...Periodic copy if needed
+            copy_needed = False
+            divide_needed = False
+            for c in copies:
+                if c > 1.5:
+                    copy_needed = True
+                elif c < 0.9:
+                    divide_needed = True
+            if copy_needed:
+                nsyss[i].repeat(*copies)
+            if divide_needed:
+                nsyss[i].divide(*copies)
+            ofname = outfname
+            if postfix_num:
+                ofname += f'_{i:d}'
+            nappy.io.write(nsyss[i],fname=ofname,format=outfmt)
     else:
         raise NotImplementedError()
 

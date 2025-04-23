@@ -70,7 +70,7 @@ def get_open_func(fname,mode):
     else:
         return open, mode
     
-def read(fname="pmdini",format=None, specorder=None, index=None):
+def read(fname="pmdini",format=None, specorder=[], index=None):
     if format in (None, 'None'):
         format= parse_filename(fname, mode='read')
 
@@ -116,7 +116,7 @@ def read(fname="pmdini",format=None, specorder=None, index=None):
     return nsys
 
 def read_pmd(fname:str = 'pmdini',
-             specorder:list = None):
+             specorder:list = []):
     """
     Reader method for pmd format.
     *pmd* format is like following:
@@ -168,7 +168,7 @@ def read_pmd(fname:str = 'pmdini',
                         nsyss.append(nsys)
                     #...create new system here
                     nsys = NAPSystem()
-                    if specorder is not None: nsys.specorder = specorder
+                    if specorder != []: nsys.specorder = specorder
                     aux_names = []
                     iline = 0
                     incatm = 0
@@ -356,7 +356,7 @@ def write_pmd(nsys,fname='pmdini', auxs=[], **kwargs):
     f.close()
     return None
 
-def read_POSCAR(fname='POSCAR',specorder=None,):
+def read_POSCAR(fname='POSCAR',specorder=[],):
     nsys = NAPSystem()
     myopen, mode = get_open_func(fname,'r')
     with myopen(fname,mode) as f:
@@ -374,7 +374,7 @@ def read_POSCAR(fname='POSCAR',specorder=None,):
             spcs = copy.deepcopy(buff)
             buff= f.readline().split()
             assert buff[0].isdigit, f'buff[0] is not digits, buff={buff[0]}'
-            if specorder is None:
+            if specorder == []:
                 nsys.specorder = spcs
             else:
                 nsys.specorder = specorder
@@ -497,7 +497,7 @@ def write_POSCAR(nsys,fname='POSCAR',):
     f.close()
     return None
 
-def read_dump(fname="dump",specorder=None,):
+def read_dump(fname="dump",specorder=[],):
     """
     LAMMPS dump file stores positions and velocities data in real unit, not in scaled unit.
     Thus, nappy has to convert these from real unit to scaled unit.
@@ -510,7 +510,7 @@ def read_dump(fname="dump",specorder=None,):
     iatm= 0
     natm= -1
     symbol = None
-    if specorder is None:
+    if specorder == []:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
@@ -774,9 +774,9 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz'],):
     f.close()
     return None
 
-def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=None,):
+def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=[],):
     nsys = NAPSystem()
-    if specorder is None:
+    if specorder == []:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
@@ -909,10 +909,10 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic',):
     f.close()
     return None
 
-def read_xsf(fname="xsf",specorder=None,):
+def read_xsf(fname="xsf",specorder=[],):
     from nappy.elements import get_symbol_from_number
     nsys = NAPSystem()
-    if specorder is None:
+    if specorder == []:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
@@ -1095,7 +1095,7 @@ def write_extxyz(fileobj, nsys):
     return None
 
 
-def read_extxyz(fname, specorder=None,):
+def read_extxyz(fname, specorder=[],):
     """
     Read an extxyz format using ASE package.
     NOTE: extxyz file could contain multiple structures.
@@ -1121,16 +1121,16 @@ def read_extxyz(fname, specorder=None,):
         if type(atoms) == list:
             nsyss = []
             for a in atoms:
-                #...Since usually, stress unit in extxyz is in eV/Ang^3,
-                #...convert it to GPa 
-                nsyss.append(from_ase(a, stress_factor=160.218))
+                #...Since usually, stress unit in extxyz is in eV/Ang^3 and the definition of sign is opposite,
+                #...convert it to GPa taking into account the sign.
+                nsyss.append(from_ase(a, stress_factor=-160.218))
         else:
             nsys = from_ase(atoms)
     except Exception as e:
         print(' Failed to load input file even with ase.')
         raise
 
-    if specorder != None:
+    if specorder != []:
         if type(atoms) == list:
             nsys = nsyss[0]
         if nsys.specorder != specorder:
@@ -1142,7 +1142,7 @@ def read_extxyz(fname, specorder=None,):
     else:
         return nsys
     
-def read_CHGCAR(fname='CHGCAR',specorder=None,):
+def read_CHGCAR(fname='CHGCAR',specorder=[],):
     """
     Read CHGCAR file and get information of cell, atoms, and volumetric data.
 
@@ -1167,7 +1167,7 @@ def read_CHGCAR(fname='CHGCAR',specorder=None,):
         if not buff[0].isdigit():
             spcs = copy.deepcopy(buff)
             buff= f.readline().split()
-            if specorder is None:
+            if specorder == None:
                 nsys.specorder = spcs
             else:
                 nsys.specorder = specorder
@@ -1256,12 +1256,12 @@ need to specify the species order correctly with --specorder option.
         nsys.voldata = np.reshape(voldata,ndiv,order='F')
     return nsys
 
-def read_cube(fname, specorder=None,):
+def read_cube(fname, specorder=[],):
     """Read Gaussian cube format file."""
     from nappy.elements import get_symbol_from_number
     from nappy.units import Bohr_to_Ang
     nsys = NAPSystem()
-    if specorder is None:
+    if specorder == []:
         nsys.specorder = []
     else:
         nsys.specorder = specorder
@@ -1473,14 +1473,14 @@ def get_PDB_txt(nsys,**kwargs):
 
     return txt
 
-def from_ase(atoms, specorder=None,
+def from_ase(atoms, specorder=[],
              get_forces=True,
              get_stress=True, stress_factor=1.0):
     """
     Convert ASE Atoms object to NAPSystem object.
     """
     spcorder = []
-    if specorder is not None:
+    if specorder == []:
         spcorder = specorder
     symbols = atoms.get_chemical_symbols()
     spos = atoms.get_scaled_positions()

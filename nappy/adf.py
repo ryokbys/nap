@@ -18,7 +18,8 @@ Options:
               Order of species separated by comma, like, --specorder=Si,O. [default: None]
   --triplets=TRIPLETS
               Triplets whose angles are to be computed. Three species should be specified connected by hyphen,
-              and separated by comma, e.g.) P-O-O,Li-O-O. [default: None]
+              and separated by comma, in which first one is the center of the three.
+              e.g.) P-O-O,Li-O-O. [default: None]
   -o OUT      Output file name [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --skip=NSKIP 

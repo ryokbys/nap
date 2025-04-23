@@ -265,6 +265,9 @@ contains
 !
 ! Stochastic gradient decent (SGD)
 !
+! In SGD, the iteration is called epoch, and in each epoch several iteration exists,
+! and in each iteration only a fraction of samples (called batch) is evaluated.
+!
     integer,intent(in):: ndim,iprint,niter_eval,myid,mpi_world, &
          mynsmpl,myntrn,isid0,isid1
     integer,intent(inout):: iflag,maxiter
@@ -371,7 +374,7 @@ contains
 
     call sub_eval(0)
 
-!.....One iteration includes evaluation of all the training data.
+!.....One iteration includes evaluation of all the training data, which is actually an epoch.
     do iter=1,maxiter
       fp = ftrn
       gp(:) = g(:)
@@ -387,7 +390,7 @@ contains
       call get_order_iarr(myntrn,nsgdbsize,imaskarr)
 !!$      print *,'myid,iter,imaskarr(:)=',myid,iter,imaskarr(:)
 
-!.....Inner loop for batch process
+!.....Inner loop for batch process, which is the actual iteration
       do innerstp = 1,ninnerstp
 !.....Unmask only the samples whose imaskarr(i)==innerstp
         ismask(:) = 1
@@ -454,11 +457,12 @@ contains
         enddo
         call wrap_ranges(ndim,x,xranges)
         call func(ndim,x,ftmp,ftst)
-        call grad(ndim,x,gtmp)
-        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
-        if( iter.ne.maxiter ) call sub_eval(iter)
-        call write_vars(ndim,xbest,xranges,'best')
+!!$        call grad(ndim,x,gtmp)  ! grad call for all the samples maybe time consuming
+!!$        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
+        if( iter.ne.maxiter ) call sub_eval(iter)  ! Write (ENERGY:, FORCE:, STRESS: ...)
+        call write_vars(ndim,xbest,xranges,'best') 
       endif
+!.....Write (iter,ninner,ftrn,ftst,...)
       call write_status(6,myid,iprint,cpena,iter,ninnerstp &
            ,ftrn,ftst,pval,xnorm,gnorm,dxnorm,fp)
       if( ftst < fbest ) then

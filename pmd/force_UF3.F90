@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-07 18:02:19 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-13 23:03:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -1420,18 +1420,6 @@ contains
 !.....which may be slower because of double computation of dij,
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
-!!$!.....Compute ls3b before going to main 3b part
-!!$      ls3b(0) = 0
-!!$      do jj=1,lspr(0,ia)
-!!$        ja = lspr(jj,ia)
-!!$        xj(1:3) = ra(1:3,ja)
-!!$        xij(1:3) = xj(1:3) -xi(1:3)
-!!$        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-!!$        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-!!$        if( dij2 > rc3max2 ) cycle
-!!$        ls3b(0) = ls3b(0) +1
-!!$        ls3b(ls3b(0)) = ja
-!!$      enddo
 
       tmp3 = 0d0
       do jj=1,lspr(0,ia)

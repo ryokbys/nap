@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-12 23:16:54 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-14 12:21:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -365,7 +365,7 @@ contains
         else
           ediff= (epot+esub -eref)/natm /eerr
         endif
-        if( trim(ctype_loss).eq.'Huber' ) then
+        if( trim(ctype_loss).eq.'huber' ) then
           if( abs(ediff).gt.1.d0 ) then
             ediff = 2d0*abs(ediff) -1d0
           else
@@ -411,7 +411,7 @@ contains
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+fsub(ixyz,ia) &
                  -fref(ixyz,ia)) *ferri
-            if( trim(ctype_loss).eq.'Huber' ) then
+            if( trim(ctype_loss).eq.'huber' ) then
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
               else
@@ -459,7 +459,7 @@ contains
                    -sref(ixyz,jxyz)) *serri
             enddo
           enddo
-          if( trim(ctype_loss).eq.'Huber' ) then
+          if( trim(ctype_loss).eq.'huber' ) then
             do k=1,6
               if( abs(pdiff(k)).gt.1d0 ) then
                 pdiff(k) = 2d0*abs(pdiff(k)) -1d0
