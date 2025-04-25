@@ -337,7 +337,7 @@ def write_params_uf3l(uf3lprms,
             gmk = d3b['gmk']
             f.write(entry_comment)
             f.write(f'3B  {spi}  {spj}  {spk}  {nlead}  {ntrail}  {spacing}\n')
-            f.write(f'{rc:0.2f}  {nknot}  {gmj:0.2f}  {gmk:0.2f}\n')
+            f.write(f'{rc:0.2f}  {nknot}  {gmj:0.2f}  {gmk:0.2f}\n')  # no need to write gmj and gmk
             for i in range(nknot):
                 f.write(f'{knots[i]:0.4f} ')
             f.write('\n')

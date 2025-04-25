@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-13 23:03:24 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-25 21:11:37 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -860,18 +860,16 @@ subroutine qn_wrapper(ftrn0,ftst0)
 !!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. cpot(1:3).eq.'uf3' ) then
     call qn(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
+         ,iprint,iflag,myid,cfmethod &
+         ,niter_eval)
   else
     if( myid.eq.0 ) then
       print *,'Warning: BFGS is not available for '&
@@ -888,16 +886,14 @@ subroutine sd_wrapper(ftrn0,ftst0)
 !
   use variables
 !!$  use NNd,only:NN_init,NN_func,NN_grad
-  use fp_common,only: func_w_pmd, grad_w_pmd
   use parallel
   use minimize
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  external:: write_stats
 
   call steepest_descent(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol &
-       ,ftol,niter,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
-       ,niter_eval,write_stats)
+       ,ftol,niter,iprint,iflag,myid,cfmethod &
+       ,niter_eval)
 
   return
 end subroutine sd_wrapper
@@ -907,18 +903,16 @@ subroutine cg_wrapper(ftrn0,ftst0)
 !!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
-  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  external:: write_stats
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
        .or. cpot(1:3).eq.'uf3' ) then
     call cg(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-         ,iprint,iflag,myid,func_w_pmd,grad_w_pmd,cfmethod &
-         ,niter_eval,write_stats)
+         ,iprint,iflag,myid,cfmethod &
+         ,niter_eval)
   else
     if( myid.eq.0 ) then
       print *,'Warning: CG is not available for '&
@@ -936,14 +930,12 @@ subroutine sgd_wrapper(ftrn0,ftst0)
   use variables
   use minimize
   use parallel
-  use fp_common,only: func_w_pmd, grad_w_pmd
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-  external:: write_stats
 
-  call sgd(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
-       ,iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1,func_w_pmd &
-       ,grad_w_pmd,cfmethod,niter_eval,write_stats)
+  call sgd(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter, &
+       iprint,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1, &
+       cfmethod,niter_eval)
 
 end subroutine sgd_wrapper
 !=======================================================================

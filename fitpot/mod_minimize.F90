@@ -4,7 +4,7 @@ module minimize
        sgd_eps,adam_b1,adam_b2,ninnergfs,cread_fsmask,cfs_xrefresh, &
        maxfsrefresh,niter_linmin,fac_dec,fac_inc,armijo_xi,armijo_tau, &
        armijo_maxiter,icgbtype,m_lbfgs,fupper_lim
-  use fp_common,only: wrap_ranges
+  use fp_common,only: wrap_ranges, func=>func_w_pmd, grad=>grad_w_pmd
   implicit none 
   save
 
@@ -14,6 +14,9 @@ module minimize
       real(8),intent(in):: x(n),xr(2,n)
       character(len=*),intent(in):: c 
     end subroutine write_vars
+    subroutine write_stats(iter)
+      integer,intent(in):: iter
+    end subroutine write_stats
   end interface
 
 contains
@@ -110,7 +113,7 @@ contains
   end subroutine check_converge
 !=======================================================================
   subroutine steepest_descent(ndim,x0,xbest,ibest,fbest,g,d,xranges,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+       ,iprint,iflag,myid,cfmethod,niter_eval)
     implicit none
     integer,intent(in):: ndim,iprint,myid,niter_eval
     integer,intent(inout):: iflag,maxiter
@@ -120,19 +123,6 @@ contains
     real(8),intent(out):: xbest(ndim)
     character(len=*),intent(in):: cfmethod
     interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
     end interface
 
     integer:: iter,niter,nxtol,ngtol,nftol
@@ -173,7 +163,7 @@ contains
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
+             ,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
@@ -181,18 +171,18 @@ contains
             print *,'since quad_interpolate failed, call golden_section.'
           endif
           call golden_section(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
+               ,iprint,iflag,myid)
         endif
       else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
+             ,iprint,iflag,myid)
       else if( trim(clinmin).eq.'two-point' ) then
 !.....Like backtrack, but once alpha is defined, not to perform line minimization
 !     no matter the func value gets larger.
 !.....Currently this does NOT work well...
         if( iter.le.1 ) then  ! only 1st call, perform line minimization a bit
           call backtrack(ndim,x,xranges,d,ftrn,ftst,alpha,iprint &
-               ,iflag,myid,func,niter)
+               ,iflag,myid,niter)
         else
           alpha = sprod(ndim,s,s)/sprod(ndim,s,y)
           alpha = max(min(alpha,1d0),xtol)
@@ -202,7 +192,7 @@ contains
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,d,ftrn,ftst,g,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       else ! Default = backtrack
 !.....Increase alpha a bit every step,
 !.....alpha is to be decreased in subroutine backtrack to decrease func value.
@@ -210,7 +200,7 @@ contains
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,d,ftrn,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       endif
       if( iflag/100.ne.0 ) then
         if( myid.eq.0 ) then
@@ -220,7 +210,7 @@ contains
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        if( iter.ne.maxiter ) call sub_eval(iter)
+        if( iter.ne.maxiter ) call write_stats(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
 !.....Update x
@@ -261,7 +251,7 @@ contains
 !=======================================================================
   subroutine sgd(ndim,x0,xbest,ibest,fbest,g,u,xranges,xtol,gtol,ftol,maxiter,iprint &
        ,iflag,myid,mpi_world,mynsmpl,myntrn,isid0,isid1 &
-       ,func,grad,cfmethod,niter_eval,sub_eval)
+       ,cfmethod,niter_eval)
 !
 ! Stochastic gradient decent (SGD)
 !
@@ -276,21 +266,6 @@ contains
     real(8),intent(inout):: fbest,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
     character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
     include 'mpif.h'
     real(8),parameter:: tiny  = 1d-14
 
@@ -372,7 +347,7 @@ contains
     call write_status(6,myid,iprint,cpena,iter,ninnerstp &
          ,ftrn,ftst,pval,xnorm,gnorm,dxnorm,ftrn)
 
-    call sub_eval(0)
+    call write_stats(0)
 
 !.....One iteration includes evaluation of all the training data, which is actually an epoch.
     do iter=1,maxiter
@@ -459,7 +434,7 @@ contains
         call func(ndim,x,ftmp,ftst)
 !!$        call grad(ndim,x,gtmp)  ! grad call for all the samples maybe time consuming
 !!$        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
-        if( iter.ne.maxiter ) call sub_eval(iter)  ! Write (ENERGY:, FORCE:, STRESS: ...)
+        if( iter.ne.maxiter ) call write_stats(iter)  ! Write (ENERGY:, FORCE:, STRESS: ...)
         call write_vars(ndim,xbest,xranges,'best') 
       endif
 !.....Write (iter,ninner,ftrn,ftst,...)
@@ -551,7 +526,7 @@ contains
 !=======================================================================
   subroutine cg(ndim,x0,xbest,ibest,fbest,g,u,xranges,xtol,gtol,ftol, &
        maxiter,iprint,iflag,myid, &
-       func,grad,cfmethod,niter_eval,sub_eval)
+       cfmethod,niter_eval)
 !
 !  Conjugate gradient minimization
 !
@@ -562,21 +537,7 @@ contains
     real(8),intent(inout):: fbest,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
     character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
+
     real(8),parameter:: xtiny  = 1d-14
     real(8),parameter:: t_DL   = 0.2d0
     logical:: ltwice = .false.
@@ -625,7 +586,7 @@ contains
          ftrn,ftst,pval,vnorm,sgnorm,dxnorm,ftrn)
     u(1:ndim)= -g(1:ndim)
 
-    call sub_eval(0)
+    call write_stats(0)
     do iter=1,maxiter
       fp= ftrn
       xp(1:ndim)= x(1:ndim)
@@ -635,7 +596,7 @@ contains
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,ftrn,ftst,xtol,gtol,ftol &
-             ,alpha,iprint,iflag,myid,func)
+             ,alpha,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
@@ -643,11 +604,11 @@ contains
             print *,'since quad_interpolate failed, call golden_section.'
           endif
           call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol &
-               ,alpha,iprint,iflag,myid,func)
+               ,alpha,iprint,iflag,myid)
         endif
       else if ( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
+             ,iprint,iflag,myid)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
@@ -656,13 +617,13 @@ contains
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,u,ftrn,ftst,g,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,u,ftrn,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       endif
 
       if( iflag/100.ne.0 ) then
@@ -687,7 +648,7 @@ contains
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        if( iter.ne.maxiter ) call sub_eval(iter)
+        if( iter.ne.maxiter ) call write_stats(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
 !.....Update x
@@ -747,7 +708,7 @@ contains
   end subroutine cg
 !=======================================================================
   subroutine qn(ndim,x0,xbest,ibest,fbest,g,u,xranges,xtol,gtol,ftol,maxiter, &
-       iprint,iflag,myid,func,grad,cfmethod,niter_eval,sub_eval)
+       iprint,iflag,myid,cfmethod,niter_eval)
 !
 !  Limited-memory Broyden-Fletcher-Goldfarb-Shanno type of Quasi-Newton method.
 !  Since BFGS is a bit too heavy for high-dimension parameters (> 10,000),
@@ -760,21 +721,7 @@ contains
     real(8),intent(inout):: fbest,x0(ndim),g(ndim),u(ndim)
     real(8),intent(out):: xbest(ndim)
     character(len=*),intent(in):: cfmethod
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
+
     real(8),parameter:: xtiny  = 1d-14
     logical:: ltwice = .false.
     real(8),save,allocatable:: x(:),gp(:),s(:),y(:),dx(:)
@@ -858,7 +805,7 @@ contains
     call write_status(6,myid,iprint,cpena,iter,niter, &
          ftrn,ftst,pval,vnorm,gnorm,dxnorm,ftrn)
 
-    call sub_eval(0)
+    call write_stats(0)
 !.....Initial direction assuming H_0 == I in L-BFGS
     if( limited_mem ) u(:) = -g(:)
     do iter=1,maxiter
@@ -874,7 +821,7 @@ contains
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
         call quad_interpolate(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
+             ,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
@@ -882,11 +829,11 @@ contains
             print *,'since quad_interpolate failed, call golden_section.'
           endif
           call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid,func)
+               ,iprint,iflag,myid)
         endif
       else if( trim(clinmin).eq.'golden') then
         call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid,func)
+             ,iprint,iflag,myid)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
@@ -895,13 +842,13 @@ contains
 !!$        alpha = max(alpha,xtol)*2d0
         alpha = alpha *fac_inc
         call armijo_search(ndim,x,xranges,u,ftrn,ftst,g,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !        alpha = max(alpha,xtol)*2d0
         alpha = alpha *fac_inc
         call backtrack(ndim,x,xranges,u,ftrn,ftst,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
       endif
 !!$      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
       if( iflag/100.ne.0 ) then
@@ -950,7 +897,7 @@ contains
       endif
 !.....evaluate statistics at every niter_eval
       if( mod(iter,niter_eval).eq.0 ) then
-        if( iter.ne.maxiter ) call sub_eval(iter)
+        if( iter.ne.maxiter ) call write_stats(iter)
         call write_vars(ndim,xbest,xranges,'best')
       endif
       call check_converge(myid,iprint,'QN',xtol,gtol,ftol, &
@@ -1054,21 +1001,13 @@ contains
   end subroutine qn
 !=======================================================================
   subroutine get_bracket(ndim,x0,d,a,b,c,fa,fb,fc,fta,ftb,ftc &
-       ,iprint,iflag,myid,func)
+       ,iprint,iflag,myid)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: x0(ndim),d(ndim)
     real(8),intent(inout):: a,b,fa,fb,fta,ftb
     real(8),intent(out):: c,fc,ftc
-    
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-    end interface
 
     real(8),parameter:: RATIO = 1.61803398875d0
     real(8),parameter:: RATIOI= 1d0/RATIO
@@ -1141,7 +1080,7 @@ contains
   end subroutine exchange
 !=======================================================================
   subroutine quad_interpolate(ndim,x0,g,ftrn,ftst,xtol,gtol,ftol,a,iprint &
-       ,iflag,myid,func)
+       ,iflag,myid)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
@@ -1153,14 +1092,6 @@ contains
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
 
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-    end interface
-
     integer:: iter,imin,imax,ix
     real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
     real(8):: xi(4),fi(4),fti(4)
@@ -1169,7 +1100,7 @@ contains
     xi(2)= xi(1) +STP0
     call get_bracket(ndim,x0,g,xi(1),xi(2),xi(3),fi(1),fi(2),fi(3) &
          ,fti(1),fti(2),fti(3) &
-         ,iprint,iflag,myid,func)
+         ,iprint,iflag,myid)
     if( iflag/1000.ne.0 ) return
     
     iter= 0
@@ -1284,19 +1215,12 @@ contains
   end subroutine quad_interpolate
 !=======================================================================
   subroutine golden_section(ndim,x0,g,ftrn,ftst,xtol,gtol,ftol,alpha,iprint &
-       ,iflag,myid,func)
+       ,iflag,myid)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
     real(8),intent(inout):: ftrn,alpha,ftst
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-    end interface
 
     real(8),parameter:: STP0 = 1d-1
     real(8),parameter:: GR   = 0.61803398875d0
@@ -1309,7 +1233,7 @@ contains
     a= 0d0
     b1= STP0
     call get_bracket(ndim,x0,g,a,b1,c,fa,fb1,fc,fta,ftb1,ftc,&
-         iprint,iflag,myid,func)
+         iprint,iflag,myid)
     if( iflag/1000.ne.0 ) return
     xl= (c-a)
     b1= a +GR2*xl
@@ -1370,7 +1294,7 @@ contains
   end subroutine golden_section
 !=======================================================================
   subroutine armijo_search(ndim,x0,xranges,d,ftrn,ftst,g,alpha,iprint &
-       ,iflag,myid,func,niter)
+       ,iflag,myid,niter)
 !  
 !  1D search using Armijo rule.
 !
@@ -1379,13 +1303,6 @@ contains
     integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
     real(8),intent(inout):: ftrn,alpha,ftst
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-    end interface
 
 !!$  real(8),external:: sprod
     real(8),parameter:: xtiny  = 1d-14
@@ -1453,7 +1370,7 @@ contains
   end subroutine armijo_search
 !=======================================================================
   subroutine backtrack(ndim,x0,xranges,d,ftrn,ftst,alpha,iprint &
-       ,iflag,myid,func,niter)
+       ,iflag,myid,niter)
 !
 !  Simply move onestep towards current direction with max length
 !  that can decreases function value.
@@ -1463,13 +1380,6 @@ contains
     integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),d(ndim),xranges(2,ndim)
     real(8),intent(inout):: ftrn,alpha,ftst
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-    end interface
 
 !.....Precision
     real(8),parameter:: tiny = 1d-15
@@ -1568,7 +1478,7 @@ contains
   end subroutine soft_threshold
 !=======================================================================
   subroutine fs(ndim,x,f,g,d,xtol,gtol,ftol,maxiter &
-       ,iprint,iflag,myid,func,grad)
+       ,iprint,iflag,myid)
 !
 !  Forward Stagewise (FS) regression
 !
@@ -1579,18 +1489,6 @@ contains
     real(8),intent(in):: xtol,gtol,ftol
     real(8),intent(inout):: f,x(ndim),g(ndim),d(ndim)
 !!$    real(8):: func,grad
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-    end interface
 
     real(8),parameter:: eps = 1d0
     real(8),parameter:: xtiny= 1d-14
@@ -1725,8 +1623,7 @@ contains
   end subroutine fs
 !=======================================================================
   subroutine gfs(ndim,x,f,ftst,g,d,xtol,gtol,ftol,xranges,maxiter &
-       ,iprint,iflag,myid,func,grad,cfmethod,niter_eval &
-       ,sub_eval)
+       ,iprint,iflag,myid,cfmethod,niter_eval)
 !
 !  Grouped Forward Stepwise (grouped FS) regression
 !
@@ -1740,21 +1637,6 @@ contains
     real(8),intent(inout):: f,ftst,x(ndim),g(ndim),d(ndim)
     character(len=*),intent(in):: cfmethod
 !!$    real(8):: func,grad
-    interface
-      subroutine func(n,x,ftrn,ftst)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: ftrn,ftst
-      end subroutine func
-      subroutine grad(n,x,gtrn)
-        integer,intent(in):: n
-        real(8),intent(in):: x(n)
-        real(8),intent(out):: gtrn(n)
-      end subroutine grad
-      subroutine sub_eval(iter)
-        integer,intent(in):: iter
-      end subroutine sub_eval
-    end interface
 
     integer:: iter,i,ig,jg,j,igmm,itergfs,niter,inc,jnc&
          ,nfailinmin
@@ -1837,10 +1719,10 @@ contains
         f = fp
 !!$      alpha = 1d0
 !!$      call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
-!!$           ,iflag,myid,func,niter)
+!!$           ,iflag,myid,niter)
         alpha = min(max(alpha,xtol*10d0)*2d0, 1d0)
         call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
-             ,iflag,myid,func,niter)
+             ,iflag,myid,niter)
 !!$        print *,'ig,f,f-fp=',ig,f,f-fp
         gmaxgl0(ig) = -(f-fp)
       enddo
@@ -1854,7 +1736,7 @@ contains
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print '(a,i6,2es15.6e3,i6)',' iter,ftrn,ftst,nbases=',0,f,ftst,nbases
     endif
-    call sub_eval(0)
+    call write_stats(0)
 
 !.....Start gFS loop here
     fpgfs = f
@@ -2044,18 +1926,18 @@ contains
         if( trim(clinmin).eq.'armijo' ) then
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
           call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
-               ,iflag,myid,func,niter)
+               ,iflag,myid,niter)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
             call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
-                 ,iflag,myid,func,niter)
+                 ,iflag,myid,niter)
           endif
         else   ! backtrack (default)
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
           call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
-               ,iflag,myid,func,niter)
+               ,iflag,myid,niter)
         endif
 !.....get out of bfgs loop
 !!$        print '(a,3i4,2es12.4)','iter,itergfs,iflag,ftrn,fpgfs=' &
@@ -2284,7 +2166,7 @@ contains
           print '(a,i6,2es15.6e3,i6)',' iter,ftrn,ftst,nbases=' &
                ,iter,f,ftst,nbases
         endif
-        call sub_eval(iter)
+        call write_stats(iter)
       endif
     enddo
 

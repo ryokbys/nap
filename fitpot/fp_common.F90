@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-14 12:21:15 KOBAYASHI Ryo>
+!                     Last modified: <2025-04-25 21:07:41 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -170,27 +170,20 @@ contains
     return
   end subroutine wrap_ranges
 !=======================================================================
-  subroutine mask_grad(ndim,vranges,grad)
+  subroutine mask_grad(ndim,x,xranges,grad)
 !
-!  Set grad 0.0 if vranges is super narrow so that the var to be fixed.
+!  Set grad 0.0 if the var is at a bound and the grad goes to beyond the bound.
 !
     integer,intent(in):: ndim
-    real(8),intent(in):: vranges(2,ndim)
+    real(8),intent(in):: x(ndim),xranges(2,ndim)
     real(8),intent(inout):: grad(ndim)
 
+    real(8),parameter:: eps = 1.0d-14
     integer:: i
-    logical,save,allocatable:: lfix(:)
-
-    if( .not.allocated(lfix) ) then
-      allocate(lfix(ndim))
-      lfix(:) = .false.
-      do i=1,ndim
-        if( abs(vranges(1,i)-vranges(2,i)) < 1d-14 ) lfix(i) = .true.
-      enddo
-    endif
 
     do i=1,ndim
-      if( lfix(i) ) grad(i) = 0d0
+      if( grad(i) > 0d0 .and. abs(x(i)-xranges(1,i)) < eps ) grad(i) = 0d0
+      if( grad(i) < 0d0 .and. abs(x(i)-xranges(2,i)) < eps ) grad(i) = 0d0
     enddo
     return
   end subroutine mask_grad
@@ -580,8 +573,7 @@ contains
          vranges,ismask, repul_radii
     use parallel
 !!$    use minimize
-    use UF3,only: get_mem_uf3, get_mem_uf3l, dealloc_gwx_uf3, &
-         calc_short_lossgrad
+    use UF3,only: get_mem_uf3, get_mem_uf3l, dealloc_gwx_uf3, calc_short_lossgrad
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -883,7 +875,7 @@ contains
 !!$           ndim,grepul)
 !!$      gtrn(:) = gtrn(:) +pwgt_repul*grepul(:)
 !!$    endif
-    call mask_grad(ndim,vranges,gtrn)
+    call mask_grad(ndim,x,vranges,gtrn)
 
     if( .not.allocated(ldcover) ) then
       allocate(ldcover(ndim))
