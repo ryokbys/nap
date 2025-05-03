@@ -1,12 +1,13 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-03-31 16:30:03 KOBAYASHI Ryo>
+!                     Last-modified: <2025-05-03 18:27:47 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
 subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,auxtot,epot,ekin,stnsr)
 !.....All the arguments are in pmdvars module
-  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
+  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump, &
+       write_extxyz
   use util,only: iauxof, calc_nfmv, cell_info
   use pmdvars
   use zload
@@ -451,6 +452,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
              rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
       endif
+    else if( ifpmd.eq.3 ) then  ! extxyz format
+      call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+           rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0)
     endif
     call accum_time('write_xxx',mpi_wtime() -tmp)
   endif
@@ -941,6 +945,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
             call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
                  rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
           endif
+        else if( ifpmd.eq.3 ) then  ! extxyz format
+          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+               rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
         endif
         call accum_time('write_xxx',mpi_wtime() -tmp)
       endif
@@ -1319,7 +1326,8 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !  subroutine for minimization.
 !
 !.....All the arguments are in pmdvars module
-  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump
+  use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump, &
+       write_extxyz
   use util,only: iauxof, cell_info
   use pmdvars
   use force
@@ -1540,6 +1548,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
                rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
         endif
+      else if( ifpmd.eq.3 ) then  ! extxyz format
+        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+             rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
       endif
       call accum_time('write_xxx',mpi_wtime() -tmp)
     endif

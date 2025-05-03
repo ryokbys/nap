@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-13 23:03:05 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-03 18:55:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -3766,7 +3766,7 @@ contains
     write(c,'(i2)') size(ps%knots)
     print '(a,'//c//'(1x,f7.3))','     knots =',(ps%knots(i),i=1,size(ps%knots))
     write(c,'(i2)') size(ps%coefs)
-    print '(a,'//trim(c)//'(1x,f7.3))','     coefs =',(ps%coefs(i),i=1,size(ps%coefs))
+    print '(a,'//trim(c)//'(1x,es11.2))','     coefs =',(ps%coefs(i),i=1,size(ps%coefs))
   end subroutine print_2b
 !=======================================================================
   subroutine print_3b(ps)

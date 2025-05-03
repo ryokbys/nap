@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2024-11-28 18:03:45 KOBAYASHI Ryo>
+!                    Last modified: <2025-05-03 18:39:16 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -61,10 +61,11 @@ module pmdvars
   integer:: nstp = 0
   integer:: minstp = 0
   integer:: nerg = 1000
-  integer:: ifpmd= 2    ! 0:none, 1:pmd, 2:dump (default)
-  logical:: loutforce = .false.
+  character(len=20):: cfpos= 'extxyz'  ! 0:none, 1:pmd, 2:dump, 3:extxyz
+  integer:: ifpmd= 3    ! 0:none, 1:pmd, 2:dump, 3:extxyz
   integer:: npmd = 10
-  logical:: lcomb_pos = .false.
+  logical:: loutforce = .false.
+  logical:: lcomb_pos = .true.
   integer:: ifsort= 1
   real(8):: dt = 1d0
   real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
@@ -178,7 +179,8 @@ module pmdvars
 !-----------------------------------------------------------------------
 
   integer:: nstp_done
-  integer:: nouterg,noutpmd,istp,iocntpmd,iocnterg
+  integer:: nouterg,istp,iocnterg
+  integer:: noutpmd,iocntpmd
   integer:: natm,nb,nsp,nalmax,ntot
   integer:: maxnn = 0
   integer:: maxnb = 0

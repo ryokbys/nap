@@ -1103,7 +1103,7 @@ def read_extxyz(fname, specorder=[],):
     The extxyz format is defined in ASE and is like following:
     ---
     8
-    Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:frc:R:3
+    Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:forces:R:3
     Si        0.00000000      0.00000000      0.00000000    1.6215e-03   -6.4788e-03    2.6939e-05
     Si        1.36000000      1.36000000      1.36000000   -9.4438e-05   -5.7187e-04   -2.6944e-04
     Si        2.72000000      2.72000000      0.00000000   -5.9288e-06   -1.4727e-04   -1.7694e-03

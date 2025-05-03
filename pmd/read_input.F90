@@ -88,8 +88,15 @@ subroutine set_variable(ionum,cname)
     call read_i1(ionum,nerg)
     return
   elseif( trim(cname).eq.'flag_out_pmd' .or. &
-       trim(cname).eq.'flag_out_pos' ) then
-    call read_i1(ionum,ifpmd)
+       trim(cname).eq.'flag_out_pos' .or. &
+       trim(cname).eq.'traj_format' .or. &
+       trim(cname).eq.'out_pos_format' ) then
+    backspace(ionum)
+    read(ionum,*) ctmp, cfpos
+    if( trim(cfpos).eq.'0' .or. trim(cfpos).eq.'none' ) ifpmd = 0
+    if( trim(cfpos).eq.'1' .or. trim(cfpos).eq.'pmd' ) ifpmd = 1
+    if( trim(cfpos).eq.'2' .or. trim(cfpos).eq.'dump' ) ifpmd= 2
+    if( trim(cfpos).eq.'3' .or. trim(cfpos).eq.'extxyz' ) ifpmd= 3
     return
   elseif( trim(cname).eq.'flag_write_force' ) then
     call read_l1(ionum, loutforce)
@@ -209,10 +216,11 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pressure_target' ) then
     call read_r1(ionum,ptgt)
 !.....As ptgt can be also used for vc-X isobaric methods, copy it to stgt(i,i)
+    stgt(:,:) = 0d0
     stgt(1,1) = ptgt
     stgt(2,2) = ptgt
     stgt(3,3) = ptgt
-    lhydrostatic = .true.
+!!$    lhydrostatic = .true.
     return
   elseif( trim(cname).eq.'initial_pressure_target' ) then
     call read_r1(ionum,pini)
@@ -639,7 +647,7 @@ subroutine read_stress_target(ionum)
 
   if( ndat .eq. 4 ) then
     read(ionum,*) ctmp, stgt(1,1), stgt(2,2), stgt(3,3)
-    lhydrostatic = .true.
+!!$    lhydrostatic = .true.
   else if( ndat .eq. 7 ) then
     read(ionum,*) ctmp, stgt(1,1), stgt(2,2), stgt(3,3), &
          stgt(2,3), stgt(1,3), stgt(1,2)

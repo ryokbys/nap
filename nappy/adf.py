@@ -190,7 +190,8 @@ def write_normal(fname,triplets,na,angd,agr):
     Write out ADF data in normal ADF format.
     """
     outfile= open(fname,'w')
-    cmd = ' '.join(s for s in sys.argv)
+    #cmd = ' '.join(s for s in sys.argv)
+    cmd = 'adf.py'
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     cwd = os.getcwd()
     outfile.write(f'# Output from {cmd:s}\n')
@@ -227,7 +228,8 @@ def write_out4fp(fname,triplets,na,angd,agr,rcut,nperline=6):
             n += 1
     
     with open(fname,'w') as f:
-        cmd = ' '.join(s for s in sys.argv)
+        # cmd = ' '.join(s for s in sys.argv)
+        cmd = 'adf.py'
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cwd = os.getcwd()
         f.write(f'# Output from {cmd:s}\n')
