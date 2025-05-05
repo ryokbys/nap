@@ -12,7 +12,7 @@ time_interval     -2.0d0
 num_iteration     2
 num_out_energy    100
 
-flag_out_pmd      2
+# flag_out_pmd      3
 num_out_pmd       100
 
 force_type        DNN  ZBL

@@ -54,7 +54,7 @@ $ pip install -e .
 
 Then you can use the nappy commands, `napsys`, in the terminal and can import `nappy` package in python programs.
 
-For details, please see the [documentation](http://ryokbys.web.nitech.ac.jp/contents/nap_doc_jp)(in Japanese) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
+For details, please see the [documentation](http://ryokbys.web.nitech.ac.jp/contents/nap_doc_jp) (in Japanese) or ask me via e-mail (kobayashi.ryo[at]nitech.ac.jp).
 
 # Acknowledgements
 This program was supported in part by ["Materials research by Information Integration" Initiative (MI2I)](http://www.nims.go.jp/MII-I/) project of the Support Program for Starting Up Innovation Hub from Japan Science and Technology Agency (JST).
