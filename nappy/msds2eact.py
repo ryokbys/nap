@@ -6,6 +6,9 @@ PATHS should be like '300K' and the digits before 'K' is used as temperature.
 else if PATHS are files,
 PATHS should be like 'out.msd.300' and the digit at the end is used as temperature.
 
+NOTICE that the errors in Ds are not exactly the statistical errors, but just regression errors,
+which should not be confused and not used as errors in D vs 1/T plot.
+
 Usage:
   msds2eact.py [options] PATHS [PATHS...]
 
@@ -92,11 +95,11 @@ def msds2Ds(files,temps,dim=3,offset=0,specorder=[],spc=None):
     for i,f in enumerate(files):
         T = temps[i]
         # ts,msds = read_out_msd(d+'/out.msd',offset=offset,column=specorder.index(spc)+1)
-        ts,msds = read_out_msd(f,offset=offset,column=specorder.index(spc)+1)
+        ts,msds = read_out_msd(f,offset=offset,column=specorder.index(spc)+2)
         D,b,Dstd = msd2D(ts,msds,fac,dim=dim)
         if D < 0.0:
             continue
-        print(' T,D = {0:5d}K, {1:12.4e} +/- {2:12.4e} [cm^2/s]'.format(int(T),D,Dstd))
+        print(' T,D = {0:5d}K, {1:0.4e} +/- {2:0.3e} [cm^2/s]'.format(int(T),D,Dstd))
         Ts.append(float(T))
         Ds.append(D)
         Dstds.append(Dstd)

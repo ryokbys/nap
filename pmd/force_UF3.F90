@@ -1,6 +1,6 @@
 module UF3
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-05-03 18:55:00 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-06 21:36:01 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Parallel implementation of Ultra-Fast Force-Field (UF3) for pmd
 !    - 2024.09.02 by R.K., start to implement
@@ -653,6 +653,7 @@ contains
       call mpi_bcast(prm2s(i2b)%nknot,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%rc,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc2,1,mpi_real8,0,mpi_world,ierr)
       if( .not.allocated(prm2s(i2b)%knots) ) &
            allocate(prm2s(i2b)%knots(prm2s(i2b)%nknot))
       if( .not.allocated(prm2s(i2b)%coefs) ) &
@@ -678,6 +679,9 @@ contains
         call mpi_bcast(prm3ls(i3b)%nknot,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%rc,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%rc2,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%gmj,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%gmk,1,mpi_real8,0,mpi_world,ierr)
         if( .not.allocated(prm3ls(i3b)%knots) ) &
              allocate(prm3ls(i3b)%knots(prm3ls(i3b)%nknot))
         if( .not.allocated(prm3ls(i3b)%coefs)) &

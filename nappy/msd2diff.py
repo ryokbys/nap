@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 """
 Compute diffusion coefficient from MSD data.
-Time interval DT is obtained from the file option of MDS_FILE,
-which is different from the style of previous version where DT is extracted
-from in.pmd file in the same directory.
 
 Usage:
   msd2diff.py [options] MSD_FILE [MSD_FILE...]
@@ -29,9 +26,9 @@ import numpy as np
 from nappy.util import parse_option, gen_header
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "231108"
+__version__ = "250506"
 
-def read_out_msd(fname='out.msd',offset=0,column=1):
+def read_out_msd(fname='out.msd',offset=0,column=2):
         
     with open(fname,'r') as f:
         lines = f.readlines()
@@ -45,6 +42,7 @@ def read_out_msd(fname='out.msd',offset=0,column=1):
     ts = []
     msds = []
     n0 = 0
+    t0 = 0.0
     msd0 = 0.0
     dt = -1.0
     for il,line in enumerate(lines):
@@ -59,11 +57,13 @@ def read_out_msd(fname='out.msd',offset=0,column=1):
         data = line.split()
         if il < offset:
             n0 = int(data[0])
+            t0 = float(data[1])
             msd0 = float(data[column])
             continue
         n = int(data[0])
+        t = float(data[1])
         msd = float(data[column])
-        ts.append((n-n0)*dt)
+        ts.append(t - t0)
         msds.append(msd-msd0)
     return np.array(ts),np.array(msds)
 
@@ -102,7 +102,8 @@ def msd2D(ts,msds,fac,dim=3):
 def main():
 
     #args = docopt(__doc__)
-    args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
+                  version=__version__)
     
     fnames = args['MSD_FILE']
     offset = int(args['--offset'])
@@ -118,16 +119,16 @@ def main():
     MSDs = []
     Ts = []
     for fname in fnames:
-        ts,msdmain = read_out_msd(fname,offset,column=sidmain)
+        ts,msdmain = read_out_msd(fname,offset,column=sidmain+1)
         if sidsub > 0:
-            tmp, msdsub = read_out_msd(fname,offset,column=sidsub)
+            tmp, msdsub = read_out_msd(fname,offset,column=sidsub+1)
             msdmain = msdmain -msdsub
-        #...Assuming input MSD unit in A^2/fs and output in cm^2/s
-        fac = 1.0e-5 /1.0e-4
+        #...Assuming input MSD unit in A^2/ps and output in cm^2/s
+        fac = 1.0e-8 /1.0e-4
         #...Least square
         D,b,std = msd2D(ts,msdmain,fac,dim=dim)
-        print(f' {fname:s}:  Diffusion coefficient = {D:12.4e}'+
-              f' +/- {std:12.4e} [cm^2/s]')
+        print(f' {fname:s}:  Diffusion coefficient = {D:0.4e}'+
+              f' +/- {std:0.3e} [cm^2/s]')
         Ds.append(D)
         Bs.append(b)
         Ts.append(ts)
