@@ -17,6 +17,7 @@ import gzip
 from nappy.napsys import NAPSystem
 from nappy.util import get_tag, decode_tag, pbc, \
     scaled_to_cartesian, cartesian_to_scaled
+
 from icecream import ic
 
 __author__ = "RYO KOBAYASHI"
@@ -284,7 +285,7 @@ def read_pmd(fname:str = 'pmdini',
     else:
         return nsyss
 
-def write_pmd(nsys,fname='pmdini', auxs=[], **kwargs):
+def write_pmd(nsys,fname='pmdini', auxs=['fx','fy','fz'], **kwargs):
     myopen, mode = get_open_func(fname,'w')
     f=myopen(fname,mode)
     f.write("#\n")
@@ -1475,13 +1476,17 @@ def get_PDB_txt(nsys,**kwargs):
 
 def from_ase(atoms, specorder=[],
              get_forces=True,
-             get_stress=True, stress_factor=1.0):
+             get_stress=True, stress_factor=-160.2):
     """
     Convert ASE Atoms object to NAPSystem object.
+
+    Since the unit of ASE atoms.get_stress() is probably eV/A^3
+    and the definition of sign is opposite from that of pmd,
+    the default stress_factor is -160.2 (GPa /(eV/A^3)).
     """
-    spcorder = []
-    if specorder == []:
-        spcorder = specorder
+    # spcorder = []
+    # if specorder == []:
+    #     spcorder = specorder
     symbols = atoms.get_chemical_symbols()
     spos = atoms.get_scaled_positions()
     vels = atoms.get_velocities()
@@ -1490,10 +1495,14 @@ def from_ase(atoms, specorder=[],
     if spos is None:
         raise ValueError('ASE atoms object has no atom in it.')
     #...Initialize and remake self.specorder
+    # for s in symbols:
+    #     if s not in spcorder:
+    #         spcorder.append(s)
+    # nsys = NAPSystem(specorder=spcorder)
     for s in symbols:
-        if s not in spcorder:
-            spcorder.append(s)
-    nsys = NAPSystem(specorder=spcorder)
+        if s not in specorder:
+            specorder.append(s)
+    nsys = NAPSystem(specorder=specorder)
     # nsys = cls(specorder=spcorder)
     nsys.alc= 1.0
     nsys.a1[:] = atoms.cell[0]
@@ -1518,6 +1527,8 @@ def from_ase(atoms, specorder=[],
     stnsr = np.zeros((3,3))
     if get_stress:
         try:
+            #...Unit of ase atoms.get_stress() is (probably) eV/A^3
+            #...and the definition of the sign is opposite from that of pmd
             stress = atoms.get_stress()  # 6 voigt values
             # 6 values to 3x3 matrix
             stnsr[0,0] = stress[0]

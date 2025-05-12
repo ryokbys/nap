@@ -251,7 +251,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'max_strain_rate' ) then
     call read_r1(ionum,sratemax)
     return
-  elseif( trim(cname).eq.'cell_fix' ) then
+  elseif( trim(cname).eq.'cell_fix' .or. &
+          trim(cname).eq.'fix_cell' ) then
     call read_ls(ionum,3,3,lcellfix)
     return
   elseif( trim(cname).eq.'deformation' ) then

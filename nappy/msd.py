@@ -160,23 +160,6 @@ def get_msd(structs, nmeasure, nshift, error=False):
 def main(files=[], dt=1.0, n_iid=1, xyz=False, lcom=False,
          error=False, spcs=None, outfname="out.msd"):
 
-    # if nmeasure < 2:
-    #     nmeasure = 1
-    #     nshift = len(files)
-    #     error = False
-    #     print(' Since nmeasure < 2, nmeasure and nshift are set to ',nmeasure,nshift)
-    # elif nshift < 0:
-    #     nshift = int(len(files)/nmeasure)
-    #     print(' Since nshift is not given, set nshift by len(files)/nmeasure = ',nshift)
-    
-    # #...compute sampling time-window from nmeasure and nshift
-    # ntwindow= len(files) -(nmeasure-1)*nshift
-    # if ntwindow <= 0:
-    #     errmsg=' [Error] ntwindow <= 0 !!!\n'\
-    #         + '  Chech the parameters nmeasure and nshift, and input files.'
-    #     raise ValueError(errmsg)
-
-    #files.sort(key=get_key,reverse=True)
     nsyss = []
     try:
         print(' Reading data files...')
@@ -209,12 +192,12 @@ def main(files=[], dt=1.0, n_iid=1, xyz=False, lcom=False,
     with open(outfname,'w') as f:
         f.write(gen_header(sys.argv))
         if dt > 0.0:
-            f.write(f'# dt: {dt/1000:0.3f}    ! Time interval in ps\n')
+            f.write(f'# dt: {dt:0.3f}    ! Time interval in fs\n')
         if xyz:
             icol = 1
             f.write(f'#   {icol:d}:data_ID,')
             icol += 1
-            f.write(f'  {icol:d}:time(ps),')
+            f.write(f'  {icol:d}:time(fs),')
             icol += 1
             for spc in specorder:
                 if spc not in spcs: continue
@@ -233,7 +216,7 @@ def main(files=[], dt=1.0, n_iid=1, xyz=False, lcom=False,
                         icol += 3
             f.write('\n')
             for idat in range(len(msd)):
-                f.write(f' {idat:10d}  {idat*dt/1000:11.4e}')
+                f.write(f' {idat:10d}  {idat*dt:11.4e}')
                 for isp,spc in enumerate(specorder):
                     if spc not in spcs: continue
                     f.write(' {0:11.3e} {1:11.3e} {2:11.3e}'.format(*msd[idat,isp,:]))
@@ -250,7 +233,7 @@ def main(files=[], dt=1.0, n_iid=1, xyz=False, lcom=False,
             icol = 1
             f.write(f'# {icol:d}:data_ID,')
             icol += 1
-            f.write(f'  {icol:d}:time(ps),')
+            f.write(f'  {icol:d}:time(fs),')
             for spc in specorder:
                 if spc not in spcs: continue
                 icol += 1
@@ -268,7 +251,7 @@ def main(files=[], dt=1.0, n_iid=1, xyz=False, lcom=False,
                         f.write(f'   {icol:d}:errc_{spc:<2s},')
             f.write('\n')
             for idat in range(len(msd)):
-                f.write(f' {idat:10d}  {idat*dt/1000:11.4e}')
+                f.write(f' {idat:10d}  {idat*dt:11.4e}')
                 for isp,spc in enumerate(specorder):
                     if spc not in spcs: continue
                     f.write(f' {msd[idat,isp].sum():12.3e}')

@@ -330,11 +330,12 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
 
 def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
                 pairwise=False,nnmax=100,fortran=False,
-                format=None):
+                format=None,nskip=0):
     nspcs = len(specorder)
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    inc = 0
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
@@ -343,12 +344,25 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
         nsys = nappy.io.read(fname=infname,specorder=specorder,
                              format=format)
         print(' File =',infname)
-        rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
-                   pairwise=pairwise,nnmax=nnmax,fortran=fortran)
-        if rd.shape[-1] != nr:
-            raise ValueError('The shape of radius data is wrong.')
-        agr += gr
-        nsum += 1
+        if type(nsys) is list:
+            for nsysi in nsys:
+                rd,gr= rdf(nsysi,nspcs,dr,nr,rmax,rmin=rmin,
+                           pairwise=pairwise,nnmax=nnmax,fortran=fortran)
+                if rd.shape[-1] != nr:
+                    raise ValueError('The shape of radius data is wrong.')
+                inc += 1
+                if inc < nskip: continue
+                agr += gr
+                nsum += 1
+        else:  # nsys is NAPSystem object
+            rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
+                       pairwise=pairwise,nnmax=nnmax,fortran=fortran)
+            if rd.shape[-1] != nr:
+                raise ValueError('The shape of radius data is wrong.')
+            inc += 1
+            if inc < nskip: continue
+            agr += gr
+            nsum += 1
     agr /= nsum
     return rd,agr
 
@@ -741,9 +755,6 @@ def main():
     if nspcs < 1:
         raise ValueError('--specorder must be set.')
 
-    if len(infiles) > 1:
-        infiles.sort(key=get_key, reverse=True)
-    del infiles[:nskip]
     if len(infiles) < 1:
         raise ValueError('No input files to be processed.')
     print(' Number of files to be processed: ',len(infiles))
@@ -751,7 +762,7 @@ def main():
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr)  # +1
     rd, agr = rdf_average(infiles, specorder, dr=dr,
-                          rmin=rmin, rmax=rmax,
+                          rmin=rmin, rmax=rmax, nskip=nskip,
                           pairwise=pairwise, nnmax=nnmax,
                           fortran=fortran,format=fmt)
 

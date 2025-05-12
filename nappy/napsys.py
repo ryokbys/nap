@@ -41,10 +41,8 @@ import nappy
 from nappy.atom import get_symbol_from_number, get_number_from_symbol
 from nappy.util import pbc
 
-from icecream import ic
-
 __author__ = "RYO KOBAYASHI"
-__version__ = "240323"
+__version__ = "250508"
 
 #...constants
 # FILE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps',

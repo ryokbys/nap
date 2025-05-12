@@ -13,6 +13,8 @@ Options:
              Convert a snapshot of INDEX. Comma separated indices can be specified. 
              If three digits are separated by colons like 0:1000:10, indices of slices 
              of initial(0), final(1000) and skip(10) are spcified. [default: -1]
+  --num-origin N_ORIG
+             Origin of the postfix number in the file name (#### in smpl_####). [default: 0]
   --sequence
              Extract all the sequence of MD or relaxation stored in vasprun.xml.
              If the index is specified as a list of indices, this option will be omitted.
@@ -60,6 +62,7 @@ def slice_to_indices(slc, sequence_length):
 def main():
     args=docopt(__doc__)
     # dirs= args['DIR']
+    n_orig = int(args['--num-origin'])
     specorder= args['--specorder'].split(',')
     sequence = args['--sequence']
     velocity = args['--velocity']
@@ -119,21 +122,21 @@ def main():
 
     if type(indices) is list:
         print(' Extracting specified steps from ',len(nsyss),' steps in total')
-        n = 0
+        inc = 0
         for j,nsys in enumerate(nsyss):
             if j not in indices:
                 continue
-            fname = f'smpl_{j:05d}'
+            fname = f'smpl_{inc+n_orig:05d}'
+            inc += 1
             print('.',end='',flush=True)
             output_for_fitpot(nsys,fname=fname,
                               specorder=specorder)
-            n += 1
     elif sequence:  # Whole MD sequence
         print(' Extracting sequence of ',len(nsyss),' steps')
         indices = []
         # for j,nsys in enumerate(nsyss):
         for j,nsys in enumerate(nsyss):
-            fname = f'smpl_{j:05d}'
+            fname = f'smpl_{n_orig+j:05d}'
             print('.',end='',flush=True)
             output_for_fitpot(nsys, fname=fname,
                               specorder=specorder)

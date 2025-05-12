@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-25 21:11:37 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-10 11:04:27 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1224,7 +1224,7 @@ subroutine write_force_relation(cadd)
     write(92,'(a)') '# 1:fref, 2:fpot, 3:smplname, 4:ia, 5:ixyz, 6:diff,' &
          //' 7:error, 8:fsub, 9:gdw'
     write(93,'(a)') '# 1:fref, 2:fpot, 3:smplname, 4:ia, 5:ixyz, 6:diff,' &
-         //' 7:error, 8;fsub, 9;gdw'
+         //' 7:error, 8:fsub, 9:gdw'
     do ismpl=1,nsmpl
       if( iclist(ismpl).eq.1 ) then
         natm= nalist(ismpl)

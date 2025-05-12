@@ -32,13 +32,6 @@ def read_out_msd(fname='out.msd',offset=0,column=2):
         
     with open(fname,'r') as f:
         lines = f.readlines()
-    # try:
-    #     dname = os.path.dirname(fname)
-    #     if len(dname) == 0:
-    #         dname = '.'
-    #     dt = dt_from_inpmd(fname='/'.join([dname,'in.pmd']))
-    # except Exception as e:
-    #      raise RuntimeError('Failed to read in.pmd.')
     ts = []
     msds = []
     n0 = 0
@@ -123,8 +116,8 @@ def main():
         if sidsub > 0:
             tmp, msdsub = read_out_msd(fname,offset,column=sidsub+1)
             msdmain = msdmain -msdsub
-        #...Assuming input MSD unit in A^2/ps and output in cm^2/s
-        fac = 1.0e-8 /1.0e-4
+        #...Assuming input MSD unit in A^2/fs and output in cm^2/s
+        fac = 1.0e-16 /1.0e-15
         #...Least square
         D,b,std = msd2D(ts,msdmain,fac,dim=dim)
         print(f' {fname:s}:  Diffusion coefficient = {D:0.4e}'+

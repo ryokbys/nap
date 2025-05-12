@@ -34,7 +34,7 @@ from functools import cmp_to_key
 from nappy.common import get_key
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "191212"
+__version__ = "250509"
 
 _kB = 8.6173303e-5
 
@@ -169,3 +169,4 @@ if __name__ == "__main__":
         plt.yscale('log')
         plt.savefig("graph_msds2eact.png", format='png',
                     dpi=300, bbox_inches='tight')
+        print(' Wrote graph_msds2eact.png')

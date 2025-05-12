@@ -164,7 +164,8 @@ contains
       open(ionum,file=trim(cfoutpd),status='replace')
       write(ionum,'(a)') '# Probability density in Gaussian cube format.'
       write(ionum,'(a)') '# NOTE: length unit in Bohr.'
-      write(ionum,'(2x,i0,3(1x,es15.7))') 1, (orig_pdens(1:3)+dr(1:3)/2)*ang2bohr
+!!$      write(ionum,'(2x,i0,3(1x,es15.7))') 1, (orig_pdens(1:3)+dr(1:3)/2)*ang2bohr
+      write(ionum,'(2x,i0,3(1x,es15.7))') 1, orig_pdens(1:3)*ang2bohr
       write(ionum,'(2x,i0,3(1x,es15.7))') npx,hmat_pdens(1:3,1)*ang2bohr/npx
       write(ionum,'(2x,i0,3(1x,es15.7))') npy,hmat_pdens(1:3,2)*ang2bohr/npy
       write(ionum,'(2x,i0,3(1x,es15.7))') npz,hmat_pdens(1:3,3)*ang2bohr/npz

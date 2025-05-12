@@ -15,6 +15,8 @@ Options:
               Output file name. [default: in.vars.fitpot_YYMMDD]
   --specorder SPECORDER
               Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
+  --repul-pairs PAIRS
+              Pairs that should be repulsive. Hyphen-connected, comma-separated, e.g.) Li-O,P-O  [default: None]
 """
 import os
 from docopt import docopt
@@ -349,7 +351,7 @@ def uf32fp(outfname,specorder):
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 
-def uf3l2fp(outfname,specorder):
+def uf3l2fp(outfname,specorder,repul_pairs=[]):
     """
     Create in.vars.fitpot file from parameter file for uf3l potential.
     Cut-off radii for 2- and 3-body are given in the parameter file.
@@ -370,9 +372,12 @@ def uf3l2fp(outfname,specorder):
         coefs = d2b[pair]['coefs']
         ntrail= d2b[pair]['ntrail']
         rc2max = max(rc2max, d2b[pair]['rc2b'])
+        vmin = -1e+10
+        if any( set(pair) == set(rp) for rp in repul_pairs ):
+            vmin = 0.0
         for i in range(ncoef-ntrail):
             fpvars.append(coefs[i])
-            vranges.append((-1e+10, 1e+10))
+            vranges.append((vmin, 1e+10))
         for i in range(ncoef-ntrail, ncoef):
             fpvars.append(coefs[i])
             vranges.append((0.0, 0.0))
@@ -406,6 +411,13 @@ def main():
     specorder = args['--specorder'].split(',')
     if specorder[0] == 'None':
         raise Exception('specorder must be specified.')
+    repul_pairs0 = args['--repul-pairs'].split(',')
+    repul_pairs = []
+    if repul_pairs0[0] != 'None':
+        for rp in repul_pairs0:
+            spi,spj = rp.split('-')
+            repul_pairs.append((spi,spj))
+    print(' repulsive pairs = ',repul_pairs)
 
     ic(args)
     if potname == 'Morse':
@@ -432,7 +444,7 @@ def main():
         UF3L (light)
         """
         print(' rc, rc3 are given from in.params.uf3l, not by this options.')
-        uf3l2fp(outfname,specorder)
+        uf3l2fp(outfname,specorder,repul_pairs=repul_pairs)
 
     return None
 
