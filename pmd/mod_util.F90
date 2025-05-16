@@ -1,6 +1,6 @@
 module util
 !-----------------------------------------------------------------------
-!                     Last modified: <2024-11-24 09:25:33 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-16 13:43:26 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
@@ -392,6 +392,47 @@ contains
     enddo
     return
   end function to_upper
+!=======================================================================
+  subroutine resize_iarr(iarr, new_size, default_value)
+!
+!  Resize 1D int array.
+!
+    integer,allocatable:: iarr(:)
+    integer,intent(in):: new_size, default_value
+    integer,allocatable:: itemp(:)
+
+    allocate(itemp(new_size))
+
+    if( size(iarr) > 0 ) then
+      itemp(:min(size(iarr), new_size)) = iarr(:min(size(iarr),new_size))
+    endif
+    if( new_size > size(iarr) ) then
+      itemp(size(iarr)+1:new_size) = default_value
+    endif
+
+    call move_alloc(itemp, iarr)
+  end subroutine resize_iarr
+!=======================================================================
+  subroutine resize_darr(arr, new_size, default_value)
+!
+!  Resize 1D int array.
+!
+    real(8),allocatable:: arr(:)
+    integer,intent(in):: new_size
+    real(8),allocatable:: temp(:)
+    real(8):: default_value
+
+    allocate(temp(new_size))
+
+    if( size(arr) > 0 ) then
+      temp(:min(size(arr), new_size)) = arr(:min(size(arr),new_size))
+    endif
+    if( new_size > size(arr) ) then
+      temp(size(arr)+1:new_size) = default_value
+    endif
+
+    call move_alloc(temp, arr)
+  end subroutine resize_darr
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:

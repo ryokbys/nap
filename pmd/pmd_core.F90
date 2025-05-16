@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-05-03 18:27:47 KOBAYASHI Ryo>
+!                     Last-modified: <2025-05-16 14:43:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -40,6 +40,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        setup_cell_langevin
   use descriptor,only: write_desc,lout_desc
   use group,only: grouping
+  use virtual_wall,only: correct_pos_vwall, write_frc_vwall
 
   implicit none
   include "mpif.h"
@@ -617,6 +618,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i) )*dt
       enddo
     endif
+    if( nvwall>0 ) call correct_pos_vwall(natm,tag,ra,va)
     ltot_updated = .false.
     if( chgopt_method(1:4).eq.'xlag' ) &
          call update_auxq(aux(iaux_q,:),aux(iaux_vq,:))
@@ -656,7 +658,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Update pair list and boundary atoms
 !.....if making new pair list is needed.
     if( rbufres.le.0d0 .or. &
-         (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) ) then
+         (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) .or. &
+         nvwall > 0 ) then  ! if virtual_wall exists, update do bacopy every step.
       if( iprint.ge.ipl_info .and. myid_md.eq.0 ) then
         print *,'Update boundary atoms and thus pair-list, too.'
         if( rbufres.le.0d0 ) then
@@ -832,12 +835,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call flush(iostrs)
 !.....write temperature
         ediff(1:9)= 0d0
-
         if( trim(czload_type).eq.'atoms' .or. &
              trim(czload_type).eq.'shear' ) then
           write(iozload,'(i8,3es15.7)') istp,strnow,ftop,fbot
           call flush(iozload)
         endif
+!.....write forces on virtual walls
+        if( nvwall>0 ) call write_frc_vwall(istp)
       endif   ! myid_md.eq.0
 
 !---------output step, time, and temperature

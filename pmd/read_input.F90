@@ -415,6 +415,10 @@ subroutine set_variable(ionum,cname)
     read(ionum,'(a)') ctmp
     call register_group(ctmp)
     return
+!.....Virtual wall
+  elseif( trim(cname).eq.'virtual_wall' ) then
+    call read_vwall(ionum)
+    return
 #ifdef __WALL__
   elseif( trim(cname).eq.'wall_pos_top' ) then
     call read_r1(ionum,wtop)
@@ -659,6 +663,43 @@ subroutine read_stress_target(ionum)
   endif
   return
 end subroutine read_stress_target
+!=======================================================================
+subroutine read_vwall(ionum)
+  use pmdvars,only: nvwall,ivwall,spos_vwall,iside_vwall,frc_vwall
+  use util,only: resize_iarr, resize_darr
+  integer,intent(in):: ionum
+
+  integer:: i123,iside
+  real(8):: wpos
+  character(len=128) ctmp
+  
+  backspace(ionum)
+  read(ionum, *) ctmp, i123, wpos, iside
+
+  if( i123 < 1 .or. i123 > 3 ) then
+    stop ' Error@read_vwall: i123 must be 1, 2, or 3.'
+  elseif( wpos < 0.0 .or. wpos > 1.0 ) then
+    stop ' Error@read_vwall: wpos must be in [0.0, 1.0).'
+  elseif( iside == 0 ) then
+    stop ' Error@read_vwall: iside must not be 0.'
+  endif
+
+  nvwall = nvwall + 1
+  if( allocated(ivwall) ) then
+    call resize_iarr(ivwall, nvwall, 0)
+    call resize_darr(spos_vwall, nvwall, 0d0)
+    call resize_iarr(iside_vwall, nvwall, 0)
+    call resize_darr(frc_vwall, nvwall, 0d0)
+  else
+    allocate(ivwall(nvwall), spos_vwall(nvwall), iside_vwall(nvwall), &
+         frc_vwall(nvwall))
+  endif
+
+  ivwall(nvwall) = i123
+  spos_vwall(nvwall) = wpos
+  iside_vwall(nvwall) = iside / abs(iside)  ! -1 or 1
+  return
+end subroutine read_vwall
 !-----------------------------------------------------------------------
 !     Local Variables:
 !     compile-command: "make pmd lib"

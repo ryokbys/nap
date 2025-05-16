@@ -1,6 +1,6 @@
 program pmd
 !-----------------------------------------------------------------------
-!                     Last-modified: <2024-11-16 22:20:47 KOBAYASHI Ryo>
+!                     Last-modified: <2025-05-16 14:12:15 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Spatial decomposition parallel molecular dynamics program.
 ! Core part is separated to pmd_core.F.
@@ -534,6 +534,13 @@ subroutine write_initial_setting()
     enddo
     write(6,'(2x,a)') ''
   endif
+!.....Virtual wall
+  if( nvwall > 0 ) then
+    do i=1,nvwall
+      write(6,'(2x,a,i3,f9.5,i4)') 'virtual_wall', ivwall(i), &
+           spos_vwall(i), iside_vwall(i)
+    enddo
+  endif
 !.....Charge
 !!$  write(6,'(2x,a)') 'charge'
 !!$  do i=1,nspmax
@@ -620,6 +627,7 @@ subroutine bcast_params(nprocs)
   use descriptor,only: lout_desc
   use isostat,only: sratemax
   use group, only: bcast_group
+  use virtual_wall, only: bcast_vwall
   implicit none
   include 'mpif.h'
   integer,intent(in):: nprocs
@@ -761,6 +769,7 @@ subroutine bcast_params(nprocs)
   call mpi_bcast(istruct,1,mpi_integer,0,mpicomm,ierr)
 
   call bcast_group(mpicomm)
+  call bcast_vwall(mpicomm)
 
 end subroutine bcast_params
 !=======================================================================

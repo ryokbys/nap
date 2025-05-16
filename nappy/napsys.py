@@ -435,10 +435,10 @@ class NAPSystem(object):
         if len(rposs) != len(self.atoms):
             raise ValueError('Array size inconsistent.')
         hmati = self.get_hmat_inv()
+        sposs = np.zeros((len(self),3))
         for i in range(len(self.atoms)):
-            rpi = rposs[i]
-            spi = np.dot(hmati,rpi)
-            self.atoms.at[i,['x','y','z']] = spi
+            sposs[i,:] = np.dot(hmati,rposs[i])
+        self.atoms[['x','y','z']] = sposs
         return None
 
     def get_scaled_positions(self):

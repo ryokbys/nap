@@ -1,6 +1,6 @@
 module pmdvars
 !-----------------------------------------------------------------------
-!                    Last modified: <2025-05-03 18:39:16 KOBAYASHI Ryo>
+!                    Last modified: <2025-05-16 13:00:48 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   implicit none
 !=======================================================================
@@ -13,6 +13,7 @@ module pmdvars
   integer,parameter:: iostrs= 13
   integer,parameter:: iotdst= 14
   integer,parameter:: iozload= 15
+  integer,parameter:: iovwall= 16
 
   character(len=20),parameter:: cinpmd='in.pmd'
 
@@ -173,6 +174,11 @@ module pmdvars
 
 !.....nnmax update ratio
   real(8):: ratio_nnmax_update = 1.1d0
+
+!.....Virtual wall
+  integer:: nvwall = 0
+  integer,allocatable:: ivwall(:), iside_vwall(:)
+  real(8),allocatable:: spos_vwall(:),frc_vwall(:)
 
 !-----------------------------------------------------------------------
 !  Global variables used in pmd

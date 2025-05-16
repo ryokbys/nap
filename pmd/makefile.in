@@ -34,7 +34,8 @@ mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
 	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o mod_element.o \
 	mod_extforce.o mod_colorcharge.o mod_localflux.o mod_pdens.o mod_time.o \
-	mod_pairlist.o mod_memory.o mod_random.o mod_isostat.o mod_distfunc.o mod_group.o
+	mod_pairlist.o mod_memory.o mod_random.o mod_isostat.o mod_distfunc.o mod_group.o \
+  mod_virtual_wall.o
 args= iargc.o getarg.o
 
 force_common= force_common.o
@@ -160,4 +161,5 @@ mod_pairlist.o: mod_memory.o mod_pmdvars.o
 mod_util.o: mod_pmdvars.o mod_vector.o
 mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
 mod_group.o: mod_pmdvars.o mod_util.o
+mod_virtual_wall.o: mod_pmdvars.o
 descriptor.o: mod_pmdvars.o mod_util.o mod_memory.o
