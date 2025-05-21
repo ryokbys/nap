@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-05-10 11:04:27 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-21 17:40:40 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -47,13 +47,13 @@ program fitpot
     write(6,'(a,i6)') ' Number of processes in MPI = ',nnode
     call read_infitpot(10,'in.fitpot')
 !.....NN and NN2 are both pointing NN2
-    if( trim(cpot).eq.'NN' .or. trim(cpot).eq.'NN2' ) then
+    if( cpotlow(1:2)=='nn' ) then
       print *,'ERROR: NN and NN2 potentials are no longer available in fitpot.'
       print *,'       Use DNN instead.'
       stop
     endif
 !.....Check GDW; GDW works only with ML potentials, which use descriptors
-    if( index(cpot,'NN').eq.0  .and. trim(cpot).ne.'linreg' ) then
+    if( index(cpotlow,'nn').eq.0  .and. trim(cpotlow).ne.'linreg' ) then
       if( lgdw ) print *,'Gaussian density weight only works for ML potentials, so unset GDW.'
       lgdw = .false.
     endif
@@ -73,9 +73,6 @@ program fitpot
 
 !.....Copy specorder in fitpot to that in pmdvars
   specorder_pmd(:) = specorder(:)
-
-!!$!.....read_params_desc in read_params.F90
-!!$  if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg' ) call read_params_desc()
 
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
@@ -131,45 +128,23 @@ program fitpot
 !     subtracting FFs if needed.
   call get_data_stats()
 
-!!$!.....Set cffs only for pmd calculation
-!!$  if( trim(cpot).eq.'BVS' ) then
-!!$    nff = 2
-!!$    allocate(cffs(nff))
-!!$    cffs(1) = 'Coulomb'
-!!$    cffs(2) = 'Morse'
-!!$  else if( trim(cpot).eq.'BVSx' ) then
-!!$    nff = 3
-!!$    allocate(cffs(nff))
-!!$    cffs(1) = 'Coulomb'
-!!$    cffs(2) = 'Morse'
-!!$    cffs(3) = 'angular'
-!!$  else if( trim(cpot).eq.'fpc' ) then
-!!$    nff = 2
-!!$    allocate(cffs(nff))
-!!$    cffs(1) = 'fpc'
-!!$    cffs(2) = 'Coulomb'
-!!$  else
-!!$    nff = 1
-!!$    allocate(cffs(nff))
-!!$    cffs(1) = trim(cpot)
-!!$  endif
     nff = 1
     allocate(cffs(nff))
     cffs(1) = trim(cpot)
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
-       trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
+       trim(cpotlow).eq.'linreg' .or. trim(cpotlow).eq.'dnn' ) then
     lnormalize = .true.
   endif
 
   call init_fp_common()
 
 !.....Initial computations of all samples
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. cpot(1:3).eq.'uf3' ) then
+  if( trim(cpotlow).eq.'linreg' .or. trim(cpotlow).eq.'dnn' &
+       .or. cpotlow(1:3).eq.'uf3' ) then
 !.....Some restriction to parameters in case of UF3 potential.
 !.....No need for UF3L.
-    if( trim(cpot)=='uf3' ) call symmetrize_params_uf3(nvars,vars)
+    if( trim(cpotlow)=='uf3' ) call symmetrize_params_uf3(nvars,vars)
     call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
   else
@@ -181,13 +156,13 @@ program fitpot
 !!$  if( trim(cpot).eq.'NN2' ) then
 !!$    call set_iglid_NN2(cpena,cfmethod)
 !!$  else if( trim(cpot).eq.'linreg' ) then
-  if( trim(cpot).eq.'linreg' ) then
+  if( trim(cpotlow).eq.'linreg' ) then
     call set_iglid_linreg(cpena,cfmethod)
   endif
 
   select case (trim(cfmethod))
   case ('dsgnmat')
-    if( trim(cpot).ne.'linreg' ) then
+    if( trim(cpotlow).ne.'linreg' ) then
       if( myid.eq.0 ) print *,'dsgnmat is only available for linreg' &
            //' and not for '//trim(cpot)
     else if( nnode.ne.1 ) then
@@ -405,7 +380,7 @@ subroutine write_initial_setting()
   if( len(trim(crefstrct)).gt.5 ) then
     print *,''
     write(6,'(2x,a25,2x,a)') 'reference_structure',trim(crefstrct)
-  else if( trim(cpot).ne.'dnn' ) then
+  else if( trim(cpotlow).ne.'dnn' ) then
     do i=1,nspmax
       if( trim(specorder(i)).ne.'x' ) then
         write(6,'(2x,a25,2x,i2,a4,es15.7)') 'atom_energy',i,specorder(i),eatom(i)
@@ -865,8 +840,8 @@ subroutine qn_wrapper(ftrn0,ftst0)
 
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. cpot(1:3).eq.'uf3' ) then
+  if( trim(cpotlow)=='linreg' .or. trim(cpotlow)=='dnn' &
+       .or. cpotlow(1:3)=='uf3' ) then
     call qn(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,cfmethod &
          ,niter_eval)
@@ -906,10 +881,8 @@ subroutine cg_wrapper(ftrn0,ftst0)
   implicit none
   real(8),intent(in):: ftrn0,ftst0
 
-!!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
-!!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
-  if( trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' &
-       .or. cpot(1:3).eq.'uf3' ) then
+  if( trim(cpotlow)=='linreg' .or. trim(cpotlow)=='dnn' &
+       .or. cpotlow(1:3)=='uf3' ) then
     call cg(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol,ftol,niter &
          ,iprint,iflag,myid,cfmethod &
          ,niter_eval)
@@ -1023,11 +996,7 @@ subroutine test(ftrn0,ftst0)
 
   allocate(g(nvars))
 
-!!$  if( trim(cpot).eq.'NN' ) then
-!!$    call NN_init()
-!!$    call NN_func(nvars,vars,ftrn,ftst)
-!!$    call NN_grad(nvars,vars,g)
-  if( trim(cpot).eq.'linreg' .or. index(cpot,'NN').ne.0 ) then
+  if( trim(cpotlow).eq.'linreg' .or. index(cpotlow,'nn').ne.0 ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else
@@ -1932,6 +1901,7 @@ subroutine sync_input()
   call mpi_bcast(csmplistfile,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(csmplftype,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cpotlow,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpenalty,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)

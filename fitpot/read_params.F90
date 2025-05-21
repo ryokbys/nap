@@ -171,11 +171,11 @@ subroutine read_vars_NN()
 
 !.....Bias treatment depends on NN version
     nvars= 0
-    if( trim(cpot).eq.'NN2' ) then
+    if( trim(cpotlow).eq.'nn2' ) then
       do i=1,nn_nl+1
         nvars= nvars +nn_nhl(i-1)*nn_nhl(i)
       enddo
-    else if( trim(cpot).eq.'DNN' ) then
+    else if( trim(cpotlow).eq.'dnn' ) then
       do i=1,nn_nl+1
         nvars = nvars +(nn_nhl(i-1)+1)*nn_nhl(i)
       enddo

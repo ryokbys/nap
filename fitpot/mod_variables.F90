@@ -36,7 +36,8 @@ module variables
   character(len=128):: cnormalize= 'std'
   logical:: lnormalize  = .false.  ! whether of not to normalize vars
   logical:: lnormalized = .false.  ! whether or not vars already normalized
-  character(len=128):: cpot= 'NN'
+  character(len=128):: cpot = ''
+  character(len=128):: cpotlow = ''
 !.....Cutoff for FF that is to be optimized [default: 5.0 Ang]
   real(8):: rcut   = 6.0d0
   real(8):: rc3    = 3.0d0

@@ -166,7 +166,7 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'potential' .or. &
        trim(cname).eq.'force_field' ) then
     call read_c1(ionum,cpot)
-    cpot = to_lower(cpot)
+    cpotlow = to_lower(cpot)
     return
   elseif( trim(cname).eq.'rcut' ) then
     call read_r1(ionum,rcut)

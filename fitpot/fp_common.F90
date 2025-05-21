@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-04-25 21:07:41 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-21 17:39:25 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -144,7 +144,7 @@ contains
   end subroutine calc_swgts
 !=======================================================================
   subroutine wrap_ranges(ndim,x,xranges)
-    use variables,only: cpot, nsp, short_radii, l_correct_short
+    use variables,only: cpot,cpotlow, nsp, short_radii, l_correct_short
     use uf3,only: uf3_short_correction
     implicit none
     integer,intent(in):: ndim
@@ -154,7 +154,7 @@ contains
     integer:: i
 
 !.....Short-range correction for uf3
-    if( trim(cpot).eq.'uf3' .and. l_correct_short ) then
+    if( trim(cpotlow).eq.'uf3' .and. l_correct_short ) then
       if( allocated(ldcover) ) then
         call uf3_short_correction(ndim,x,nsp,short_radii,ldcover)
       endif
@@ -194,7 +194,7 @@ contains
 !
     use variables,only:samples,tfunc, &
          lematch,lfmatch,lsmatch,nfunc,tcomm,twait,mdsys, &
-         swgt2trn,swgt2tst,cpot,ismask, &
+         swgt2trn,swgt2tst,cpot,cpotlow, ismask, &
          nff,cffs,maxna,rcut,force_limit,stress_limit, &
          crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
          ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom, &
@@ -245,7 +245,7 @@ contains
         allocate(fdiff(3,maxna),frcs(3,maxna),fref(3,maxna),fsub(3,maxna))
         dmem = dmem +8d0*size(fdiff) +8d0*size(frcs)*3
       endif
-      if( index(cpot,'NN').ne.0 .or. trim(cpot).eq.'linreg') lupdate_gsf = .true.
+      if( index(cpotlow,'nn').ne.0 .or. trim(cpotlow).eq.'linreg') lupdate_gsf = .true.
       gsfmem = 0d0
     endif
 
@@ -257,7 +257,7 @@ contains
       stop
     endif
 
-    if( trim(cpot).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+    if( trim(cpotlow).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
       repul_radii(:,:) = 1d+10
     endif
     
@@ -277,7 +277,7 @@ contains
       call pre_pmd(samples(ismpl),ndim,x,nff,cffs,rcut,l1st)
 
 !.....Set lfdsgnmat=.true. to make run_pmd() compute dsgnmat_force related data
-      if( trim(cpot).eq.'linreg' .and. &
+      if( trim(cpotlow).eq.'linreg' .and. &
            l1st .and. lfmatch .and. trim(cfmethod).eq.'dsgnmat' ) then
           lfdsgnmat = .true.
       endif
@@ -289,7 +289,7 @@ contains
       samples(ismpl)%epot = epot
       samples(ismpl)%fa(1:3,1:natm) = frcs(1:3,1:natm)
       samples(ismpl)%strs(1:3,1:3) = strs(1:3,1:3)
-      if( trim(cpot).eq.'linreg' .or. index(cpot,'nn').ne.0 ) then
+      if( trim(cpotlow).eq.'linreg' .or. index(cpotlow,'nn').ne.0 ) then
         if( .not. allocated(samples(ismpl)%gsf) ) then
           call get_ints(nsf,nal,nnl)
           samples(ismpl)%nsf = nsf
@@ -302,13 +302,13 @@ contains
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
-      if( trim(cpot).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+      if( trim(cpotlow)=='uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
         call get_shortest_distances(repul_radii)  ! in pmd_core
       endif
 !!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl=',myid,ismpl,mpi_wtime()-tsmp0
     enddo  ! ismpl
 
-    if( l1st .and. index(cpot,'nn').ne.0 ) then
+    if( l1st .and. index(cpotlow,'nn').ne.0 ) then
       nn_nl = nlayer -1
       if( .not.allocated(nn_nhl) ) allocate(nn_nhl(0:nn_nl))
       nn_nhl(0:nn_nl) = nhl(0:nlayer-1)
@@ -500,7 +500,7 @@ contains
 !!$    endif
 
 !.....Compute repulsion gradient
-    if( l1st .and. trim(cpot).eq.'uf3' .and. abs(pwgt2bs)>1d-14 ) then
+    if( l1st .and. trim(cpotlow).eq.'uf3' .and. abs(pwgt2bs)>1d-14 ) then
 !.....Merge minimum distances in all nodes
       call mpi_allreduce(mpi_in_place,repul_radii,nspmax*nspmax, &
            mpi_real8,mpi_min,mpi_world,ierr)
@@ -535,7 +535,7 @@ contains
     call func_penalty(ndim,x,fpena)
     ftrn = ftrn +fpena
 !.....Repulsion correction
-!!$    if( trim(cpot).eq.'uf3' .and. n_repul_pnts > 0 ) then
+!!$    if( trim(cpotlow).eq.'uf3' .and. n_repul_pnts > 0 ) then
 !!$      call calc_short_lossfunc(n_repul_pnts,repul_radii,drepul_tbl,frepul)
 !!$      ftrn = ftrn +pwgt_repul*frepul
 !!$    endif
@@ -569,7 +569,7 @@ contains
          maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
          rcut,myidrefsub,isidrefsub,iprint, &
          ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
-         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot, &
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot,cpotlow, &
          vranges,ismask, repul_radii
     use parallel
 !!$    use minimize
@@ -661,7 +661,7 @@ contains
 !     even after the variables change, we dont need to recalculate gwx().
 !     And thus only copy them calculated at the 1st step,
 !     which will reduce a lot of computational cost but require a lot of memory.
-      if( (trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') &
+      if( (trim(cpotlow).eq.'uf3' .or. trim(cpotlow).eq.'linreg') &
            .and. (allocated(samples(ismpl)%gwe) .or. allocated(samples(ismpl)%gwf) &
            .or. allocated(samples(ismpl)%gws) ) ) then
         if( lematch ) gwe(:) = smpl%gwe(:)
@@ -675,7 +675,7 @@ contains
 !.....Note: since lgrad==.true., epot, frcs, strs are not calculated in this run_pmd.
         call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
              ,lfdsgnmat,gwe,gwf,gws)
-        if( (trim(cpot).eq.'uf3' .or. trim(cpot).eq.'linreg') ) then
+        if( (trim(cpotlow).eq.'uf3' .or. trim(cpotlow).eq.'linreg') ) then
 !!$          allocate(samples(ismpl)%gwe(ndim), samples(ismpl)%gwf(3,ndim,maxnf), &
 !!$               samples(ismpl)%gws(6,ndim))
 !!$          dmem = dmem +4d0*(size(gwe) +size(gwf) +size(gws))
@@ -898,14 +898,14 @@ contains
     twait= twait +twg
 
     if( l1st ) then
-      if( trim(cpot).eq.'uf3' ) then
+      if( trim(cpotlow).eq.'uf3' ) then
         dmem = dmem + get_mem_uf3()
-      else if( trim(cpot).eq.'uf3l') then
+      else if( trim(cpotlow).eq.'uf3l') then
         dmem = dmem + get_mem_uf3l()
       endif
     endif
     
-    if( trim(cpot).eq.'uf3') then
+    if( trim(cpotlow).eq.'uf3') then
       call dealloc_gwx_uf3()
     endif
     l1st = .false.
@@ -917,7 +917,7 @@ contains
 !
 !  Preprocesses before running pmd
 !
-    use variables,only: csmplfile,cpot,nsubff,csubffs,mdsys, &
+    use variables,only: csmplfile,cpot,cpotlow,nsubff,csubffs,mdsys, &
          maxisp,nn_nl,nn_nhl,nn_sigtype,nn_asig,rc3, &
          interact,interact3,num_interact,iprint, &
          descs,nsf_desc,nsf2_desc,nsf3_desc,nsff_desc,ilsf2,ilsf3, &
@@ -1054,7 +1054,7 @@ contains
   end subroutine run_pmd
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
-    use variables,only: cpot
+    use variables,only: cpot,cpotlow
     use UF3,only: calc_penalty_uf3, calc_penalty_uf3l
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -1069,11 +1069,11 @@ contains
       enddo
       fp = fp *penalty
     else if( trim(cpenalty).eq.'uf3' ) then
-      if( trim(cpot).ne.'uf3' ) stop 'potential and penalty is not consistent !'
+      if( trim(cpotlow).ne.'uf3' ) stop 'potential and penalty is not consistent !'
       call calc_penalty_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,fp)
     else if( trim(cpenalty).eq.'uf3l' ) then
-      if( trim(cpot).ne.'uf3l' ) stop 'potential and penalty is not consistent !'
+      if( trim(cpotlow).ne.'uf3l' ) stop 'potential and penalty is not consistent !'
       call calc_penalty_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,fp)
     endif
@@ -1553,7 +1553,7 @@ contains
 !  Normalize inputs (descriptors) wrt standard deviation.
 !
     use variables, only: samples,nvars,vars,vranges&
-         ,lnormalized,cpot,gsfvar,gsfvs,sgms,sgmis,sgm_min,iprint &
+         ,lnormalized,cpot,cpotlow,gsfvar,gsfvs,sgms,sgmis,sgm_min,iprint &
          ,nn_nhl
     use parallel
     use descriptor,only: set_gscale
@@ -1601,12 +1601,12 @@ contains
       endif
     endif  ! l1st
 
-    if( trim(cpot).eq.'linreg' ) then
+    if( trim(cpotlow).eq.'linreg' ) then
       do i=1,nvars
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-    else if( trim(cpot).eq.'dnn' ) then
+    else if( trim(cpotlow).eq.'dnn' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
         do ihl0=0,nn_nhl(0)
@@ -1628,7 +1628,7 @@ contains
 !  Normalize inputs (descriptors)
 !
     use variables, only: samples,nvars,vars,vranges&
-         ,lnormalized,cpot,sgms,sgmis,gsfss,sq_min,iprint &
+         ,lnormalized,cpot,cpotlow,sgms,sgmis,gsfss,sq_min,iprint &
          ,nn_nhl
     use parallel
     use descriptor,only: set_gscale
@@ -1674,12 +1674,12 @@ contains
       endif
     endif
 
-    if( trim(cpot).eq.'linreg' ) then
+    if( trim(cpotlow).eq.'linreg' ) then
       do i=1,nvars
         vars(i) = vars(i) *sgms(i)
         vranges(1:2,i) = vranges(1:2,i) *sgms(i)
       enddo
-!!$    else if( trim(cpot).eq.'NN2' ) then
+!!$    else if( trim(cpotlow).eq.'NN2' ) then
 !!$      iv = 0
 !!$      do ihl0=1,nn_nhl(0)
 !!$        do ihl1=1,nn_nhl(1)  ! NN2 does not use bias...
@@ -1688,7 +1688,7 @@ contains
 !!$          vranges(1:2,iv) = vranges(1:2,iv) *sgms(ihl0)
 !!$        enddo
 !!$      enddo
-    else if( trim(cpot).eq.'dnn' ) then
+    else if( trim(cpotlow).eq.'dnn' ) then
       iv = 0
       do ihl1=1,nn_nhl(1)
         do ihl0=0,nn_nhl(0)
@@ -1710,7 +1710,7 @@ contains
 !  Restore weights by inverse normalization
 !
     use variables, only: nvars,vars,vranges&
-         ,lnormalized,cnormalize,cpot,sgmis, nn_nhl
+         ,lnormalized,cnormalize,cpot,cpotlow,sgmis, nn_nhl
     use parallel
     implicit none
     integer:: i,iv,ihl0,ihl1
@@ -1720,12 +1720,12 @@ contains
 
     if( cnormalize(1:3).eq.'std' .or. cnormalize(1:3).eq.'var' .or. &
          cnormalize(1:4).eq.'norm' ) then
-      if( trim(cpot).eq.'linreg' ) then
+      if( trim(cpotlow).eq.'linreg' ) then
         do i=1,nvars
           vars(i) = vars(i) *sgmis(i)
           vranges(:,i) = vranges(:,i) *sgmis(i)
         enddo
-!!$      else if( trim(cpot).eq.'NN2' ) then
+!!$      else if( trim(cpotlow).eq.'NN2' ) then
 !!$        iv = 0
 !!$        do ihl0=1,nn_nhl(0)
 !!$          sgmi = sgmis(ihl0)
@@ -1735,7 +1735,7 @@ contains
 !!$            vranges(1:2,iv)= vranges(1:2,iv) *sgmi
 !!$          enddo
 !!$        enddo
-      else if( trim(cpot).eq.'dnn' ) then
+      else if( trim(cpotlow).eq.'dnn' ) then
         iv = 0
         do ihl1=1,nn_nhl(1)
           do ihl0=0,nn_nhl(0)
