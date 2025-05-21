@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------
-!                     Last-modified: <2025-05-16 14:43:15 KOBAYASHI Ryo>
+!                     Last-modified: <2025-05-21 13:44:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
@@ -603,8 +603,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
     if( lclrchg ) then  ! special treatment for translational momentum
       call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
-    elseif( nrmtrans.gt.0 .and. mod(istp,nrmtrans).eq.0 ) then
-      call rm_trans_motion(natm,tag,va,nspmax,am &
+    elseif( nrmtrans.gt.0 ) then
+      if( mod(istp,nrmtrans).eq.0 ) call rm_trans_motion(natm,tag,va,nspmax,am &
            ,mpi_md_world,myid_md,iprint)
     endif
 
