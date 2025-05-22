@@ -5,7 +5,7 @@ __all__ = ['pmd','napsys','atom','common','io','rdf','adf','msd','gaussian_smear
            'util','vasp','mkcell','manipulate','units','database']
 
 __author__ = 'RYO KOBAYASHI'
-__version__ = '240202'
+__version__ = '250522'
 
 from . import napsys
 from . import io

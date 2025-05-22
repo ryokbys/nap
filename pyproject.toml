@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nappy"
+version = "250522"
+description = "Pre/post-processing python utilities for *nap*-related programs."
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT"}
+
+authors = [
+    { name="Ryo KOBAYASHI", email="kobayashi.ryo@nitech.ac.jp" }
+]
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "docopt",
+    "ase",
+    "icecream"
+]
+
+[project.urls]
+Homepage = "https://github.com/ryokbys/nap"
