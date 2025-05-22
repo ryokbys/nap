@@ -25,3 +25,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/ryokbys/nap"
+
+[project.scripts]
+napsys = "nappy.napsys:main"
