@@ -1,6 +1,6 @@
 module fp_common
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-05-21 17:39:25 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-22 11:06:05 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
 !
 ! Module that contains common functions/subroutines for fitpot.
@@ -968,13 +968,13 @@ contains
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
         lfitpot_desc = .true.
         call set_params_linreg(ndim,x)
-      else if( trim(cffs(i)).eq.'dnn' ) then
+      else if( trim(cffs(i))=='DNN' .or. trim(cffs(i))=='dnn' ) then
 !.....Set lfitpot in descriptor module to let it know that it is called from fitpot
         lfitpot_desc = .true.
         call set_params_DNN(ndim,x)
-      else if( trim(cffs(i)).eq.'uf3' ) then
+      else if( trim(cffs(i))=='uf3' .or. trim(cffs(i))=='UF3' ) then
         call set_params_uf3(ndim,x)
-      else if( trim(cffs(i)).eq.'uf3l' ) then
+      else if( trim(cffs(i))=='uf3l' .or. trim(cffs(i))=='UF3L' ) then
         if( iprint > 10 ) print *,'pre_pmd: into set_params_uf3l...'
         call set_params_uf3l(ndim,x)
       endif

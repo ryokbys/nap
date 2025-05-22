@@ -1,12 +1,12 @@
 ========================================================================
  FITPOT: A program for FITting interatomic POTential parameters
  
-   Revision: rev241006
+   Revision: rev250503
    Contributors: 
      - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
 ========================================================================
  
- Job started at 00:25:17 on 2024-11-21
+ Job started at 11:11:33 on 2025-05-22
  
  Number of processes in MPI =      1
  
@@ -17,7 +17,7 @@
               num_iteration  10
                  test_ratio   0.10
  
-          dataset_directory  ./dataset/
+                sample_file  ./dataset/smpl_*
                  param_file  in.vars.fitpot
                   specorder   Si    O
 
@@ -45,13 +45,9 @@
                stress_limit     5.000E+01
            fval_upper_limit     1.000E+05
 
-                    penalty  none
-             penalty_weight     1.000E-15
             normalize_input  std
           line_minimization  backtrack
 
-               sample_error  1
-                      smpl_     0.0020     0.0100     0.3000
 
 ------------------------------------------------------------------------
  Normalized weights =   0.500  0.300  0.200
@@ -61,32 +57,29 @@
    with mu and sgm =  0.00E+00  1.00E+00
  Max num of samples per process = 2
 
- Sample list was created by performing the following command:
-   $ ls ./dataset/ | grep "smpl_" > smpl_list.txt
+ Creating sample list by performing the following command:
+   $ ls ./dataset/smpl_* > smpl_list.txt
  Number of samples (total,training,test) =   2  2  0
  
  Number of forces to be used = 51
  Total number of forces      = 51
  Number of species in all samples = 2
- Max num of atoms among samples   = 9
- Max num of atoms among nodes     = 17
- Total num of atoms among samples = 17
+ Max num of atoms in samples   = 9
+ Max num of atoms in nodes     = 17
+ Total num of atoms in dataset = 17
  Max num of atoms whose forces are used for force-matching = 9
-
- Force field to be subtracted:
-   i,FF =            1 ZBL
-
- MPI_COMM_PMD was created at each node for pmd calculations.
 
  Number of data (total,train,test), standard deviations (train, test):
    Energy:          2         2         0   1.510E+00   0.000E+00
-   Force:          51        51         0   1.093E+00   0.000E+00
+   Force:          51        51         0   5.887E+00   0.000E+00
    Stress:         12        12         0   3.808E+00   0.000E+00
 
  Prefactors for loss function by terms (train,test):
-   Energy:      0.110E+00     0.500E+00
-   Force:       0.493E-02     0.300E+00
-   Stress:      0.115E-02     0.200E+00
+   Energy:      1.097E-01     5.000E-01
+   Force:       1.697E-04     3.000E-01
+   Stress:      1.149E-03     2.000E-01
+
+ MPI_COMM_PMD was created at each node for pmd calculations.
  
  Mean of input symmetry functions =    4.209E-01
  Var  of input symmetry functions =    5.021E-01
@@ -94,38 +87,36 @@
  
  ******************************* QN (BFGS) *******************************
  Memory for BFGS =     12 MB
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    0   0  1.259E+02  0.000E+00  2.392E+01  2.215E+02  0.000E+00  0.000E+00
- # ENERGY: ITER, TIME, RMSE(TRAINING), RMSE(TEST), MAX(TRAINING), MAX(TEST), R^2(TRAINING), R^2(TEST), 
- # FORCE:  ITER, TIME, RMSE(TRAINING), RMSE(TEST), MAX(TRAINING), MAX(TEST), R^2(TRAINING), R^2(TEST)
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    0   0  1.216E+01  0.000E+00  2.392E+01  2.134E+01  0.000E+00  0.000E+00
+ # ENERGY:  ITER, TIME, RMSE(TRAINING), RMSE(TEST), MAX(TRAINING), MAX(TEST), R^2(TRAINING), R^2(TEST)
+ # FORCE:   ITER, TIME, RMSE(TRAINING), RMSE(TEST), MAX(TRAINING), MAX(TEST), R^2(TRAINING), R^2(TEST)
  # STRESS:  ITER, TIME, RMSE(TRAINING), RMSE(TEST), MAX(TRAINING), MAX(TEST), R^2(TRAINING), R^2(TEST)
- ENERGY:        0           0.04    9.9010302    0.0000000   13.9585593    0.0000000  -42.0062690    0.0000000
- FORCE:         0           0.04    5.4303519    0.0000000   12.2540405    0.0000000  -23.6975490    0.0000000
- STRESS:        0           0.04   68.9481615    0.0000000  171.2923971    0.0000000 -490.7844795    0.0000000
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    1   4  6.959E+00  0.000E+00  2.537E+01  1.135E+01  8.861E+00  1.190E+02
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    2   3  6.504E+00  0.000E+00  2.536E+01  6.980E+00  9.106E-02  4.552E-01
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    3   1  5.547E+00  0.000E+00  2.537E+01  1.870E+01  3.056E-01  9.563E-01
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    4   2  4.185E+00  0.000E+00  2.545E+01  1.517E+01  1.185E+00  1.363E+00
- ENERGY:        5           0.12    2.0846128    0.0000000    2.3868923    0.0000000   -0.9064341    0.0000000
- FORCE:         5           0.13    2.3964243    0.0000000    4.6785178    0.0000000   -3.8097814    0.0000000
- STRESS:        5           0.13    4.4742921    0.0000000    8.3010143    0.0000000   -1.0709905    0.0000000
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    5   2  2.686E+00  0.000E+00  2.547E+01  2.865E+00  4.195E-01  1.499E+00
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    6   1  1.604E+00  0.000E+00  2.549E+01  3.959E+00  6.499E-01  1.082E+00
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    7   3  1.187E+00  0.000E+00  2.550E+01  2.048E+00  2.594E-01  4.176E-01
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    8   1  6.673E-01  0.000E+00  2.555E+01  4.259E+00  9.831E-01  5.193E-01
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    9   4  6.503E-01  0.000E+00  2.555E+01  2.911E+00  1.503E-02  1.698E-02
- ENERGY:       10           0.23    0.0518664    0.0000000    0.0615803    0.0000000    0.9988198    0.0000000
- FORCE:        10           0.23    1.0221830    0.0000000    2.0345067    0.0000000    0.1249050    0.0000000
- STRESS:       10           0.23    4.9256055    0.0000000   11.2596812    0.0000000   -1.5098553    0.0000000
- iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=   10   1  5.675E-01  0.000E+00  2.555E+01  1.638E+00  6.669E-02  8.279E-02
- ENERGY:       10           0.25    0.0518664    0.0000000    0.0615803    0.0000000    0.9988198    0.0000000
- FORCE:        10           0.26    1.0221830    0.0000000    2.0345067    0.0000000    0.1249050    0.0000000
- STRESS:       10           0.26    4.9256055    0.0000000   11.2596812    0.0000000   -1.5098553    0.0000000
- Number of func and grad calls =  24  11
+ ENERGY:        0           0.06    6.5826426    0.0000000    9.2584571    0.0000000  -18.0095375    0.0000000
+ FORCE:         0           0.06    4.8639332    0.0000000   12.7807770    0.0000000    0.3173058    0.0000000
+ STRESS:        0           0.06   13.0407180    0.0000000   27.2425179    0.0000000  -16.5926980    0.0000000
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    1   5  1.082E+01  0.000E+00  2.392E+01  2.277E+01  1.707E-01  1.338E+00
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    2   1  5.599E+00  0.000E+00  2.392E+01  7.771E+00  7.921E-01  5.223E+00
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    3   1  2.599E+00  0.000E+00  2.401E+01  1.446E+01  1.971E+00  3.000E+00
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    4   4  1.701E+00  0.000E+00  2.402E+01  8.314E+00  1.936E-01  8.973E-01
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    5   1  1.117E+00  0.000E+00  2.404E+01  3.626E+00  2.450E-01  5.847E-01
+ ENERGY:        5           0.26    1.6177733    0.0000000    2.0098921    0.0000000   -0.1481703    0.0000000
+ FORCE:         5           0.26    6.9683423    0.0000000   21.1056447    0.0000000   -0.4012318    0.0000000
+ STRESS:        5           0.26    2.6362711    0.0000000    5.7331567    0.0000000    0.2810320    0.0000000
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    6   1  5.334E-01  0.000E+00  2.403E+01  8.657E-01  4.833E-01  5.831E-01
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    7   2  4.692E-01  0.000E+00  2.403E+01  5.695E-01  1.309E-01  6.425E-02
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    8   1  4.372E-01  0.000E+00  2.406E+01  5.964E-01  4.448E-01  3.202E-02
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=    9   3  4.188E-01  0.000E+00  2.406E+01  3.557E-01  5.041E-02  1.831E-02
+ iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=   10   1  3.997E-01  0.000E+00  2.405E+01  1.857E-01  2.136E-01  1.917E-02
+ Best of test loss (iter,loss): 0  0.0000
+ ENERGY:        0           0.49    6.5826426    0.0000000    9.2584571    0.0000000  -18.0095375    0.0000000
+ FORCE:         0           0.49    4.8639332    0.0000000   12.7807770    0.0000000    0.3173058    0.0000000
+ STRESS:        0           0.49   13.0407180    0.0000000   27.2425179    0.0000000  -16.5926980    0.0000000
+ Number of func and grad calls =  23  11
  Memory/proc =                12.8 MB
  Memory(total) =              12.8 MB
- Time func (max) =           0.026 sec
- Time grad (max) =           0.167 sec
+ Time func (max) =           0.035 sec
+ Time grad (max) =           0.360 sec
  Time comm (max) =           0.000 sec
  Time wait (max) =           0.000 sec
- Time      =           0.262 sec  =   0h00m00s
- Job finished at 00:25:17 on 2024-11-21
+ Time      =           0.543 sec  =   0h00m00s
+ Job finished at 11:11:33 on 2025-05-22

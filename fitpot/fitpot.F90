@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-05-21 17:40:40 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-22 11:06:49 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -128,9 +128,9 @@ program fitpot
 !     subtracting FFs if needed.
   call get_data_stats()
 
-    nff = 1
-    allocate(cffs(nff))
-    cffs(1) = trim(cpot)
+  nff = 1
+  allocate(cffs(nff))
+  cffs(1) = trim(cpot)
 
   if( (trim(cfmethod).ne.'test' .or. trim(cfmethod).ne.'dsgnmat') .and. &
        trim(cpotlow).eq.'linreg' .or. trim(cpotlow).eq.'dnn' ) then

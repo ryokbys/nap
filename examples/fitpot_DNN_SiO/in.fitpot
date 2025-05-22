@@ -8,7 +8,7 @@ converge_num    3
 
 test_ratio 0.1
 
-sample_directory  "./dataset/"
+sample_file  "./dataset/smpl_*"
 param_file        in.vars.fitpot
 
 # fitting_method    test
