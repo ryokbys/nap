@@ -38,7 +38,7 @@ subroutine set_variable(ionum,cname)
   use variables
   use random
 !!$  use minimize
-  use pmdvars,only: nnmax
+  use pmdvars,only: nnmax,namax
   use composition
   use util,only: to_lower
   implicit none
@@ -64,6 +64,9 @@ subroutine set_variable(ionum,cname)
     return
   elseif( trim(cname).eq.'max_num_neighbors' ) then
     call read_i1(ionum,nnmax)
+    return
+  elseif( trim(cname).eq.'max_num_atoms' ) then
+    call read_i1(ionum,namax)
     return
   elseif( trim(cname).eq.'num_iteration' ) then
     call read_i1(ionum,niter)

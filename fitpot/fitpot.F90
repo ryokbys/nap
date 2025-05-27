@@ -1,6 +1,6 @@
 program fitpot
 !-----------------------------------------------------------------------
-!                     Last modified: <2025-05-22 11:06:49 KOBAYASHI Ryo>
+!                     Last modified: <2025-05-27 18:06:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
   use variables
   use parallel
@@ -1883,7 +1883,7 @@ subroutine sync_input()
   use parallel
   use minimize
   use random
-  use pmdvars,only: nnmax
+  use pmdvars,only: nnmax,namax
   use composition
   implicit none
   
@@ -2024,6 +2024,7 @@ subroutine sync_input()
 
 !.....pmdio related
   call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)
+  call mpi_bcast(namax,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Debugging
   call mpi_bcast(id_check_grad,1,mpi_integer,0,mpi_world,ierr)
