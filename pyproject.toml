@@ -20,7 +20,8 @@ dependencies = [
     "scipy",
     "docopt",
     "ase",
-    "icecream"
+    "icecream",
+    "mpi4py"
 ]
 
 [project.urls]

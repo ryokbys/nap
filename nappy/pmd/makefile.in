@@ -4,7 +4,6 @@ all: pmd_wrapper mods
 
 obj= pmd_wrapper.F90
 pmddir= ${HOME}/src/nap/pmd
-# modobj= ${pmddir}/mod_pairlist.F90 ${pmddir}/mod_distfunc.F90 ${pmddir}/mod_memory.F90 ${pmddir}/sort.F90
 
 # In case of macOS (at least in my environment), need to use gfortran with mpi options instead of using mpif90.
 # You should modify paths in the following.
@@ -18,10 +17,6 @@ pmd_wrapper: ${obj}
 	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd   # for linux, use mpif90 directly
 #	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${mpiopts}       # for mac, use gfortran and mpiopts defined above
 #	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${ompopts}  # add ompopts if pmd was compiled with -fopenmp
-
-# mods: ${modojb}
-# 	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj}
-# #	f2py --f90exec=@FC@ --quiet -m $@ -c ${modobj} ${ompopts}
 
 clean:
 	rm -f *.o *.so *~
