@@ -51,7 +51,8 @@ DEFAULT_LABELS = ('x','y','z','vx','vy','vz','fx','fy','fz','sid')
 DEFAULT_DTYPES = {'x':'float64', 'y':'float64', 'z':'float64',
                   'vx':'float32', 'vy':'float32', 'vz':'float32',
                   'fx':'float32', 'fy':'float32', 'fz':'float32',
-                  'sid':'int8', 'chg':'float16', 'ekin':'float32',
+                  'sid':'int8', 'ifmv':'int8',
+                  'chg':'float16', 'ekin':'float32',
                   'epot':'float32'}
 # _file_formats = ('pmd','POSCAR','dump','xsf','lammps',
 #                  'cube','CHGCAR')
@@ -278,7 +279,7 @@ class NAPSystem(object):
         b3 = 2.0 *np.pi *np.cross(a1,a2)/v
         return b1,b2,b3
 
-    def add_atoms(self,symbols,poss,vels=[],frcs=[]):
+    def add_atoms(self,symbols,poss,vels=[],frcs=[],ifmvs=[]):
         """
         Add atoms of given symbols, positions, velocities and forces.
         Positions, velocities and forces are assumed to be scaled in lattice vectors.
@@ -303,18 +304,32 @@ class NAPSystem(object):
         if type(poss) == list:
             poss = np.array(poss)
         newatoms[['x','y','z']] = poss
+
+        #...velocities
         if len(vels) == len(poss):
             if type(vels) == list:
                 vels = np.array(vels)
         else:
             vels = np.zeros(poss.shape)
         newatoms[['vx','vy','vz']] = vels
+
+        #...forces
         if len(frcs) == len(poss):
             if type(frcs) == list:
                 frcs = np.array(frcs)
         else:
             frcs = np.zeros(poss.shape)
         newatoms[['fx','fy','fz']] = frcs
+
+        #...ifmvs
+        if len(ifmvs) == len(poss):
+            if type(ifmvs) == list:
+                ifmvs = np.array(ifmvs,dtype=np.int8)
+        else:
+            ifmvs = np.zeros(len(poss),dtype=np.int8)
+            ifmvs[:] = 1
+        newatoms['ifmv'] = ifmvs
+        
         newatoms.sid = [ sid for sid in sids ]
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)

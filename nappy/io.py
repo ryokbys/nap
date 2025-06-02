@@ -397,6 +397,7 @@ need to specify the species order correctly with --specorder option.
             raise ValueError(msg)
         natm = np.sum(num_species)
         sids = [ 0 for i in range(natm) ]
+        ifmvs = [ 1 for i in range(natm) ]
         # poss = [ np.zeros(3) for i in range(natm) ]
         # vels = [ np.zeros(3) for i in range(natm) ]
         # frcs = [ np.zeros(3) for i in range(natm) ]
@@ -445,8 +446,8 @@ need to specify the species order correctly with --specorder option.
     nsys.atoms['fx']= frcs[:,0]
     nsys.atoms['fy']= frcs[:,1]
     nsys.atoms['fz']= frcs[:,2]
-
     nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv']= ifmvs
     return nsys
             
 def write_POSCAR(nsys,fname='POSCAR',):
@@ -601,12 +602,14 @@ def read_dump(fname="dump",specorder=[],):
         elif mode == 'NUMBER OF ATOMS':
             natm= int(data[0])
             sids = [ 0 for i in range(natm) ]
+            ifmvs= [ 1 for i in range(natm) ]
             # poss = [ np.zeros(3) for i in range(natm) ]
             # vels = [ np.zeros(3) for i in range(natm) ]
             # frcs = [ np.zeros(3) for i in range(natm) ]
             poss = np.zeros((natm,3))
             vels = np.zeros((natm,3))
             frcs = np.zeros((natm,3))
+
         elif mode == 'BOX BOUNDS':
             if ixyz == 0:
                 xlo_bound= float(data[0])
@@ -688,6 +691,7 @@ def read_dump(fname="dump",specorder=[],):
     nsys.atoms['fy']= frcs[:,1]
     nsys.atoms['fz']= frcs[:,2]
 
+    nsys.atoms['ifmv'] = ifmvs
     nsys.atoms['sid'] = sids
     for ia in range(len(aux_names)):
         name = aux_names[ia]
@@ -796,6 +800,7 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=[],):
             if 'atoms' in line:
                 natm = int(data[0])
                 sids = [ 0 for i in range(natm) ]
+                ifmvs= [ 1 for i in range(natm) ]
                 poss = np.zeros((natm,3))
                 vels = np.zeros((natm,3))
                 frcs = np.zeros((natm,3))
@@ -870,6 +875,7 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=[],):
     nsys.atoms['fz']= frcs[:,2]
 
     nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv'] = ifmvs
     return nsys
 
 def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic',):
@@ -962,6 +968,7 @@ def read_xsf(fname="xsf",specorder=[],):
             if len(data) == 1:
                 natm= int(data[0])
                 sids = [ 0 for i in range(natm) ]
+                ifmvs = [ 1 for i in range(natm) ]
                 poss = np.zeros((natm,3))
                 vels = np.zeros((natm,3))
                 frcs = np.zeros((natm,3))
@@ -970,6 +977,7 @@ def read_xsf(fname="xsf",specorder=[],):
                 natm= int(data[0])
                 nspcs= int(data[1])
                 sids = [ 0 for i in range(natm) ]
+                ifmvs = [ 1 for i in range(natm) ]
                 poss = np.zeros((natm,3))
                 vels = np.zeros((natm,3))
                 frcs = np.zeros((natm,3))
@@ -1004,6 +1012,7 @@ def read_xsf(fname="xsf",specorder=[],):
     nsys.atoms['fz']= frcs[:,2]
 
     nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv'] = ifmvs
     f.close()
     return nsys
 
@@ -1190,6 +1199,7 @@ need to specify the species order correctly with --specorder option.
             raise ValueError(msg)
         natm = np.sum(num_species)
         sids = [ 0 for i in range(natm) ]
+        ifmvs = [ 1 for i in range(natm) ]
         poss = np.zeros((natm,3))
         vels = np.zeros((natm,3))
         frcs = np.zeros((natm,3))
@@ -1238,6 +1248,7 @@ need to specify the species order correctly with --specorder option.
         nsys.atoms['fz']= frcs[:,2]
 
         nsys.atoms['sid'] = sids
+        nsys.atoms['ifmv'] = ifmvs
 
         #...Read volumetric data
         f.readline()  # should be one blank line
@@ -1293,6 +1304,7 @@ def read_cube(fname, specorder=[],):
     # 7-(7+natm)-th lines: id, elem-ID, rh[0:3]
     rpos = np.zeros(3,dtype=float)  # real pos in Bohr
     sposs = np.zeros((natm,3),dtype=float)  # scaled poss
+    ifmvs = [ 1 for i in range(natm) ]
     sids = np.zeros(natm, dtype=int)
     for i in range(natm):
         d = lines[6+i].split()
@@ -1316,6 +1328,7 @@ def read_cube(fname, specorder=[],):
     # nsys.atoms['fz']= frcs[:,2]
 
     nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv'] = ifmvs
     # hereafter, volumetric data if exists
     if nvoldat > 0:
         vdata = np.zeros(nvoldat, dtype=float)
@@ -1543,7 +1556,8 @@ def from_ase(atoms, specorder=[],
 
     #...Create arrays to be installed into nsys.atoms
     sids = [ nsys.specorder.index(si)+1 for si in symbols ]
-    nsys.atoms.sid = sids
+    nsys.atoms['sid'] = sids
+    nsys.atoms['ifmv'] = [ 1 for i in range(len(symbols)) ]
 
     nsys.atoms['x'] = poss[:,0]
     nsys.atoms['y'] = poss[:,1]
