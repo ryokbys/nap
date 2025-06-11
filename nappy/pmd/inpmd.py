@@ -1,7 +1,14 @@
 """
 Module for handling in.pmd file and related information.
+
+Usage:
+  inpmd.py [options] INPMD_NAME
+
+Options:
+  -h, --help  Show this help message and exit.
 """
 import copy
+from docopt import docopt
 
 _entry_to_varname = {
     'num_nodes_x': 'nx',
@@ -229,3 +236,14 @@ def inputs_to_vars(inputs={}):
         vname = _entry_to_varname[k]
         vs[vname] = v
     return vs
+
+def main():
+    import os,sys
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])))
+
+    print("Under construction...")
+    return None
+
+if __name__ == '__main__':
+    main()
+    

@@ -1762,11 +1762,22 @@ contains
 
 !.....Check whether some parameters are consistent with those
 !     read in read_params_desc().
-    if( nsf .ne. nsf_in ) stop cerr//' nsf != nsf_in'
-    if( nsf2 .ne. nsf2_in ) stop cerr//' nsf2 != nsf2_in'
-    if( nsf3 .ne. nsf3_in ) stop cerr//' nsf3 != nsf3_in'
-    if( nsff .ne. nsff_in ) stop cerr//' nsff != nsff_in'
-    if( lcheby .neqv. lcheby_in ) stop cerr//' lcheby != lcheby_in'
+    if( nsf .ne. nsf_in ) then
+      print *,cerr//' nsf != nsf_in'
+      stop 
+    else if( nsf2 .ne. nsf2_in ) then
+      print *,cerr//' nsf2 != nsf2_in'
+      stop
+    else if( nsf3 .ne. nsf3_in ) then
+      print *,cerr//' nsf3 != nsf3_in'
+      stop 
+    else if( nsff .ne. nsff_in ) then
+      print *,cerr//' nsff != nsff_in'
+      stop 
+    else if( lcheby .neqv. lcheby_in ) then
+      print *,cerr//' lcheby != lcheby_in'
+      stop
+    endif
     ilsf2(:,:,:) = ilsf2_in(:,:,:)
     ilsf3(:,:,:,:) = ilsf3_in(:,:,:,:)
     cnst(:) = cnst_in(:)

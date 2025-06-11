@@ -17,11 +17,11 @@ Options:
   --ediff EDIFF
               Convergence criteria for the energy difference. [default: 1.0e-6]
   --ediffg EDIFFG
-              Convergence criteria for ionic relaxation. 
+              Convergence criteria for ionic relaxation.
               Negative value for force criterion. [default: -0.05]
   --spin-polarize
               Set spin polarization true. If '--high-spin' is set, this is also set.
-  --high-spin 
+  --high-spin
               Set initial spin state as high. Otherwise set it low.
   --break-symmetry
               Set to allow symmetry breakage.
@@ -82,11 +82,11 @@ def determine_num_kpoint(b_length,pitch,leven):
 def estimate_ncore(nbands):
     """
     Estimate NCORE value from NBANDS info.
-    NCORE specifies how many cores store one orbital (NPAR=cpu/NCORE). 
-    VASP master recommends that 
+    NCORE specifies how many cores store one orbital (NPAR=cpu/NCORE).
+    VASP master recommends that
         NCORE = 4 - approx. SQRT( # of cores )
     But we cannot know how many cores will be used when preparing inputs.
-    Here we use the following original criterion, 
+    Here we use the following original criterion,
        NCORE ~ SQRT(NBANDS)/2
     """
     nbo = int(math.sqrt(nbands)/2)
@@ -116,7 +116,7 @@ def estimate_nbands(nel):
     The policy is that the NBANDS:
     - should be multiples of 4 considering the efficient
       parallelization (which cannot be taken account here, though),
-    - should be not be less than number of electrons, NEL, 
+    - should be not be less than number of electrons, NEL,
       if it is less than 50,
     """
     nbands = nel
@@ -155,14 +155,14 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
     tdate = dt.now()
     dstr = tdate.strftime('%Y-%m-%d')
     SYSTEM = 'System made by nappy/vasp/prepare.py '+ dstr
-    
+
     if mode == 'scf' and nsw != 0:
         print('NSW is meaningless for mode==scf, so reset NSW=0.')
         nsw = 0
     elif mode != 'scf' and nsw == 0:
         print(' Since NSW==0 is meaningless for mode==(relax|md), change NSW=1000.')
         nsw = 1000
-        
+
     with open(fname,'w') as f:
         f.write("SYSTEM = "+SYSTEM+"\n")
         f.write("\n")
@@ -183,12 +183,12 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
             f.write("MAGMOM   = {0:s} \n".format(magmom))
         else:
             f.write("ISPIN  = 1  # 1) no-spin,  2) spin-polarized \n")
-    
+
         if break_symmetry:
             f.write("ISYM   = 0  # 0) symmetry OFF,  1-3) symmetry ON, \n")
         else:
             f.write("ISYM   = 2  # 0) symmetry OFF,  1-3) symmetry ON, \n")
-    
+
         f.write("\n")
         f.write("ENCUT  =  {0:7.3f}\n".format(encut))
         f.write("LREAL  =  Auto  # non-local projectors in real space \n")
@@ -216,7 +216,7 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
         #     f.write("SIGMA  =   0.01\n")
         f.write("ISMEAR =   {0:d}  # method for partial occupancy: -5) Blochl, -1) Fermi, 0) Gaussian, 1-5) Methfessel-Paxton order-N \n".format(ismear))
         f.write("SIGMA  =   {0:8.4f}  # width of Gaussian\n".format(sigma))
-    
+
         f.write("\n")
         f.write("# Ionic updates IBRION: -1) no update, 0) MD, 1) quasi-Newton, 2) CG \n")
         if 'scf' in mode:
@@ -233,12 +233,16 @@ def write_INCAR(fname,encut,nbands,break_symmetry,
             f.write("SMASS  = 0.4\n")
             f.write("MDALGO = 3   # 0)NVE, 1)Andersen thermostat, 2)Nose-Hoover, 3)Langevin \n")
             gmms = [ 10.0 for i in range(len(species)) ]
+            f.write("# friction coeff in Langevin thermostat (1/ps) for each species. \n")
             f.write("LANGEVIN_GAMMA = ")
             for g in gmms:
                 f.write("{0:4.1f} ".format(g))
             f.write("\n")
             if 'cell' in mode or 'shape' in mode:
+                f.write("# friction coeff for lattice DOF (1/ps) in Langevin thermostat with Parrinello-Rahman barostat. \n")
                 f.write("LANGEVIN_GAMMA_L = 10.0\n")
+                f.write("# External stress (kBar = 0.1 GPa) in Parrinello-Rahman barostat.\n")
+                f.write("PSTRESS = 0.0\n")
             f.write("TEBEG  = 1000.0\n")
             f.write("# TEEND  = 1000.0\n")
         else:
@@ -345,7 +349,7 @@ def prepare_vasp(poscar_fname,pitch,even,spin_polarized,break_symmetry,
     for e in _magnetic_elements:
         if e in species:
             spin_polarized = True
-    
+
     l1= al *math.sqrt(a1[0]**2 +a1[1]**2 +a1[2]**2)
     l2= al *math.sqrt(a2[0]**2 +a2[1]**2 +a2[2]**2)
     l3= al *math.sqrt(a3[0]**2 +a3[1]**2 +a3[2]**2)
@@ -414,4 +418,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

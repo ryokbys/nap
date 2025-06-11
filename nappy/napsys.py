@@ -1122,9 +1122,9 @@ class NAPSystem(object):
                         y= pi0[1]/m2 +1.0/m2*i2
                         z= pi0[2]/m3 +1.0/m3*i3
                         vi0 = vels[i0]
-                        vx= vi0[0]/m1 +1.0/m1*i1
-                        vy= vi0[1]/m2 +1.0/m2*i2
-                        vz= vi0[2]/m3 +1.0/m3*i3
+                        vx= vi0[0]
+                        vy= vi0[1]
+                        vz= vi0[2]
                         newsids[inc] = self.atoms.sid[i0]
                         newposs[inc,:] = [x,y,z]
                         newvels[inc,:] = [vx,vy,vz]
