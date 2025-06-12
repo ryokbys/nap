@@ -70,7 +70,7 @@ def get_open_func(fname,mode):
         return gzip.open, mode+'t'
     else:
         return open, mode
-    
+
 def read(fname="pmdini",format=None, specorder=[], index=None):
     if format in (None, 'None'):
         format= parse_filename(fname, mode='read')
@@ -136,7 +136,7 @@ def read_pmd(fname:str = 'pmdini',
     ...
     1.100000000000008   0.750  0.750  0.750  0.000  0.000  0.000
     ---
-    
+
     - There must be at least one comment line and after the comment lines, there must not be any comment line until the all the entry finishes.
     - If there are multiple configurations (timesteps) in one file, they must be separated with comment lines.
     - There should not be any blank line.
@@ -256,7 +256,7 @@ def read_pmd(fname:str = 'pmdini',
                     fdata = [float(x) for x in data]
                     tag = fdata[0]
                     sid,ifmv,num = decode_tag(tag)
-                    
+
                     # poss[incatm][:] = fdata[1:4]
                     # vels[incatm][:] = fdata[4:7]
                     poss[incatm,:] = fdata[1:4]
@@ -289,6 +289,14 @@ def write_pmd(nsys,fname='pmdini', auxs=['fx','fy','fz'], **kwargs):
     myopen, mode = get_open_func(fname,'w')
     f=myopen(fname,mode)
     f.write("#\n")
+    #...Replace nsys.specorder with the given specorder if given
+    for k,v in kwargs.items():
+        if k == 'specorder':
+            assert type(v) is list or type(v) is tuple, f"Type of specorder must be list or tuple, but {type(v)}"
+            for s in nsys.specorder:
+                if not s in v:
+                    raise ValueError("The given specorder is insufficent for this NAPSystem.")
+            nsys.specorder = v
     if nsys.specorder and len(nsys.specorder)> 0:
         f.write("#  specorder: ")
         for s in nsys.specorder:
@@ -341,7 +349,7 @@ def write_pmd(nsys,fname='pmdini', auxs=['fx','fy','fz'], **kwargs):
         ifmvs = [ 1 for i in range(len(poss)) ]
     else:
         ifmvs = nsys.atoms.ifmv
-    
+
     for i in range(len(nsys.atoms)):
         pi = poss[i]
         vi = vels[i]
@@ -414,7 +422,7 @@ need to specify the species order correctly with --specorder option.
             coord = 'cartesian'
         else:  # such as "Direct"
             coord = 'scaled'
-        
+
         #...Atom positions
         for i in range(natm):
             buff= f.readline().split()
@@ -449,7 +457,7 @@ need to specify the species order correctly with --specorder option.
     nsys.atoms['sid'] = sids
     nsys.atoms['ifmv']= ifmvs
     return nsys
-            
+
 def write_POSCAR(nsys,fname='POSCAR',):
     from datetime import datetime
     myopen, mode = get_open_func(fname,'w')
@@ -596,7 +604,7 @@ def read_dump(fname="dump",specorder=[],):
             elif 'TIMESTEP' in line:
                 mode= 'TIMESTEP'
                 continue
-            
+
         if mode == 'TIMESTEP':
             timestep = int(data[0])
         elif mode == 'NUMBER OF ATOMS':
@@ -674,7 +682,7 @@ def read_dump(fname="dump",specorder=[],):
                 poss[iatm,:] = sr[:]
                 vels[iatm,:] = sv[:]
                 frcs[iatm,:] = f0[:]
-                
+
                 if len(aux_names)>0:
                     # auxs[iatm,:] = [ float(x) for x in data[iauxstart:] ]
                     auxs[iatm,:] = [ float(x) for x in data[2:] ]
@@ -730,7 +738,7 @@ def write_dump(nsys,fname='dump',auxs=['vx','vy','vz'],):
     f.write("{0:15.4f} {1:15.4f} {2:15.4f}\n".format(zlo,
                                                      zhi,
                                                      yz))
-    
+
     auxs_exist = nsys.get_aux_names()
     aux_names = []
     for aux in auxs:
@@ -843,12 +851,12 @@ def read_lammps_data(fname="data.lammps",atom_style='atomic',specorder=[],):
                     symbol = nsys.specorder[sid-1]
                 # if symbol and ai.symbol != symbol:
                 #     ai.set_symbol(symbol)
-                # if atom_style == 'charge': 
+                # if atom_style == 'charge':
                 #     idat += 1
                 #     chg = float(data[idat])
                 #     # ai.set_aux('charge',chg)
                 #     if aux_names and 'charge' not in aux_names:
-                        
+
                 idat += 1
                 x0= float(data[idat])
                 idat += 1
@@ -883,7 +891,7 @@ def write_lammps_data(nsys,fname='data.lammps',atom_style='atomic',):
     Write LAMMPS data format file.
     The definition of cell vectors is a bit tricky, see the following page
     http://lammps.sandia.gov/doc/Section_howto.html#howto-12
-    And also the format of Atoms entry could change depending on 
+    And also the format of Atoms entry could change depending on
     `atom_style` which is not given in the same file.
     """
     myopen, mode = get_open_func(fname,'w')
@@ -943,7 +951,7 @@ def read_xsf(fname="xsf",specorder=[],):
             # print 'Inversed h-matrix:'
             # print hi
             continue
-        
+
         if mode == 'CRYSTAL':
             pass
         elif mode == 'PRIMVEC':
@@ -1029,7 +1037,7 @@ def write_xsf(nsys,fname='xsf',):
     h[0,:] = nsys.a1[:]
     h[1,:] = nsys.a2[:]
     h[2,:] = nsys.a3[:]
-    
+
     myopen, mode = get_open_func(fname,'w')
     f= myopen(fname,mode)
     f.write("CRYSTAL\n")
@@ -1109,7 +1117,7 @@ def read_extxyz(fname, specorder=[],):
     """
     Read an extxyz format using ASE package.
     NOTE: extxyz file could contain multiple structures.
-    
+
     The extxyz format is defined in ASE and is like following:
     ---
     8
@@ -1151,7 +1159,7 @@ def read_extxyz(fname, specorder=[],):
         return nsyss
     else:
         return nsys
-    
+
 def read_CHGCAR(fname='CHGCAR',specorder=[],):
     """
     Read CHGCAR file and get information of cell, atoms, and volumetric data.
@@ -1213,7 +1221,7 @@ need to specify the species order correctly with --specorder option.
             coord = 'cartesian'
         else:  # such as "Direct"
             coord = 'scaled'
-        
+
         #...Atom positions
         for i in range(natm):
             buff= f.readline().split()
@@ -1392,11 +1400,11 @@ def get_cube_txt(nsys,origin=[0.,0.,0.]):
     a = a /ndiv[0] *Ang_to_Bohr
     b = b /ndiv[1] *Ang_to_Bohr
     c = c /ndiv[2] *Ang_to_Bohr
-        
+
     txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[0],*a)
     txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[1],*b)
     txt += ' {0:8d} {1:12.6f} {2:12.6f} {3:12.6f}\n'.format(ndiv[2],*c)
-    
+
 
     #...Atoms
     from nappy.elements import elements
@@ -1448,10 +1456,10 @@ def get_PDB_txt(nsys,**kwargs):
     max_num_atoms = 100000
     if 'max_num_atoms' in kwargs:
         max_num_atoms = kwargs['max_num_atoms']
-    
+
     if len(nsys.atoms) >= max_num_atoms:
         raise ValueError('Number of atoms is too large for PDB format...')
-    
+
     from datetime import datetime
     txt = ''
     txt += '{0:6s}    Generated by napsys.py at {1}\n'.format('COMPND',
@@ -1587,7 +1595,7 @@ def parse_filename(filename, mode=None):
 
 def to_lammps(hmat,spos):
     """
-    Convert h-matrix and scaled positions in napsys to 
+    Convert h-matrix and scaled positions in napsys to
     LAMMPS representation.
     Parameters to be output:
       xlo, xhi, ylo, yhi, zlo, zhi, xy, xz, yz, pos
@@ -1600,7 +1608,7 @@ def to_lammps(hmat,spos):
     """
     if isinstance(hmat,list):
         hmat = np.array(hmat)
-        
+
     if not isinstance(spos,np.ndarray):
         if isinstance(spos,list):
             spos = np.array(spos)
@@ -1627,7 +1635,7 @@ def to_lammps(hmat,spos):
     x = xhi-xlo
     y = yhi-ylo
     z = zhi-zlo
-    
+
     lxy = 0
     if xy > xhi/2:
         xy -= xhi
@@ -1680,7 +1688,7 @@ def to_lammps(hmat,spos):
             newspos = shift_spos_for_lammps(sp,lxy,lxz,lyz,x,y,z,yz,xz,xy)
             pos[i] = np.dot(hmat,newspos)
             pos[i] = np.dot(bmat,np.dot(amat,pos[i]))/vol
-        
+
     return xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz,pos
 
 def shift_spos_for_lammps(spos,lxy,lxz,lyz,x,y,z,yz,xz,xy):
@@ -1706,7 +1714,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     Based on read_vasp_xml in ase.io.vasp.py.
     """
     import xml.etree.ElementTree as ET
-    
+
     tree = ET.iterparse(fname, events=['start', 'end'])
     calcs = []
     dt = -1.0
@@ -1735,12 +1743,12 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     except Exception as e:
         print(f' Exception: {e}')
         raise
-    
+
     if len(calcs)==0:
         raise ValueError(f'There is no calculation in {fname}')
     else:
         print(f' Num of calculations in vasprun.xml = {len(calcs):d}')
-    
+
     nsyss = []
     for calc in calcs:
         nsys = NAPSystem(specorder=specorder)
@@ -1754,7 +1762,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
             continue
         epot = e_free + de
         nsys.set_potential_energy(epot)
-        
+
         cell = np.zeros((3, 3), dtype=float)
         for i, vector in enumerate(
                 calc.find('structure/crystal/varray[@name="basis"]')):
@@ -1788,14 +1796,14 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
             # strs *= -1.0
             strs *= 0.1
             #strs = strss.reshape(9)[[0, 4, 8, 5, 2, 1]]
-        
+
         nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
         nsys.add_atoms(species, sposs,)
         nsys.set_real_forces(frcs)
         if strs is not None:
             nsys.set_stress_tensor(strs)
         nsyss.append(nsys)
-    
+
     if velocity:
         # Assuming that the change/velocity of the cell does not contribute to atom velocities,
         # which is a common assumption in Andersen and Parrinello-Rahman methods.
@@ -1832,7 +1840,7 @@ def write_fitpot_sample(nsys, dirname):
     epot = nsys.get_potential_energy()
     frcs = nsys.get_forces()
     strs = nsys.get_stress()
-    
+
     write(nsys, fname=dirname+'/pos', format='pmd', forces=True)
 
     with open(dirname+'/erg.ref', 'w') as f:
@@ -1855,4 +1863,3 @@ if __name__ == "__main__":
 
     args = docopt(__doc__)
     print(__file__)
-

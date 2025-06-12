@@ -67,11 +67,11 @@ module UF3
     real(8),allocatable:: knots(:), coefs(:)
     real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm3l
-  
+
   integer:: n1b, n2b, n3b
   integer:: ncoef = 0
   real(8):: erg1s(nspmax), gerg1s(nspmax)
-  integer,allocatable:: prm1s(:) 
+  integer,allocatable:: prm1s(:)
   type(prm2),allocatable:: prm2s(:)
   type(prm3),allocatable:: prm3s(:)
   type(prm3l),allocatable:: prm3ls(:)
@@ -83,12 +83,12 @@ module UF3
 
   real(8),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
   integer,allocatable:: ls3b(:)
-  
+
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
 !.....Cutoffs
   real(8):: rc2_3b(nspmax,nspmax)
-  
+
 !.....constants
   integer:: nelem,nexp,nsp
   integer,parameter:: ivoigt(3,3)= &
@@ -130,7 +130,7 @@ contains
 !
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    
+
     integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
     real(8):: etmp
@@ -139,7 +139,7 @@ contains
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
          cknot*2, ctmp*128, cline*128
 !  cmode: none or read
-    
+
     if( myid == 0 ) then
       if( iprint >= ipl_basic ) print '(/,a)',' Read UF3 parameters...'
       fname = trim(paramsdir)//'/'//trim(cpfname)
@@ -285,7 +285,7 @@ contains
 !
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    
+
     integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
     real(8):: etmp
@@ -294,7 +294,7 @@ contains
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
          cknot*2, ctmp*128, cline*128
 !  cmode: none or read
-    
+
     if( myid == 0 ) then
       if( iprint >= ipl_basic ) print '(/,a)',' Read UF3L parameters...'
       fname = trim(paramsdir)//'/'//trim(cpfname_l)
@@ -418,7 +418,7 @@ contains
     type(prm2),intent(out):: ps
     integer,intent(in):: i2b
     integer:: i, isp, jsp
-    
+
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%nklead, ps%nktrail, ps%cknot
     if( ps%cb /= '2B' ) stop 'ERROR@read_2b: CB should be 2B.'
     if( ps%nktrail /= 3 ) stop 'ERROR@read_2b: nktrail must be 2 !'
@@ -451,7 +451,7 @@ contains
     type(prm3),intent(out):: ps
     integer,intent(in):: i3b
     integer:: i,j,k,isp,jsp,ksp
-    
+
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%csk, ps%nklead, ps%nktrail, ps%cknot
     if( ps%cb /= '3B' ) stop 'ERROR: CB should be 3B.'
     read(ioprms,*) ps%rcjk, ps%rcij, ps%rcik, ps%nknjk, ps%nknij, ps%nknik
@@ -500,7 +500,7 @@ contains
     type(prm3l),intent(out):: ps
     integer,intent(in):: i3b
     integer:: i,j,k,isp,jsp,ksp
-    
+
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%csk, ps%nklead, ps%nktrail, ps%cknot
     if( ps%cb /= '3B' ) stop 'ERROR@read_3bl: CB should be 3B.'
     read(ioprms,*) ps%rc, ps%nknot, ps%gmj, ps%gmk
@@ -539,7 +539,7 @@ contains
 !
     integer,intent(in):: mpi_world, myid
     integer:: i, i2b, i3b, i1b, ierr
-    character(2):: p1 
+    character(2):: p1
     type(prm2):: p2
     type(prm3):: p3
 
@@ -619,10 +619,10 @@ contains
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
     endif  ! has_solo
-    
+
     call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
     call mpi_bcast(interact3, nspmax**3, mpi_integer, 0,mpi_world,ierr)
-    
+
   end subroutine bcast_uf3_params
 !=======================================================================
   subroutine bcast_uf3l_params(mpi_world,myid)
@@ -631,7 +631,7 @@ contains
 !
     integer,intent(in):: mpi_world, myid
     integer:: i, i2b, i3b, i1b, ierr
-    character(2):: p1 
+    character(2):: p1
     type(prm2):: p2
     type(prm3):: p3
 
@@ -699,10 +699,10 @@ contains
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
     endif  ! has_solo
-    
+
     call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
     call mpi_bcast(interact3, nspmax**3, mpi_integer, 0,mpi_world,ierr)
-    
+
   end subroutine bcast_uf3l_params
 !=======================================================================
   subroutine force_uf3_tmp(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -710,7 +710,7 @@ contains
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
 !  UF3 implementation without using recursive function of b-spline.
-!  
+!
 !  TODO: More efficient B-spline implementation is available (see, lammps src/ML-UF3/pair_uf3.cpp).
 !        But that is a bit complicated, use simple b_spl() routine for now.
 !
@@ -723,7 +723,7 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
@@ -858,7 +858,7 @@ contains
 !!$        ls3b(0) = ls3b(0) +1
 !!$        ls3b(ls3b(0)) = ja
 !!$      enddo
-      
+
       tmp3 = 0d0
 !!$      do jsp=1,nspmax
 !!$        do ksp=jsp,nspmax
@@ -879,7 +879,7 @@ contains
             dij = sqrt(dij2)
             drijj(1:3) = rij(1:3)/dij
 !!$            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-            
+
             do kk=jj+1,lspr(0,ia)
               ka = lspr(kk,ia)
 !!$              if( ka == ja ) cycle
@@ -959,7 +959,7 @@ contains
                              +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
-                    
+
                   enddo  ! lij
                 enddo  ! ljk
               enddo  ! lik
@@ -1005,7 +1005,7 @@ contains
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
 !  UF3 implementation without using recursive function of b-spline.
-!  
+!
 !  TODO: More efficient B-spline implementation is available (see, lammps src/ML-UF3/pair_uf3.cpp).
 !        But that is a bit complicated, use simple b_spl() routine for now.
 !
@@ -1018,7 +1018,7 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
@@ -1153,7 +1153,7 @@ contains
 !!$        ls3b(0) = ls3b(0) +1
 !!$        ls3b(ls3b(0)) = ja
 !!$      enddo
-      
+
       tmp3 = 0d0
       do jsp=1,nspmax
         do ksp=jsp,nspmax
@@ -1173,7 +1173,7 @@ contains
             dij = sqrt(dij2)
             drijj(1:3) = rij(1:3)/dij
             call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-            
+
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( ka == ja ) cycle
@@ -1249,7 +1249,7 @@ contains
                              +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
-                    
+
                   enddo  ! lij
                 enddo  ! ljk
               enddo  ! lik
@@ -1313,7 +1313,7 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
@@ -1558,7 +1558,7 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st 
+    logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
@@ -1688,7 +1688,7 @@ contains
               bij3(inc) = b_spl_rec(n,3,dij, p3%knij, p3%nknij)
               dbij3(inc) = db_spl(n,3,dij, p3%knij, p3%nknij)
             enddo
-              
+
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( jsp == ksp .and. ka <= ja ) cycle
@@ -1929,7 +1929,7 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2 > p2%rc2 ) cycle
         dij = sqrt(dij2)
-!!$!.....Pair-list for 3-body cannot be used for gwf 
+!!$!.....Pair-list for 3-body cannot be used for gwf
 !!$!     because it uses ia2ifcal
 !!$        if( has_trios ) then
 !!$          if( dij2 < rc2_3b(is,js) ) then
@@ -1992,7 +1992,7 @@ contains
             dij = sqrt(dij2)
             drijj(1:3) = rij(1:3)/dij
             call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-            
+
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( ka == ja ) cycle
@@ -2082,7 +2082,7 @@ contains
                            -(rij(1)*tmpij(2) +rik(1)*tmpik(2) &
                            +rjk(1)*tmpjk(2))
                     endif
-                    
+
                   enddo  ! lij
                 enddo  ! ljk
               enddo  ! lik
@@ -2130,7 +2130,7 @@ contains
         enddo
       enddo  ! i3b
     endif
-    
+
     if( lfmatch ) then  ! force matching
       do ia=1,natm
         if( .not. lfrc_eval(ia) ) cycle
@@ -2165,7 +2165,7 @@ contains
         enddo
       enddo ! ia
     endif
-    
+
     if( lsmatch ) then  ! stress matching
       ip = iprm0 +n1b  ! no contrib. from solo term to forces
       do i2b=1,n2b
@@ -2194,7 +2194,7 @@ contains
         enddo
       enddo  ! i3b
     endif
-    
+
     return
   end subroutine gradw_uf3
 !=======================================================================
@@ -2220,6 +2220,7 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
+    real(8),parameter:: tiny = 1d-8
     integer:: i,ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs
@@ -2412,6 +2413,7 @@ contains
 !.....common terms
           vexp = dexp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
+          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
           call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
           sumcb = 0d0
           sumcdb= 0d0
@@ -2456,7 +2458,7 @@ contains
             kfcal = ia2ifcal(kra)
             if( ifcal.ne.0 ) then
 !.....deriv. wrt gmj
-              prm3ls(i3b)%gwf(:,1,ifcal)= prm3ls(i3b)%gwf(:,1,ifcal) & 
+              prm3ls(i3b)%gwf(:,1,ifcal)= prm3ls(i3b)%gwf(:,1,ifcal) &
                    +drijj(:)*dv3rijbj +dcsnj(:)*dv3csnbj &
                    +drikk(:)*dv3rikbj +dcsnk(:)*dv3csnbj
 !.....deriv. wrt gmk
@@ -2473,21 +2475,21 @@ contains
               enddo
             endif
             if( jfcal.ne.0 ) then
-              prm3ls(i3b)%gwf(:,1,jfcal)= prm3ls(i3b)%gwf(:,1,jfcal) & 
+              prm3ls(i3b)%gwf(:,1,jfcal)= prm3ls(i3b)%gwf(:,1,jfcal) &
                    -drijj(:)*dv3rijbj -dcsnj(:)*dv3csnbj
-              prm3ls(i3b)%gwf(:,2,jfcal)= prm3ls(i3b)%gwf(:,2,jfcal) & 
+              prm3ls(i3b)%gwf(:,2,jfcal)= prm3ls(i3b)%gwf(:,2,jfcal) &
                    -drijj(:)*dv3rijbk -dcsnj(:)*dv3csnbk
               do lcs=-3,0
                 n = ncs +lcs
                 if( n < 1 .or. n > p3%ncoef ) cycle
-                prm3ls(i3b)%gwf(:,2+n,jfcal)= prm3ls(i3b)%gwf(:,2+n,jfcal) & 
+                prm3ls(i3b)%gwf(:,2+n,jfcal)= prm3ls(i3b)%gwf(:,2+n,jfcal) &
                      -drijj(:)*dv3rijc*bcs(lcs) -dcsnj(:)*dv3csnc*dbcs(lcs)
               enddo
             endif
             if( kfcal.ne.0 ) then
-              prm3ls(i3b)%gwf(:,1,kfcal)= prm3ls(i3b)%gwf(:,1,kfcal) & 
+              prm3ls(i3b)%gwf(:,1,kfcal)= prm3ls(i3b)%gwf(:,1,kfcal) &
                    -drikk(:)*dv3rikbj -dcsnk(:)*dv3csnbj
-              prm3ls(i3b)%gwf(:,2,kfcal)= prm3ls(i3b)%gwf(:,2,kfcal) & 
+              prm3ls(i3b)%gwf(:,2,kfcal)= prm3ls(i3b)%gwf(:,2,kfcal) &
                    -drikk(:)*dv3rikbk -dcsnk(:)*dv3csnbk
               do lcs=-3,0
                 n = ncs +lcs
@@ -2720,7 +2722,7 @@ contains
   recursive function b_spl_rec(n,d,r,ts,nmax) result(val)
 !
 !  TODO: check the efficiency of recursive func
-!  
+!
 !  Recursive implementation of B-spline function with N and D as indices
 !  and R as an argument.
 !  TS --- a list of {t_n}
@@ -2729,7 +2731,7 @@ contains
     real(8),intent(in):: r,ts(nmax)
     real(8):: val
     real(8):: denom1,denom2
-    
+
     if( d == 0 ) then
       if( r >= ts(n) .and. r < ts(n+1) ) then
         val = 1d0
@@ -2805,7 +2807,7 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !  This will compare num of parameters given from outside
 !  and num of coefficients already read in read_params_uf3().
-!  Also it takes into account the symmetry of 3-body term 
+!  Also it takes into account the symmetry of 3-body term
 !  when species of j and k are identical.
 !
     integer,intent(in):: ndimp
@@ -3050,7 +3052,7 @@ contains
       jsp = p2%jsp
       rc = repul_radii(isp,jsp)
       nr2 = knot_index(rc,p2%nknot,p2%knots)
-      
+
       do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
@@ -3075,7 +3077,7 @@ contains
         enddo
         p2bd = p2bd +tmp**2
       enddo
-      
+
     enddo
     p2b = p2b*pwgt2b
     p2bd = p2bd*pwgt2bd
@@ -3184,7 +3186,7 @@ contains
       jsp = p2%jsp
       rc = repul_radii(isp,jsp)
       nr2 = knot_index(rc,p2%nknot,p2%knots)
-      
+
       ic2ip(:) = 0
       do ic=1,prm2s(i2b)%ncoef
         inc = inc +1
@@ -3344,7 +3346,7 @@ contains
       nktrail= p2%nktrail
       rc = repul_radii(isp,jsp)
       nr2 = knot_index(rc,p2%nknot,p2%knots)
-      
+
       do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
@@ -3369,7 +3371,7 @@ contains
         enddo
         p2bd = p2bd +tmp**2
       enddo
-      
+
     enddo
     p2b = p2b*pwgt2b
     p2bd = p2bd*pwgt2bd
@@ -3392,7 +3394,7 @@ contains
           prm3ls(i3b)%coefs(ic) = params_in(inc)
           p3b = p3b +prm3ls(i3b)%coefs(ic)**2
         enddo
-        
+
 !.....penalty to derivative
         if( abs(pwgt3bd).lt.1d-14 ) cycle
         do ic=1,p3%ncoef
@@ -3529,7 +3531,7 @@ contains
           gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%coefs(ic)
           ic3ip(ic) = inc
         enddo
-        
+
         if( abs(pwgt3bd).lt.1d-14 ) cycle
         p3 = prm3ls(i3b)
         do ic=1,ncoef
@@ -3567,7 +3569,7 @@ contains
     integer:: i2b,isp,jsp,ir,lij,n,nr2
     real(8):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
     type(prm2):: p2
-    
+
     floss = 0d0
     do i2b=1,n2b
       p2 = prm2s(i2b)
@@ -3619,7 +3621,7 @@ contains
     do i1b=1,n1b
       inc = inc +1
     enddo
-    
+
     gloss(:) = 0d0
     do i2b=1,n2b
       p2 = prm2s(i2b)
@@ -3630,7 +3632,7 @@ contains
         inc = inc +1
         ic2ip(ic) = inc
       enddo
-      
+
       do ir=1,npnts
 !.....r-point to be evaluated as mid-point of the section
         ri = radii(isp,jsp)/npnts *(dble(ir)-0.5d0)
@@ -3652,7 +3654,7 @@ contains
       enddo  ! ir
     enddo  ! i2b
     return
-    
+
   end subroutine calc_short_lossgrad
 !=======================================================================
   subroutine uf3_short_correction(ndimp,params,nsp,radii,ldcover)
@@ -3678,7 +3680,7 @@ contains
       enddo
       allocate(ic2ip(nc2max))
     endif
-    
+
 !.....Replace coefficients with params given from outside
 !     so that easily capture the relationshiop between neighboring parameters.
     inc = 0
@@ -3735,7 +3737,7 @@ contains
         params(ip) = max(tgt,0d0)
 !!$        print '(a,i3,4es12.3)','  ic,ri,rc,dr,tgt=',ic,ri,rc,dr,tgt
       enddo
-      
+
 !!$      ri = radii(isp,jsp)
 !!$      nr2 = knot_index(ri, p2%nknot, p2%knots)
 !!$      do ic=nr2-nbuf,1,-1
@@ -3823,7 +3825,7 @@ contains
 
     dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
 !!$    dmem = dmem +4d0*size(ls3b)
-    
+
     do i2b=1,n2b
       p2 = prm2s(i2b)
       dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
@@ -3855,7 +3857,7 @@ contains
 
     dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
 !!$    dmem = dmem +4d0*size(ls3b)
-    
+
     do i2b=1,n2b
       p2 = prm2s(i2b)
       dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
