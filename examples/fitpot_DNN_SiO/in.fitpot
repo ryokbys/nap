@@ -25,11 +25,10 @@ subtract_potential  ZBL
 energy_match   true
 force_match    true
 stress_match   true
-force_denom_type   abs2rel
-stress_denom_type  abs2rel
-# fval_upper_limit 1.0d+10
-force_limit       50.0
-stress_limit      50.0
+force_scale_type   one
+stress_scale_type  one
+force_scale       1.0
+stress_scale      1.0
 
 
 # compos_weight  T

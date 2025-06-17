@@ -1,7 +1,7 @@
 module variables
   use pmdvars,only: nspmax
   use descriptor,only: desc
-  implicit none 
+  implicit none
   save
   integer:: nsmpl
   integer:: niter= 1
@@ -61,16 +61,16 @@ module variables
   real(8):: vinitsgm = 1d0
   real(8):: vinitmu  = 0d0
   real(8):: vinitrs  = 12345d0
-!.....Atomic forces over this value will not be used and neglected for fitting
-  real(8):: force_limit = 100d0
-!.....Stress over this value will not be used and neglected for fitting
-  real(8):: stress_limit = 100d0
+!.....Characteristic force scale used for limit or decay length
+  real(8):: f_scale = 1d0
+!.....Characteristic stress scale used for limit or decay length
+  real(8):: s_scale = 1d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
-!.....Denominator type of force in loss function: absolute (default) or relative
-  character(len=128):: cfrc_denom = 'absolute' ! 
-!.....Denominator type of stress in loss function: absolute or relative (default), abs2rel
-  character(len=128):: cstrs_denom = 'relative' ! 
+!.....Scaling type of force|stress in loss function:
+!.....  one (default) | abs | rel | exp
+  character(len=128):: cfrc_scale = 'one' !
+  character(len=128):: cstrs_scale = 'one' !
 !.....Gaussian density weight
   logical:: lgdw  = .false.  ! flag for GDW
   logical:: lgdwed = .false.  ! whether compuation of GDW is finished
@@ -106,7 +106,7 @@ module variables
   integer:: nserr = 0
   character(len=128),allocatable:: cserr(:)
   real(8),allocatable:: seerr(:),sferr(:),sserr(:)
-  
+
 !.....sample weights
   integer:: nswgt = 0
   character(len=128),allocatable:: cswgt(:)
@@ -114,7 +114,7 @@ module variables
 
 !.....Limit number of forces to be evaluated
   real(8):: rate_eval_frc = 1.0d0
-  
+
   type mdsys
     character(len=128):: cdirname
     character(len=128):: csmplname
@@ -179,7 +179,7 @@ module variables
   integer:: netrn,netst,nftrn,nftst,nstrn,nstst
   real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst
   real(8):: etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm
-  
+
   real(8):: time0,tcomm,tfunc,tgrad,twait
   real(8):: terg, tfrc, tstrs
   integer:: nfunc,ngrad
@@ -307,7 +307,7 @@ module variables
 
 !-----DEBUGGING------------------------------------------------------
   integer:: id_check_grad = 0
-  
+
 contains
   subroutine init_variables()
 
@@ -315,7 +315,7 @@ contains
     cspcs_neglect(:) = 'x'
     short_radii(:,:) = 0d0
     nsubff = 0
-    
+
   end subroutine init_variables
 !=======================================================================
   function csp_in_neglect(csp)

@@ -279,7 +279,7 @@ subroutine write_initial_setting()
   use minimize
   use random
   use composition
-  implicit none 
+  implicit none
   integer:: i,isp,jsp
 
   write(6,*) ''
@@ -289,7 +289,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,i0)') 'num_samples',nsmpl
   write(6,'(2x,a25,2x,i0)') 'num_iteration',niter
   write(6,'(2x,a25,2x,f5.2)') 'test_ratio',ratio_test
-  
+
   print *,''
 !!$  write(6,'(2x,a25,2x,a)') 'dataset_directory',trim(cdatasetdir)
   write(6,'(2x,a25,2x,a)') 'sample_file',trim(csmplfile)
@@ -313,24 +313,24 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,f0.2)') 'init_params_rs',vinitrs
   write(6,'(2x,a25,2x,f0.2)') 'init_params_sgm',vinitsgm
   write(6,'(2x,a25,2x,f0.2)') 'init_params_mu',vinitmu
-  
+
   print *,''
   write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
   write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
   print *,''
   if( lfmatch ) then
-    write(6,'(2x,a25,2x,a)') 'force_denom_type',trim(cfrc_denom)
-    write(6,'(2x,a25,2x,es12.3)') 'force_limit',force_limit
+    write(6,'(2x,a25,2x,a)') 'force_scale_type',trim(cfrc_scale)
+    write(6,'(2x,a25,2x,es12.3)') 'force_scale',f_scale
     if( rate_eval_frc < 1d0 -1d-8 ) write(6,'(2x,a25,2x,f6.3)') &
          'reduce_fmatch',rate_eval_frc
   endif
   if( lsmatch ) then
-    write(6,'(2x,a25,2x,a)') 'stress_denom_type',trim(cstrs_denom)
-    write(6,'(2x,a25,2x,es12.3)') 'stress_limit',stress_limit
+    write(6,'(2x,a25,2x,a)') 'stress_scale_type',trim(cstrs_scale)
+    write(6,'(2x,a25,2x,es12.3)') 'stress_scale',s_scale
   endif
   write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
-  
+
   write(6,'(a)') ''
   if( trim(cpenalty).ne.'none' ) write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
   if( trim(cpenalty).eq.'ridge' ) then
@@ -367,7 +367,7 @@ subroutine write_initial_setting()
       write(6,'(4x,a23,1x,f10.4)') trim(cswgt(i)), swgt0(i)
     enddo
   endif
-  
+
 !!$  write(6,'(2x,a25,2x,es12.3)') 'coeff_sequential',seqcoef
   write(6,'(2x,a25,2x,a)') 'line_minimization',trim(clinmin)
   write(6,'(a)') ''
@@ -400,7 +400,7 @@ subroutine write_initial_setting()
     enddo
     write(6,'(a)') ''
   endif
-  
+
   write(6,'(a)') '------------------------------------------------------------------------'
 
 end subroutine write_initial_setting
@@ -483,7 +483,7 @@ subroutine get_smpl_list(ionum)
 !!$      print *,' is,csmpl=',is,csmplist(is)
 !!$    enddo
 !!$  endif
-  
+
   if(myid.eq.0 .and. iprint.gt.1 ) print*,'Finished get_smpl_list'
   return
 
@@ -534,7 +534,7 @@ subroutine set_training_test_with_ratio()
   iclist(1:nsmpl)= 0
   call mpi_allreduce(icll,iclist,nsmpl,mpi_integer,mpi_max &
        ,mpi_world,ierr)
-  
+
   if( myid.eq.0 ) then
 !!$    do ismpl=1,nsmpl
 !!$      print *,'ismpl,iclist=',ismpl,iclist(ismpl)
@@ -565,7 +565,7 @@ subroutine count_training_test()
     if( iclist(i).eq.1 ) myntrn= myntrn +1
     if( iclist(i).eq.2 ) myntst= myntst +1
   enddo
-  
+
   if( myid.eq.0 ) then
     nsmpl_trn = 0
     nsmpl_tst = 0
@@ -599,7 +599,7 @@ subroutine read_samples()
   nftot = 0
   nfrc = 0
   ispmaxl = 0
-  
+
   do is=isid0,isid1
     cfname= samples(is)%csmplname
 !!$    call read_smpl(12,trim(cdatasetdir)//'/'//trim(cfname),is,samples(is))
@@ -646,7 +646,7 @@ subroutine read_samples()
 
   call mpi_barrier(mpi_world,ierr)
   deallocate(nal)
-  
+
   if( myid.eq.0 ) then
     print *,''
     if( iprint.gt.1 ) print '(a)',' Finished read_smpl'
@@ -667,7 +667,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
   use variables
   use util,only: num_data
   use random,only: urnd
-  implicit none 
+  implicit none
   integer,intent(in):: ionum,ismpl
   character(len=*),intent(in):: fname
   type(mdsys),intent(inout):: smpl
@@ -784,7 +784,7 @@ subroutine read_smpl(ionum,fname,ismpl,smpl)
     enddo
   endif
   close(ionum)
-  
+
 end subroutine read_smpl
 !=======================================================================
 subroutine get_base_energies()
@@ -796,7 +796,7 @@ subroutine get_base_energies()
   implicit none
   integer:: ismpl,naps(nspmax),natm,ispcs,ielem
   real(8):: ebl(nspmax),erg
-  
+
   ebl(1:nspmax) = 0d0
   do ismpl=isid0,isid1
     naps(1:nspmax) = samples(ismpl)%naps(1:nspmax)
@@ -892,7 +892,7 @@ subroutine cg_wrapper(ftrn0,ftst0)
            //trim(cpot)
     endif
   endif
-  
+
   return
 end subroutine cg_wrapper
 !=======================================================================
@@ -946,7 +946,7 @@ subroutine check_grad(ftrn0,ftst0)
          '      error [%]'
   endif
   call flush(6)
-  
+
   call wrap_ranges(nvars,vars,vranges)
   call grad_w_pmd(nvars,vars,ganal)
 
@@ -1026,11 +1026,11 @@ subroutine write_energy_relation(cadd)
   implicit none
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
-  
+
   integer:: ismpl
   logical,save:: l1st = .true.
 !!$  real(8):: epotsub
-  
+
   cfname='out.erg'
 
   if( .not. allocated(erefl) ) then
@@ -1111,7 +1111,7 @@ subroutine write_energy_relation(cadd)
     close(91)
   endif
   l1st = .false.
-  
+
 end subroutine write_energy_relation
 !=======================================================================
 subroutine write_force_relation(cadd)
@@ -1124,7 +1124,7 @@ subroutine write_force_relation(cadd)
   integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
   real(8):: dmeml
   logical:: l1st = .true.
-  
+
   cfname= 'out.frc'
 
   nmaxl= 0
@@ -1320,7 +1320,7 @@ subroutine write_stats(iter)
 !!$  use NNd
   implicit none
   integer,intent(in):: iter
-  
+
   integer:: ismpl,natm,ntrnl,ntstl,ia,l,ntrn,ntst,nfcal,ixyz,jxyz
   type(mdsys)::smpl
   real(8):: de,df,ds
@@ -1343,7 +1343,7 @@ subroutine write_stats(iter)
       write(6,*) '# ENERGY:  ITER, TIME, ' &
            //'RMSE(TRAINING), RMSE(TEST), ' &
            //'MAX(TRAINING), MAX(TEST), ' &
-           //'R^2(TRAINING), R^2(TEST)' 
+           //'R^2(TRAINING), R^2(TEST)'
       write(6,*) '# FORCE:   ITER, TIME, ' &
            //'RMSE(TRAINING), RMSE(TEST), ' &
            //'MAX(TRAINING), MAX(TEST), ' &
@@ -1427,7 +1427,7 @@ subroutine write_stats(iter)
   if( etrndnm.gt.1d-15 ) er2trn = 1d0 -desum_trn/etrndnm
   er2tst = 0d0
   if( etstdnm.gt.1d-15 ) er2tst = 1d0 -desum_tst/etstdnm
-  
+
   if( myid.eq.0 ) then
 !!$    write(6,'(a,2i6)') ' nsmpl_trn, nsmpl_tst = ',nsmpl_trn,nsmpl_tst
     write(6,'(a,i8,f15.2,6(1x,f12.7))') ' ENERGY: ' &
@@ -1517,7 +1517,7 @@ subroutine write_stats(iter)
          ,mpi_real8,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(fref2l,fref2,1 &
          ,mpi_real8,mpi_sum,0,mpi_world,ierr)
-    fvar = fref2/(ntrn+ntst) -(fref1/(ntrn+ntst))**2 
+    fvar = fref2/(ntrn+ntst) -(fref1/(ntrn+ntst))**2
   endif
   if( ntst.ne.0 ) then
     rmse_tst= sqrt(dfsum_tst/ntst)
@@ -1638,7 +1638,7 @@ subroutine get_data_stats()
   use variables
   use parallel
   implicit none
-  
+
   integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
   type(mdsys)::smpl
   real(8):: eref,esub,tmp
@@ -1859,7 +1859,7 @@ subroutine get_data_stats()
     print '(a,3i10,2es12.3)', '   Stress: ',nstrn+nstst,nstrn,nstst,&
          sqrt(svtrn),sqrt(svtst)
   endif
-  
+
   return
 end subroutine get_data_stats
 !=======================================================================
@@ -1886,7 +1886,7 @@ subroutine sync_input()
   use pmdvars,only: nnmax,namax
   use composition
   implicit none
-  
+
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(niter_eval,1,mpi_integer,0,mpi_world,ierr)
@@ -1907,8 +1907,8 @@ subroutine sync_input()
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(ctype_loss,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cfrc_denom,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cstrs_denom,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cfrc_scale,128,mpi_character,0,mpi_world,ierr)
+  call mpi_bcast(cstrs_scale,128,mpi_character,0,mpi_world,ierr)
 
   call mpi_bcast(xtol,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftol,1,mpi_real8,0,mpi_world,ierr)
@@ -1925,11 +1925,11 @@ subroutine sync_input()
   call mpi_bcast(pwgt3bd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(force_limit,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(stress_limit,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(f_scale,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(s_scale,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rc_other,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
-  
+
   call mpi_bcast(lematch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lfmatch,1,mpi_logical,0,mpi_world,ierr)
   call mpi_bcast(lsmatch,1,mpi_logical,0,mpi_world,ierr)
@@ -1980,7 +1980,7 @@ subroutine sync_input()
   call mpi_bcast(seerr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sferr,nserr,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(sserr,nserr,mpi_real8,0,mpi_world,ierr)
-  
+
   call mpi_bcast(nswgt,1,mpi_integer,0,mpi_world,ierr)
   if( myid.ne.0 ) then
     allocate(cswgt(nswgt),swgt0(nswgt))
@@ -1998,7 +1998,7 @@ subroutine sync_input()
 !.....Normalization
   call mpi_bcast(cnormalize,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(lnormalize,1,mpi_logical,0,mpi_world,ierr)
-  
+
   call mpi_bcast(nsmpl_outfrc,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force-fields to be subtracted from reference values
@@ -2028,7 +2028,7 @@ subroutine sync_input()
 
 !.....Debugging
   call mpi_bcast(id_check_grad,1,mpi_integer,0,mpi_world,ierr)
-  
+
 end subroutine sync_input
 !=======================================================================
 subroutine get_node2sample()
@@ -2076,7 +2076,7 @@ subroutine shuffle_list(nsmpl,clist,iclist,luse_iclist)
   integer,intent(in):: nsmpl
   character(len=128),intent(inout):: clist(nsmpl)
   integer,intent(inout):: iclist(nsmpl)
-  logical,intent(in):: luse_iclist 
+  logical,intent(in):: luse_iclist
 
   integer:: i,j,k,n
   character(len=128),allocatable:: cltmp(:)
@@ -2135,7 +2135,7 @@ end subroutine normalize_weights
 subroutine set_sample_errors()
   use variables
   use parallel
-  implicit none 
+  implicit none
   integer:: ismpl,iserr,idx
 
   do ismpl=isid0,isid1
@@ -2159,7 +2159,7 @@ subroutine set_sample_weights()
   implicit none
   integer:: ismpl,iswgt,idx,natm
   real(8):: erg
-  
+
   do ismpl=isid0,isid1
     natm = samples(ismpl)%natm
     erg = samples(ismpl)%eref /natm
@@ -2186,7 +2186,7 @@ subroutine subtract_atomic_energy()
   implicit none
   integer:: ismpl,is,i,isp
   type(mdsys):: smpl
-  character(len=3):: csp 
+  character(len=3):: csp
 
   do ismpl=isid0,isid1
     smpl = samples(ismpl)
@@ -2237,7 +2237,7 @@ subroutine subtract_ref_struct_energy()
   endif
 !!$  print *,'myid,myidrefsubl,myidrefsub,erefsub=',myid,&
 !!$       myidrefsubl,myidrefsub,erefsub
-  
+
 end subroutine subtract_ref_struct_energy
 !=======================================================================
 subroutine set_max_num_atoms()
@@ -2273,7 +2273,7 @@ subroutine set_max_num_atoms()
     if( lfmatch ) write(6,'(a,i0)') ' Max num of atoms whose forces' &
          //' are used for force-matching = ',maxnf
   endif
-  
+
 end subroutine set_max_num_atoms
 !=======================================================================
 function string_in_arr(string,narr,array)
@@ -2291,7 +2291,7 @@ function string_in_arr(string,narr,array)
       return
     endif
   enddo
-  return  
+  return
 end function string_in_arr
 !-----------------------------------------------------------------------
 ! Local Variables:

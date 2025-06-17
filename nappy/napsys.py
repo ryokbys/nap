@@ -80,7 +80,7 @@ class NAPSystem(object):
                 break
         if not specorder_good:
             self.specorder = None
-        
+
         if fname is not None:
             # self.read(fname=fname,format=format)
             raise ValueError('Initializing NAPSystem with file is obsolete.\n'
@@ -122,7 +122,7 @@ class NAPSystem(object):
             except KeyError as ke:
                 pass
         return None
-        
+
     def get_aux_names(self):
         aux_names = list(self.atoms.columns)
         for l in DEFAULT_LABELS:
@@ -183,7 +183,7 @@ class NAPSystem(object):
                       c*np.sqrt(np.sin(gmmr)**2 -np.cos(alpr)**2 -np.cos(betr)**2
                              +2.0*np.cos(alpr)*np.cos(betr)*np.cos(gmmr))/np.sin(gmmr)]
         return None
-        
+
     def get_hmat(self):
         """
         Be careful about the definition of H-matrix here.
@@ -197,7 +197,7 @@ class NAPSystem(object):
         hmat[:, 1] = self.a2 * self.alc
         hmat[:, 2] = self.a3 * self.alc
         return hmat
-    
+
     def set_hmat(self, hmat):
         self.alc = 1.0
         self.a1[:] = hmat[:, 0]
@@ -238,7 +238,7 @@ class NAPSystem(object):
             self.atoms.sid = newsids
             self.specorder = specorder
         return None
-                
+
     def get_lattice_vectors(self):
         return self.a1*self.alc, self.a2*self.alc, self.a3*self.alc
 
@@ -299,7 +299,7 @@ class NAPSystem(object):
                 self.specorder.append(symbol)
             sid = self.specorder.index(symbol)+1
             sids.append(sid)
-        
+
         newatoms = pd.DataFrame(columns=self.atoms.columns)
         if type(poss) == list:
             poss = np.array(poss)
@@ -329,7 +329,7 @@ class NAPSystem(object):
             ifmvs = np.zeros(len(poss),dtype=np.int8)
             ifmvs[:] = 1
         newatoms['ifmv'] = ifmvs
-        
+
         newatoms.sid = [ sid for sid in sids ]
         self.atoms = pd.concat([self.atoms, newatoms])
         self.atoms.reset_index(drop=True,inplace=True)
@@ -375,7 +375,7 @@ class NAPSystem(object):
             return self.specorder.index(spc) +1
         except:
             return -1
-    
+
     def num_atoms(self,sid=0):
         if sid == 0:
             return len(self.atoms)
@@ -387,7 +387,7 @@ class NAPSystem(object):
         Return number of species in the system, counted not using self.specorder.
         """
         return self.atoms.sid.max()
-    
+
     def natm_per_species(self):
         """
         Return number of atoms per species as a list of integer in the order of specorder.
@@ -428,7 +428,7 @@ class NAPSystem(object):
         if real:
             return self.get_real_velocities()
         return self.get_scaled_velocities()
-    
+
     def get_forces(self,real=False):
         """
         Get forces of atoms. If real=True, they are multiplied with h-mat.
@@ -436,7 +436,7 @@ class NAPSystem(object):
         if real:
             return self.get_real_forces()
         return self.get_scaled_forces()
-    
+
     def get_real_positions(self):
         hmat = self.get_hmat()
         spos = self.get_scaled_positions()
@@ -508,7 +508,7 @@ class NAPSystem(object):
             sfrcs = np.array(sfrcs)
         self.atoms[['fx','fy','fz']] = sfrcs
         return None
-    
+
     def get_real_forces(self):
         hmat = self.get_hmat()
         frcs = self.get_scaled_forces()
@@ -541,7 +541,7 @@ class NAPSystem(object):
         for i in range(self.num_atoms()):
             tags[i] = 1.0*sids[i] +0.1 +1e-14*(i+1)
         return tags
-        
+
     def get_symbols(self):
         """
         Returns
@@ -587,7 +587,7 @@ class NAPSystem(object):
         Returns chemical formula as a string based on the chemical symbols same as ASE.
         """
         symbols = self.get_symbols()
-        
+
         uniq_symbols = []
         for s in symbols:
             if s not in uniq_symbols:
@@ -632,7 +632,7 @@ class NAPSystem(object):
             raise TypeError('Stress tensor should be 3x3 array.')
         self.stnsr = copy.copy(stnsr)
         return None
-    
+
     def get_potential_energy(self):
         return getattr(self,'epot',None)
 
@@ -649,7 +649,10 @@ class NAPSystem(object):
                          self.stnsr[1,2],
                          self.stnsr[0,2],
                          self.stnsr[0,1]])
-    
+
+    def get_pressure(self):
+        return (self.stnsr[0,0] + self.stnsr[1,1] + self.stnsr[2,2])/3
+
     def get_atom(self,idatm=-1):
         """
         Return a dictionary data of an atom specified by IDATM.
@@ -659,7 +662,7 @@ class NAPSystem(object):
             raise ValueError('idatm must be specified within, ',0,len(self.atoms)-1)
         return self.atoms.iloc[idatm].to_dict()
 
-        
+
     def get_atom_attr(self,idatm=-1,attr_name=None):
         """
         Returns an atom attribute of given IDATM.
@@ -725,14 +728,14 @@ class NAPSystem(object):
             self.vorig = np.zeros(3)
         else:
             self.vorig = volorig
-        
+
         return None
-    
+
     def view(self,backend='3Dmol',**options):
         """
         Visualize the system using the given backend.
         """
-        
+
         if '3Dmol' in backend:
             self._view_3Dmol(**options)
         else:
@@ -753,7 +756,7 @@ class NAPSystem(object):
             modopts = options['model']
         if 'volume' in options.keys():
             volopts = options['volume']
-        
+
         pdb = nappy.io.get_PDB_txt(self,**options)
         v = py3Dmol.view()
         v.removeAllModels()
@@ -889,7 +892,7 @@ class NAPSystem(object):
         lshd= np.zeros((lcxyz,),dtype=int)
         lscl[:]= -1
         lshd[:]= -1
-        
+
         # Use numpy array instead of accessing pandas series when it will be heavily accessed.
         poss = self.get_scaled_positions()
 
@@ -968,7 +971,7 @@ class NAPSystem(object):
                                 dij = np.sqrt(rij2)
                                 nlspr[ia] += 1
                                 nlspr[ja] += 1
-                                
+
                             ja = lscl[ja]
         #...Finally add the lspr to atoms DataFrame
         lspr = []
@@ -1061,10 +1064,10 @@ class NAPSystem(object):
             newdf[to_col[i]] = self.atoms[from_col[i]]
         self.atoms[['x','y','z']] = newdf[['x','y','z']]
         return None
-        
+
     def repeat(self,n1o,n2o,n3o,n1m=0,n2m=0,n3m=0):
         """
-        Multiply the system by given n1o,n2o,n3o and replace the system 
+        Multiply the system by given n1o,n2o,n3o and replace the system
         with multiplied one.
         """
         import pandas as pd
@@ -1168,13 +1171,13 @@ class NAPSystem(object):
         self.a1 = self.a1 *ds[0]
         self.a2 = self.a2 *ds[1]
         self.a3 = self.a3 *ds[2]
-        newsids = [ 0 for i in range(newnatm) ] 
+        newsids = [ 0 for i in range(newnatm) ]
         newposs = np.zeros((newnatm,3))
         newvels = np.zeros((newnatm,3))
         newfrcs = np.zeros((newnatm,3))
-        # newposs = [ np.zeros(3) for i in range(newnatm) ] 
-        # newvels = [ np.zeros(3) for i in range(newnatm) ] 
-        # newfrcs = [ np.zeros(3) for i in range(newnatm) ] 
+        # newposs = [ np.zeros(3) for i in range(newnatm) ]
+        # newvels = [ np.zeros(3) for i in range(newnatm) ]
+        # newfrcs = [ np.zeros(3) for i in range(newnatm) ]
         colnames = list(self.atoms.columns)
         #...Labels except (sid,pos,vel,frc) are all auxiliary data
         auxnames = colnames.copy()
@@ -1241,7 +1244,7 @@ class NAPSystem(object):
         lengths = self.get_lattice_lengths()
         ratios = np.array((1.0, 1.0, 1.0))
         ratios[axis] += length /lengths[axis]
-            
+
         self.assign_pbc()
         #...Store reaal positions before extending the system
         rpos = self.get_real_positions()
@@ -1267,11 +1270,11 @@ class NAPSystem(object):
             spos[ia,axis] += sshift
         self.atoms[['x','y','z']] = spos
         return None
-        
+
     def to_ase_atoms(self):
         """
         Convert NAPSystem object to ASE atoms.
-        Note that some information will be abandonned, 
+        Note that some information will be abandonned,
         for example, forces cannot be stored in ASE atoms object (calculator object can have them, though).
         """
         try:
@@ -1325,7 +1328,7 @@ class NAPSystem(object):
         # print remove_ids
         self.remove_atoms(*remove_ids)
         return
-        
+
 
 def analyze_msg(nsys):
     from nappy.elements import elements
@@ -1369,7 +1372,7 @@ def analyze_msg(nsys):
                                                   /(vol*Ang_to_cm**3))
         msg +=' = {0:7.5f} atom/Ang^3\n'.format(float(len(nsys))/vol)
     return msg
-    
+
 def analyze(nsys):
     msg = analyze_msg(nsys)
     print(msg,end='')
@@ -1415,7 +1418,7 @@ def main():
             nsyss[i].shift_atoms(*shift)
             if ncycle > 0:
                 nsyss[i].cycle_coord(ncycle)
-        
+
             #...Periodic copy if needed
             copy_needed = False
             divide_needed = False

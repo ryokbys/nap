@@ -136,13 +136,15 @@ subroutine set_variable(ionum,cname)
     call read_c1(ionum,ctype_loss)
     ctype_loss = to_lower(ctype_loss)
     return
-  elseif( trim(cname).eq.'force_denom_type' ) then
-    call read_c1(ionum,cfrc_denom)
-    cfrc_denom = to_lower(cfrc_denom)
+  elseif( trim(cname).eq.'force_scale_type' .or. &
+       trim(cname).eq.'force_denom_type') then
+    call read_c1(ionum,cfrc_scale)
+    cfrc_scale = to_lower(cfrc_scale)
     return
-  elseif( trim(cname).eq.'stress_denom_type' ) then
-    call read_c1(ionum,cstrs_denom)
-    cstrs_denom = to_lower(cstrs_denom)
+  elseif( trim(cname).eq.'stress_scale_type' .or. &
+       trim(cname).eq.'stress_denom_type' ) then
+    call read_c1(ionum,cstrs_scale)
+    cstrs_scale = to_lower(cstrs_scale)
     return
   elseif( trim(cname).eq.'penalty' ) then
     call read_c1(ionum,cpenalty)
@@ -337,11 +339,13 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'fval_upper_limit' ) then
     call read_r1(ionum,fupper_lim)
     return
-  elseif( trim(cname).eq.'force_limit' ) then
-    call read_r1(ionum,force_limit)
+  elseif( trim(cname).eq.'force_scale' .or. &
+       trim(cname).eq.'force_limit' ) then
+    call read_r1(ionum,f_scale)
     return
-  elseif( trim(cname).eq.'stress_limit' ) then
-    call read_r1(ionum,stress_limit)
+  elseif( trim(cname).eq.'stress_scale' .or. &
+       trim(cname).eq.'stress_limit' ) then
+    call read_r1(ionum,s_scale)
     return
 !!$  elseif( trim(cname).eq.'NN_num_layers' ) then
 !!$    call read_i1(ionum,nn_nl)
@@ -438,7 +442,7 @@ subroutine read_smpl_err(ionum,nrow,cval,eerr,ferr,serr)
 
 !      integer,external:: num_data
   integer:: irow,ndat
-  character(len=1024):: ctmp 
+  character(len=1024):: ctmp
 
   read(ionum,'(a)') ctmp
   ndat = num_data(trim(ctmp),' ')
@@ -634,7 +638,7 @@ subroutine read_interactions(ionum,nrow)
     else
       print *,'ERROR reading interactions: 2 or 3 entries are required.'
     endif
-    
+
 !!$    interact(isp,jsp) = .true.
 !!$    interact(jsp,isp) = interact(isp,jsp)
   enddo
@@ -671,7 +675,7 @@ subroutine read_specorder(ionum)
 !
   use util,only: num_data
   use variables
-  implicit none 
+  implicit none
   integer,intent(in):: ionum
 
   character(len=1024):: ctmp
@@ -683,7 +687,7 @@ subroutine read_specorder(ionum)
   ndat = num_data(trim(ctmp),' ')
   nsp = ndat -1
   read(ctmp,*) c1, (specorder(i),i=1,nsp)
-  
+
 end subroutine read_specorder
 !=======================================================================
 subroutine read_vals_nsp(ionum,vals)
@@ -692,7 +696,7 @@ subroutine read_vals_nsp(ionum,vals)
 !
   use util,only: num_data
   use variables,only: nspmax
-  implicit none 
+  implicit none
   integer,intent(in):: ionum
   real(8),intent(out):: vals(nspmax)
 
@@ -705,7 +709,7 @@ subroutine read_vals_nsp(ionum,vals)
   ndat = num_data(trim(ctmp),' ')
   nsp = ndat -1
   read(ctmp,*) c1, (vals(i),i=1,nsp)
-  
+
 end subroutine read_vals_nsp
 !-----------------------------------------------------------------------
 ! Local Variables:

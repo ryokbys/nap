@@ -122,7 +122,7 @@ contains
 
     integer:: ismpl
     real(8):: swgtrn,swgtst
-    
+
 !.....set nominator for sample weights
     swgtrn = 0d0
     swgtst = 0d0
@@ -139,7 +139,7 @@ contains
          ,mpi_world,ierr)
     call mpi_allreduce(swgtst,swgts_tst,1,mpi_real8,mpi_sum &
          ,mpi_world,ierr)
-    
+
     return
   end subroutine calc_swgts
 !=======================================================================
@@ -195,9 +195,9 @@ contains
     use variables,only:samples,tfunc, &
          lematch,lfmatch,lsmatch,nfunc,tcomm,twait,mdsys, &
          swgt2trn,swgt2tst,cpot,cpotlow, ismask, &
-         nff,cffs,maxna,rcut,force_limit,stress_limit, &
+         nff,cffs,maxna,rcut,f_scale,s_scale, &
          crefstrct,erefsub,myidrefsub,isidrefsub,iprint, &
-         ctype_loss,dmem,cfmethod,cfrc_denom,cstrs_denom, &
+         ctype_loss,dmem,cfmethod,cfrc_scale,cstrs_scale, &
          lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs, &
          nn_nl, nn_nhl, nn_sigtype, nn_asig, &
          wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn, &
@@ -260,7 +260,7 @@ contains
     if( trim(cpotlow).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
       repul_radii(:,:) = 1d+10
     endif
-    
+
     do ismpl=isid0,isid1
       tsmp0 = mpi_wtime()
       if( allocated(ismask) ) then
@@ -380,9 +380,6 @@ contains
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         fref(1:3,1:natm) = smpl%fref(1:3,1:natm)
         fsub(1:3,1:natm) = smpl%fsub(1:3,1:natm)
-!!$        ferr = smpl%ferr
-        ferr = 1d0
-!!$        ferri = 1d0/ferr
         jfcal = 0
         do ia=1,natm
           if( .not. smpl%lfrc_eval(ia) ) cycle
@@ -390,20 +387,18 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 +fref(2,ia)**2 +fref(3,ia)**2)
-          if( cfrc_denom(1:7).eq.'abs2rel' ) then
-            if( absfref.lt.force_limit ) then
-              ferri = 1d0 /ferr
-            else
-              ferri = 1d0 /max(absfref,ferr)
-            endif
-          else if( cfrc_denom(1:3).eq.'rel' ) then
-            ferri = 1d0/ max(absfref,ferr)
-          else  ! default: abs
-            ferri = 1d0/ ferr
+          if( cfrc_scale(1:3).eq.'abs' ) then
+            ferri = 1d0 /f_scale
+          else if( cfrc_scale(1:3).eq.'rel' ) then
+            ferri = 1d0/ max(absfref,f_scale)
+          else if( cfrc_scale(1:3).eq.'exp' ) then
+            ferri = min(exp(-absfref/f_scale), 1d0)
+          else  ! default: one
+            ferri = 1d0
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+fsub(ixyz,ia) &
-                 -fref(ixyz,ia)) *ferri
+                 -fref(ixyz,ia))
             if( trim(ctype_loss).eq.'huber' ) then
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
@@ -413,7 +408,7 @@ contains
             else ! LS as default
               fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
-            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw
+            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw *ferri
           enddo
         enddo
         tfrcl = tfrcl +mpi_wtime() -tmp
@@ -423,33 +418,26 @@ contains
       if( lsmatch ) then
         tmp = mpi_wtime()
 !.....Compare these ptnsr elements with sref elements
-!!$        serr = smpl%serr
-        serr = 1d0
         strs(:,:) = smpl%strs(:,:)
         sref(:,:) = smpl%sref(:,:)
         ssub(:,:) = smpl%ssub(:,:)
         pdiff(1:6) = 0d0
         abssref = abs(sref(1,1) + sref(2,2) + sref(3,3))/3
-        if( cstrs_denom(1:7).eq.'abs2rel' ) then
-          if( abssref.lt.stress_limit ) then
-            serri = 1d0/ serr
-          else
-            serri = 1d0/ max(abssref,serr)
-          endif
-        else if( cstrs_denom(1:3).eq.'abs' ) then
-          serri = 1d0/ max(abssref,serr)
-        else  ! default: relative
-          serri = 1d0/ serr
+        if( cstrs_scale(1:3).eq.'abs' ) then
+          serri = 1d0/ s_scale
+        else if( cstrs_scale(1:3).eq.'rel' ) then
+          serri = 1d0/ max(abssref,s_scale)
+        else if( cstrs_scale(1:3).eq.'exp' ) then
+          serri = min(exp(-abssref/s_scale), 1d0)
+        else  ! default: one
+          serri = 1d0
         endif
-!.....Skip abnormally large stress
-!!$        if( stress_limit.lt.0d0 .or. &
-!!$             .not.(cstrs_denom(1:7).ne.'abs2rel' .and. abssref.gt.stress_limit) ) then
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
               pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  &
                    +ssub(ixyz,jxyz) &
-                   -sref(ixyz,jxyz)) *serri
+                   -sref(ixyz,jxyz))
             enddo
           enddo
           if( trim(ctype_loss).eq.'huber' ) then
@@ -459,7 +447,7 @@ contains
               else
                 pdiff(k)= pdiff(k)*pdiff(k)
               endif
-              fstmp= fstmp +pdiff(k) *swgt
+              fstmp= fstmp +pdiff(k) *swgt *serri
             enddo
           else  ! LS as default
             do k=1,6
@@ -565,10 +553,10 @@ contains
 !  using pmd (actually one_shot routine.)
 !
     use variables,only: tgrad,ngrad,tcomm,tgrad,twait, &
-         samples,mdsys,swgt2trn,nff,cffs,force_limit,stress_limit, &
+         samples,mdsys,swgt2trn,nff,cffs,f_scale,s_scale, &
          maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
          rcut,myidrefsub,isidrefsub,iprint, &
-         ctype_loss,cfrc_denom,cstrs_denom,lgdw,dmem,terg,tfrc,tstrs, &
+         ctype_loss,cfrc_scale,cstrs_scale,lgdw,dmem,terg,tfrc,tstrs, &
          wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot,cpotlow, &
          vranges,ismask, repul_radii
     use parallel
@@ -593,7 +581,7 @@ contains
     logical,parameter:: lfdsgnmat = .false.
     character(len=128):: csmplname
     real(8),allocatable,save:: gpena(:)
-    
+
     logical,external:: string_in_arr
 
     call flush(6)
@@ -696,7 +684,7 @@ contains
           endif
         endif
       endif
-      
+
 !!$    enddo  ! ismpl
 !!$
 !!$    do ismpl=isid0,isid1
@@ -707,7 +695,7 @@ contains
 !!$!.....Since g calc is time consuming,
 !!$!.....not calculate g for test set.
 !!$      if( smpl%iclass.ne.1 ) cycle
-      
+
       natm= smpl%natm
       epot= smpl%epot
       swgt= smpl%wgt
@@ -758,8 +746,6 @@ contains
         frcs(1:3,1:natm)= smpl%fa(1:3,1:natm)
         fref(1:3,1:natm)= smpl%fref(1:3,1:natm)
         fsub(1:3,1:natm)= smpl%fsub(1:3,1:natm)
-!!$        ferr= smpl%ferr
-        ferr= 1d0
         jfcal = 0
         do ia=1,natm
           if( .not. smpl%lfrc_eval(ia) ) cycle
@@ -767,31 +753,30 @@ contains
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 + fref(2,ia)**2 + fref(3,ia)**2)
-          if( cfrc_denom(1:7).eq.'abs2rel' ) then
-            if( absfref.lt.force_limit ) then
-              ferri = 1d0 /ferr
-            else
-              ferri = 1d0 /max(absfref,ferr)
-            endif
-          else if( cfrc_denom(1:3).eq.'rel' ) then
-            ferri = 1d0/ max(absfref,ferr)
-          else  ! default: abs
-            ferri = 1d0/ ferr
+          if( cfrc_scale(1:3).eq.'abs' ) then
+            ferri = 1d0 /f_scale
+          else if( cfrc_scale(1:3).eq.'rel' ) then
+            ferri = 1d0/ max(absfref,f_scale)
+          else if( cfrc_scale(1:3).eq.'exp' ) then
+            ferri = min(exp(-absfref/f_scale), 1d0)
+          else  ! default: one
+            ferri = 1d0
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) + fsub(ixyz,ia) &
-                 -fref(ixyz,ia)) *ferri
+                 -fref(ixyz,ia))
             if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *fdiff(ixyz,ia) *ferri
+              tmp = 2d0 *fdiff(ixyz,ia)
             else  ! Huber
               if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
                 tmp = 2d0 *sign(1d0,fdiff(ixyz,ia))
               else
-                tmp = 2d0 *fdiff(ixyz,ia) *ferri
+                tmp = 2d0 *fdiff(ixyz,ia)
               endif
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
-                 *gwf(ixyz,1:ndim,jfcal) *swgt *gdw *fac_ftrn
+                 *gwf(ixyz,1:ndim,jfcal) *swgt *gdw *fac_ftrn &
+                 *ferri
           enddo  ! ixyz=1,3
         enddo  ! ia=1,natm
         tfrcl = tfrcl +mpi_wtime() -ttmp
@@ -799,47 +784,40 @@ contains
 !.....Derivative of stress w.r.t. weights
       if( lsmatch ) then
         ttmp = mpi_wtime()
-!!$        serr= smpl%serr
-        serr= 1d0
         strs(:,:) = smpl%strs(:,:)
         sref(:,:) = smpl%sref(:,:)
         ssub(:,:) = smpl%ssub(:,:)
         pdiff(1:6) = 0d0
         abssref = abs(sref(1,1) + sref(2,2) + sref(3,3))/3
-        if( cstrs_denom(1:7).eq.'abs2rel' ) then
-          if( abssref.lt.stress_limit ) then
-            serri = 1d0/ serr
-          else
-            serri = 1d0/ max(abssref,serr)
-          endif
-        else if( cstrs_denom(1:3).eq.'rel' ) then
-          serri = 1d0/ max(abssref,serr)
-        else ! default: absolute
-          serri = 1d0/ serr
+        if( cstrs_scale(1:3).eq.'abs' ) then
+          serri = 1d0/ s_scale
+        else if( cstrs_scale(1:3).eq.'rel' ) then
+          serri = 1d0/ max(abssref,s_scale)
+        else if( cstrs_scale(1:3).eq.'exp' ) then
+          serri = min(exp(-abssref/s_scale), 1d0)
+        else ! default: one
+          serri = 1d0
         endif
-!.....Skip abnormally large stress?
-!!$        if( stress_limit.lt.0d0 .or. &
-!!$             .not.(cstrs_denom(1:7).ne.'abs2rel' .and. abssref.gt.stress_limit) ) then
           do ixyz=1,3
             do jxyz=ixyz,3
               k = ivoigt(ixyz,jxyz)
               pdiff(k)= pdiff(k) +(strs(ixyz,jxyz) + ssub(ixyz,jxyz) &
-                   - sref(ixyz,jxyz)) *serri
+                   - sref(ixyz,jxyz))
             enddo
           enddo
           do k=1,6
             if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *pdiff(k) *serri 
+              tmp = 2d0 *pdiff(k)
             else  ! Huber
               if( abs(pdiff(k)).gt.1d0 ) then
                 tmp = 2d0 *sign(1d0,pdiff(k))
               else
-                tmp = 2d0 *pdiff(k) *serri 
+                tmp = 2d0 *pdiff(k)
               endif
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) *swgt *fac_strn
+            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) &
+                 *swgt *fac_strn *serri
           enddo
-!!$        endif
         tstrsl = tstrs +mpi_wtime() -ttmp
       endif
 !!$      print '(a,3i5,f8.4)','grad: myid,ismpl,nfcal,tsmpl=',myid,ismpl,smpl%nfcal,mpi_wtime()-tsmp0
@@ -904,7 +882,7 @@ contains
         dmem = dmem + get_mem_uf3l()
       endif
     endif
-    
+
     if( trim(cpotlow).eq.'uf3') then
       call dealloc_gwx_uf3()
     endif
@@ -978,7 +956,7 @@ contains
         if( iprint > 10 ) print *,'pre_pmd: into set_params_uf3l...'
         call set_params_uf3l(ndim,x)
       endif
-    
+
       if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then
 !.....Some potentials use descriptors already computed in the previous steps
 !.....and stored in samples (and normalized if specified so.)
@@ -992,7 +970,7 @@ contains
         endif
       endif
     enddo  ! i=1,nff
-    
+
     return
   end subroutine pre_pmd
 !=======================================================================
@@ -1027,7 +1005,7 @@ contains
 
     integer:: i,is
     real(8):: ptnsr(3,3),ekin
-    character:: csp*3 
+    character:: csp*3
     type(atom):: elem
     logical:: update_force_list
 
@@ -1290,7 +1268,7 @@ contains
 !
     use variables
     use parallel
-    implicit none 
+    implicit none
     real(8),parameter:: tiny = 1d-15
     integer:: nsuml,nsumg,ismpl,natm,isf,jsf,ia,nsf
     real(8):: gmeanl,tmp,gvarl,dgi,dgj
@@ -1395,7 +1373,7 @@ contains
       enddo
       close(20)
     endif
-    
+
     gsfmean= 0d0
     gsfvar = 0d0
     do isf=1,nsf
@@ -1620,7 +1598,7 @@ contains
 
     l1st = .false.
     lnormalized = .true.
-    
+
   end subroutine normalize_std
 !=======================================================================
   subroutine normalize_norm()
@@ -1702,7 +1680,7 @@ contains
 
     l1st = .false.
     lnormalized = .true.
-    
+
   end subroutine normalize_norm
 !=======================================================================
   subroutine restore_normalize()
@@ -1748,7 +1726,7 @@ contains
         enddo
       endif
     endif
-    
+
     lnormalized = .false.
   end subroutine restore_normalize
 !=======================================================================
@@ -1785,7 +1763,7 @@ contains
     enddo
     ndimr = inc  ! total num of atoms in the current node
     gdfr(:) = 0d0
-    
+
 !.....Repeat sending, recving, and computing the GDF
     inode = mod(myid+1,nnode)
     itag = 10
@@ -1803,7 +1781,7 @@ contains
         call mespasd(inode,iprty,xparts,xpartr,ndims*nsf,ndimr*nsf,itag,mpi_world)
         call mespasd(inode,iprty,gdfs,gdfr,ndims,ndimr,itag,mpi_world)
       endif
-      
+
 !.....Compute GDF between given data and data in the current node
       do ismpl=isid0,isid1
         smpl = samples(ismpl)
@@ -1828,7 +1806,7 @@ contains
       call mespasi(inode,iprty,ndims,ndimr,1,1,itag,mpi_world)
       call mespasd(inode,iprty,gdfs,gdfr,ndims,ndimr,itag,mpi_world)
     endif
-    
+
 !.....Store GDFs and compute GDWs
     inc = 0
     do ismpl=isid0,isid1
@@ -1847,7 +1825,7 @@ contains
     endif
     deallocate(xparts,xpartr,gdfs,gdfr)
     lgdwed = .true.
-    
+
   end subroutine compute_gdw
 !=======================================================================
   function ndat_in_line(ionum,delim) result(ndat)
