@@ -318,6 +318,10 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,l3)') 'energy_match',lematch
   write(6,'(2x,a25,2x,l3)') 'force_match',lfmatch
   write(6,'(2x,a25,2x,l3)') 'stress_match',lsmatch
+
+  print *,''
+  write(6,'(2x,a25,2x,3f6.2)') 'weights', wgte, wgtf, wgts
+
   print *,''
   if( lfmatch ) then
     write(6,'(2x,a25,2x,a)') 'force_scale_type',trim(cfrc_scale)

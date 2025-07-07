@@ -10,7 +10,7 @@ Options:
   -o, --output OUTPUT   Output file name. [default: from_pmds.extxyz]
   --in-format FORMAT    Input file format. [default: pmd]
 """
-import os,sys
+import os, sys
 from docopt import docopt
 import nappy
 

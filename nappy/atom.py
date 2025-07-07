@@ -79,7 +79,7 @@ class Atom(object):
         p = 0.0
         p = (self.strs[0] +self.strs[1] +self.strs[2])/3
         return p
-        
+
     def set_epot(self,epot):
         self.epot = epot
 
@@ -97,10 +97,10 @@ class Atom(object):
 
     def set_ifmv(self,ifmv):
         self.ifmv = ifmv
-    
+
     def set_aux(self,key,value):
         self.aux[key] = value
-        
+
     def tag(self):
         tag= self.sid +self.ifmv*0.1 +self.id*1e-14
         return tag
@@ -125,9 +125,7 @@ def write_info_of_element(*symbols):
     return None
 
 if __name__ == '__main__':
-    
+
     args= docopt(__doc__)
     symbols = args['SYMBOL']
     write_info_of_element(*symbols)
-
-

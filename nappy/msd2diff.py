@@ -18,9 +18,10 @@ Options:
   --plot      Plot a fitted graph. [default: False]
   --out4fp    Output data file for fp.py in any-target mode.
   --out4fp-name OUTNAME
-              File name for --out4fp. [default: data.pmd.D] 
+              File name for --out4fp. [default: data.pmd.D]
 """
-import os,sys
+import os
+import sys
 from docopt import docopt
 import numpy as np
 from nappy.util import parse_option, gen_header
@@ -29,7 +30,7 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "250506"
 
 def read_out_msd(fname='out.msd',offset=0,column=2):
-        
+
     with open(fname,'r') as f:
         lines = f.readlines()
     ts = []
@@ -70,12 +71,12 @@ def dt_from_inpmd(fname='in.pmd'):
             num_iteration = int(line.split()[1])
         elif 'num_out_pos' in line or 'num_out_pmd' in line:
             num_out_pos = int(line.split()[1])
-    
+
     return time_interval*num_iteration/num_out_pos
 
 def msd2D(ts,msds,fac,dim=3):
     """
-    Compute diffusion coefficient from time [fs] vs MSD [Ang^2] data 
+    Compute diffusion coefficient from time [fs] vs MSD [Ang^2] data
     by solving least square problem using numpy.
     Return diffusion coefficient multiplied by FAC.
     """
@@ -92,12 +93,13 @@ def msd2D(ts,msds,fac,dim=3):
     std = np.sqrt(res[0]/len(ts)/xvar) *fac /(2.0*dim)
     return a,b,std
 
+
 def main():
 
     #args = docopt(__doc__)
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
                   version=__version__)
-    
+
     fnames = args['MSD_FILE']
     offset = int(args['--offset'])
     dim = int(args['--dim'])
@@ -168,7 +170,8 @@ def main():
         print(' Wrote graph_msd2D.png')
 
     return None
-        
+
+
 if __name__ == "__main__":
 
     main()

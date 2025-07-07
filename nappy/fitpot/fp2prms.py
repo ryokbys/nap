@@ -14,7 +14,7 @@ Options:
               e.g.) Li-O,P-O. [default: None]
   --triplets TRIPLETS
               Specify triplets by hyphen-connected and comma-separated,
-              e.g.) Li-O,P-O. 
+              e.g.) Li-O,P-O.
               The 1st species (X1 in X1-X2-X3) is the center of two bonds. [default: None]
 """
 import os
@@ -33,7 +33,7 @@ def read_in_fitpot2(infname='in.fitpot'):
     """
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
-    
+
     with open(infname,'r') as f:
         lines = f.readlines()
 
@@ -70,7 +70,7 @@ def read_in_fitpot2(infname='in.fitpot'):
                 mode = None
 
     return specorder, interact, param_files
-    
+
 
 def read_params_Coulomb(infname):
 
@@ -168,7 +168,7 @@ def read_vars_fitpot(fname='in.vars.fitpot'):
     return varsfp
 
 def write_params_Morse(outfname,pairs,morse_prms):
-    
+
     with open(outfname,'w') as f:
         f.write('# cspi, cspj,    D,      alpha,  rmin\n')
         inc = -1
@@ -176,7 +176,7 @@ def write_params_Morse(outfname,pairs,morse_prms):
             d0,alp,rmin = morse_prms[tuple(pair)]
             f.write('  {0:3s}   {1:3s}'.format(*pair))
             f.write('  {0:7.4f}  {1:7.4f}  {2:7.4f}\n'.format(d0,alp,rmin))
-            
+
     return None
 
 def write_params_Coulomb(outfname,specorder,pairs,fbvs,rads,
@@ -184,7 +184,7 @@ def write_params_Coulomb(outfname,specorder,pairs,fbvs,rads,
     """
     Write in.params.Coulomb specific for BVS.
     """
-    
+
     with open(outfname,'w') as f:
         f.write('terms   screened_cut\n')
         f.write('charges   {0:s}\n'.format(charges))
@@ -249,7 +249,7 @@ def same_pair_exists(pair,pairs):
         if same_pair(p,pair):
             return True
     return False
-    
+
 def fp2Morse(varsfp, **kwargs):
 
     rc2 = varsfp['rc2']
@@ -258,7 +258,7 @@ def fp2Morse(varsfp, **kwargs):
     nv = len(vs)
 
     pairs = kwargs['pairs']
-    
+
     #...Check num of vars and pairs
     if len(pairs)*3 != nv:
         raise ValueError('Number of variables and pairs are inconsistent.')
@@ -275,7 +275,7 @@ def fp2Morse(varsfp, **kwargs):
         morse_prms[p] = (d0,alp,rmin)
 
     write_params_Morse('in.params.Morse',pairs,morse_prms)
-        
+
     return
 
 def fp2BVS(varsfp, **kwargs):
@@ -409,7 +409,7 @@ def fp2uf3(outfname, vs, uf3_prms, **kwargs):
     write_params_uf3(uf3_prms,
                      outfname=outfname,
                      overwrite=True)
-    print(f' Wrote {outfname}')
+    print(f' --> {outfname}')
     return None
 
 def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
@@ -444,7 +444,7 @@ def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
     write_params_uf3l(uf3l_prms,
                       outfname=outfname,
                       overwrite=True)
-    print(f' Wrote {outfname}')
+    print(f' --> {outfname}')
     return None
 
 def fp2params(vs,**kwargs):
@@ -460,7 +460,7 @@ def fp2params(vs,**kwargs):
         raise
     if type(param_fnames) != list or len(param_fnames) < 1:
         raise ValueError('MD_param_files may not be specified correctly...')
-        
+
     for fname in param_fnames:
         try:
             fcontents = kwargs[fname]
@@ -522,7 +522,7 @@ def main():
     varsfp = read_vars_fitpot(infname)
     if pot_type == 'map':
         """
-        The keyword map specifies that the in.params.XXX files contain entries such as '{p[0]}' 
+        The keyword map specifies that the in.params.XXX files contain entries such as '{p[0]}'
         that are to be replaced.
         """
         param_files = infp['param_files']
@@ -531,9 +531,9 @@ def main():
                 kwargs[pfile] = f.read()
             os.system(f'cp -f {pfile} {pfile}.bak')
         fp2params(varsfp['variables'], **kwargs)
-        print(' Wrote the following files:')
+        #print(' Wrote the following files:')
         for pfile in param_files:
-            print(f'   - {pfile}')
+            print(f' --> {pfile}')
         print('')
 
     elif pot_type in ('UF3', 'uf3'):
@@ -560,15 +560,15 @@ def main():
             print(' Triplets to be extracted:')
             for t in triplets:
                 print('   {0:s}-{1:s}-{2:s}'.format(*t))
-    
+
                 kwargs['pairs'] = pairs
         if pot_type == 'Morse':
             fp2Morse(varsfp, **kwargs)
-            print(' Wrote in.params.Morse')
+            print(' --> in.params.Morse')
 
         elif pot_type == 'BVS':
             """
-            The term 'BVS' means that the in.var.fitpot file contains 
+            The term 'BVS' means that the in.var.fitpot file contains
             fbvs, species radius and Morse parameters.
             Thus in this case, specorder should be specified.
             """
@@ -581,11 +581,11 @@ def main():
             except Exception as e:
                 pass
             fp2BVS(varsfp, **kwargs)
-            print(' Wrote in.params.{Morse,Coulomb}')
-            
+            print(' --> in.params.{Morse,Coulomb}')
+
         elif pot_type == 'BVSx':
             """
-            The term 'BVSx' means that the in.var.fitpot file contains 
+            The term 'BVSx' means that the in.var.fitpot file contains
             fbvs, species radius, Morse and angular parameters.
             Thus in this case, specorder, pairs and triplets should be specified.
             """
@@ -598,9 +598,9 @@ def main():
                 kwargs['charges'] = charges
             except Exception as e:
                 pass
-            
+
             fp2BVSx(varsfp, **kwargs)
-            print(' Wrote in.params.{Morse,Coulomb,angular}')
+            print(' --> in.params.{Morse,Coulomb,angular}')
         else:
             print(f' No such pot_type: {pot_type}')
     return None

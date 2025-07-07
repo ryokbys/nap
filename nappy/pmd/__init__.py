@@ -92,25 +92,35 @@ class PMD:
         self.result['stnsr'] = res[10]
         return None
 
-    def set_params(self,**kwargs):
+    def set_params(self, **kwargs):
         """
         Set parameters for pmdvars-module stored in self.params dictionary.
         """
         unknown_keys = []
         for k,v in kwargs.items():
             if k in self.params:
-                self.params[k] = v
+                if k == 'temperature_target':
+                    if self.params['flag_multi_temp']:
+                        if type(v) not in (list, tuple):
+                            raise TypeError('temperature_target must be list or tuple, if flag_multi_temp is True.')
+                        self.params[k] = v
+                    else:
+                        if type(v) in (list, tuple):
+                            raise TypeError('temperature_target must be scalar, if flag_multi_temp is False.')
+                        self.params[k][0] = v
+                else:
+                    self.params[k] = v
             else:
                 unknown_keys.append(k)
         if len(unknown_keys) > 0:
-            print(' Some of given parameters are unknown: ',unknown_keys)
+            print(' Some of given parameters are unknown: ', unknown_keys)
         return None
 
     def update_params(self):
         """
         Update pmdvars-module variables.
         """
-        
+
         keys = self.params.keys()
         if 'specorder' in keys:
             nspmax = 9
@@ -212,11 +222,11 @@ class PMD:
         pw.set_mpivars(fcomm,size,rank)
         return None
 
-    def load_inpmd(self,):
-        if not os.path.exists('in.pmd'):
-            raise FileNotFoundError('in.pmd does not exist.')
+    def load_inpmd(self, fname='in.pmd'):
+        if not os.path.exists(fname):
+            raise FileNotFoundError(f'The input file ({fname}) does not exist.')
         from .inpmd import read_inpmd
-        inputs = read_inpmd('in.pmd')
+        inputs = read_inpmd(fname)
         self.params = copy.deepcopy(inputs)
         return None
 
@@ -225,7 +235,7 @@ class PMD:
         Load in.params.XXX files needed to initialize force parameters.
         """
         return None
-        
+
     def set_system(self,nsys):
         self.nsys = copy.deepcopy(nsys)
         return None
@@ -264,7 +274,7 @@ class PMD:
     def get_stress(self):
         if not hasattr(self,'result'):
             return None
-        stnsr = self.result['stnsr'] 
+        stnsr = self.result['stnsr']
         return np.array([stnsr[0,0], stnsr[1,1], stnsr[2,2],
                          stnsr[1,2], stnsr[0,2], stnsr[0,1]])
 

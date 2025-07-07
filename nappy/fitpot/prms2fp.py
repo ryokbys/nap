@@ -42,10 +42,10 @@ def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
             vr = vranges[i]
             if hardlim is not None:
                 hl = hardlim[i]
-                f.write('  {0:9.4f}  {1:12.4e}  {2:12.4e} {3:12.4e} {4:12.4e}\n'.format(v,*vr,*hl))
+                f.write('  {0:12.4f}  {1:12.4e}  {2:12.4e} {3:12.4e} {4:12.4e}\n'.format(v,*vr,*hl))
             else:
-                f.write('  {0:9.4f}  {1:12.4e}  {2:12.4e}\n'.format(v,*vr))
-    print(' Wrote '+outfname)
+                f.write('  {0:12.4f}  {1:12.4e}  {2:12.4e}\n'.format(v,*vr))
+    print(' --> '+outfname)
     return None
 
 def read_params_Coulomb(infname):
@@ -83,7 +83,7 @@ def read_params_Morse(infname):
 
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
-    
+
     with open(infname,'r') as f:
         lines = f.readlines()
 
@@ -109,7 +109,7 @@ def read_params_angular(infname):
 
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
-    
+
     with open(infname,'r') as f:
         lines = f.readlines()
 
@@ -134,8 +134,8 @@ def read_params_angular(infname):
         else:
             continue
     return angular_prms
-    
-    
+
+
 def prms_to_fpvars(specorder,prms):
     """
     Convert Morse/angular prms to fpvars taking specorder into account.
@@ -165,7 +165,7 @@ def prms_to_fpvars(specorder,prms):
     fpvars = []
     vranges = []
     hardlim = []
-    
+
     if maxlen == 2:  # 2-body
         for i in range(len(specorder)):
             si = specorder[i]
@@ -178,7 +178,7 @@ def prms_to_fpvars(specorder,prms):
                             vranges.append((max(v*.75,0.0),v*1.25))
                             hardlim.append((0.0, 10.0))
                         break
-    
+
     elif maxlen == 3:  # 3-body
         for i in range(len(specorder)):
             si = specorder[i]
@@ -202,7 +202,7 @@ def prms_to_fpvars(specorder,prms):
                                     hardlim.append((0.0, 10.0))
                             break
     return fpvars, vranges, hardlim
-    
+
 
 def Morse2fp(outfname,specorder,rc,rc3):
 
@@ -251,7 +251,7 @@ def BVS2fp(outfname,specorder,rc,rc3):
         fpvars.append(rad)
         vranges.append((rad*0.75,rad*1.25))
         hardlim.append((0.0, 3.0))
-        
+
     #...Morse parameters
     v_morse, vr_morse, hl_morse = prms_to_fpvars(specorder,morse_prms)
     fpvars += v_morse
@@ -351,7 +351,7 @@ def uf32fp(outfname,specorder):
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 
-def uf3l2fp(outfname,specorder,repul_pairs=[]):
+def uf3l2fp(outfname, specorder, repul_pairs=[]):
     """
     Create in.vars.fitpot file from parameter file for uf3l potential.
     Cut-off radii for 2- and 3-body are given in the parameter file.
@@ -359,9 +359,9 @@ def uf3l2fp(outfname,specorder,repul_pairs=[]):
     uf3l_prms = read_params_uf3l('in.params.uf3l')
 
     fpvars = []
-    vranges= []
+    vranges = []
 
-    for spi,erg in uf3l_prms['1B'].items():
+    for spi, erg in uf3l_prms['1B'].items():
         fpvars.append(erg)
         vranges.append((-1e+10, 1e+10))
 
@@ -370,7 +370,7 @@ def uf3l2fp(outfname,specorder,repul_pairs=[]):
     for pair in d2b.keys():
         ncoef = d2b[pair]['ncoef']
         coefs = d2b[pair]['coefs']
-        ntrail= d2b[pair]['ntrail']
+        ntrail = d2b[pair]['ntrail']
         rc2max = max(rc2max, d2b[pair]['rc2b'])
         vmin = -1e+10
         if any( set(pair) == set(rp) for rp in repul_pairs ):
@@ -390,9 +390,9 @@ def uf3l2fp(outfname,specorder,repul_pairs=[]):
         rc3max = max(rc3max, d3b[trio]['rc'])
         coefs = d3b[trio]['coefs']
         fpvars.append(d3b[trio]['gmj'])
-        vranges.append((0.0, 3.0))
+        vranges.append((0.1, 3.0)) # gmj, gmk should be greater than 0.0
         fpvars.append(d3b[trio]['gmk'])
-        vranges.append((0.0, 3.0))
+        vranges.append((0.1, 3.0))
         for i in range(ncoef):
             fpvars.append(coefs[i])
             vranges.append((0.0, 1e+10))
@@ -425,13 +425,13 @@ def main():
 
     elif potname in ('BVS', 'BVSx'):
         """
-        The term 'BVS' means that the in.var.fitpot file contains 
+        The term 'BVS' means that the in.var.fitpot file contains
         fbvs, species radius and Morse parameters,
         Thus in this case, specorder should be specified.
         In case of 'BVSx' contains angular parameters, so triplets should be specified.
         """
         BVS2fp(outfname,specorder,rc,rc3)
-        
+
     elif potname in ('UF3','uf3'):
         """
         Ultra-fast force-field.

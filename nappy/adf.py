@@ -22,7 +22,7 @@ Options:
               e.g.) P-O-O,Li-O-O. [default: None]
   -o OUT      Output file name [default: None]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
-  --skip=NSKIP 
+  --skip=NSKIP
               Skip first NSKIP steps from the statistics. [default: 0]
   --plot      Plot figures. [default: False]
   --fortran   Try using fortran routine for ADF calculation.
@@ -114,7 +114,7 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
 
     na= int(180.0/dang)
     poss = nsys.get_scaled_positions()
-    
+
     if fortran:
         try:
             # import nappy.pmd.mods as pmods
@@ -190,14 +190,6 @@ def write_normal(fname,triplets,na,angd,agr):
     Write out ADF data in normal ADF format.
     """
     outfile= open(fname,'w')
-    #cmd = ' '.join(s for s in sys.argv)
-    cmd = 'adf.py'
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cwd = os.getcwd()
-    outfile.write(f'# Output from {cmd:s}\n')
-    outfile.write(f'#   at {cwd:s}\n')
-    outfile.write(f'#   at {now:s}\n')
-    outfile.write('#\n')
     outfile.write('# 1:theta[i], ')
     for it,t in enumerate(triplets):
         outfile.write(' {0:d}:{1:s}-{2:s}-{3:s},'.format(it+2,*t))
@@ -226,7 +218,7 @@ def write_out4fp(fname,triplets,na,angd,agr,rcut,nperline=6):
         for i in range(na):
             data[n] = agr[it,i]
             n += 1
-    
+
     with open(fname,'w') as f:
         # cmd = ' '.join(s for s in sys.argv)
         cmd = 'adf.py'
@@ -260,9 +252,33 @@ def plot_figures(angd,agr,triplets):
     plt.savefig("graph_adf.png", format='png', dpi=300, bbox_inches='tight')
     return None
 
+
+def read_adf(fname):
+    with open(fname, 'r') as f:
+        lines = f.readlines()
+    nd = len(lines) - 1
+    angls = np.zeros(nd)
+    trios = []
+    adfs = {}
+    for il, line in enumerate(lines):
+        data = line.split()
+        if il == 0:
+            for d in data[2:]:
+                dd = d.strip(',').split(':')[-1]
+                trio = tuple(dd.split('-'))
+                trios.append(trio)
+                adfs[trio] = np.zeros(nd)
+            continue
+        angls[il-1] = float(data[0])
+        for i, d in enumerate(data[1:]):
+            trio = trios[i]
+            adfs[trio][il-1] = float(d)
+    return angls, adfs
+
+
 def main():
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])),version=__version__)
-    
+
     infiles= args['INFILE']
     triplets = args['--triplets']
     specorder = [ x for x in args['--specorder'].split(',') ]
@@ -288,7 +304,7 @@ def main():
         ofname = None
     flag_plot= args['--plot']
     nskip = int(args['--skip'])
-    
+
     if out4fp and ofname is None:
         raise ValueError("Output file name must be specified with option -o.")
 
@@ -325,7 +341,7 @@ def main():
             write_out4fp(ofname,triplets,na,angd,agr,rcut)
         else:
             write_normal(ofname,triplets,na,angd,agr)
-        
+
     print(' Wrote out.adf')
     if ofname is not None:
         print(' Wrote {0:s}'.format(ofname))

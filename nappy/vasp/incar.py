@@ -66,5 +66,3 @@ def parse_entry(entry):
     else:  # str
         return entry
     raise ValueError('entry seems wrong: ',entry)
-
-

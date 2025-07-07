@@ -22,6 +22,8 @@ _entry_to_varname = {
     'num_out_energy': 'nerg',
     'flag_out_pmd': 'ifpmd',
     'flag_out_pos': 'ifpmd',
+    'combine_out_pos': 'lcomb_pos',
+    'combine_out_pmd': 'lcomb_pos',
     'num_out_pmd': 'npmd',
     'num_out_pos': 'npmd',
     'flag_sort': 'ifsort',
@@ -34,7 +36,7 @@ _entry_to_varname = {
     'converge_num': 'n_conv',
     'initial_temperature': 'tinit',
     'final_temperature': 'tfin',
-    'flag_multi_temp': 'lmultemps', 
+    'flag_multi_temp': 'lmultemps',
     'temperature_control': 'ctctl',
     'temperature_target': 'ttgt',
     'temperature_relax_time': 'trlx',
@@ -66,8 +68,9 @@ _default_params = {
     'num_iteration': 0,
     'min_iteration': 0,
     'num_out_energy': 10,
-    'flag_out_pmd': 0,
+    'flag_out_pmd': 3,
     'num_out_pmd': 1,
+    'combine_out_pos': True,
     'flag_sort': 1,
     'force_type': None,
     'cutoff_radius': 5.0,
@@ -114,29 +117,29 @@ _default_params = {
 }
 
 _int_keys = [
-    'num_nodes_x','num_nodes_y','num_nodes_z',
-    'num_iteration','num_out_energy','flag_out_pmd',
-    'num_out_pmd','flag_damping',
-    'converge_num','min_iteration','flag_sort',
-    'print_level','max_num_neighbors','remove_translation'
+    'num_nodes_x', 'num_nodes_y', 'num_nodes_z',
+    'num_iteration', 'num_out_energy', 'flag_out_pmd',
+    'num_out_pmd', 'flag_damping',
+    'converge_num', 'min_iteration', 'flag_sort',
+    'print_level', 'max_num_neighbors', 'remove_translation'
 ]
 _float_keys = [
-    'time_interval','cutoff_radius','cutoff_buffer',
-    'damping_coeff','initial_temperature',
+    'time_interval', 'cutoff_radius', 'cutoff_buffer',
+    'damping_coeff', 'initial_temperature',
     'final_temperature', 'temperature_limit',
-    'temperature_relax_time','pressure_target',
-    'stress_relax_time','shear_stress',
-    'converge_eps','final_strain'
+    'temperature_relax_time', 'pressure_target',
+    'stress_relax_time', 'shear_stress',
+    'converge_eps', 'final_strain'
 ]
 _str_keys = [
-    'io_format','force_type','temperature_control',
+    'io_format', 'force_type', 'temperature_control',
     'stress_control',
-    'zload_type','boundary',
+    'zload_type', 'boundary',
     'overlay_type',
 ]
 _bool_keys = [
-    'allow_reallocation','flag_temp_dist','flag_compute_stress',
-    'flag_multi_temp',
+    'allow_reallocation', 'flag_temp_dist', 'flag_compute_stress',
+    'flag_multi_temp', 'combine_out_pos', 'combine_out_pmd'
 ]
 
 def get_default():
@@ -219,14 +222,14 @@ def read_inpmd(fname='in.pmd'):
                 inputs[key] = data[1]
                 mode = None
             elif key in _bool_keys:
-                inputs[key] = data[1] in ('T','True','.true.')
+                inputs[key] = data[1] in ('T', 'True', '.true.')
                 mode = None
 
     return inputs
 
 def inputs_to_vars(inputs={}):
     """
-    Convert inputs, which is a dictionary with keys of entries, 
+    Convert inputs, which is a dictionary with keys of entries,
     to vars, whose names are used in pmd source code.
     """
     vs = {}
@@ -246,4 +249,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    

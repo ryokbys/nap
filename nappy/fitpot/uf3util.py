@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os,sys
+import os, sys
 import numpy as np
 
 __description__="""
@@ -7,13 +7,14 @@ Utility functions for UF3, UF3L potential.
 """
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250401"
+__version__ = "250705"
+
 
 def read_params_uf3(infname):
 
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
-    
+
     uf3_prms = {'1B':{},
                 '2B':{},
                 '3B':{}}
@@ -98,14 +99,15 @@ def read_params_uf3(infname):
                             d3b['coefs'][icij,icik,:] = \
                                 [ float(x) for x in d]
                     uf3_prms[body][(spi,spj,spk)] = d3b
-                        
+
     return uf3_prms
+
 
 def read_params_uf3l(infname):
 
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
-    
+
     uf3l_prms = {'1B':{},
                  '2B':{},
                  '3B':{}}
@@ -174,8 +176,9 @@ def read_params_uf3l(infname):
                     d = f.readline().split()
                     d3b['coefs'] = [ float(x) for x in d ]
                     uf3l_prms[body][(spi,spj,spk)] = d3b
-                        
+
     return uf3l_prms
+
 
 def write_params_uf3(uf3prms,
                      outfname='in.params.uf3',
@@ -270,6 +273,7 @@ def write_params_uf3(uf3prms,
     f.close()
     return None
 
+
 def write_params_uf3l(uf3lprms,
                       outfname='in.params.uf3l',
                       author=None,
@@ -280,9 +284,9 @@ def write_params_uf3l(uf3lprms,
 
     f = open(outfname, 'w')
 
-    data1B = uf3lprms.get('1B',None)
-    data2B = uf3lprms.get('2B',None)
-    data3B = uf3lprms.get('3B',None)
+    data1B = uf3lprms.get('1B', None)
+    data2B = uf3lprms.get('2B', None)
+    data3B = uf3lprms.get('3B', None)
 
     today = datetime.now().strftime('%Y-%m-%d')
     if author is None:
@@ -299,10 +303,10 @@ def write_params_uf3l(uf3lprms,
     if data2B is not None:
         pairs = data2B.keys()
         for pair in pairs:
-            spi,spj = pair
+            spi, spj = pair
             dp = data2B[pair]
             nlead = dp['nlead']
-            ntrail= dp['ntrail']
+            ntrail = dp['ntrail']
             spacing = dp['spacing']
             rc2b = dp['rc2b']
             nknot = dp['nknot']
@@ -323,10 +327,10 @@ def write_params_uf3l(uf3lprms,
     if data3B is not None:
         trios = data3B.keys()
         for trio in trios:
-            spi,spj,spk = trio
+            spi, spj, spk = trio
             d3b = data3B[trio]
             nlead = d3b['nlead']
-            ntrail= d3b['ntrail']
+            ntrail = d3b['ntrail']
             spacing = d3b['spacing']
             rc = d3b['rc']
             nknot = d3b['nknot']
@@ -349,6 +353,7 @@ def write_params_uf3l(uf3lprms,
     f.close()
     return None
 
+
 def to_list(variable):
     if isinstance(variable, np.ndarray):
         return variable.tolist()
@@ -356,6 +361,7 @@ def to_list(variable):
         return variable
     else:
         raise TypeError('The variable is not list nor ndarray.')
+
 
 def get_element_list(uf3prms):
     elist = []
@@ -382,6 +388,7 @@ def get_element_list(uf3prms):
                     elist.append(sk)
     return elist
 
+
 def handle_combine(args):
     prms1 = read_params_uf3(args.file1)
     prms2 = read_params_uf3(args.file2)
@@ -390,7 +397,8 @@ def handle_combine(args):
                      author=args.author)
     print(f' wrote {args.output}')
     return None
-    
+
+
 def merge_dicts(dict1, dict2):
     """
     3段階の入れ子構造を持つ辞書を結合する。
@@ -419,13 +427,76 @@ def merge_dicts(dict1, dict2):
             result[key1] = value1
 
     return result
-        
+
+
+def knot_index(r, knots):
+    n = 0
+    for i, t in enumerate(knots):
+        if r > t:
+            n = i
+        else:
+            return n
+    return n
+
+
+def b_spl(r, ts):
+    """
+    Non-recursive implementation of B-spline.
+    Assuming maximum order (d) = 3.
+
+    Args:
+      r --- position to be evaluated.
+      ts --- knot positions.
+
+    Return:
+      nr --- index in knots list.
+      b --- B array.
+    """
+    teps = 1.0e-8
+    nr = knot_index(r, ts)
+
+    b = np.zeros((5,4))  # corresponds to btmp(-3:+1,0:3) in fortran
+    b[3,0] = 1.0
+    for id in range(1,4):  # 1,2,3
+        for l in range(-id, 1):  # -id, id+1, ..., 0
+            n = nr + l
+            tn0 = ts[n]
+            tn1 = ts[n+id]
+            dt1 = tn1 - tn0
+            tmp1 = 0.0
+            if abs(dt1) > teps:
+                tmp1 = (r-tn0)/dt1 * b[l+3, id-1]
+            tn2 = ts[n+1]
+            tn3 = ts[n+id+1]
+            dt2 = tn3 - tn2
+            tmp2 = 0.0
+            if abs(dt2) > teps:
+                tmp2 = (tn3-r)/dt2 * b[l+3+1, id-1]
+            b[l+3, id] = tmp1 + tmp2
+    return nr, b[:, 3]
+
+
+def get_bspl_curve(rs, knots, coefs):
+    es = np.zeros(len(rs))
+    for i, r in enumerate(rs):
+        nr, b = b_spl(r, knots)
+        tmp = 0.0
+        for l in range(-3, 1):
+            n = nr + l
+            if n < 0 or n >= len(coefs):
+                continue
+            c = coefs[n]
+            tmp += c * b[l+3]
+        es[i] = tmp
+    return es
+
+
 
 def main():
     import argparse
     # Create arg parser
     parser = argparse.ArgumentParser(description=__description__)
-    
+
     subparsers = parser.add_subparsers(title="sub-command", dest="command")
     combine = subparsers.add_parser('combine', help="Combine two in.params.uf3 files.")
     combine.add_argument("file1", help="1st file")
@@ -440,7 +511,7 @@ def main():
                          default="")
     combine.set_defaults(func=handle_combine)
 
-    
+
     # Analyze argument
     args = parser.parse_args()
 

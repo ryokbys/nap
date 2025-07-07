@@ -7,8 +7,7 @@ __all__ = ['pmd','napsys','atom','common','io','rdf','adf','msd','gaussian_smear
 __author__ = 'RYO KOBAYASHI'
 __version__ = '250522'
 
-from . import napsys
-from . import io
+from . import napsys, io, pmd
 
 _nappy_dir = '.nappy'
 
@@ -16,4 +15,3 @@ def get_nappy_dir():
     import os
     homedir = os.environ['HOME']
     return homedir + '/' +_nappy_dir
-

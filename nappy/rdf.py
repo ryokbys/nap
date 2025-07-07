@@ -119,7 +119,7 @@ def rdf_of_atom(ia,nsys,rmax=5.0,dr=0.1,sigma=0):
     rdfi = np.zeros(ndri.shape)
     #...Gaussian smearing
     if not sigma == 0:
-        #...Total 
+        #...Total
         rdfi[0,:] = gsmear(rd,ndri[0,:],sigma)
         #...Species-decomposed
         for jsid in range(1,nspcs+1):
@@ -134,10 +134,10 @@ def rdf_desc_of(ia,nsys,rmax=5.0,dr=0.1):
     and height of each species.
     For example, in case of Mg-Si-O 3-component system, an atoms has the following data:
        R1(Mg), H1(Mg), R2(Mg), H2(Mg), R1(Si), H1(Si), R2(Si), H2(Si), R1(O), H1(O), R2(O), H2(O)
-    Thus the dimension of RDF descriptor of N-component system is 4N and 
+    Thus the dimension of RDF descriptor of N-component system is 4N and
     if the peaks are not found, the descriptor values are set 0.0.
     """
-    
+
     rd,rdfi = rdf_of_atom(ia,nsys,rmax=rmax,dr=dr,sigma=2)
     nspcs = len(nsys.specorder)
     nr = len(rd)
@@ -182,29 +182,28 @@ def rdf_desc(nsys,rmax=5.0,dr=0.1,progress=False):
 
     return desc
 
-def read_rdf(fname='out.rdf'):
-    """
-    Read RDF data from a file.
-    The format is the same as that of write_normal function.
-    """
-    with open(fname,'r') as f:
+def read_rdf(fname):
+    with open(fname, 'r') as f:
         lines = f.readlines()
-    #...Count num of data
-    nr = 0
-    for line in lines:
-        if line[0] != '#':
-            nr += 1
-    nd = len(line[-1].split()) -1
-    rdfs = np.zeros((nr,nd),dtype=float)
-    rs = np.zeros(nr,dtype=float)
-    ir = 0
-    for il,line in enumerate(lines):
-        if line[0] == '#': continue
-        dat = line.split()
-        rs[ir] = float(data[0])
-        rdfs[ir,:] = [ float(x) for x in dat[1:]]
-    return rs,rdfs
-    
+    rd = np.zeros(len(lines)-1)
+    pairs = []
+    rdfs = {}
+    for il, line in enumerate(lines):
+        data = line.split()
+        if il == 0:
+            for d in data[2:]:
+                dd = d.strip(',').split(':')[-1]
+                pair = tuple(dd.split('-'))
+                pairs.append(pair)
+                rdfs[pair] = np.zeros(len(lines)-1)
+            continue
+        rd[il-1] = float(data[0])
+        for i, d in enumerate(data[1:]):
+            pair = pairs[i]
+            rdfs[pair][il-1] = float(d)
+    return rd, rdfs
+
+
 def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
         nnmax=100,fortran=False,mask=None):
     """
@@ -219,10 +218,10 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     #         raise TypeError('mask is not list.')
     #     if len(mask) != natm0:
     #         raise ValueError('len(mask) != len(nsys0)')
-        
+
     rmax = rmin +dr*nr  # Use corrected rmax to cover regions of NR bins
     r2max = rmax*rmax
-    
+
     nsys = copy.deepcopy(nsys0)
     n1,n2,n3= nsys.get_expansion_num(3.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
@@ -234,7 +233,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     for ispcs in range(1,nspcs+1):
         natms.append(float(nsys.num_atoms(ispcs)))
     vol= nsys.get_volume()
-        
+
     hmat = nsys.get_hmat()
     # Since an access to pandas DataFrame is much slower than that to numpy array,
     # use numpy arrays in the most time consuming part.
@@ -262,7 +261,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
             print(' Since failed to use the fortran routines, use python instead...')
             print(e)
             pass
-    
+
     rd= np.array([ rmin +dr*(ir+0.5) for ir in range(nr) ])
     nadr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
     ndr = np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
@@ -482,7 +481,7 @@ def write_rdf_out4fp(fname,specorder,nspcs,agr,nr,rmax,pairs=None,rmin=0.0,nperl
         for i in range(nr):
             data[n] = agr[0,0,i]
             n += 1
-    
+
     with open(fname,'w') as f:
         cmd = ' '.join(s for s in sys.argv)
         f.write('# Output at {0:s} from,\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
@@ -526,7 +525,7 @@ def write_sq_normal(fname,qs,sq):
         for i in range(nd):
             f.write(' {0:10.4f}  {1:10.5f}\n'.format(qs[i],sq[i]))
     return None
-        
+
 
 def write_sq_out4fp(fname,qs,sq,nperline=6):
     """
@@ -547,7 +546,7 @@ def write_sq_out4fp(fname,qs,sq,nperline=6):
             if j0 >= nd:
                 break
     return None
-        
+
 
 def plot_figures(specorder,rd,agr):
     import matplotlib.pyplot as plt
@@ -784,7 +783,7 @@ def main():
             # Redfine total RDF as weighted sum of g_{ij}(r)
             # in case of multiple species
             natms = [float(nsys.num_atoms())]
-            cs = [1.0] 
+            cs = [1.0]
             for ispcs in range(1, nspcs+1):
                 natms.append(float(nsys.num_atoms(ispcs)))
                 cs.append(natms[ispcs]/natms[0])

@@ -4,7 +4,7 @@ Compute probability distribution of specified species.
 The size of the system cell is determined as that of the system read 1st.
 
 Usage:
-  probdist.py [options] FILES [FILES...]
+  {0:s} [options] FILES [FILES...]
 
 Options:
   -h, --help  Show this message and exit.
@@ -12,7 +12,7 @@ Options:
   -w WIDTH    Mesh width in Ang. [default: 0.2]
   --sigma SIGMA
               Sigma value of the gaussian smearing. If it is positive,
-              use this value in Ang. If it is negative, adopt |SIGMA|*WIDTH. [default: -2.0]
+              use this value in Ang. If it is negative, adopt |SIGMA|*WIDTH. [default: -1.0]
   --species SPC
               Secies name whose distributions are computed.
               If it is not given, all the atoms are to be taken into account. [default: None]
@@ -20,6 +20,7 @@ Options:
               Species order separated by comma. [default: None]
 """
 import os
+import sys
 from docopt import docopt
 import numpy as np
 from scipy import stats
@@ -29,7 +30,7 @@ from nappy.common import get_key
 from nappy.io import read, write
 
 from icecream import ic
-#ic.disable()
+ic.disable()
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "241126"
@@ -42,10 +43,10 @@ def get_num_division(nsys,width):
     ndivs[2] = lc/width +1
     return ndivs
 
-def get_prob_dist_kde(ndivs,nsys,spc,sgm):
-    tsgm2 = 2.0 *sgm *sgm
-    tsgm2i = 1.0 /tsgm2
-    la,lb,lc = nsys.get_lattice_lengths()
+def get_prob_dist_kde(ndivs, nsys, spc, sgm):
+    tsgm2 = 2.0 * sgm * sgm
+    tsgm2i = 1.0 / tsgm2
+    la, lb, lc = nsys.get_lattice_lengths()
     ra = 1.0/ndivs[0]
     rb = 1.0/ndivs[1]
     rc = 1.0/ndivs[2]
@@ -68,15 +69,15 @@ def get_prob_dist_kde(ndivs,nsys,spc,sgm):
     ic(pdist0.shape, pdist.shape)
     return pdist
 
-def get_prob_dist(ndivs,nsys,spc,sgm):
-    tsgm2 = 2.0 *sgm *sgm
-    tsgm2i = 1.0 /tsgm2
-    pdist = np.zeros(ndivs,dtype=float)
-    la,lb,lc = nsys.get_lattice_lengths()
+def get_prob_dist(ndivs, nsys, spc, sgm):
+    tsgm2 = 2.0 * sgm * sgm
+    tsgm2i = 1.0 / tsgm2
+    pdist = np.zeros(ndivs, dtype=float)
+    la, lb, lc = nsys.get_lattice_lengths()
     ra = 1.0/ndivs[0]
     rb = 1.0/ndivs[1]
     rc = 1.0/ndivs[2]
-    dv = la*ra *lb*rb *lc*rc
+    dv = la*ra * lb*rb * lc*rc
     prefactor = dv / (np.pi*tsgm2)**1.5
     poss = nsys.get_scaled_positions()
     symbols = np.array(nsys.get_symbols(), dtype=str)
@@ -132,23 +133,26 @@ def write_CHGCAR(nsys,pdist,fname='CHGCAR'):
     os.system('rm '+poscar)
     return None
 
-def normalize_pdist(pdist,nsys,spc):
+def normalize_pdist(pdist, nsys, spc):
     print(' Normalize pdist...')
     s = np.sum(pdist)
     sid = nsys.species2sid(spc)
     assert sid > 0, "something is wrong with species2sid..."
     na = nsys.num_atoms(sid=sid)
-    ic(na,s,sid)
+    ic(na, s, sid)
     assert s > 1.0e-14, f"np.sum(pdist) is too small, {s}"
     pdist *= float(na)/s
     #print('   Max in pdist = ',np.max(pdist))
     #print('   Sum of pdist = ',np.sum(pdist))
     #print('   Num of atoms considered = ',na)
     return pdist
-    
-if __name__ == "__main__":
 
-    args = docopt(__doc__)
+def main():
+    from tqdm import tqdm
+
+    args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
+                  version=__version__)
+
     if args['-v']:
         ic.enable()
     files = args['FILES']
@@ -166,31 +170,41 @@ if __name__ == "__main__":
                                   files[0].find('pmd') > -1 ):
         raise ValueError('ERROR: specorder must be specified, unless files are POSCAR format.')
 
-    files.sort(key=get_key,reverse=True)
+    #files.sort(key=get_key,reverse=True)
 
-    #nsys0 = NAPSystem(fname=files[0],specorder=specorder)
-    nsys0 = read(fname=files[0],specorder=specorder)
-    a,b,c = nsys0.get_lattice_angles()
+    print(f' Reading {files[0]}...')
+    nsyss0 = read(fname=files[0], specorder=specorder)
+    if type(nsyss0) is list:  # otherwise nsys0 is NAPSystem object
+        nsys0 = nsyss0[0]
+    else:
+        nsys0 = nsyss0
+    a, b, c = nsys0.get_lattice_angles()
     if abs(a-np.pi/2) > 180.0/np.pi or abs(b-np.pi/2) > 180.0/np.pi \
        or abs(c-np.pi/2) > 180.0/np.pi:
-        raise ValueError('ERROR: Currently only available for orthogonal lattice, a,b,c=',a,b,c)
-    ndivs = get_num_division(nsys0,width)
-    if np.dot(ndivs,ndivs) > 10000000:
-        raise ValueError('ERROR: ndivs too large.',ndivs)
-    else:
-        print(' # of divisions = {0:d} {1:d} {2:d}'.format(*ndivs))
+        raise ValueError('ERROR: Currently not available for non-orthogonal lattice,'
+                         +' alpha,beta,gamma=', a, b, c)
+    ndivs = get_num_division(nsys0, width)
+    if np.dot(ndivs, ndivs) > 10000000:
+        raise ValueError('ERROR: ndivs too large.', ndivs)
+    print(' # of divisions = {0:d} {1:d} {2:d}'.format(*ndivs))
 
-    pdist = np.zeros(ndivs,dtype=float)
-    for f in files:
-        print(' Reading {0:s}...'.format(f))
-        #nsys = NAPSystem(fname=f,specorder=specorder)
-        nsys = read(fname=f,specorder=specorder)
-        pdist += get_prob_dist_kde(ndivs,nsys,spc,sgm)
-        # if 'pdist' in locals():
-        #     pdist += get_prob_dist_kde(ndivs,nsys,sid,sgm)
-        # else:
-        #     pdist = get_prob_dist_kde(ndivs,nsys,sid,sgm)
-    pdist = normalize_pdist(pdist,nsys0,spc)
-    write_CHGCAR(nsys0,pdist)
+    pdist = np.zeros(ndivs, dtype=float)
+    for i, f in enumerate(files):
+        if i == 0:  # if i==0, file is already loaded
+            nsyss = nsyss0
+        else:
+            print(f' Reading {f}...')
+            nsyss = read(fname=f, specorder=specorder)
+        if type(nsyss) is list:
+            for nsys in tqdm(nsyss):
+                pdist += get_prob_dist(ndivs, nsys, spc, sgm)
+        else:
+            pdist += get_prob_dist(ndivs, nsyss, spc, sgm)
+    pdist = normalize_pdist(pdist, nsys0, spc)
+    write_CHGCAR(nsys0, pdist)
     print(' Wrote CHGCAR')
-    
+    return None
+
+
+if __name__ == "__main__":
+    main()
