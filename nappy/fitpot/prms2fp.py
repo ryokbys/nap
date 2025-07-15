@@ -390,9 +390,9 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
         rc3max = max(rc3max, d3b[trio]['rc'])
         coefs = d3b[trio]['coefs']
         fpvars.append(d3b[trio]['gmj'])
-        vranges.append((0.1, 3.0)) # gmj, gmk should be greater than 0.0
+        vranges.append((0.1, 5.0)) # gmj, gmk should be greater than 0.0
         fpvars.append(d3b[trio]['gmk'])
-        vranges.append((0.1, 3.0))
+        vranges.append((0.1, 5.0))
         for i in range(ncoef):
             fpvars.append(coefs[i])
             vranges.append((0.0, 1e+10))

@@ -342,9 +342,9 @@ def main():
         else:
             write_normal(ofname,triplets,na,angd,agr)
 
-    print(' Wrote out.adf')
+    print(' --> out.adf')
     if ofname is not None:
-        print(' Wrote {0:s}'.format(ofname))
+        print(' --> {0:s}'.format(ofname))
     return None
 
 if __name__ == "__main__":

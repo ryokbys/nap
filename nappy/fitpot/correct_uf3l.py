@@ -22,6 +22,8 @@ ic.disable()
 __author__ = "RYO KOBAYASHI"
 __version__ = "250705"
 
+azbl = (0.1818, 0.5099, 0.2802, 0.02817)
+bzbl = (3.2, 0.9423, 0.4029, 0.2016)
 
 def load_yaml(file_path):
     import yaml
@@ -65,6 +67,12 @@ def correct_coefs_wZBL(point, knots, coefs, zi=1.0, zj=1.0):
     return coefs
 
 
+def dzbl(r, zi, zj):
+    k = 14.4  # 1/(4*pi*eps0) in eV*Ang/e^2 unit
+    rs = 0.4683766 / ( zi**0.23 + zj**0.23 )
+    return (k*zi*zj) * (-1.0/r**2 *phi(r/rs) +1.0/r/rs *dphi(r/rs))
+
+
 def dddzbl(r, zi, zj):
     k = 14.4  # 1/(4*pi*eps0) in eV*Ang/e^2 unit
     rs = 0.4683766 / ( zi**0.23 + zj**0.23 )
@@ -75,23 +83,39 @@ def dddzbl(r, zi, zj):
 
 
 def phi(x):
-    return 0.1818*np.exp(-3.2*x) +0.5099*np.exp(-0.9423*x) \
-        +0.2802*np.exp(-0.4029*x) +0.02817*np.exp(-0.2016*x)
+    #return 0.1818*np.exp(-3.2*x) +0.5099*np.exp(-0.9423*x) \
+    #    +0.2802*np.exp(-0.4029*x) +0.02817*np.exp(-0.2016*x)
+    s = 0.0
+    for i in range(4):
+        s += azbl[i]*np.exp(-bzbl[i]*x)
+    return s
 
 
 def dphi(x):
-    return -0.58176*np.exp(-3.2*x) -0.48047877*np.exp(-0.9423*x) \
-        -0.11289258*np.exp(-0.4029*x) -0.005679072*np.exp(-0.2016*x)
+    #return -0.58176*np.exp(-3.2*x) -0.48047877*np.exp(-0.9423*x) \
+    #    -0.11289258*np.exp(-0.4029*x) -0.005679072*np.exp(-0.2016*x)
+    s = 0.0
+    for i in range(4):
+        s += -azbl[i] * bzbl[i] * np.exp(-bzbl[i]*x)
+    return s
 
 
 def ddphi(x):
-    return 1.861632*np.exp(-3.2*x) +0.452755144971*np.exp(-0.9423*x) \
-        +0.045484420482*np.exp(-0.4029*x) +0.0011449009152*np.exp(-0.2016*x)
+    #return 1.861632*np.exp(-3.2*x) +0.452755144971*np.exp(-0.9423*x) \
+    #    +0.045484420482*np.exp(-0.4029*x) +0.0011449009152*np.exp(-0.2016*x)
+    s = 0.0
+    for i in range(4):
+        s += azbl[i] * bzbl[i]**2 * np.exp(-bzbl[i]*x)
+    return s
 
 
 def dddphi(x):
-    return -5.9572224*np.exp(-3.2*x) -0.426631173106*np.exp(-0.9423*x) \
-        -0.0183256730122*np.exp(-0.4029*x) -0.000230812024504*np.exp(-0.2016*x)
+    #return -5.9572224*np.exp(-3.2*x) -0.426631173106*np.exp(-0.9423*x) \
+    #    -0.0183256730122*np.exp(-0.4029*x) -0.000230812024504*np.exp(-0.2016*x)
+    s = 0.0
+    for i in range(4):
+        s += -azbl[i] * bzbl[i]**3 * np.exp(-bzbl[i]*x)
+    return s
 
 
 def get_comb_index(comb, comb_list):
@@ -137,7 +161,7 @@ def correct2b(uf3l_prms, config):
 def correct3b(uf3l_prms, config, adf_file_path,
               sgm=15, ):
     """
-    Correct 3B as -ln(p(theta)/pmax) /beta +vmin.
+    Correct 3B so that the V(-cos) becomes an inverse of ADF.
     """
     from nappy.adf import read_adf
     from scipy.optimize import minimize
@@ -202,15 +226,26 @@ def objective(coefs, xs, ys, knots):
     return obj
 
 
-def chi(coefs, xs, ys, knots):
-    v = []
-    for i, xi in enumerate(xs):
-        yi = ys[i]
-        v.append(yi - bspl_at(xi, coefs, knots))
-    return np.array(v)
+def gen_vtgt_from_rdf(rs, rdf, sgm=0,):
+    """
+    UNDER CONSTSTRUCTION!
+
+    Genenrate target V(r) from RDF, p(r).
+    """
+    from nappy.gaussian_smear import gsmear
+    import copy
+    eps = 1e-15
+    grdf = copy.copy(rdf)
+    if sgm > 0:
+        grdf = gsmear(rs, rdf, sgm)
+    irmax = grdf.argmax()
+    for i in range(irmax, 0, -1):
+        pass
+    #cs = np.array([ -np.cos(t / 180 * np.pi) for t in ts ])
+    return rs, vtgt
 
 
-def gen_vtgt_from_adf(ts, adf, sgm=15, vmax=10.0, vmin=0.0, beta=1.0):
+def gen_vtgt_from_adf(ts, adf, sgm=15, vmax=10.0, vmin=0.0):
     """
     Genenrate target V(-cos) from ADF, p(theta).
     """
