@@ -322,6 +322,7 @@ def write_pmd(nsys,fname='pmdini', auxs=['fx','fy','fz'], **kwargs):
             f.write(f' {aux:s}')
         f.write('\n')
     for k,v in kwargs.items():
+        if k == 'specorder': continue
         if type(v) is list or type(v) is np.ndarray:
             f.write(f'#  {k:s}:')
             for vi in v:
@@ -1141,20 +1142,26 @@ def read_extxyz(fname, specorder=[],):
             for a in atoms:
                 #...Since usually, stress unit in extxyz is in eV/Ang^3 and the definition of sign is opposite,
                 #...convert it to GPa taking into account the sign.
-                nsyss.append(from_ase(a, stress_factor=-160.218))
+                nsys = from_ase(a, stress_factor=-160.218)
+                if specorder != []:
+                    nsys.set_specorder(*specorder)
+                nsyss.append(nsys)
         else:
-            nsys = from_ase(atoms)
+            nsys = from_ase(atoms, stress_factor=-160.218)
+            if specorder != []:
+                nsys.set_specorder(*specorder)
     except Exception as e:
-        print(' Failed to load input file even with ase.')
+        print(' Failed to load input file even with ase.\n'
+              +f' {e}')
         raise
 
-    if specorder != []:
-        if type(atoms) == list:
-            nsys = nsyss[0]
-        if nsys.specorder != specorder:
-            print(' specorder given     = ',specorder)
-            print(' specorder from file = ',nsys.specorder)
-            raise ValueError('Specorder specifically given and obtained from the file do not match!')
+    # if specorder != []:
+    #     if type(atoms) == list:
+    #         nsys = nsyss[0]
+    #     if nsys.specorder != specorder:
+    #         print(' specorder specified = ',specorder)
+    #         print(' specorder from file = ',nsys.specorder)
+    #         raise ValueError('Specorder specified and obtained from the file do not match!')
     if type(atoms) == list:
         return nsyss
     else:

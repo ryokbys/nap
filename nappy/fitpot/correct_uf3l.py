@@ -150,7 +150,12 @@ def correct2b(uf3l_prms, config):
         zj = get_number_from_symbol(sj)
         coefs = uf32b[pair]['coefs']
         knots = uf32b[pair]['knots']
-        new_coefs = correct_coefs_wZBL(pair_rins[ipair],
+        prin = pair_rins[ipair]
+        if prin > max(knots):
+            print(f' Since pair_rin > max(knots) for {si}-{sj}, '
+                  +f' correct pari_rin to {max(knots):.2f}.')
+            prin = 0.999 * max(knots)
+        new_coefs = correct_coefs_wZBL(prin,
                                        knots, coefs,
                                        zi=zi, zj=zj)
         uf3l_prms['2B'][pair]['coefs'] = new_coefs
