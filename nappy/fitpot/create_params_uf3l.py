@@ -110,17 +110,18 @@ def main():
         prms['3B'][tuple(t)] = d3b
     print(f' Max trio_cutoff = {rmax3:.2f}')
 
+    ans = 'y'
     if os.path.exists(outfname):
         ans = input(f' Overwrite {outfname}? [y/N] ').strip().lower()
-        if ans != 'y':
-            print(' Overwrite canceled.')
-        else:
-            author = args['--author']
-            if author == 'None':
-                author = __author__
-            write_params_uf3l(prms, outfname=outfname,
-                              author=author, overwrite=True)
-            print(f' --> {outfname}')
+    if ans != 'y':
+        print(' Overwrite canceled.')
+    else:
+        author = args['--author']
+        if author == 'None':
+            author = __author__
+        write_params_uf3l(prms, outfname=outfname,
+                          author=author, overwrite=True)
+        print(f' --> {outfname}')
 
 if __name__ == "__main__":
 
