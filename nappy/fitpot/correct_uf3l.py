@@ -293,7 +293,7 @@ def main():
     ic(' correct3b...')
     uf3l_prms_tmp = correct3b(uf3l_prms_tmp, config, adf_path,)
     today = datetime.now().strftime('%y%m%d')
-    outfname = f'{infname}_corr_{today}'
+    outfname = f'{infname}_corr'
     write_params_uf3l(uf3l_prms_tmp, outfname=outfname, overwrite=True)
     print(f" --> {outfname}")
     return None
