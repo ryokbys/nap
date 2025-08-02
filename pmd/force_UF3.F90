@@ -1364,7 +1364,7 @@ contains
     epotl3 = 0d0
     do ia=1,natm
       is = int(tag(ia))
-!!$      epi(ia) = epi(ia) +erg1s(is)
+      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
       tmp3 = 0d0

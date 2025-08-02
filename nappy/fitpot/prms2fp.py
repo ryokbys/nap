@@ -415,13 +415,13 @@ def main():
     repul_pairs = []
     if repul_pairs0[0] != 'None':
         for rp in repul_pairs0:
-            spi,spj = rp.split('-')
-            repul_pairs.append((spi,spj))
-    print(' repulsive pairs = ',repul_pairs)
+            spi, spj = rp.split('-')
+            repul_pairs.append((spi, spj))
+    print(' repulsive pairs = ', repul_pairs)
 
     ic(args)
     if potname == 'Morse':
-        Morse2fp(outfname,specorder,rc,rc3)
+        Morse2fp(outfname, specorder, rc, rc3)
 
     elif potname in ('BVS', 'BVSx'):
         """
@@ -430,21 +430,21 @@ def main():
         Thus in this case, specorder should be specified.
         In case of 'BVSx' contains angular parameters, so triplets should be specified.
         """
-        BVS2fp(outfname,specorder,rc,rc3)
+        BVS2fp(outfname, specorder, rc, rc3)
 
-    elif potname in ('UF3','uf3'):
+    elif potname in ('UF3', 'uf3'):
         """
         Ultra-fast force-field.
         """
-        print(' rc, rc3 are given from in.params.uf3, not by this options.')
-        uf32fp(outfname,specorder)
+        print(' rc, rc3 are given from in.params.uf3, even if --rc or --rc3 is given.')
+        uf32fp(outfname, specorder)
 
-    elif potname in ('UF3L','uf3l'):
+    elif potname in ('UF3L', 'uf3l'):
         """
         UF3L (light)
         """
-        print(' rc, rc3 are given from in.params.uf3l, not by this options.')
-        uf3l2fp(outfname,specorder,repul_pairs=repul_pairs)
+        print(' rc, rc3 are given from in.params.uf3l, even if --rc or --rc3 is given.')
+        uf3l2fp(outfname, specorder, repul_pairs=repul_pairs)
 
     return None
 
