@@ -27,7 +27,7 @@ Options:
   --plot      Plot figures. [default: False]
   --fortran   Try using fortran routine for ADF calculation.
   --format FORMAT
-              Input file format. [default: None]
+              Input file format. [default: extxyz]
 """
 
 import os,sys
@@ -166,9 +166,10 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
 
 def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
                 specorder=None,fortran=False,nnmax=100,
-                format=None):
+                format=None,nskip=0):
     na= int(180.0/dang)
     aadf= np.zeros((len(triplets),na),dtype=float)
+    inc = 0
     nsum= 0
     for infname in infiles:
         if not os.path.exists(infname):
@@ -177,10 +178,21 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
         #nsys= NAPSystem(fname=infname,specorder=specorder)
         print(' File = ',infname)
         nsys = read(fname=infname,specorder=specorder,format=format)
-        angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
-        #...NOTE that df is not averaged over the atoms in nsys
-        aadf += df
-        nsum += 1
+        if type(nsys) is list:
+            for nsysi in nsys:
+                angd,df= adf(nsysi,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
+                inc += 1
+                if inc < nskip: continue
+                #...NOTE that df is not averaged over the atoms in nsys
+                aadf += df
+                nsum += 1
+        else:
+            angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
+            inc += 1
+            if inc < nskip: continue
+            #...NOTE that df is not averaged over the atoms in nsys
+            aadf += df
+            nsum += 1
     if nsum != 0:
         aadf /= nsum
     return angd,aadf
@@ -277,6 +289,9 @@ def read_adf(fname):
 
 
 def main():
+    from nappy.util import header_msg
+    print(header_msg(sys.argv))
+
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])),version=__version__)
 
     infiles= args['INFILE']
@@ -308,19 +323,22 @@ def main():
     if out4fp and ofname is None:
         raise ValueError("Output file name must be specified with option -o.")
 
-    if nskip > len(infiles):
-        raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
+    # if nskip > len(infiles):
+    #     raise ValueError('NSKIP must be less than num of files given: ',len(infiles))
+    if len(infiles) < 1:
+        raise ValueError('No input files to be processed.')
+    print(' Number of files to be processed: ',len(infiles))
     if len(infiles) > 1:
         infiles.sort(key=get_key,reverse=True)
-    if nskip > 0 and len(infiles) > nskip:
-        del infiles[:nskip]
-    print(' Number of files to be processed: ',len(infiles))
+    # if nskip > 0 and len(infiles) > nskip:
+    #     del infiles[:nskip]
+    # print(' Number of files to be processed: ',len(infiles))
 
     na= int(180.0/dang)
     angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,triplets=triplets,
                           specorder=specorder,fortran=fortran,nnmax=nnmax,
-                          format=fmt)
+                          format=fmt,nskip=nskip)
 
     if not sigma == 0:
         print(' Gaussian smearing...')

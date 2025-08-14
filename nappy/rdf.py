@@ -9,7 +9,7 @@ Usage:
 Options:
   -h, --help  Show this help message and exit.
   --format FORMAT
-              Input file format. [default: None]
+              Input file format. [default: extxyz]
   -d DR       Width of the bin. [default: 0.1]
   -r,--rmax RMAX
               Cutoff radius of radial distribution. [default: 5.0]
@@ -55,7 +55,7 @@ from nappy.gaussian_smear import gsmear
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "230107"
+__version__ = "250814"
 
 
 def norm(vector):
@@ -688,6 +688,9 @@ def gen_plot_rdf(datafname: str,
     return gpfname
 
 def main():
+
+    from nappy.util import header_msg
+    print(header_msg(sys.argv))
 
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])),
                   version=__version__)

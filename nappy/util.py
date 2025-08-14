@@ -12,7 +12,7 @@ import os,sys
 from docopt import docopt
 
 __author__ = "RYO KOBAYASHI"
-__version__ = ""
+__version__ = "250814"
 
 def decode_tag(tag):
     """
@@ -96,7 +96,7 @@ def pbc(x):
         return x -int(x)
     else:
         return x
-    
+
 def parse_option(line):
     """
     Parse an optional variable from a comment line.
@@ -129,6 +129,23 @@ def gen_header(argv):
     cmd = ' '.join(argv)
     header += '#           by {0:s}\n'.format(cmd)
     return header
+
+def header_msg(argv):
+    """
+    Generate header message for a script.
+    ARGV is usually `sys.argv`.
+    """
+    from datetime import datetime
+    tnow = datetime.now()
+    dstr = tnow.strftime('%Y-%m-%d %H:%M:%S')
+    msg = '\n'
+    if len(argv) > 10:
+        argv = argv[:10]
+        argv.append('...')
+    cmd = ' '.join(argv)
+    msg += f' {cmd:s}\n'
+    msg += f'   at {dstr}\n'
+    return msg
 
 if __name__ == "__main__":
 

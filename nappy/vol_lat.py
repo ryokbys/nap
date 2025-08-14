@@ -8,21 +8,23 @@ Usage:
 Options:
   -h, --help  Show this message and exit.
   --skip NSKIP
-              Skip first NSKIP steps from the statistics. 
+              Skip first NSKIP steps from the statistics.
               If this is -1, vol and lat of the final step are taken. [default: 0]
   --out4fp    Flag to write out in general fp.py format. [default: Fault]
   --prefix PREFIX
               Prefix for output files. [default: data.pmd]
+  --format FORMAT
+              Input file format. [default: extxyz]
 """
 import os,sys
 from docopt import docopt
 import numpy as np
 
-from nappy.io import read
+import nappy
 from nappy.common import get_key
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "230107"
+__version__ = "250814"
 
 def nsys2lat(nsys):
     a,b,c = nsys.get_lattice_lengths()
@@ -34,25 +36,47 @@ def nsys2lat(nsys):
 
 def main():
 
+    from nappy.util import header_msg
+    print(header_msg(sys.argv))
+
     args = docopt(__doc__.format(os.path.basename(sys.argv[0])), version=__version__)
 
     files = args['FILES']
     if len(files) > 1:
         files.sort(key=get_key, reverse=True)
     nskip = int(args['--skip'])
-    del files[:nskip]
+    #del files[:nskip]
     prefix = args['--prefix']
     out4fp = args['--out4fp']
+    fmt = args['--format']
+    if fmt == 'None':
+        fmt = None
 
     nsum = 0
     volsum = 0.0
     asum= bsum= csum= 0.0
     alpsum= betsum= gmmsum= 0.0
     for i,fi in enumerate(files):
-        try:
-            nsys = read(fname=fi)
-            volsum += nsys.get_volume()
-            a,b,c,alpha,beta,gamma = nsys2lat(nsys)
+        assert os.path.exists(fi), f"[Error] File, {fi}, does not exist !!!"
+        # if not os.path.exists(fi):
+        #     print(f"[Error] File, {fi}, does not exist !!!")
+        #     sys.exit()
+        print(' File =',fi)
+        nsys = nappy.io.read(fname=fi, format=fmt)
+        if type(nsys) is list:
+            for nsysi in nsys:
+                volsum += nsysi.get_volume()
+                a,b,c,alpha,beta,gamma = nsys2lat(nsysi)
+                asum += a
+                bsum += b
+                csum += c
+                alpsum += alpha
+                betsum += beta
+                gmmsum += gamma
+                nsum += 1
+        else:
+            volsum += nsysi.get_volume()
+            a,b,c,alpha,beta,gamma = nsys2lat(nsysi)
             asum += a
             bsum += b
             csum += c
@@ -60,12 +84,8 @@ def main():
             betsum += beta
             gmmsum += gamma
             nsum += 1
-        except Exception as e:
-            print('Failed {0:s} '.format(fi))
-            pass
 
-    if nsum < 1:
-        raise ValueError('Something went wrong! nsum<1')
+    assert nsum > 0, 'NSUM==0, which should not happe!'
     vol = volsum /nsum
     a = asum/nsum
     b = bsum/nsum
@@ -100,6 +120,6 @@ def main():
 
     print(' Wrote {0:s}.vol {0:s}.lat'.format(prefix))
 
-    
+
 if __name__ == "__main__":
     main()
