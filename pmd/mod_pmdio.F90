@@ -15,7 +15,7 @@ contains
 
     integer:: ia,ib,l,i
     real(8):: hunit,h(3,3,0:1)
-    character(len=128):: ctmp 
+    character(len=128):: ctmp
 
     open(ionum,file=trim(cfname),status='old')
     do while(.true.)   ! skip comment lines
@@ -61,7 +61,7 @@ contains
     real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,itmp,num
-    character(len=128):: ctmp 
+    character(len=128):: ctmp
 
     open(ionum,file=trim(cfname),status='old')
 !.....Comment lines at the top of pmdini could contain options.
@@ -393,9 +393,9 @@ contains
 !  Format of the extxyz is like the following:
 !  ---
 !  8
-!  Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:frc:R:3
-!  Si        0.00000000      0.00000000      0.00000000    1.6215e-03   -6.4788e-03    2.6939e-05
-!  Si        1.36000000      1.36000000      1.36000000   -9.4438e-05   -5.7187e-04   -2.6944e-04
+!  Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:vel:R:3:frc:R:3
+!  Si  0.00000000  0.00000000  0.00000000  0.00e-00  0.00e-00  0.00e-00  1.6215e-03 -6.4788e-03  2.6939e-05
+!  Si  1.36000000  1.36000000  1.36000000  0.00e-00  0.00e-00  0.00e-00 -9.4438e-05 -5.7187e-04 -2.6944e-04
 !  ...
 !  ---
     use pmdvars,only: has_specorder,specorder,lcomb_pos
@@ -408,7 +408,7 @@ contains
     real(8),intent(in):: epot,ekin,stnsr(3,3)
 
     integer:: ia,ja,ib,l,i,msp,num,is
-    real(8):: atmp(3),ri(3),ai(3),epi,eki
+    real(8):: atmp(3),ri(3),vi(3),ai(3),epi,eki
     character(len=3):: csp
     character(len=128):: cftmp,str
     logical:: lopen = .false.
@@ -444,7 +444,7 @@ contains
     enddo
     write(ionum,'(a)',advance='no') '"'
 
-    write(ionum,'(a)',advance='no') ' Properties=species:S:1:pos:R:3:forces:R:3:epot:R:1:ekin:R:1 energy='
+    write(ionum,'(a)',advance='no') ' Properties=species:S:1:pos:R:3:vel:R:3:forces:R:3:epot:R:1:ekin:R:1 energy='
     write(str,'(f20.6)') epot
     write(ionum,'(a)',advance='no') trim(adjustl(str))
     write(ionum,'(a)',advance='no') ' stress="'
@@ -462,14 +462,16 @@ contains
       is = int(tagtot(i))
       csp = specorder(is)
       ri(1:3)= h(1:3,1,0)*rtot(1,i) +h(1:3,2,0)*rtot(2,i) +h(1:3,3,0)*rtot(3,i)
+      vi(1:3)= h(1:3,1,0)*vtot(1,i) +h(1:3,2,0)*vtot(2,i) +h(1:3,3,0)*vtot(3,i)
       ai(1:3)= h(1:3,1,0)*atot(1,i) +h(1:3,2,0)*atot(2,i) +h(1:3,3,0)*atot(3,i)
       eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
       epi = epitot(i)
-      write(ionum,'(1x,a3,3(1x,f12.5),3(1x,f10.5),2(1x,f8.4))') trim(csp), &
-           ri(1:3), ai(1:3),epi,eki
+      write(ionum,'(1x,a3,3(1x,f12.5),3(1x,es11.3),3(1x,es11.3),2(1x,f8.4))') &
+           trim(csp), &
+           ri(1:3), vi(1:3), ai(1:3),epi,eki
     enddo
 !===== Atom information ends
-    
+
     if( lclose ) close(ionum)
     return
   end subroutine write_extxyz

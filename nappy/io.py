@@ -1062,7 +1062,8 @@ def write_xsf(nsys,fname='xsf',):
     f.close()
     return None
 
-def write_extxyz(fileobj, nsys):
+def write_extxyz(fileobj, nsys,
+                 include_vels=True, include_frcs=True):
     """
     Write a nsys in extxyz format into the fileobj.
     Since the extxyz can contain multiple configurations, this method uses fileobj instead of filename.
@@ -1083,32 +1084,48 @@ def write_extxyz(fileobj, nsys):
 
     fileobj.write('{0:d}\n'.format(len(nsys)))
     hmat = nsys.get_hmat()
-    epot = nsys.get_potential_energy()
     fileobj.write('Lattice="{0:.3f} {1:.3f} {2:.3f}'.format(*hmat[:,0]))
     fileobj.write(' {0:.3f} {1:.3f} {2:.3f}'.format(*hmat[:,1]))
-    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}" '.format(*hmat[:,2]))
-    fileobj.write('Properties=species:S:1:pos:R:3:forces:R:3 ')
-    fileobj.write(f'energy={epot} ')
+    fileobj.write(' {0:.3f} {1:.3f} {2:.3f}"'.format(*hmat[:,2]))
+    fileobj.write(' Properties=species:S:1:pos:R:3')
+    if include_vels:
+        fileobj.write(':vel:R:3')
+    if include_frcs:
+        fileobj.write(':forces:R:3')
+    epot = nsys.get_potential_energy()
+    if not (epot is None or np.isnan(epot)):
+        fileobj.write(f' energy={epot} ')
     #...Stress information in eV/Ang^3 (GPa in napsys)
     try:
         stnsr = nsys.get_stress_tensor() /160.218
-        fileobj.write(f'stress="{stnsr[0,0]:.3e} {stnsr[0,1]:.3e} {stnsr[0,2]:.3e} '+
+        fileobj.write(f' stress="{stnsr[0,0]:.3e} {stnsr[0,1]:.3e} {stnsr[0,2]:.3e} '+
                       f'{stnsr[1,0]:.3e} {stnsr[1,1]:.3e} {stnsr[1,2]:.3e} '+
-                      f'{stnsr[2,0]:.3e} {stnsr[2,1]:.3e} {stnsr[2,2]:.3e}" ')
+                      f'{stnsr[2,0]:.3e} {stnsr[2,1]:.3e} {stnsr[2,2]:.3e}"')
     except:
         pass
     fileobj.write('\n')
 
     symbols = nsys.get_symbols()
     poss = nsys.get_real_positions()
+    max_pos = np.max(poss)
+    vels = nsys.get_real_velocities()
+    if np.any(np.isnan(vels)):
+        vels = np.zeros(vels.shape)
+    lenp = int(max_pos/10)+8
     frcs = nsys.get_real_forces()
+    if np.any(np.isnan(frcs)):
+        frcs = np.zeros(frcs.shape)
     for i in range(len(nsys)):
         si = symbols[i]
         pi = poss[i]
+        vi = vels[i]
         fi = frcs[i]
         fileobj.write(f'{si:2s}')
-        fileobj.write(f'{pi[0]:16.4f} {pi[1]:16.4f} {pi[2]:16.4f}')
-        fileobj.write(f'{fi[0]:16.3e} {fi[1]:16.3e} {fi[2]:16.3e}')
+        fileobj.write(f'{pi[0]:{lenp}.4f} {pi[1]:{lenp}.4f} {pi[2]:{lenp}.4f}')
+        if include_vels:
+            fileobj.write(f' {vi[0]:11.3e} {vi[1]:11.3e} {vi[2]:11.3e}')
+        if include_frcs:
+            fileobj.write(f' {fi[0]:11.3e} {fi[1]:11.3e} {fi[2]:11.3e}')
         fileobj.write('\n')
 
     return None
