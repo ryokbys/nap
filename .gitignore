@@ -9,6 +9,8 @@ autom4te.cache
 *.pyc
 *.tgz
 *.dSYM
+*.so
+*.a
 fitpot/run_pmd.sh
 dump_*
 pmdfin
@@ -17,4 +19,5 @@ out.erg
 erg.pmd
 frc.pmd
 strs.pmd
+traj.extxyz
 subdir_[0-9]*
