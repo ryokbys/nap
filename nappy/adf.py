@@ -21,13 +21,14 @@ Options:
               and separated by comma, in which first one is the center of the three.
               e.g.) P-O-O,Li-O-O. [default: None]
   -o OUT      Output file name [default: None]
-  --out4fp    Flag to write out in general fp.py format. [default: Fault]
+  --out4fp    Flag to write out in general fp.py format. [default: False]
   --skip=NSKIP
               Skip first NSKIP steps from the statistics. [default: 0]
   --plot      Plot figures. [default: False]
   --fortran   Try using fortran routine for ADF calculation.
   --format FORMAT
               Input file format. [default: extxyz]
+  --progress  Show progress. [default: False]
 """
 
 import os,sys
@@ -166,7 +167,7 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
 
 def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
                 specorder=None,fortran=False,nnmax=100,
-                format=None,nskip=0):
+                format=None,nskip=0, show_progress=False):
     na= int(180.0/dang)
     aadf= np.zeros((len(triplets),na),dtype=float)
     inc = 0
@@ -180,16 +181,20 @@ def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
         nsys = read(fname=infname,specorder=specorder,format=format)
         if type(nsys) is list:
             for nsysi in nsys:
-                angd,df= adf(nsysi,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
                 inc += 1
                 if inc < nskip: continue
+                if show_progress:
+                    print(f'   {inc}/{len(nsys):}',end='\r',flush=True)
+                angd,df= adf(nsysi,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
                 #...NOTE that df is not averaged over the atoms in nsys
                 aadf += df
                 nsum += 1
         else:
-            angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
             inc += 1
             if inc < nskip: continue
+            if show_progress:
+                print(f'   {inc}/{len(infiles):}',end='\r',flush=True)
+            angd,df= adf(nsys,dang,rcut,triplets,fortran=fortran,nnmax=nnmax)
             #...NOTE that df is not averaged over the atoms in nsys
             aadf += df
             nsum += 1
@@ -319,6 +324,7 @@ def main():
         ofname = None
     flag_plot= args['--plot']
     nskip = int(args['--skip'])
+    progress = args['--progress']
 
     if out4fp and ofname is None:
         raise ValueError("Output file name must be specified with option -o.")
@@ -338,7 +344,7 @@ def main():
     angd,agr= adf_average(infiles,dang=dang,
                           rcut=rcut,triplets=triplets,
                           specorder=specorder,fortran=fortran,nnmax=nnmax,
-                          format=fmt,nskip=nskip)
+                          format=fmt,nskip=nskip,show_progress=progress)
 
     if not sigma == 0:
         print(' Gaussian smearing...')

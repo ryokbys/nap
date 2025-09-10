@@ -24,7 +24,7 @@ Options:
   --specorder=SPECORDER
               Order of species separated by comma, like, --specorder=W,H.
               [default: None]
-  --out4fp    Flag to write out in general fp.py format. [default: Fault]
+  --out4fp    Flag to write out in general fp.py format. [default: False]
   --pairs PAIRS
               Pairs to be extracted, available only if out4fp is specified.
               hyphen-connected, comma separated, e.g.) Li-O,P-O [default: None]
@@ -40,6 +40,7 @@ Options:
               Scattering lengths of corresponding species in Angstrom.
               [default: None]
   --fortran   Try using fortran function for computing RDF.
+  --progress  Show progress. [default: False]
 """
 
 import os
@@ -329,7 +330,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
 
 def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
                 pairwise=False,nnmax=100,fortran=False,
-                format=None,nskip=0):
+                format=None,nskip=0, show_progress=False):
     nspcs = len(specorder)
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
@@ -345,21 +346,25 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
         print(' File =',infname)
         if type(nsys) is list:
             for nsysi in nsys:
+                inc += 1
+                if inc < nskip: continue
+                if show_progress:
+                    print(f'   {inc}/{len(nsys):}',end='\r',flush=True)
                 rd,gr= rdf(nsysi,nspcs,dr,nr,rmax,rmin=rmin,
                            pairwise=pairwise,nnmax=nnmax,fortran=fortran)
                 if rd.shape[-1] != nr:
                     raise ValueError('The shape of radius data is wrong.')
-                inc += 1
-                if inc < nskip: continue
                 agr += gr
                 nsum += 1
         else:  # nsys is NAPSystem object
+            inc += 1
+            if inc < nskip: continue
+            if show_progress:
+                print(f'   {inc}/{len(infiles):}',end='\r',flush=True)
             rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
                        pairwise=pairwise,nnmax=nnmax,fortran=fortran)
             if rd.shape[-1] != nr:
                 raise ValueError('The shape of radius data is wrong.')
-            inc += 1
-            if inc < nskip: continue
             agr += gr
             nsum += 1
     agr /= nsum
@@ -718,6 +723,7 @@ def main():
         specorder = []
     plot = args['--plot']
     nskip = int(args['--skip'])
+    progress = args['--progress']
     SQ = args['--SQ']
     if SQ:
         qmax = float(args['--qmax'])
@@ -766,7 +772,8 @@ def main():
     rd, agr = rdf_average(infiles, specorder, dr=dr,
                           rmin=rmin, rmax=rmax, nskip=nskip,
                           pairwise=pairwise, nnmax=nnmax,
-                          fortran=fortran,format=fmt)
+                          fortran=fortran,format=fmt,
+                          show_progress=progress)
 
     if not sigma == 0:
         # print(' Gaussian smearing...')
@@ -811,12 +818,14 @@ def main():
                            rho, qmin=0.7, qmax=qmax, nq=200)
 
     # Regardless ofname, write out.rdf in normal format
+    print(' --> out.rdf')
     write_rdf_normal('out.rdf', specorder, nspcs, rd, agr, nr,)
     gpfname = gen_plot_rdf('out.rdf', specorder, rd)
     if SQ:
         write_sq_out4fp('out.sq',qs,sqs)
     # Format of output (named by ofname) depends on out4fp
     if ofname is not None:
+        print(f' --> {ofname}')
         if out4fp:
             write_rdf_out4fp(ofname, specorder, nspcs, agr,
                              nr, rmax, pairs=pairs, rmin=rmin)
@@ -834,15 +843,15 @@ def main():
         else:
             print(' Check graph_rdf_total.png and graph_rdfs.png')
     else:
-        print(' Check out.rdf with gnuplot, like')
+        print(' Check out.rdf with gnuplot as follows:')
         print("   gnuplot> plot 'out.rdf' us 1:2  w l")
         print('   or')
         print(f"   gnuplot> load '{gpfname}'")
         print('')
-        if ofname is not None:
-            print(" In addition to out.rdf,"
-                  + " {0:s} is also written.".format(ofname))
-            print('')
+        # if ofname is not None:
+        #     print(" In addition to out.rdf,"
+        #           + " {0:s} is also written.".format(ofname))
+        #     print('')
 
     return None
 
