@@ -95,10 +95,10 @@ def read(fname="pmdini",format=None, specorder=[], index=None):
         nsys = read_lammps_data(fname,specorder=specorder)
     elif format == 'cube':
         nsys = read_cube(fname,specorder=specorder)
-    elif format == 'extxyz':
+    elif format in 'extxyz':
         nsys = read_extxyz(fname,specorder=specorder)
     else:
-        print('Since the file format is unknown, try to read the file using ASE.')
+        print(' Since the file format is unknown, try to read the file using ASE.')
         try:
             import ase.io
             atoms = ase.io.read(fname,format=format,index=index)
@@ -1601,6 +1601,7 @@ def from_ase(atoms, specorder=[],
         nsys.set_potential_energy(epot)
 
     return nsys
+
 
 def parse_filename(filename, mode=None):
     if mode == 'read':
