@@ -410,7 +410,7 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
     call accum_time('force_angular',mpi_wtime() -tmp)
   endif
-  
+
   if( use_force('Coulomb') ) then
     tmp = mpi_wtime()
     if( lvc .and. chgopt_method(1:4).eq.'xlag' .and. .not.l1st ) then
@@ -476,7 +476,7 @@ subroutine init_force(linit)
 !!$  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
   use ZBL, only: read_params_ZBL, init_ZBL
-  use LJ, only: read_params_LJ_repul
+  use LJ, only: read_params_LJ, read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
   use descriptor, only: read_params_desc,init_desc,lprmset_desc,lout_desc
 !!$  use NN2, only: read_params_NN2,lprmset_NN2,update_params_NN2
@@ -495,7 +495,7 @@ subroutine init_force(linit)
   use fdesc, only: init_fdesc
   implicit none
   include "./const.h"
-  
+
   logical,intent(in):: linit
 
   integer:: i,j
@@ -523,7 +523,7 @@ subroutine init_force(linit)
     endif
   endif
 
-!!$!.....vcMorse requires charge optimization, 
+!!$!.....vcMorse requires charge optimization,
 !!$!.....everywhen atomic positions or potential parameters change
 !!$  if( use_force('vcMorse') ) then
 !!$    if( use_force('Ewald_long') ) then
@@ -602,7 +602,7 @@ subroutine init_force(linit)
       call read_params_repel(myid_md,mpi_md_world,iprint,specorder)
     endif
   endif
-  
+
 !.....Need to set descriptors before NN or linreg
   if( use_force('DNN') .or. use_force('linreg') &
        .or. lout_desc .or. use_force('fdesc') ) then
@@ -647,7 +647,9 @@ subroutine init_force(linit)
     call init_ZBL(iprint)
   endif
 !.....LJ_repul
-  if( use_force('LJ_repul') ) then
+  if( use_force('LJ') ) then
+    call read_params_LJ(myid_md, mpi_md_world, iprint, specorder, rc)
+  else if ( use_force('LJ_repul') ) then
     call read_params_LJ_repul(myid_md,mpi_md_world,iprint,specorder)
   endif
 !.....Linear regression
@@ -662,7 +664,7 @@ subroutine init_force(linit)
   if( use_force('Tersoff') ) then
     call init_tersoff(myid_md,mpi_md_world,iprint,specorder)
   endif
-  
+
 !.....angular
   if( use_force('angular') ) then
     if( .not.lprmset_angular ) then
@@ -1107,7 +1109,7 @@ function hvsd(x)
     hvsd= 1d0
     return
   endif
-  return 
+  return
 
 end function hvsd
 !=======================================================================
@@ -1469,7 +1471,7 @@ subroutine set_fqtot_zero(fq)
   do i=1,natm
     fq(i) = fq(i) -avmu
   enddo
-  
+
   return
 end subroutine set_fqtot_zero
 !=======================================================================
@@ -1490,7 +1492,7 @@ subroutine get_bounding_fq(chg,fq,epot)
   real(8):: epotl
 
   epotl = 0d0
-  
+
   do i=1,natm
     is = int(tag(i))
     if( chg(i).ge.qtop(is) ) then
@@ -1543,7 +1545,7 @@ subroutine suppress_dq(dq,dqlim,dqmax)
 
   integer:: i,ierr
   real(8):: dqmaxl,fac
-  
+
   dqmaxl = 0d0
   do i=1,natm
     dqmaxl = max(dqmaxl,abs(dq(i)))
@@ -1607,7 +1609,7 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
      ,iprint,l1st,lvc &
      ,ndimp,gwe,gwf,gws)
 !
-!  Compute derivative of potential energy (and forces) 
+!  Compute derivative of potential energy (and forces)
 !  w.r.t. potential parameters.
 !
   use force
@@ -1752,7 +1754,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
   real(8),intent(in):: chg0(namax),dchg(namax)
   real(8),intent(inout):: a,b,c,fa,fb,fc
   integer,intent(inout):: iflag
-  
+
   real(8),parameter:: gr = 1.61803398875d0  ! golden ratio
   real(8),parameter:: gri = 1d0/gr
   real(8),parameter:: eps = 1d-12
@@ -1778,7 +1780,7 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
     print '(a,i5,2f12.8,2es16.8)','   get_range: istp,a,b,fa,fb=', &
          istp,a,b,fa,fb
   endif
-  
+
 10 continue
   istp = istp +1
   if( istp.gt.nstp ) then

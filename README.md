@@ -15,7 +15,7 @@ and uses spatial decomposition technique for the parallelization, and linked-cel
 
 # Who made this?
 * [Ryo KOBAYASHI](http://ryokbys.web.nitech.ac.jp/index.html)
-* Assistant Professor in the department of mechanical engineering, Nagoya Institute of Technology.
+* Associate Professor in the department of mechanical engineering, Nagoya Institute of Technology.
 
 # Requirements and dependencies
 
@@ -62,4 +62,3 @@ This program was supported in part by ["Materials research by Information Integr
 
 # LICENSE
 This software is released under the MIT License, see the LICENSE.
-

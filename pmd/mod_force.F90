@@ -11,7 +11,7 @@ module force
        write_forces,bcast_force,calc_overlay
   public:: luse_charge, luse_elec_temp, force_list, num_forces, loverlay, &
        ol_type, ol_force, ol_ranges, ol_alphas, ol_dalphas, ol_pair
-  
+
 !.....Force index list
   integer,parameter:: N_FORCES = 37
   character(len=128):: force_index_list(N_FORCES)
@@ -78,7 +78,7 @@ contains
 
     ol_ranges(:,:) = -1d0
 !!$    do i=1,num_forces
-!!$      
+!!$
 !!$    enddo
 
   end subroutine init_mod_force
@@ -148,7 +148,7 @@ contains
     call mpi_bcast(ol_type,128,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(ol_force,128,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(ol_ranges,2*nspmax,mpi_real8,0,mpicomm,ierr)
-      
+
   end subroutine bcast_force
 !=======================================================================
   function ol_pair(ir,isp,jsp)
@@ -164,7 +164,7 @@ contains
 !=======================================================================
   subroutine ol_allocate(namax,nnmax)
     integer,intent(in):: namax,nnmax
-    
+
     if( .not.allocated(ol_alphas) ) then
       allocate(ol_alphas(0:nnmax,namax),ol_dalphas(nnmax,namax))
     else if( size(ol_alphas).ne.(nnmax+1)*namax ) then
@@ -197,7 +197,7 @@ contains
       fol = 0d0
       dfol = 0d0
     endif
-    
+
     return
   end subroutine get_fol_dfol
 !=======================================================================
@@ -241,7 +241,7 @@ contains
 
     return
   end subroutine calc_overlay
-  
+
 end module force
 !-----------------------------------------------------------------------
 !     Local Variables:
