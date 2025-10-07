@@ -179,12 +179,12 @@ contains
 !.....All the length values (r,v,a) are scaled by h-mat in pmd format
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
-        write(ionum,'(f17.14,3es22.14,14es12.4)') tagtot(i) &
+        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tagtot(i) &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
-        write(ionum,'(f17.14,3es22.14,14es12.4)') tagtot(i) &
+        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tagtot(i) &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif
