@@ -1304,6 +1304,9 @@ contains
 !  Light-weight UF3 implementation without using recursive function of b-spline.
 !
     use util, only: itotOf
+#ifdef IMPULSE
+    use impulse,only: ftaul, ia_impls, tau_impls
+#endif
     implicit none
     real(8),parameter:: tiny = 1d-8
     integer,intent(in):: namax,natm,nnmax,iprint
@@ -1362,6 +1365,9 @@ contains
     epotl1 = 0d0
     epotl2 = 0d0
     epotl3 = 0d0
+#ifdef IMPULSE
+    ftaul(:) = 0d0
+#endif
     do ia=1,natm
       is = int(tag(ia))
       epi(ia) = epi(ia) +erg1s(is)
@@ -1408,6 +1414,14 @@ contains
             aal2(ixyz,ia) = aal2(ixyz,ia) +drijj(ixyz)*tmp2
             aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
           enddo
+#ifdef IMPULSE
+          if( ia == ia_impls ) then
+            ftaul(js) = ftaul(js) +tmp2 &
+                 *(drijj(1)*tau_impls(1) &
+                 +drijj(2)*tau_impls(2) &
+                 +drijj(3)*tau_impls(3) )
+          endif
+#endif
 !.....Stresses
           do ixyz=1,3
             do jxyz=1,3
@@ -1497,6 +1511,16 @@ contains
             aal3(ixyz,ja) = aal3(ixyz,ja) -tmpj(ixyz)
             aal3(ixyz,ka) = aal3(ixyz,ka) -tmpk(ixyz)
           enddo
+#ifdef IMPULSE
+          if( ia == ia_impls ) then
+            ftaul(js) = ftaul(js) +tmpj(1)*tau_impls(1) &
+                 +tmpj(2)*tau_impls(2) &
+                 +tmpj(3)*tau_impls(3)
+            ftaul(ks) = ftaul(ks) +tmpk(1)*tau_impls(1) &
+                 +tmpk(2)*tau_impls(2) &
+                 +tmpk(3)*tau_impls(3)
+          endif
+#endif
 !.....stress
           do jxyz=1,3
             do ixyz=1,3

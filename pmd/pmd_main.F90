@@ -33,6 +33,7 @@ program pmd
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
   use group,only: init_group
+  use impulse,only: init_impulse, l_impls, l_macro_impls
 !$  use omp_lib
   implicit none
   include "mpif.h"
@@ -309,6 +310,10 @@ program pmd
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
   if( use_force('fdesc') ) auxtot(iaux_edesc,:) = 0d0
+#ifdef IMPULSE
+  l_macro_impls = .true.
+#endif
+  if( l_impls ) call init_impulse(myid_md)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then
@@ -334,6 +339,7 @@ program pmd
 
   if( lflux ) call final_lflux(myid_md)
   if( lpdens ) call final_pdens(myid_md,mpi_md_world,hmat)
+  if( l_impls ) call final_impulse(myid)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
@@ -628,6 +634,7 @@ subroutine bcast_params(nprocs)
   use isostat,only: sratemax
   use group, only: bcast_group
   use virtual_wall, only: bcast_vwall
+  use impulse,only: l_impls, bcast_impulse
   implicit none
   include 'mpif.h'
   integer,intent(in):: nprocs
@@ -767,6 +774,9 @@ subroutine bcast_params(nprocs)
 !.....Structure analysis
   call mpi_bcast(cstruct,128,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(istruct,1,mpi_integer,0,mpicomm,ierr)
+!.....Impulse analysis
+  call mpi_bcast(l_impls,1,mpi_logical,0,mpicomm,ierr)
+  if( l_impls ) call bcast_impulse(myid_md,mpicomm)
 
   call bcast_group(mpicomm)
   call bcast_vwall(mpicomm)
