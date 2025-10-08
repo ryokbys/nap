@@ -33,7 +33,7 @@ program pmd
   use localflux,only: lflux,init_lflux,final_lflux
   use pdens,only: lpdens,init_pdens,final_pdens
   use group,only: init_group
-  use impulse,only: init_impulse, l_impls, l_macro_impls
+  use impulse,only: init_impulse, final_impulse, l_impls, l_macro_impls
 !$  use omp_lib
   implicit none
   include "mpif.h"
@@ -339,7 +339,7 @@ program pmd
 
   if( lflux ) call final_lflux(myid_md)
   if( lpdens ) call final_pdens(myid_md,mpi_md_world,hmat)
-  if( l_impls ) call final_impulse(myid)
+  if( l_impls ) call final_impulse(myid_md)
 
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then

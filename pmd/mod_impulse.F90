@@ -4,6 +4,7 @@ module impulse
 !
   use memory,only: accum_mem
   use pmdvars,only: nspmax
+  use util,only: itotOf
   implicit none
   include "mpif.h"
   include "./const.h"
@@ -24,7 +25,7 @@ module impulse
 contains
 !=======================================================================
   subroutine init_impulse(myid)
-    use pmdvars,only: specorder
+    use pmdvars,only: specorder,nsp
     integer,intent(in):: myid
     real(8):: dtau
     integer:: is
@@ -83,9 +84,9 @@ contains
 
   end subroutine set_ia_impls
 !=======================================================================
-  subroutine comp_ptau(natm,nsp,tag,va,h)
-    use pmdvars,only: am,fa2v
-    integer,intent(in):: natm,nsp
+  subroutine comp_ptau(natm,tag,va,h)
+    use pmdvars,only: am,fa2v,nsp
+    integer,intent(in):: natm
     real(8),intent(in):: tag(natm),va(3,natm),h(3,3)
 
     integer:: is, ixyz
@@ -102,14 +103,14 @@ contains
     return
   end subroutine comp_ptau
 !=======================================================================
-  subroutine write_impulse(myid,mpi_world,iprint)
+  subroutine write_impulse(istp,simtime,myid,mpi_world,iprint)
 !
 !  Write out impulse information into the file.
 !  This will be called after velocity update is done.
 !
     use pmdvars,only: fa2v,am,dt,nsp
-    integer,intent(in):: myid, mpi_world, iprint
-
+    integer,intent(in):: istp, myid, mpi_world, iprint
+    real(8),intent(in):: simtime
     integer:: ierr, is
 
 !.....Scale forces
@@ -128,7 +129,7 @@ contains
 !.....Write to the file only at node-0
     if( myid == 0 ) then
       write(io_impls,'(i10, f10.1, 11es12.4)') istp, simtime, ptau, &
-           (ftau(i), isp=1,nsp)
+           (ftau(is), is=1,nsp)
     endif
     
   end subroutine write_impulse

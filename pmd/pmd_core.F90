@@ -41,7 +41,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use descriptor,only: write_desc,lout_desc
   use group,only: grouping
   use virtual_wall,only: correct_pos_vwall, write_frc_vwall
-  use impulse,only: comp_ptau, l_impls, ftaul
+  use impulse,only: comp_ptau, write_impulse, l_impls, ftaul
 
   implicit none
   include "mpif.h"
@@ -745,7 +745,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Impulse analysis
     if( l_impls ) then
       call comp_ptau(natm,tag,va,h)
-      call write_impulse(myid_md, mpi_md_world,iprint)
+      call write_impulse(istp,simtime,myid_md, mpi_md_world,iprint)
     endif
     
 
