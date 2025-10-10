@@ -48,6 +48,7 @@ subroutine set_variable(ionum,cname)
   use isostat,only: sratemax
   use fdesc,only: lfdesc
   use group,only: register_group
+  use impulse,only: l_impls, itot_impls, tau_impls, cfout_impls
 #ifdef __WALL__
   use wall
 #endif
@@ -436,6 +437,21 @@ subroutine set_variable(ionum,cname)
     call read_i1(ionum,nout_wall)
     return
 #endif
+  elseif( trim(cname).eq.'flag_impulse' ) then
+    call read_l1(ionum,l_impls)
+    return
+  elseif( trim(cname).eq.'tau_impulse') then
+    backspace(ionum)
+    read(ionum,*) ctmp, tau_impls(1:3)
+    return
+  elseif( trim(cname).eq.'itot_impulse') then
+    backspace(ionum)
+    read(ionum,*) ctmp, itot_impls
+    return
+  elseif( trim(cname).eq.'output_impulse') then
+    backspace(ionum)
+    read(ionum,*) ctmp, cfout_impls
+    return
 !      elseif( trim(cname).eq.'' ) then
 !        call read_i1(ionum,nz)
 !        return

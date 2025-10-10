@@ -1305,7 +1305,7 @@ contains
 !
     use util, only: itotOf
 #ifdef IMPULSE
-    use impulse,only: ftaul, ia_impls, tau_impls
+    use impulse,only: ftaul, itot_impls, tau_impls
 #endif
     implicit none
     real(8),parameter:: tiny = 1d-8
@@ -1370,6 +1370,7 @@ contains
 #endif
     do ia=1,natm
       is = int(tag(ia))
+      itot = itotOf(tag(ia))
       epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
@@ -1415,7 +1416,7 @@ contains
             aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
           enddo
 #ifdef IMPULSE
-          if( ia == ia_impls ) then
+          if( itot == itot_impls ) then
             ftaul(js) = ftaul(js) +tmp2 &
                  *(drijj(1)*tau_impls(1) &
                  +drijj(2)*tau_impls(2) &
@@ -1512,7 +1513,7 @@ contains
             aal3(ixyz,ka) = aal3(ixyz,ka) -tmpk(ixyz)
           enddo
 #ifdef IMPULSE
-          if( ia == ia_impls ) then
+          if( itot == itot_impls ) then
             ftaul(js) = ftaul(js) +tmpj(1)*tau_impls(1) &
                  +tmpj(2)*tau_impls(2) &
                  +tmpj(3)*tau_impls(3)

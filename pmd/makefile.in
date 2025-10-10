@@ -162,5 +162,5 @@ mod_util.o: mod_pmdvars.o mod_vector.o
 mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
 mod_group.o: mod_pmdvars.o mod_util.o
 mod_virtual_wall.o: mod_pmdvars.o
+mod_impulse.o: mod_pmdvars.o mod_memory.o mod_util.o
 descriptor.o: mod_pmdvars.o mod_util.o mod_memory.o
-mod_impulse.o: mod_pmdvars.o mod_memory.o

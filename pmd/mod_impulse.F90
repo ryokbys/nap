@@ -50,9 +50,15 @@ contains
 
 !.....Open file
     if( myid == 0 ) then
+      print *,''
+      print *,'Impulse analysis ON'
+      print '(a,i8)','  itot = ', itot_impls
+      print '(a,3f6.3)', '  tau = ', (tau_impls(is),is=1,3)
+      print '(a,a)', '  cfout = ', trim(cfout_impls)
+      
       open(io_impls, file=trim(cfout_impls), status='replace')
-      write(io_impls,'(a,9a)') "# istp, simtime, ptau,",&
-           (specorder(is), is=1,nsp)
+      write(io_impls,'(a,9a)') "# istp, simtime, ptau",&
+           (", "//trim(specorder(is)), is=1,nsp)
     endif
     return
   end subroutine init_impulse
@@ -65,7 +71,7 @@ contains
     call mpi_bcast(l_impls, 1, mpi_logical, 0, mpi_world, ierr)
     call mpi_bcast(itot_impls, 1, mpi_integer, 0, mpi_world, ierr)
     call mpi_bcast(tau_impls, 3, mpi_real8, 0, mpi_world, ierr)
-
+    
   end subroutine bcast_impulse
 !=======================================================================
   subroutine set_ia_impls(natm,tag)

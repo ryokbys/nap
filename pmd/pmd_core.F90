@@ -41,7 +41,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use descriptor,only: write_desc,lout_desc
   use group,only: grouping
   use virtual_wall,only: correct_pos_vwall, write_frc_vwall
-  use impulse,only: comp_ptau, write_impulse, l_impls, ftaul
+  use impulse,only: comp_ptau, write_impulse, set_ia_impls, &
+       l_impls, ftaul
 
   implicit none
   include "mpif.h"
@@ -647,6 +648,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call apply_deform(h,dt,simtime)
       lcell_updated = .true.
     endif
+
+#ifdef IMPULSE
+    call set_ia_impls(natm,tag)
+#endif
 
     simtime = simtime +dt
 
