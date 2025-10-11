@@ -1379,6 +1379,7 @@ contains
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
         js = int(tag(ja))
+        jtot = itotOf(tag(ja))
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -1418,6 +1419,12 @@ contains
 #ifdef IMPULSE
           if( itot == itot_impls ) then
             ftaul(js) = ftaul(js) +tmp2 &
+                 *(drijj(1)*tau_impls(1) &
+                 +drijj(2)*tau_impls(2) &
+                 +drijj(3)*tau_impls(3) )
+          endif
+          if( jtot == itot_impls ) then
+            ftaul(is) = ftaul(is) -tmp2 &
                  *(drijj(1)*tau_impls(1) &
                  +drijj(2)*tau_impls(2) &
                  +drijj(3)*tau_impls(3) )
@@ -1520,6 +1527,16 @@ contains
             ftaul(ks) = ftaul(ks) +tmpk(1)*tau_impls(1) &
                  +tmpk(2)*tau_impls(2) &
                  +tmpk(3)*tau_impls(3)
+          endif
+          if( jtot == itot_impls ) then
+            ftaul(is) = ftaul(is) -tmpj(1)*tau_impls(1) &
+                 -tmpj(2)*tau_impls(2) &
+                 -tmpj(3)*tau_impls(3)
+          endif
+          if( ktot == itot_impls ) then
+            ftaul(is) = ftaul(is) -tmpk(1)*tau_impls(1) &
+                 -tmpk(2)*tau_impls(2) &
+                 -tmpk(3)*tau_impls(3)
           endif
 #endif
 !.....stress

@@ -313,7 +313,7 @@ program pmd
 #ifdef IMPULSE
   l_macro_impls = .true.
 #endif
-  if( l_impls ) call init_impulse(myid_md)
+  if( l_impls ) call init_impulse(myid_md,ntot0,rtot)
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0d0 ) then

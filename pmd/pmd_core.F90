@@ -649,10 +649,6 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       lcell_updated = .true.
     endif
 
-#ifdef IMPULSE
-    call set_ia_impls(natm,tag)
-#endif
-
     simtime = simtime +dt
 
 !.....Reset matrices
@@ -696,6 +692,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !$acc update device(ra,h)
     endif
 !!$    print *,'Time at 6 = ',mpi_wtime() -tcpu0
+
+#ifdef IMPULSE
+    call set_ia_impls(natm,tag,mpi_md_world)
+#endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
       lstrs = lstrs0
@@ -749,7 +749,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Impulse analysis
     if( l_impls ) then
-      call comp_ptau(natm,tag,va,h)
+      call comp_ptau(natm,tag,ra,va,h,sorg)
       call write_impulse(istp,simtime,myid_md, mpi_md_world,iprint)
     endif
     
