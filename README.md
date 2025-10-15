@@ -15,7 +15,7 @@ and uses spatial decomposition technique for the parallelization, and linked-cel
 
 # Who made this?
 * [Ryo KOBAYASHI](http://ryokbys.web.nitech.ac.jp/index.html)
-* An associate professor at Department of Physical Science and Engineering, Nagoya Institute of Technology, Japan.
+* An associate professor at [Department of Physical Science and Engineering, Nagoya Institute of Technology](https://psae.web.nitech.ac.jp/), Japan.
 
 # Requirements and dependencies
 
