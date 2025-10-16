@@ -16,6 +16,7 @@ program fitpot
   use DNN,only: write_tgrads_DNN
   use UF3,only: symmetrize_params_uf3
   use pmdvars,only: specorder_pmd => specorder
+  use conditions,only: lconds, read_conds
   implicit none
   integer:: ismpl,ihour,imin,isec,isp,jsp
   real(8):: tmp,ftrn0,ftst0
@@ -77,7 +78,10 @@ program fitpot
   call read_vars()
   allocate(gvar(nvars),dvar(nvars))
   dmem = dmem +8d0*size(gvar) +8d0*size(dvar)
-!!$  if( myid.eq.0 ) print *,'after read_vars, dmem=',dmem
+!!$  if( myid.eq.0 ) print *,'after read_vars, dmem=',Dem
+
+!.....Read_in.vars.conditions if lconds
+  if( lconds ) call read_conds(myid, mpi_world, iprint)
 
   if( nnode.gt.nsmpl ) then
     if( myid.eq.0 ) then
@@ -279,6 +283,7 @@ subroutine write_initial_setting()
   use minimize
   use random
   use composition
+  use conditions,only: lconds
   implicit none
   integer:: i,isp,jsp
 
@@ -345,6 +350,9 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_short',pwgt2bs
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b',pwgt3b
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b_diff',pwgt3bd
+  endif
+  if( lconds ) then
+    write(6,'(2x,a25,2x,l3)') 'conditions',lconds
   endif
 !!$  write(6,'(2x,a25,2x,l3)') 'gradient',lgrad
 !!$  write(6,'(2x,a25,2x,l3)') 'grad_scale',lgscale
@@ -1889,6 +1897,7 @@ subroutine sync_input()
   use random
   use pmdvars,only: nnmax,namax
   use composition
+  use conditions,only: lconds
   implicit none
 
   call mpi_bcast(nsmpl,1,mpi_integer,0,mpi_world,ierr)
@@ -2025,6 +2034,9 @@ subroutine sync_input()
 !!$    call mpi_bcast(core_chgs,nspmax,mpi_real8,0,mpi_world,ierr)
 !!$    call mpi_bcast(pwgt_repul,1,mpi_real8,0,mpi_world,ierr)
 !!$  endif
+
+!.....Conditions for variables
+  call mpi_bcast(lconds, 1, mpi_logical, 0, mpi_world, ierr)
 
 !.....pmdio related
   call mpi_bcast(nnmax,1,mpi_integer,0,mpi_world,ierr)

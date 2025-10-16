@@ -41,6 +41,7 @@ subroutine set_variable(ionum,cname)
   use pmdvars,only: nnmax,namax
   use composition
   use util,only: to_lower
+  use conditions, only: lconds
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cname
@@ -389,6 +390,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pwgt_repul' ) then
     backspace(ionum)
     read(ionum,*) ctmp, pwgt_repul
+    return
+  elseif( trim(cname).eq.'conditions' ) then
+    call read_l1(ionum, lconds)
     return
 !      elseif( trim(cname).eq.'' ) then
 !        call read_i1(ionum,nz)

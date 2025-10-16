@@ -2,6 +2,7 @@
 """
 Convert pmd param file `in.params.XXX` to fitpot var file `in.vars.fitpot`.
 By default `in.vars.fitpot` includes hard-limit of parameters.
+If repulsive pairs are given, `in.vars.conditions` is also written.
 
 Usage:
   prms2fp.py [options] POTENTIAL
@@ -397,7 +398,41 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
             fpvars.append(coefs[i])
             vranges.append((0.0, 1e+10))
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
+    if repul_pairs != []:
+        write_vars_conditions(uf3l_prms, repul_pairs)
     return None
+
+
+def write_vars_conditions(uf3l_prms, repul_pairs):
+    """
+    Write in.vars.conditions for vars2cond if repul_pairs != [].
+    """
+    msgline = []
+    msgline.append('# var-ID-LHS,  operator,  var-ID-RHS\n')
+    d2b = uf3l_prms['2B']
+    inc = 0
+    nconds = 0
+    for spi, erg in uf3l_prms['1B'].items():
+        inc += 1
+    for pair in d2b.keys():
+        ncoef = d2b[pair]['ncoef']
+        ntrail = d2b[pair]['ntrail']
+        for i in range(ncoef-ntrail):
+            inc += 1
+            if any( set(pair) == set(rp) for rp in repul_pairs ):
+                if i != 0:
+                    msgline.append(f'   {inc:d}  <  {inc-1:d}\n')
+                    nconds += 1
+        for i in range(ncoef-ntrail, ncoef):
+            inc += 1
+    wgt = 1.0
+    msgline.insert(1, f'  {nconds:d}  {wgt:.3f}\n')
+    print(' --> in.vars.conditions')
+    with open('in.vars.conditions', 'w') as f:
+        for l in msgline:
+            f.write(l)
+    return None
+
 
 def main():
     args = docopt(__doc__)

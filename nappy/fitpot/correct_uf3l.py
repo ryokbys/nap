@@ -275,7 +275,7 @@ def main():
     verbose = args['--verbose']
     if verbose:
         ic.enable()
-        ic(' Verbose mode on.')
+        ic(' Verbose mode ON.')
 
     infname = args['FILENAME']
     ic(' read_params_uf3l...')

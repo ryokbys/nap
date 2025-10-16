@@ -1034,6 +1034,7 @@ contains
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow
     use UF3,only: calc_penalty_uf3, calc_penalty_uf3l
+    use conditions,only: lconds, calc_fpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
@@ -1054,12 +1055,15 @@ contains
       if( trim(cpotlow).ne.'uf3l' ) stop 'potential and penalty is not consistent !'
       call calc_penalty_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,fp)
+    else if( lconds ) then
+      call calc_fpenal_conds(ndim, x, fp)
     endif
     return
   end subroutine func_penalty
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
     use UF3,only: calc_penalty_grad_uf3,calc_penalty_grad_uf3l
+    use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gp(ndim)
@@ -1075,6 +1079,8 @@ contains
     else if( trim(cpenalty).eq.'uf3l' ) then
       call calc_penalty_grad_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
            pwgt3b,pwgt3bd,repul_radii,gp)
+    else if( lconds ) then
+      call calc_gpenal_conds(ndim, x, gp)
     endif
     return
   end subroutine grad_penalty
