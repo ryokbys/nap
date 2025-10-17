@@ -29,7 +29,7 @@ ic.disable()
 from uf3util import read_params_uf3, read_params_uf3l
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "241119"
+__version__ = "251017"
 
 def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
     with open(outfname,'w') as f:
@@ -393,11 +393,11 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
         # gmj, gmk are parameters in exp.
         # Too small values cause violation of energy conservation,
         # and too large values make them negligibly small.
-        # Here, we set the range at (0.5, 2.0).
+        # But for now, we fix it to 1.0.
         fpvars.append(d3b[trio]['gmj'])
-        vranges.append((0.5, 2.0)) # gmj, gmk should be greater than 0.0
+        vranges.append((1.0, 1.0)) # gmj, gmk should be greater than 0.0
         fpvars.append(d3b[trio]['gmk'])
-        vranges.append((0.5, 2.0))
+        vranges.append((1.0, 1.0))
         for i in range(ncoef):
             fpvars.append(coefs[i])
             vranges.append((0.0, 1e+10))
