@@ -25,7 +25,8 @@ __version__ = "240903"
 
 READ_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
                 'cube','CHGCAR','pdb','extxyz')
-WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz', 'pdb')
+WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz',
+                 'pdb', 'cube')
 
 def write(nsys,fname="pmdini",format=None,**kwargs):
     global myopen, open
@@ -1330,7 +1331,7 @@ def read_cube(fname, specorder=[],):
         d = lines[3+i].split()
         ndiv[i] = int(d[0])
         dhmat[i,:] = [ float(v)*Bohr_to_Ang for v in d[1:4] ]
-        hmat[i,:] = dhmat[i,:] *ndiv[i]
+        hmat[:,i] = dhmat[i,:] *ndiv[i]
     nvoldat = ndiv[0]*ndiv[1]*ndiv[2]
     hmati = np.linalg.inv(hmat)
     # 7-(7+natm)-th lines: id, elem-ID, rh[0:3]
