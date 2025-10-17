@@ -1456,6 +1456,7 @@ contains
         xij(1:3)= xj(1:3) - xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2 > rc3max2 ) cycle
         dij = sqrt(dij2)
         diji = 1d0/dij
         drijj(1:3) = rij(1:3)*diji

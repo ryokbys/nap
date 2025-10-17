@@ -390,10 +390,14 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
         ncoef = d3b[trio]['ncoef']
         rc3max = max(rc3max, d3b[trio]['rc'])
         coefs = d3b[trio]['coefs']
+        # gmj, gmk are parameters in exp.
+        # Too small values cause violation of energy conservation,
+        # and too large values make them negligibly small.
+        # Here, we set the range at (0.5, 2.0).
         fpvars.append(d3b[trio]['gmj'])
-        vranges.append((0.1, 5.0)) # gmj, gmk should be greater than 0.0
+        vranges.append((0.5, 2.0)) # gmj, gmk should be greater than 0.0
         fpvars.append(d3b[trio]['gmk'])
-        vranges.append((0.1, 5.0))
+        vranges.append((0.5, 2.0))
         for i in range(ncoef):
             fpvars.append(coefs[i])
             vranges.append((0.0, 1e+10))
