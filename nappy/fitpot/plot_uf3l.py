@@ -54,7 +54,7 @@ def plot_uf3l_2b(uf3l_prms,
     # Analyze 2b
     pairs = uf3l_prms['2B'].keys()
     miny = -1.0
-    maxy =  1.0
+    maxy =  5.0
     minx = 10.0
     maxx = 0.0
     for pair in pairs:

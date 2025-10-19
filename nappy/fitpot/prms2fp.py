@@ -388,8 +388,14 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
     for trio in d3b.keys():
         print(trio)
         ncoef = d3b[trio]['ncoef']
-        rc3max = max(rc3max, d3b[trio]['rc'])
+        rc3max = max(rc3max, d3b[trio]['rcij'], d3b[trio]['rcik'])
         coefs = d3b[trio]['coefs']
+        # rcij, rcik are cutoff parameters for each pair
+        fpvars.append(d3b[trio]['rcij'])
+        vranges.append((0.5, rc2max))
+        fpvars.append(d3b[trio]['rcik'])
+        vranges.append((0.5, rc2max))
+        # gmj, gmk should be greater than 0.0
         # gmj, gmk are parameters in exp.
         # Too small values cause violation of energy conservation,
         # and too large values make them negligibly small.

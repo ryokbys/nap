@@ -96,7 +96,8 @@ def main():
         d3b['nlead'] = leading_trim
         d3b['ntrail'] = trailing_trim
         d3b['spacing'] = spacing
-        d3b['rc'] = trio_cutoffs[it]
+        d3b['rcij'] = trio_cutoffs[it]
+        d3b['rcik'] = trio_cutoffs[it]
         d3b['gmj'] = 1.0
         d3b['gmk'] = 1.0
         res = trio_res[it]

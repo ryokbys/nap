@@ -162,8 +162,11 @@ def read_params_uf3l(infname):
                     d3b['ntrail'] = int(data[5])
                     d3b['spacing'] = data[6]
                     d = f.readline().split()
-                    rc, nknot, gmj, gmk = (float(d[0]), int(d[1]), float(d[2]), float(d[3]))
-                    d3b['rc'] = rc
+                    rcij, rcik, nknot, gmj, gmk = \
+                        (float(d[0]),  float(d[1]), int(d[2]),
+                         float(d[3]), float(d[4]))
+                    d3b['rcij'] = rcij
+                    d3b['rcik'] = rcik
                     d3b['nknot'] = nknot
                     d3b['gmj'] = gmj
                     d3b['gmk'] = gmk
@@ -332,7 +335,8 @@ def write_params_uf3l(uf3lprms,
             nlead = d3b['nlead']
             ntrail = d3b['ntrail']
             spacing = d3b['spacing']
-            rc = d3b['rc']
+            rcij = d3b['rcij']
+            rcik = d3b['rcik']
             nknot = d3b['nknot']
             knots = d3b['knots']
             ncoef = d3b['ncoef']
@@ -341,7 +345,7 @@ def write_params_uf3l(uf3lprms,
             gmk = d3b['gmk']
             f.write(entry_comment)
             f.write(f'3B  {spi}  {spj}  {spk}  {nlead}  {ntrail}  {spacing}\n')
-            f.write(f'{rc:0.4f}  {nknot}  {gmj:0.3f}  {gmk:0.3f}\n')  # no need to write gmj and gmk
+            f.write(f'{rcij:0.3f}  {rcik:0.3f}  {nknot}  {gmj:0.3f}  {gmk:0.3f}\n')
             for i in range(nknot):
                 f.write(f'{knots[i]:0.4f} ')
             f.write('\n')

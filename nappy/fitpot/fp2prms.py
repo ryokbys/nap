@@ -433,6 +433,10 @@ def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
         dic = uf3l_prms['3B'][trio]
         ncoef = dic['ncoef']
         iv += 1
+        dic['rcij'] = vs[iv]
+        iv += 1
+        dic['rcik'] = vs[iv]
+        iv += 1
         dic['gmj'] = vs[iv]
         iv += 1
         dic['gmk'] = vs[iv]
