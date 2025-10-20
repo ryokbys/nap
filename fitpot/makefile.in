@@ -29,7 +29,8 @@ endif
 
 # fitpotobj= NN.o read_input.o fitpot.o read_params.o
 fitpotobj= read_input.o fitpot.o read_params.o
-mods= mod_variables.o mod_parallel.o fp_common.o mod_minimize.o mod_composition.o
+mods= mod_variables.o mod_parallel.o fp_common.o mod_minimize.o \
+    mod_composition.o mod_conditions.o
 args= iargc.o getarg.o
 
 ${PMDDIR}/%.o: ${PMDDIR}/%.F90
@@ -68,5 +69,5 @@ fitpot.o: ${mods}
 
 mod_minimize.o: mod_variables.o fp_common.o
 
-fp_common.o fp_common.mod: fp_common.F90 mod_parallel.o
+fp_common.o fp_common.mod: fp_common.F90 mod_parallel.o mod_conditions.o
 	${MPIFC} -c ${MPIFLAGS} ${CPPFLAGS} $<
