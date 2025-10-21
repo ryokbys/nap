@@ -257,10 +257,14 @@ def gen_vtgt_from_adf(ts, adf, sgm=15, vmax=10.0, vmin=0.0):
     from nappy.gaussian_smear import gsmear
     eps = 1e-15
     gadf = gsmear(ts, adf, sgm)
-    gadf /= gadf.max()
-    #vtgt = np.array([ -np.log(a + eps) for a in gadf ])
-    #adf /= adf.max()
-    vtgt = -(gadf - 1.0) * (vmax - vmin) + vmin
+    if gadf.max() < 1e-10:
+        # If no data, set vmax for target
+        vtgt = np.array([vmax for x in gadf])
+    else:
+        gadf /= gadf.max()
+        #vtgt = np.array([ -np.log(a + eps) for a in gadf ])
+        #adf /= adf.max()
+        vtgt = -(gadf - 1.0) * (vmax - vmin) + vmin
     cs = np.array([ -np.cos(t / 180 * np.pi) for t in ts ])
     return cs, vtgt
 
