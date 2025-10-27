@@ -163,7 +163,28 @@ def correct2b(uf3l_prms, config):
     return uf3l_prms
 
 
-def correct3b(uf3l_prms, config, adf_file_path,
+def correct3b(uf3l_prms, config):
+    """
+    Add constant (angle-independent) value to 3B potential.
+    """
+    uf33b = uf3l_prms['3B']
+    trios = config['trios']
+    trio_vmins = config['trio_vmins']
+    trio_vmaxs = config['trio_vmaxs']
+    for trio in uf33b.keys():
+        coefs = uf33b[trio]['coefs']
+        knots = uf33b[trio]['knots']
+        bounds = np.array([ (0.0, 1e+10) for c in coefs ])
+        itrio = get_comb_index(trio, trios)
+        v3min = trio_vmins[itrio]
+        v3max = trio_vmaxs[itrio]
+        new_coefs = np.array([ v3max for x in coefs ])
+        uf3l_prms['3B'][trio]['coefs'] = new_coefs
+
+    return uf3l_prms
+
+
+def correct3b_old(uf3l_prms, config, adf_file_path,
               sgm=15, ):
     """
     Correct 3B so that the V(-cos) becomes an inverse of ADF.
@@ -295,7 +316,7 @@ def main():
     ic(' correct2b...')
     uf3l_prms_tmp = correct2b(uf3l_prms_tmp, config)
     ic(' correct3b...')
-    uf3l_prms_tmp = correct3b(uf3l_prms_tmp, config, adf_path,)
+    uf3l_prms_tmp = correct3b(uf3l_prms_tmp, config)
     today = datetime.now().strftime('%y%m%d')
     outfname = f'{infname}_corr'
     write_params_uf3l(uf3l_prms_tmp, outfname=outfname, overwrite=True)
