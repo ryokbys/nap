@@ -46,6 +46,7 @@ contains
     fac_etrn = wgte
     fac_ftrn = wgtf
     fac_strn = wgts
+!.....evtrn, fvtrn, svtrn are variances of E,F,S
     if( netrn > 1 ) fac_etrn = wgte /(evtrn*netrn)
     if( nftrn > 1 ) fac_ftrn = wgtf /(fvtrn*nftrn)
     if( nstrn > 1 ) fac_strn = wgts /(svtrn*nstrn)
@@ -218,6 +219,8 @@ contains
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
     real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp
+    real(8):: fetstl,fftstl,fststl,fetst,fftst,fstst
+    real(8):: fetrnl,fftrnl,fstrnl,fetrn,fftrn,fstrn
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0,tw0,twl,twg,tsmp0
     real(8):: tergl,tfrcl,tstrsl,tmp
 !!$    real(8):: fac_e, fac_f, fac_s
@@ -329,6 +332,12 @@ contains
 
     ftrnl = 0d0
     ftstl = 0d0
+    fetrnl = 0d0
+    fftrnl = 0d0
+    fstrnl = 0d0
+    fetstl = 0d0
+    fftstl = 0d0
+    fststl = 0d0
     tergl = 0d0
     tfrcl = 0d0
     tstrsl= 0d0
@@ -461,8 +470,16 @@ contains
 
       if( smpl%iclass.eq.1 ) then
         ftrnl = ftrnl +fetmp*fac_etrn +fftmp*fac_ftrn +fstmp*fac_strn
+!.....For debugging
+        fetrnl = fetrnl +fetmp*fac_etrn
+        fftrnl = fftrnl +fftmp*fac_ftrn
+        fstrnl = fstrnl +fstmp*fac_strn
       else if( smpl%iclass.eq.2 ) then
         ftstl = ftstl +fetmp*fac_etst +fftmp*fac_ftst +fstmp*fac_stst
+!.....For debugging
+        fetstl = fetstl +fetmp*fac_etst
+        fftstl = fftstl +fftmp*fac_ftst
+        fststl = fststl +fstmp*fac_stst
       endif
     enddo  ! ismpl
 
@@ -481,11 +498,18 @@ contains
     tc0= mpi_wtime()
     call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+!.....For debugging
+    if( iprint.gt.1 ) then
+      call mpi_allreduce(fetrnl,fetrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(fftrnl,fftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(fstrnl,fstrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(fetstl,fetst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(fftstl,fftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      call mpi_allreduce(fststl,fstst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+      if( myid==0 ) print '(a,2(2x,3f8.4))',' Losses train(E,F,S), test(E,F,S) = ', &
+           fetrn,fftrn,fstrn,fetst,fftst,fstst
+    endif
     tcl = tcl + (mpi_wtime() -tc0)
-!!$    ftrn = ftrn /swgt2trn
-!!$    if( swgt2tst.gt.1d-5 ) then
-!!$      ftst = ftst /swgt2tst
-!!$    endif
 
 !.....Compute repulsion gradient
     if( l1st .and. trim(cpotlow).eq.'uf3' .and. abs(pwgt2bs)>1d-14 ) then
