@@ -212,13 +212,14 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: ftrn,ftst
 
-    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,jfcal,ir
+    integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,ir
     integer:: isp,jsp
     character(len=3):: csi,csj
     real(8):: ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
-    real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp
+    real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp, &
+         fftmp_trn, fftmp_tst
     real(8):: fetstl,fftstl,fststl,fetst,fftst,fstst
     real(8):: fetrnl,fftrnl,fstrnl,fetrn,fftrn,fstrn
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0,tw0,twl,twg,tsmp0
@@ -352,6 +353,8 @@ contains
       ftmp = 0d0
       fetmp = 0d0
       fftmp = 0d0
+      fftmp_trn = 0d0
+      fftmp_tst = 0d0
       fstmp = 0d0
       swgt = smpl%wgt
 !.....Energy matching
@@ -377,22 +380,17 @@ contains
           ediff= ediff*ediff
         endif
         fetmp= fetmp +ediff *swgt
-        if( iprint.gt.2 ) then
-          write(6,'(a,2i4,1x,a,7es11.3)') ' myid,ismpl,smplname,epot,eref,esub,(epot+esub)/natm= ', &
-               myid,ismpl,trim(csmplname),epot,eref,esub,(epot+esub)/natm
-        endif
         tergl = tergl +mpi_wtime() -tmp
       endif
 !.....Force matching
-      if( lfmatch .and. smpl%nfcal.ne.0 ) then
+!!$      if( lfmatch .and. smpl%nfcal.ne.0 ) then
+      if( lfmatch ) then
         tmp = mpi_wtime()
         frcs(1:3,1:natm) = smpl%fa(1:3,1:natm)
         fref(1:3,1:natm) = smpl%fref(1:3,1:natm)
         fsub(1:3,1:natm) = smpl%fsub(1:3,1:natm)
-        jfcal = 0
         do ia=1,natm
-          if( .not. smpl%lfrc_eval(ia) ) cycle
-          jfcal = jfcal +1
+!!$          if( .not. smpl%lfrc_eval(ia) ) cycle
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 +fref(2,ia)**2 +fref(3,ia)**2)
@@ -417,7 +415,12 @@ contains
             else ! LS as default
               fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
             endif
-            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw *ferri
+            if( smpl%iclass.eq.1 .and. smpl%lfrc_eval(ia) ) then
+              fftmp_trn = fftmp_trn +fdiff(ixyz,ia) *swgt *gdw *ferri
+            else
+              fftmp_tst = fftmp_tst +fdiff(ixyz,ia) *swgt *gdw *ferri
+            endif
+!!$            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw *ferri
           enddo
         enddo
         tfrcl = tfrcl +mpi_wtime() -tmp
@@ -469,18 +472,22 @@ contains
       endif  ! stress matching
 
       if( smpl%iclass.eq.1 ) then
-        ftrnl = ftrnl +fetmp*fac_etrn +fftmp*fac_ftrn +fstmp*fac_strn
+        ftrnl = ftrnl +fetmp*fac_etrn +fstmp*fac_strn
 !.....For debugging
         fetrnl = fetrnl +fetmp*fac_etrn
-        fftrnl = fftrnl +fftmp*fac_ftrn
         fstrnl = fstrnl +fstmp*fac_strn
       else if( smpl%iclass.eq.2 ) then
-        ftstl = ftstl +fetmp*fac_etst +fftmp*fac_ftst +fstmp*fac_stst
+        ftstl = ftstl +fetmp*fac_etst +fstmp*fac_stst
 !.....For debugging
         fetstl = fetstl +fetmp*fac_etst
-        fftstl = fftstl +fftmp*fac_ftst
         fststl = fststl +fstmp*fac_stst
       endif
+!.....Not all the forces in iclass==1 are for train data.
+      ftrnl = ftrnl +fftmp_trn*fac_ftrn
+      ftstl = ftstl +fftmp_tst*fac_ftst
+!.....For debugging
+      fftrnl = fftrnl +fftmp_trn*fac_ftrn
+      fftstl = fftstl +fftmp_tst*fac_ftst
     enddo  ! ismpl
 
     terg = terg + tergl
@@ -506,7 +513,7 @@ contains
       call mpi_allreduce(fetstl,fetst,1,mpi_real8,mpi_sum,mpi_world,ierr)
       call mpi_allreduce(fftstl,fftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
       call mpi_allreduce(fststl,fstst,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      if( myid==0 ) print '(a,2(2x,3f8.4))',' Losses train(E,F,S), test(E,F,S) = ', &
+      if( myid.eq.0 ) print '(a,2(2x,3f8.4))',' Losses train(E,F,S), test(E,F,S) = ', &
            fetrn,fftrn,fstrn,fetst,fftst,fstst
     endif
     tcl = tcl + (mpi_wtime() -tc0)
