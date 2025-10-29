@@ -444,30 +444,29 @@ contains
         else  ! default: one
           serri = 1d0
         endif
-          do ixyz=1,3
-            do jxyz=ixyz,3
-              k = ivoigt(ixyz,jxyz)
-              pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  &
-                   +ssub(ixyz,jxyz) &
-                   -sref(ixyz,jxyz))
-            enddo
+        do ixyz=1,3
+          do jxyz=ixyz,3
+            k = ivoigt(ixyz,jxyz)
+            pdiff(k)= pdiff(k) +(strs(ixyz,jxyz)  &
+                 +ssub(ixyz,jxyz) &
+                 -sref(ixyz,jxyz))
           enddo
-          if( trim(ctype_loss).eq.'huber' ) then
-            do k=1,6
-              if( abs(pdiff(k)).gt.1d0 ) then
-                pdiff(k) = 2d0*abs(pdiff(k)) -1d0
-              else
-                pdiff(k)= pdiff(k)*pdiff(k)
-              endif
-              fstmp= fstmp +pdiff(k) *swgt *serri
-            enddo
-          else  ! LS as default
-            do k=1,6
+        enddo
+        if( trim(ctype_loss).eq.'huber' ) then
+          do k=1,6
+            if( abs(pdiff(k)).gt.1d0 ) then
+              pdiff(k) = 2d0*abs(pdiff(k)) -1d0
+            else
               pdiff(k)= pdiff(k)*pdiff(k)
-              fstmp= fstmp +pdiff(k) *swgt
-            enddo
-          endif
-!!$        endif
+            endif
+            fstmp= fstmp +pdiff(k) *swgt *serri
+          enddo
+        else  ! LS as default
+          do k=1,6
+            pdiff(k)= pdiff(k)*pdiff(k)
+            fstmp= fstmp +pdiff(k) *swgt
+          enddo
+        endif
         tstrsl = tstrsl +mpi_wtime() -tmp
       endif  ! stress matching
 
@@ -849,7 +848,7 @@ contains
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) &
                  *swgt *fac_strn *serri
           enddo
-        tstrsl = tstrs +mpi_wtime() -ttmp
+        tstrsl = tstrsl +mpi_wtime() -ttmp
       endif
 !!$      print '(a,3i5,f8.4)','grad: myid,ismpl,nfcal,tsmpl=',myid,ismpl,smpl%nfcal,mpi_wtime()-tsmp0
     enddo  ! ismpl
