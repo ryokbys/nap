@@ -59,7 +59,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
         ase.io.write(filename=fname,images=nsys.to_ase_atoms(),
                      format='proteindatabank')
     elif format in ('extxyz',):
-        with open(fname,'w') as f:
+        with open(fname,'a') as f:
             write_extxyz(f,nsys)
     else:
         raise IOError('Cannot write out in the given format: '+format)
