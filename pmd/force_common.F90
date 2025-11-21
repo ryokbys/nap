@@ -451,11 +451,7 @@ subroutine get_force(l1st,epot,stnsr)
          nb,nbmax,lsb,nex,lsrc,myparity,nn,myid_md,mpi_md_world,iprint,l1st)
   endif
 
-!!$!.....convert forces from hmat-coordinates to Cartesian coordinates
-!!$  do i=1,natm
-!!$    at(1:3)= aa(1:3,i)
-!!$    aa(1:3,i)= hi(1:3,1)*at(1) +hi(1:3,2)*at(2) +hi(1:3,3)*at(3)
-!!$  enddo
+! forces are returned in real unit (eV/Ang.)
   return
 end subroutine get_force
 !=======================================================================

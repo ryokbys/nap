@@ -58,6 +58,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,itemp,nave,nspl,i_conv,ierr
   integer:: ihour,imin,isec
+  integer:: ifwrong  ! for sanity check
   real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
   logical:: l1st
@@ -335,6 +336,16 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   lstrs = .false.
   epot= epot0
   epotp = 0d0
+!.....In damping-MD, scale large-forces as log-scale.
+  if( ifdmp .gt. 0 ) then
+    do i=1,natm
+      tmp = aa(1,i)**2 +aa(2,i)**2 +aa(3,i)**2
+      if( tmp.gt.1d0 ) then
+        tmp = log(tmp)/2 +1d0
+        aa(1:3,i) = aa(1:3,i) /tmp
+      endif
+    enddo
+  endif
 
 !.....Structure analysis
   if( trim(cstruct).eq.'CNA' ) then
@@ -415,7 +426,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          ,istp,tcpu,tave,epot,vol,prss
   endif
 
-  call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
+  call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world,ifwrong)
+  if( ifwrong .gt. 0 ) goto 90
 
 !!$  print *,'Time at 3 = ',mpi_wtime() -tcpu0
 !.....output initial configuration including epi, eki, and strs
@@ -574,7 +586,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
     endif
 
-!-------first kick of velocities
+!-------first kick of velocities (both va and aa are in real unit)
     do i=1,natm
       is = int(tag(i))
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
@@ -615,6 +627,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( lconst ) then
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
     else
+!.....Here va is converted from real to hmat-normalized length scale.
       do i=1,natm
         ra(1:3,i)=ra(1:3,i) +(hi(1:3,1)*va(1,i) &
              +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i) )*dt
@@ -735,6 +748,17 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
          ,h,nnmax,lspr)
 !!$    print *,'Time at 7 = ',mpi_wtime() -tcpu0
+!.....In damping-MD, scale large-forces as log-scale.
+    if( ifdmp .gt. 0 ) then
+      do i=1,natm
+        tmp = aa(1,i)**2 +aa(2,i)**2 +aa(3,i)**2
+        if( tmp.gt.1d0 ) then
+          tmp = log(tmp)/2 +1d0
+          aa(1:3,i) = aa(1:3,i) /tmp
+        endif
+      enddo
+    endif
+    
 
 !.....Second kick of velocities
     if( index(ctctl,'lange').ne.0 ) then
@@ -892,9 +916,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 #endif
     endif ! energy output
 
-    call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world)
+    call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world,ifwrong)
+    if( ifwrong .gt. 0 ) goto 90
 
-!.....check convergence criteria if it is dumped MD
+!.....check convergence criteria if it is damped MD
     if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and. n_conv.gt.0 .and. &
          abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
       i_conv = i_conv + 1
@@ -973,6 +998,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( lconverged ) exit
 !.....End of velocity-verlet loop    
   enddo
+
+!.....For skipping the VV-loop, goto-90 is set here.
+90 continue
 
 !.....Close out_pos file in the end, if combined out_pos.
   if( lcomb_pos ) close(20)
@@ -3563,17 +3591,20 @@ subroutine copy_iarr(ndim,srcarr,destarr)
   return
 end subroutine copy_iarr
 !=======================================================================
-subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
+subroutine sanity_check(ekin,epot,stnsr,tave, &
+     myid,mpi_world,ifwrong)
   use pmdvars,only: tlimit
   implicit none 
-  real(8),intent(in):: ekin,epot,stnsr(3,3),tave
   integer,intent(in):: myid,mpi_world
+  real(8),intent(in):: ekin,epot,stnsr(3,3),tave
+  integer,intent(out):: ifwrong
   include "mpif.h"
 
   integer:: i,j,ierr
   character(len=128):: msg
-  
+
   msg = ''
+  ifwrong = 0
 
   if( epot*0d0 .ne. 0d0 ) then
     msg = 'ERROR: epot == NaN !'
@@ -3583,6 +3614,7 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
     msg = 'ERROR: ekin == NaN !'
     goto 10
   endif
+!.....Check stress values
   do j=1,3
     do i=1,3
       if( stnsr(i,j)*0d0 .ne. 0d0 ) then
@@ -3591,6 +3623,7 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
       endif
     enddo
   enddo
+!.....Check temperature
   if( tave .gt. tlimit ) then
     msg = 'ERROR: too high temperature (tave > temperature_limit) !'
     goto 10
@@ -3602,8 +3635,10 @@ subroutine sanity_check(ekin,epot,stnsr,tave,myid,mpi_world)
     if( myid.eq.0 ) then
       print *,'Exit pmd, because of '//trim(msg)
     endif
-    call mpi_finalize(ierr)
-    stop
+!!$    call mpi_finalize(ierr)
+!!$    stop
+    ifwrong = 1
+    call mpi_bcast(ifwrong,1,mpi_integer,0,mpi_world,ierr)
   endif
   return
 
