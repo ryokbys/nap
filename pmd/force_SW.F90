@@ -22,6 +22,8 @@ module SW
   real(8):: swe   = 2.1678d0
 !-----SW unit length in Ang
   real(8):: swl   = 2.0951d0*sfac
+!.....Si element energy if needed
+  real(8):: swei  = 0.d0
 !-----si-si
   real(8):: swa   = 7.049556277d0
   real(8):: swb   = 0.6022245584d0
@@ -39,6 +41,7 @@ module SW
   logical:: interact(msp,msp)
   logical:: interact3(msp,msp,msp)
   real(8):: aswe,aswl
+  real(8):: aswei(msp)
   real(8):: aswa(msp,msp)
   real(8):: aswb(msp,msp)
   real(8):: aswp(msp,msp)
@@ -79,7 +82,7 @@ contains
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
     real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
-    real(8):: epotl,epotl2,epotl3,epott,epot2,epot3
+    real(8):: epotl,epotl1,epotl2,epotl3,epott,epot1,epot2,epot3
     real(8),save:: swli,a8d3r3,rcmax2
     real(8),save,allocatable:: aa2(:,:),aa3(:,:)
     real(8),allocatable,save:: strsl(:,:,:)
@@ -129,11 +132,14 @@ contains
     strsl(1:3,1:3,1:natm+nb)= 0d0
 
 !-----2 body term
-    epotl2= 0d0
+    epotl1 = 0d0
+    epotl2 = 0d0
     aa2(1:3,1:natm+nb)=0d0
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
+      epotl1 = epotl1 +aswe*aswei(is)
+      epi(i) = epi(i) +aswe*aswei(is)
       do k=1,lspr(0,i)
         j=lspr(k,i)
 !!$        if(j.eq.0) exit
@@ -297,14 +303,17 @@ contains
 
 !-----gather epot
 !!$    epotl= epotl2 +epotl3
+    epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
+    call mpi_allreduce(epotl1,epot1,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
 !!$    epot= epot +epott
-    epot = epot +epot2 +epot3
-    if( iprint.ge.ipl_info ) print '(a,3es12.3)','SW epot2,epot3,epot = ', &
-         epot2,epot3,(epot2+epot3)
+    epot = epot +epot1 +epot2 +epot3
+    if( iprint.ge.ipl_info ) print '(a,3es12.3)', &
+         'SW epot1,epot2,epot3,epot = ', epot1,epot2,epot3, &
+         epot1+epot2+epot3
     return
   end subroutine force_SW
 !=======================================================================
@@ -316,7 +325,7 @@ contains
     character(len=3),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd
-    real(8):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt
+    real(8):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt,tswei
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
     character(len=3):: cspi,cspj
@@ -335,8 +344,18 @@ contains
         interact3(isp,isp,isp) = .true.
       enddo
 !.....Initialize parameters
+      aswei(:) = 0d0
+      aswa(:,:) = 0d0
+      aswb(:,:) = 0d0
+      aswp(:,:) = 0d0
+      aswq(:,:) = 0d0
+      aswc(:,:) = 0d0
+      aswrc(:,:) = 0d0
+      asws(:,:,:) = 0d0
+      aswt(:,:,:) = 0d0
       aswe = swe
       aswl = swl
+      aswei(1) = swei
       aswa(1,1) = swa
       aswb(1,1) = swb
       aswp(1,1) = swp
@@ -371,6 +390,19 @@ contains
           read(ioprms,*) ctmp, aswe, aswl
           if( iprint.ne.0 ) &
                write(6,'(a,2es14.4)') '   unit (energy,length) = ',aswe,aswl
+        else if( nd.eq.2 ) then  ! one body
+          backspace(ioprms)
+          read(ioprms,*) isp, tswei
+          if( isp.gt.msp ) then
+            if( iprint.ne.0 ) then
+              write(6,*) 'WARNING@read_params_SW: isp is greater than msp, ' &
+                   //'so skip the line.'
+            endif
+            cycle
+          endif
+          if( iprint.ne.0 ) &
+               write(6,'(i4, es14.4)') isp, tswei
+          aswei(isp) = tswei
         else if( nd.eq.8 ) then  ! two body
           backspace(ioprms)
           read(ioprms,*) isp,jsp,tswa,tswb,tswp,tswq,tswc,tswrc
@@ -452,6 +484,7 @@ contains
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(aswe,1,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(aswl,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswei,msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(aswa,msp*msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(aswb,msp*msp,mpi_real8,0,mpi_world,ierr)
     call mpi_bcast(aswp,msp*msp,mpi_real8,0,mpi_world,ierr)
