@@ -30,7 +30,7 @@ from docopt import docopt
 from nappy.io import read
 from nappy.common import get_key
 
-from pwtools.signal import pad_zeros, welch
+# from pwtools.signal import pad_zeros, welch
 from scipy.fftpack import fft
 from scipy.ndimage import gaussian_filter
 
@@ -222,7 +222,15 @@ def main(args):
     with open('dat.ps_vacf','w') as f:
         f.write('# Power spectrum of velocity auto correlation from vel_auto_corr.py ' +
                 'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        f.write('#      f [THz],   I(f) of each species,   sum of species-I(f)\n')
+        # f.write('#     f [THz],   I(f) of each species,   sum of species-I(f)\n')
+        i = 1
+        f.write(f'#     {i:d}:f [THz],   ')
+        i += 1
+        for spc in nsys0.specorder:
+            f.write(f'{i:d}:I(f)_{spc:<2s},  ')
+            i += 1
+        f.write('I(f)_total')
+        f.write('\n')
         for mw in range(mwmax):
             freq = float(mw) /(tmax/1000)
             f.write(f' {freq:11.3e}')
