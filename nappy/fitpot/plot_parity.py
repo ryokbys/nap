@@ -17,6 +17,8 @@ Options:
   --S-range SRANGE
                  Specify the range of stress partiy plot,
                  by comma-separated two values, e.g., -3.0,3.0. [default: None]
+  --refname REFNAME
+                 Specify the name of the reference data. [default: DFT]
 """
 import os,sys
 from docopt import docopt
@@ -66,7 +68,8 @@ def calc_stats(reference, predicted):
 
 
 def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
-         loc='best', bbox_to_anchor=None, outfname="graph_parity.png"):
+         loc='best', bbox_to_anchor=None, outfname="graph_parity.png",
+         refname = "DFT"):
     import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set_theme(context='talk', style='ticks')
@@ -124,7 +127,7 @@ def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
                 f'RMSE = {tst_rmse:0.3f}\nR^2 = {tst_r2:0.3f}', 
                 transform=ax.transAxes, ha='right', va='bottom')
     
-    ax.set_xlabel(f'DFT {label}')
+    ax.set_xlabel(f'{refname} {label}')
     ax.set_ylabel(f'FF {label}')
     ax.set_xlim(limits)
     ax.set_ylim(limits)
@@ -165,13 +168,15 @@ def main():
     else:
         srange = [ float(x) for x in srange.split(',')]
         assert len(Srange) == 2, "--S-range should be comma-separated two values."
-        
+
+    refname = args['--refname']
+    
     plot('erg', erg_trn, erg_tst, loc='best', xylim=erange,
-         outfname='graph_parity_E.png')
+         outfname='graph_parity_E.png', refname=refname)
     plot('frc', frc_trn, frc_tst, xylim=frange,
-         outfname='graph_parity_F.png')
+         outfname='graph_parity_F.png', refname=refname)
     plot('strs', strs_trn, strs_tst, loc='center right', xylim=srange,
-         outfname='graph_parity_S.png')
+         outfname='graph_parity_S.png', refname=refname)
     return None
 
         

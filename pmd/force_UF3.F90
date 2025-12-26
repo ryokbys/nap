@@ -670,16 +670,18 @@ contains
 
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
     if( has_trios ) then
+      call mpi_bcast(rc3max,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rc3max2,1,mpi_real8,0,mpi_world,ierr)
       if( .not. allocated(prm3ls) ) allocate(prm3ls(n3b))
       do i3b=1,n3b
         call mpi_bcast(prm3ls(i3b)%cb,2,mpi_character,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%csi,2,mpi_character,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%csj,2,mpi_character,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%csk,2,mpi_character,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%cknot,2,mpi_character,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%isp,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%jsp,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%ksp,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%cknot,2,mpi_character,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%nklead,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%nknot,1,mpi_integer,0,mpi_world,ierr)
@@ -1262,17 +1264,10 @@ contains
                 enddo  ! ljk
               enddo  ! lik
 
-!!$              if( ia==39 .or. ia==55 ) then
-!!$                print '(a,7i5,2es12.3)','  ia,ja,ka,i3b,nik,njk,nij,c3t,tmp3=',&
-!!$                     ia,ja,ka,i3b,nik,njk,nij,c3t,tmp3
-!!$              endif
             enddo  ! kk
           enddo  ! jj
         enddo  ! ksp
       enddo  ! jsp
-!!$      if( ia==8 .or. ia==39 .or. ia==55 ) then
-!!$        print '(a,i5,2es12.3)',' ia,tmp2,tmp3=',ia,epi(ia)-tmp3,tmp3
-!!$      endif
 
     enddo ! ia
 !$omp end do
@@ -1324,21 +1319,25 @@ contains
          ,h(3,3),hi(3,3),sv(3,6)
     real(8),intent(inout):: rcin
     real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st
-    logical:: lstrs
+    logical,intent(in):: l1st, lstrs
 
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
-         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
+         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
     real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
     real(8):: rcij, rcik, rcij2, rcik2
     real(8),save:: rcin2 = -1d0
+
+#ifdef CONTRIB
+    real(8):: epot_LiLa, epot_NbO, epot_X, epot_Xp, epot_Xm, epot_elem, &
+         epot_Li, epot_La
+#endif
 
     type(prm2):: p2
     type(prm3l):: p3
@@ -1377,13 +1376,25 @@ contains
 #ifdef IMPULSE
     ftaul(:) = 0d0
 #endif
+#ifdef CONTRIB
+    epot_LiLa = 0d0
+    epot_Li = 0d0
+    epot_La = 0d0
+    epot_NbO = 0d0
+    epot_X = 0d0
+    epot_Xp = 0d0
+    epot_Xm = 0d0
+    epot_elem = 0d0
+#endif
     do ia=1,natm
       is = int(tag(ia))
       itot = itotOf(tag(ia))
       epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
+#ifdef CONTRIB
+      epot_elem = epot_elem +erg1s(is)
+#endif
       xi(1:3) = ra(1:3,ia)
-      tmp3 = 0d0
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
@@ -1417,7 +1428,28 @@ contains
           c2t = p2%coefs(n)
           tmp = c2t *bij(lij)
 !.....Energy
+#ifdef CONTRIB
+          if( is==1 .and. js==1 ) then
+            epot_Li = epot_Li +tmp
+          else if( is==2 .and. js==2 ) then
+            epot_La = epot_La +tmp
+          else if( (is==1 .and. js==2) .or. (is==2.and.js==1) ) then
+            epot_LiLa = epot_LiLa +tmp
+          else if( (is==3 .or. is==4) .and. (js==3 .or. js==4) ) then
+            epi(ia) = epi(ia) +tmp
+            epot_NbO = epot_NbO +tmp
+          else
+            if( is==2 ) epi(ia) = epi(ia) +tmp
+            epot_X = epot_X +tmp
+            if( tmp > 0d0 ) then
+              epot_Xp = epot_Xp +tmp
+            else
+              epot_Xm = epot_Xm +tmp
+            endif
+          endif
+#else
           epi(ia) = epi(ia) +tmp
+#endif
           epotl2 = epotl2 +tmp
 !.....Forces
           tmp2 = c2t *dbij(lij)
@@ -1456,8 +1488,7 @@ contains
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
 
-      tmp3 = 0d0
-      do jj=1,lspr(0,ia)
+      do jj=1,lspr(0,ia)-1
         ja = lspr(jj,ia)
         js = int(tag(ja))
         jtot = itotOf(tag(ja))
@@ -1522,8 +1553,26 @@ contains
           enddo  ! lcs
 !.....energy
           tmp = vexp *sumcb
-          tmp3 = tmp3 + tmp
+#ifdef CONTRIB
+          if( (is==1.or.is==2) .and. (js==1.or.js==2) .and. &
+               (ks==1.or.ks==2) ) then
+            epot_LiLa = epot_LiLa +tmp
+          else if( (is==3.or.is==4) .and. (js==3.or.js==4) .and. &
+               (ks==3.or.ks==4) ) then
+            epot_NbO = epot_NbO +tmp
+            epi(ia) = epi(ia) +tmp
+          else
+            epot_X = epot_X +tmp
+            if( is==2 ) epi(ia) = epi(ia) +tmp
+            if( tmp > 0d0 ) then
+              epot_Xp = epot_Xp +tmp
+            else
+              epot_Xm = epot_Xm +tmp
+            endif
+          endif
+#else
           epi(ia) = epi(ia) +tmp
+#endif
           epotl3 = epotl3 +tmp
 !.....force
           dv3rij = -drijc*drijc *gmj *tmp
@@ -1601,6 +1650,11 @@ contains
     if( myid == 0 .and. iprint > 2 ) &
          print '(a,3es12.4)',' force_uf3l epot1,epot2,epot3 = ', &
          epot1,epot2,epot3
+
+#ifdef CONTRIB
+    if( myid == 0 ) print '(a,6es12.4)', ' epot_{elem,Li,La,LiLa,NbO,X} =', &
+         epot_elem, epot_Li, epot_La, epot_LiLa, epot_NbO, epot_X
+#endif
 
     return
   end subroutine force_uf3l
