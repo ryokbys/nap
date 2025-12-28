@@ -44,7 +44,8 @@ $ ./configure --prefix=$(pwd)
 $ make test
 ```
 
-If it works, you can use this program in your system.
+If it works, you can use this program in your system. (In macOS, this configure may not work. 
+See [here](http://ryokbys.web.nitech.ac.jp/contents/nap_doc_jp/pmd/02_install#pmd-%E3%81%8A%E3%82%88%E3%81%B3-fitpot-%E3%81%AE%E3%83%93%E3%83%AB%E3%83%89) for gfortran FCFLAGS option. But it is Japanese only, m(._.)m.)
 To install the python package *nappy*, run the following commands on `nap/` top directory,
 
 ```shell
