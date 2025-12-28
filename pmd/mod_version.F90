@@ -8,14 +8,15 @@ module version
   private
   save
 
-  public:: write_revision, write_authors
+  public:: write_revision, write_authors, write_runtime
   
-  character(len=128),parameter:: crevision = 'rev250503'
+  character(len=128),parameter:: crevision = 'rev251228'
 
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)
   
 contains
+!=======================================================================
   subroutine write_revision()
     write(6,'(a)') '   Revision: '//trim(crevision)
     return
@@ -30,4 +31,13 @@ contains
     enddo
     return
   end subroutine write_authors
+!=======================================================================
+  subroutine write_runtime()
+    use,intrinsic:: iso_fortran_env, only: compiler_version
+    
+    write(6,'(/a)') '   Compiler: '//trim(compiler_version())
+    write(6,'(a)',advance='no') '   Machine: '
+    call execute_command_line("uname -snmr")
+    return
+  end subroutine write_runtime
 end module version

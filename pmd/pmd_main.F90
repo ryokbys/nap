@@ -366,13 +366,14 @@ subroutine write_headline()
 ! Assuming that this is called only at 0-th node.
 !
   use time, only: time_stamp
-  use version
+  use version, only: write_revision, write_authors, write_runtime
   
   write(6,*) ''
   write(6,'(a)') ' PMD --- Parallel Molecular Dynamics ---'
   write(6,*) ''
   call write_revision()
   call write_authors()
+  call write_runtime()
   write(6,*) ''
   call time_stamp(' Job started')
   write(6,*) ''
