@@ -433,6 +433,31 @@ contains
 
     call move_alloc(temp, arr)
   end subroutine resize_darr
+!=======================================================================
+  function basename(path) result(name)
+!
+!  Extract basename from full path (by removing strings before "/").
+!
+    character(len=*), intent(in) :: path
+    character(len=:), allocatable :: name
+    integer :: p
+    character(len=:), allocatable :: tmp
+
+    tmp = trim(path)
+
+    if (len(tmp) > 1 .and. tmp(len(tmp):len(tmp)) == "/") then
+      tmp = tmp(:len(tmp)-1)
+    end if
+
+    p = index(tmp, "/", back=.true.)
+
+    if (p > 0) then
+      name = tmp(p+1:)
+    else
+      name = tmp
+    end if
+  end function basename
+
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:

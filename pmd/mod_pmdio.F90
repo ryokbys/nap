@@ -399,6 +399,7 @@ contains
 !  ...
 !  ---
     use pmdvars,only: has_specorder,specorder,lcomb_pos
+    use util, only: basename
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
@@ -411,6 +412,7 @@ contains
     real(8):: atmp(3),ri(3),vi(3),ai(3),epi,eki
     character(len=3):: csp
     character(len=128):: cftmp,str
+    character(len=256):: cpath
     logical:: lopen = .false.
     logical:: lclose = .false.
     logical,save:: l1st = .true.
@@ -422,14 +424,15 @@ contains
       l1st = .false.
     endif
 
-    inquire(ionum, name=cftmp, number=num, opened=lopen)
-!!$    print *,'name,number,cfname,opened = ',trim(cftmp),num,trim(cfname),lopen
+    inquire(ionum, name=cpath, number=num, opened=lopen)
+    cftmp = trim(basename(cpath))
     if( .not.lopen .or. &
          (lopen .and. trim(cfname).ne.trim(cftmp)) ) then ! the unit number is used by other file
       if( lopen ) close(ionum)
       open(ionum,file=trim(cfname),status='replace')
       lclose = .true.
     endif
+!!$    print *,'name,number,cfname,opened,closed = ',trim(cftmp),num,trim(cfname),lopen,lclose
 
 !===== 1st line: number of atoms
     write(ionum,'(2x,i0)') ntot
