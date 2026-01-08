@@ -21,6 +21,10 @@ Options:
                Whether or not normalize the VACF, <v(t).v(t0)> or <v(t).v(t0)>/<v(t0).v(t0)>. [default: False]
   --sigma SIGMA
                Sigma for Gaussian smoothing by integer. [default: 0]
+  --vacf-fname ACFNAME
+               Output file name for VACF. [default: out.vacf]
+  --ps-fname PSFNAME
+               Output file name for power-spectrum of VACF. [default: out.ps_vacf]
 """
 import os,sys,glob,time,copy
 from datetime import datetime
@@ -136,6 +140,10 @@ def main(args):
 
     #...Normalize or not
     normalize = args['--normalize']
+
+    #...file names
+    acfname = args['--vacf-fname']
+    psfname = args['--ps-fname']
     
     print(' nmeasure =',nmeasure)
     print(' nshift =',nshift)
@@ -144,7 +152,7 @@ def main(args):
 
     #...parse arguments
     infiles = args['INFILE']
-    if not parse_filename(infiles[0]) in ('pmd','extxyz'):
+    if not parse_filename(infiles[0], mode='read') in ('pmd','extxyz'):
         raise ValueError('This file format is not available.')
         
     nsyss = get_nsyss(infiles)  # nsyss is a list
@@ -225,7 +233,7 @@ def main(args):
     print('')
     
     #.....output auto correlation function
-    acfname='dat.vacf'
+    #acfname='out.vacf'
     vdenom = np.zeros(nspcs)
     for im in range(nmeasure):
         for ia in range(natm):
@@ -297,8 +305,8 @@ def main(args):
         sumps = ps.sum()*df
         ps = ps/sumps
     
-    with open('dat.ps_vacf','w') as f:
-        f.write('# Power spectrum of VACF from vacf.py ' +
+    with open(psfname,'w') as f:
+        f.write('# Power spectrum of VACF (DOS) from vacf.py ' +
                 'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         # f.write('#     f [THz],   I(f) of each species,   sum of species-I(f)\n')
         i = 1
@@ -318,8 +326,8 @@ def main(args):
                 sumps += ps[ifreq,ispc]
             f.write(f' {sumps:11.3e}\n')
 
-    print(' --> dat.vacf')
-    print(' --> dat.ps_vacf')
+    print(f' --> {acfname}')
+    print(f' --> {psfname}')
     return None
 
 if __name__ == "__main__":
