@@ -91,17 +91,16 @@ def ft_vacf(ntw,nspcs,ac,dt,tmax,tdamp):
     #...Compute power spectrum
     #mwmax = int(ntw/2)
     mwmax = 2*ntw - 1
-    print(f' mwmax,len(freq)= {mwmax:d}, {len(freq)}')
     dw = 2.0*np.pi /tmax
     ts = [ it * dt for it in range(ntw) ]
     decays = np.exp(-(ts/tdamp)**2)
-    ps0 = np.zeros((mwmax,nspcs))
+    dos = np.zeros((mwmax,nspcs))
     for ispc in range(nspcs):
         ac[:,ispc] = ac[:,ispc] * decays
         ac[0,ispc] = ac[0,ispc] * 0.5
-        ps0[:,ispc] = abs(fft(pad(ac[:,ispc])).real)
+        dos[:,ispc] = abs(fft(pad(ac[:,ispc])).real)
 
-    return ps0, freq
+    return dos, freq
 
 
 def main(args):
@@ -270,18 +269,18 @@ def main(args):
         acfile.write('\n')
     acfile.close()
 
-    ps0, freq = ft_vacf(ntw,nspcs,ac,dt,tmax,tdamp)
+    dos0, freq = ft_vacf(ntw,nspcs,ac,dt,tmax,tdamp)
 
     #...Gaussian smearing
-    ps = copy.deepcopy(ps0)
+    dos = copy.deepcopy(dos0)
     if sgm > 0:
         for ispc in range(nspcs):
-            ps[:,ispc] = gaussian_filter(ps0[:,ispc], sigma=[sgm],)
+            dos[:,ispc] = gaussian_filter(dos0[:,ispc], sigma=[sgm],)
 
     #...Normalize
     if normalize:
-        sumps = ps.sum()
-        ps = ps/sumps
+        sumps = dos.sum()
+        dos = dos/sumps
 
     freq = freq / 1e+12  # Hz to THz
     
@@ -302,8 +301,8 @@ def main(args):
             f.write(f' {fi:11.3e}')
             sumps = 0.0
             for ispc in range(nspcs):
-                f.write(' {0:11.3e}'.format(ps[ifreq,ispc]))
-                sumps += ps[ifreq,ispc]
+                f.write(' {0:11.3e}'.format(dos[ifreq,ispc]))
+                sumps += dos[ifreq,ispc]
             f.write(f' {sumps:11.3e}\n')
 
     print(f' --> {acfname}')
