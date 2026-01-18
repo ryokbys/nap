@@ -23,8 +23,8 @@ Options:
                Sigma for Gaussian smoothing by integer. [default: 0]
   --vacf-fname ACFNAME
                Output file name for VACF. [default: out.vacf]
-  --ps-fname PSFNAME
-               Output file name for power-spectrum of VACF. [default: out.ps_vacf]
+  --vdos-fname VDOSFNAME
+               Output file name for Fourier-transform of VACF, which is the vibrational DOS. [default: out.vdos]
 """
 import os,sys,glob,time,copy
 from datetime import datetime
@@ -73,54 +73,34 @@ def pad(x, nadd=None):
     return np.concatenate([x, add_arr])
 
 
-def power_spectrum_old(ntw,nspcs,ac,dt,tmax,tdamp):
+def ft_vacf(ntw,nspcs,ac,dt,tmax,tdamp):
     """
-    vacfをpower spectrumに変換する関数（以前のやり方）．
+    Fourier transform of real part of VACF.
+
+    Input:
+    - dt (sec)
+    - tmax (sec)
+    - tdamp (sec)
+
+    Output:
+    - ps0
+    - freq
     """
+    dtsec = dt  # sec
+    freq = np.fft.fftfreq(2*ntw-1, dtsec)  # Hz
     #...Compute power spectrum
-    mwmax = int(ntw/2)
+    #mwmax = int(ntw/2)
+    mwmax = 2*ntw - 1
+    print(f' mwmax,len(freq)= {mwmax:d}, {len(freq)}')
     dw = 2.0*np.pi /tmax
+    ts = [ it * dt for it in range(ntw) ]
+    decays = np.exp(-(ts/tdamp)**2)
     ps0 = np.zeros((mwmax,nspcs))
-    for mw in range(mwmax):
-        w = dw *mw
-        for it in range(ntw):
-            t = it*dt
-            decay = np.exp(-(t/tdamp)**2)
-            coswt = np.cos(w*t)
-            if it == 0:
-                ps0[mw,:] += 1.0 *ac[it,:] *decay *coswt *dt
-            else:
-                ps0[mw,:] += 2.0 *ac[it,:] *decay *coswt *dt
-
-    #...Normalize in THz freq unit
-    pst = np.zeros(nspcs)
-    for mw in range(mwmax):
-        freq = float(mw) /(tmax/1000)
-        pst[:] += ps0[mw,:]*freq
-    for mw in range(mwmax):
-        ps0[mw,:] /= pst[:]
-        #...Negative values to zero
-        for ispc in range(nspcs):
-            ps0[mw,ispc] = max(ps0[mw,ispc],0.0)
-
-    return ps0, mwmax
-
-
-def power_spectrum(ntw,nspcs,ac,dt,tmax,tdamp):
-    """
-    Convert VACF to power spectrum.
-    """
-    dtsec = dt * 1.0e-15  # fs to sec
-    freq = np.fft.fftfreq(2*ntw-1, dtsec) / 1e+12  # Hz to THz
-    ps0 = np.zeros((len(freq),nspcs))
-    acd = np.zeros_like(ac, dtype=float)
-    for it in range(ntw):
-        t = it * dt
-        decay = np.exp(-(t/tdamp)**2)
-        acd[it,:] = ac[it,:] * decay
-        
     for ispc in range(nspcs):
-        ps0[:,ispc] = (abs(fft(pad(acd[:,ispc])))**2)
+        ac[:,ispc] = ac[:,ispc] * decays
+        ac[0,ispc] = ac[0,ispc] * 0.5
+        ps0[:,ispc] = abs(fft(pad(ac[:,ispc])).real)
+
     return ps0, freq
 
 
@@ -135,20 +115,19 @@ def main(args):
     #...Ggaussian sigma
     sgm = int(args['--sigma'])
     
-    #...time interval
-    dt = float(args['--time-interval'])
+    #...time interval in fs --> sec
+    dt = float(args['--time-interval']) * 1e-15
 
     #...Normalize or not
     normalize = args['--normalize']
 
     #...file names
     acfname = args['--vacf-fname']
-    psfname = args['--ps-fname']
+    vdosfname = args['--vdos-fname']
     
     print(' nmeasure =',nmeasure)
     print(' nshift =',nshift)
     print(' normalize =',normalize)
-    print(' len(args) =',len(args))
 
     #...parse arguments
     infiles = args['INFILE']
@@ -160,13 +139,13 @@ def main(args):
     
     #...compute sampling time-window from nmeasure and nshift
     ntw= len(nsyss) -(nmeasure-1)*nshift
-    tmax = (ntw-1) *dt
-    tdamp = tmax/np.sqrt(3.0)
-    print(' ntw =',ntw)
-    print(f' dt, tmax = {dt:.1f}, {tmax:.1f} fs')
-    fmax = 1.0/(dt*1e-15)/1e+12  # THz
-    df = 1.0/(tmax*1e-15)/1e+12  # THz
-    print(f' df, fmax = {df:.3f}, {fmax:.1f} THz')
+    tmax = (ntw-1) *dt  # sec
+    tdamp = tmax/np.sqrt(3.0)  # sec
+    print(f' ntw = {ntw:d}')
+    print(f' dt, tmax = {dt*1e+15:.1f}, {tmax*1e+15:.1f} fs')
+    fmax = 1.0/dt  # Hz
+    df = 1.0/tmax  # Hz
+    print(f' df, fmax = {df/1e+12:.3f}, {fmax/1e+12:.1f} THz')
     if ntw <= 0:
         print(' [Error] ntw <= 0 !!!')
         print('  Chech the parameters nmeasure and nshift, and input files.')
@@ -271,7 +250,7 @@ def main(args):
             ac[it,:] = ac[it,:] /vdenom_tot
         else:
             ac[it,:] /= nmeasure *n_per_spcs[ispc]
-        acfile.write(' {0:11.3e}'.format(it*dt) )
+        acfile.write(' {0:11.3e}'.format(it*dt*1e+15) )
         sumac = 0.0
         for ispc in range(nspcs):
             acfile.write(' {0:11.3e}'.format(ac[it,ispc]))
@@ -291,8 +270,7 @@ def main(args):
         acfile.write('\n')
     acfile.close()
 
-    #ps0, mwmax = power_spectrum_old(ntw,nspcs,ac,dt,tmax,tdamp)
-    ps0, freq = power_spectrum(ntw,nspcs,ac,dt,tmax,tdamp)
+    ps0, freq = ft_vacf(ntw,nspcs,ac,dt,tmax,tdamp)
 
     #...Gaussian smearing
     ps = copy.deepcopy(ps0)
@@ -302,10 +280,12 @@ def main(args):
 
     #...Normalize
     if normalize:
-        sumps = ps.sum()*df
+        sumps = ps.sum()
         ps = ps/sumps
+
+    freq = freq / 1e+12  # Hz to THz
     
-    with open(psfname,'w') as f:
+    with open(vdosfname,'w') as f:
         f.write('# Power spectrum of VACF (DOS) from vacf.py ' +
                 'at {0:s}\n'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         # f.write('#     f [THz],   I(f) of each species,   sum of species-I(f)\n')
@@ -327,7 +307,7 @@ def main(args):
             f.write(f' {sumps:11.3e}\n')
 
     print(f' --> {acfname}')
-    print(f' --> {psfname}')
+    print(f' --> {vdosfname}')
     return None
 
 if __name__ == "__main__":
