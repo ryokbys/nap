@@ -185,6 +185,7 @@ module variables
   integer:: nfunc,ngrad
   integer:: iflag
 
+  logical,allocatable:: lfevall(:,:),lfevalg(:,:)
   real(8),allocatable:: erefl(:),erefg(:),epotl(:),epotg(:),esubl(:),esubg(:)
   real(8),allocatable:: frefl(:,:,:),frefg(:,:,:),fal(:,:,:)&
        ,fag(:,:,:),fsubl(:,:,:),fsubg(:,:,:)

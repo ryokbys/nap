@@ -1039,7 +1039,7 @@ subroutine write_energy_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl
+  integer:: ismpl,ionum
   logical,save:: l1st = .true.
 !!$  real(8):: epotsub
 
@@ -1105,19 +1105,12 @@ subroutine write_energy_relation(cadd)
     write(91,'(a)') '# eref, epot, smplname, diff, error, esub, swgt'
     do ismpl=1,nsmpl
       epotg(ismpl)= epotg(ismpl)/nalist(ismpl)
-      if( iclist(ismpl).eq.1 ) then
-        write(90,'(2es15.7,2x,a,10es13.4e3)') erefg(ismpl) &
-             ,epotg(ismpl),trim(csmplist(ismpl)) &
-             ,abs(erefg(ismpl)-epotg(ismpl)) &
-             ,eerrg(ismpl),esubg(ismpl),swgtg(ismpl)
-      else if( iclist(ismpl).eq.2 ) then
-        write(91,'(2es15.7,2x,a,10es12.3e3)') erefg(ismpl) &
-             ,epotg(ismpl),trim(csmplist(ismpl)) &
-             ,abs(erefg(ismpl)-epotg(ismpl)) &
-             ,eerrg(ismpl),esubg(ismpl),swgtg(ismpl)
-!!$        write(91,'(2es15.7,2x,a)') erefg(ismpl)/nalist(ismpl) &
-!!$             ,epotg(ismpl)/nalist(ismpl),cdirlist(ismpl)
-      endif
+      ionum = 91
+      if( iclist(ismpl).eq.1 ) ionum = 90
+      write(ionum,'(2es15.7,2x,a,10es13.4e3)') erefg(ismpl) &
+           ,epotg(ismpl),trim(csmplist(ismpl)) &
+           ,abs(erefg(ismpl)-epotg(ismpl)) &
+           ,eerrg(ismpl),esubg(ismpl),swgtg(ismpl)
     enddo
     close(90)
     close(91)
@@ -1133,7 +1126,7 @@ subroutine write_force_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl
+  integer:: ismpl,ia,ixyz,natm,nmax,nmaxl,ionum
   real(8):: dmeml
   logical:: l1st = .true.
 
@@ -1148,14 +1141,15 @@ subroutine write_force_relation(cadd)
 
 !.....This uses a lot of memory when the number of samples is large.
   if( .not. allocated(frefl) ) then
-    allocate(frefl(3,nmax,nsmpl)&
-         ,frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl)&
-         ,ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl) &
-         ,fsubg(3,nmax,nsmpl) &
-         ,gdwl(nmax,nsmpl),gdwg(nmax,nsmpl))
+    allocate(frefl(3,nmax,nsmpl), &
+         frefg(3,nmax,nsmpl),fal(3,nmax,nsmpl),fag(3,nmax,nsmpl), &
+         ferrl(nsmpl),ferrg(nsmpl),fsubl(3,nmax,nsmpl), &
+         fsubg(3,nmax,nsmpl), &
+         gdwl(nmax,nsmpl),gdwg(nmax,nsmpl), &
+         lfevall(nmax,nsmpl),lfevalg(nmax,nsmpl))
     dmeml = 8d0*size(frefl) +8d0*size(frefg) +8d0*size(fal) +8d0*size(fag) &
          +8d0*size(ferrl) +8d0*size(ferrg) +8d0*size(fsubl) +8d0*size(fsubg) &
-         +8d0*size(gdwl) +8d0*size(gdwg)
+         +8d0*size(gdwl) +8d0*size(gdwg) +4d0*size(lfevall) +4d0*size(lfevalg)
     dmem = dmem +dmeml
     if( iprint.gt.1 .and. myid.eq.0 .and. l1st ) then
       print '(a,f0.3,a)',' Memory for write_force_relation = ', &
@@ -1170,11 +1164,13 @@ subroutine write_force_relation(cadd)
     gdwl(:,:) = 0d0
     do ismpl=isid0,isid1
       natm= samples(ismpl)%natm
+      lfevall(1:natm,ismpl) = samples(ismpl)%lfrc_eval(1:natm)
       frefl(1:3,1:natm,ismpl)= samples(ismpl)%fref(1:3,1:natm)
       fsubl(1:3,1:natm,ismpl)= samples(ismpl)%fsub(1:3,1:natm)
       ferrl(ismpl) = samples(ismpl)%ferr
       if( lgdw ) gdwl(1:natm,ismpl) = samples(ismpl)%gdw(1:natm)
     enddo
+    lfevalg(1:nmax,1:nsmpl) = .false.
     frefg(1:3,1:nmax,1:nsmpl)= 0d0
     fsubg(1:3,1:nmax,1:nsmpl)= 0d0
     ferrg(1:nsmpl) = 0d0
@@ -1184,6 +1180,8 @@ subroutine write_force_relation(cadd)
     call mpi_reduce(fsubl,fsubg,3*nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
     call mpi_reduce(ferrl,ferrg,nsmpl,mpi_real8,mpi_sum &
+         ,0,mpi_world,ierr)
+    call mpi_reduce(lfevall,lfevalg,nmax*nsmpl,mpi_logical,mpi_lor &
          ,0,mpi_world,ierr)
     if( lgdw ) call mpi_reduce(gdwl,gdwg,nmax*nsmpl,mpi_real8,mpi_sum &
          ,0,mpi_world,ierr)
@@ -1207,29 +1205,18 @@ subroutine write_force_relation(cadd)
     write(93,'(a)') '# 1:fref, 2:fpot, 3:smplname, 4:ia, 5:ixyz, 6:diff,' &
          //' 7:error, 8:fsub, 9:gdw'
     do ismpl=1,nsmpl
-      if( iclist(ismpl).eq.1 ) then
-        natm= nalist(ismpl)
-        do ia=1,natm
-          do ixyz=1,3
-            write(92,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
-                 ,fag(ixyz,ia,ismpl) &
-                 ,trim(csmplist(ismpl)),ia,ixyz &
-                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl)
-          enddo
+      natm= nalist(ismpl)
+      do ia=1,natm
+        ionum = 93  ! test data as default
+        if( iclist(ismpl).eq.1 .and. lfevalg(ia,ismpl) ) ionum = 92
+        do ixyz=1,3
+          write(ionum,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
+               ,fag(ixyz,ia,ismpl) &
+               ,trim(csmplist(ismpl)),ia,ixyz &
+               ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
+               ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl)
         enddo
-      else if( iclist(ismpl).eq.2 ) then
-        natm= nalist(ismpl)
-        do ia=1,natm
-          do ixyz=1,3
-            write(93,'(2es12.4,2x,a,i6,i3,4es11.2e3,l3)') frefg(ixyz,ia,ismpl) &
-                 ,fag(ixyz,ia,ismpl) &
-                 ,trim(csmplist(ismpl)),ia,ixyz &
-                 ,abs(frefg(ixyz,ia,ismpl)-fag(ixyz,ia,ismpl))&
-                 ,ferrg(ismpl),fsubg(ixyz,ia,ismpl),gdwg(ia,ismpl)
-          enddo
-        enddo
-      endif
+      enddo
     enddo
     close(92)
     close(93)
@@ -1244,7 +1231,7 @@ subroutine write_stress_relation(cadd)
   character(len=*),intent(in):: cadd
   character(len=128):: cfname
 
-  integer:: ismpl,ixyz,jxyz,natm,nmax,nmaxl
+  integer:: ismpl,ixyz,jxyz,natm,nmax,nmaxl,ionum
   logical:: l1st = .true.
 
   cfname= 'out.strs'
@@ -1298,27 +1285,17 @@ subroutine write_stress_relation(cadd)
     open(94,file=trim(cfname)//'.trn.'//trim(cadd),status='replace')
     open(95,file=trim(cfname)//'.tst.'//trim(cadd),status='replace')
     do ismpl=1,nsmpl
-      if( iclist(ismpl).eq.1 ) then
-        do ixyz=1,3
-          do jxyz=ixyz,3
-            write(94,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
-                 ,strsg(ixyz,jxyz,ismpl) &
-                 ,trim(csmplist(ismpl)),ixyz,jxyz &
-                 ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
-                 ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
-          enddo
+      ionum = 95
+      if( iclist(ismpl).eq.1 ) ionum = 94
+      do ixyz=1,3
+        do jxyz=1,3
+          write(ionum,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
+               ,strsg(ixyz,jxyz,ismpl) &
+               ,trim(csmplist(ismpl)),ixyz,jxyz &
+               ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
+               ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
         enddo
-      else if( iclist(ismpl).eq.2 ) then
-        do ixyz=1,3
-          do jxyz=ixyz,3
-            write(95,'(2es15.6e3,2x,a,i6,i3,3es12.3e3)') srefg(ixyz,jxyz,ismpl) &
-                 ,strsg(ixyz,jxyz,ismpl) &
-                 ,trim(csmplist(ismpl)),ixyz,jxyz &
-                 ,abs(srefg(ixyz,jxyz,ismpl)-strsg(ixyz,jxyz,ismpl))&
-                 ,serrg(ismpl),ssubg(ixyz,jxyz,ismpl)
-          enddo
-        enddo
-      endif
+      enddo
     enddo
     close(94)
     close(95)
