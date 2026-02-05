@@ -26,8 +26,10 @@ module UF3
 
   logical:: lprms_read_uf3 = .false.
   logical:: lprms_read_uf3l = .false.
-  logical:: lprmset_uf3 = .false.
-  logical:: lprmset_uf3l = .false.
+  logical:: lprms_read_uf3d = .false.
+!!$  logical:: lprmset_uf3 = .false.
+!!$  logical:: lprmset_uf3l = .false.
+!!$  logical:: lprmset_uf3d = .false.
 
 !.....uf2 parameters
   type prm2
@@ -560,8 +562,8 @@ contains
           else if( cb == '3B' ) then
             backspace(ioprms)
             i3b = i3b +1
-            call read_3bl(prm3ds(i3b),i3b)
-            if( iprint >= ipl_basic ) call print_3bl(prm3ds(i3b))
+            call read_3bd(prm3ds(i3b),i3b)
+            if( iprint >= ipl_basic ) call print_3bd(prm3ds(i3b))
           else if( cb == '1B' ) then
             i1b = i1b +1
             backspace(ioprms)
@@ -581,7 +583,7 @@ contains
       enddo  ! while(.true.)
 20    continue  ! when the file reached the end
       if( iprint >= ipl_basic ) print '(/,a,i0)', &
-           '   Total num of UF3D coefficients =  ',ncoef
+           '   Total num of UF3d coefficients =  ',ncoef
     endif
 
     call bcast_uf3d_params(mpi_world,myid)
@@ -736,7 +738,7 @@ contains
     if( ps%csj.eq.ps%csk .and. ps%nknij.ne.ps%nknik ) &
          stop 'ERROR@read_3bd: must be nknij==nknik for csj==csk in 3BD.'
     if( allocated(ps%knij) ) deallocate(ps%knij, ps%knik, ps%kncs)
-    allocate(ps%knij(ps%nknij), ps%knik(ps%nknik), ps%kncs(ps%kncs))
+    allocate(ps%knij(ps%nknij), ps%knik(ps%nknik), ps%kncs(ps%nkncs))
     read(ioprms,*) (ps%knij(i), i=1,ps%nknij)
     read(ioprms,*) (ps%knik(i), i=1,ps%nknik)
     read(ioprms,*) (ps%kncs(i), i=1,ps%nkncs)
@@ -994,8 +996,6 @@ contains
         call mpi_bcast(prm3ds(i3b)%ksp,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nklead,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%nknot,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%rcij,1,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%rcij2,1,mpi_real8,0,mpi_world,ierr)
@@ -2003,13 +2003,16 @@ contains
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
-         ixyz,jxyz,lcs,lij,ncs
+         ixyz,jxyz,lcs,lij,ncs,nij3,nik3,lik,nik
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
-         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b
+         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b, &
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0)
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
-         drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
+         drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik, &
+         sumcb,sumcdb,sumcbij,sumcdbij,sumcbik,sumcdbik, &
+         c3ij,c3ik
+    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
     real(8):: rcij, rcik, rcij2, rcik2
     real(8),save:: rcin2 = -1d0
 
@@ -2140,12 +2143,23 @@ contains
         dij = sqrt(dij2)
         diji = 1d0/dij
         drijj(1:3) = rij(1:3)*diji
+        call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+        sumcbij = 0d0
+        sumcdbij= 0d0
+        do lij = -3,0
+          nij = nij3 +lij
+          if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+          c3ij = p3%cfij(nij)
+          sumcbij = sumcbij +c3ij*bij3(lij)
+          sumcdbij= sumcdbij +c3ij*dbij3(lij)
+        enddo
+        
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
           ks = int(tag(ka))
           i3b = interact3(is,js,ks)
           if( i3b <= 0 ) cycle
-          p3 = prm3ls(i3b)
+          p3 = prm3ds(i3b)
           rcij = p3%rcij
           rcij2 = p3%rcij2
           rcik = p3%rcik
@@ -2170,35 +2184,43 @@ contains
           drikk(1:3) = rik(1:3)*diki
           drijc = 1d0/(dij-rcij)
           drikc = 1d0/(dik-rcik)
-!.....parameters
-          gmj = p3%gmj
-          gmk = p3%gmk
-          if( js==ks ) then
-            gmj = (gmj+gmk) /2
-            gmk = gmj
-          endif
-!.....common terms
-          vexp = dexp(gmj*drijc +gmk*drikc)
+!.....r_ik term
+          call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
+          sumcbik = 0d0
+          sumcdbik= 0d0
+          do lik = -3,0
+            nik = nik3 +lik
+            if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+            c3ik = p3%cfik(nik)
+            sumcbik = sumcbik +c3ik*bik3(lik)
+            sumcdbik= sumcdbik +c3ik*dbik3(lik)
+          enddo
+!.....Cos term
+!!$          vexp = dexp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
           csn = max(min(csn, 1d0-tiny), -1d0+tiny)
-          call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
+          call b_spl(-csn, p3%kncs, p3%nkncs, ncs, bcs, dbcs)
           sumcb = 0d0
           sumcdb= 0d0
           do lcs = -3,0
             n = ncs +lcs
-            if( n < 1 .or. n > p3%ncoef ) cycle
-            c3t = p3%coefs(n) !*fac3b
+            if( n < 1 .or. n > p3%ncfcs ) cycle
+            c3t = p3%cfcs(n) !*fac3b
             sumcb = sumcb +c3t*bcs(lcs)
             sumcdb= sumcdb +c3t*dbcs(lcs)
           enddo  ! lcs
 !.....energy
-          tmp = vexp *sumcb
+!!$          tmp = vexp *sumcb
+          tmp = sumcbij * sumcbik * sumcb
           epi(ia) = epi(ia) +tmp
           epotl3 = epotl3 +tmp
 !.....force
-          dv3rij = -drijc*drijc *gmj *tmp
-          dv3rik = -drikc*drikc *gmk *tmp
-          dv3csn = -vexp *sumcdb
+!!$          dv3rij = -drijc*drijc *gmj *tmp
+!!$          dv3rik = -drikc*drikc *gmk *tmp
+!!$          dv3csn = -vexp *sumcdb
+          dv3rij = -drijc*drijc *sumcdbij *sumcbik *sumcb
+          dv3rik = -drikc*drikc *sumcdbik *sumcbij *sumcb
+          dv3csn = -sumcdb *sumcbij *sumcbik
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
 !!$          dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
@@ -2269,7 +2291,7 @@ contains
          mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
-         print '(a,3es12.4)',' force_uf3l epot1,epot2,epot3 = ', &
+         print '(a,3es12.4)',' force_uf3d epot1,epot2,epot3 = ', &
          epot1,epot2,epot3
 
     return
@@ -4623,6 +4645,32 @@ contains
     write(c,'(i2)') size(ps%coefs)
     print '(a,'//trim(c)//'es11.2)','     coefs =',(ps%coefs(i),i=1,size(ps%coefs))
   end subroutine print_3bl
+!=======================================================================
+  subroutine print_3bd(ps)
+    type(prm3d),intent(in):: ps
+    integer:: i
+    character:: c*2
+    print '(/,a)','   UF3d parameters of 3B for '&
+         //trim(ps%csi)//'-'//trim(ps%csj)//'-'//trim(ps%csk)
+    print '(6(a,1x))','     cb,csi,csj,csk,cknot = ',ps%cb,ps%csi,ps%csj,ps%csk,ps%cknot
+    print '(a,2i3)','     nklead,nktrail = ',ps%nklead,ps%nktrail
+    print '(a,6i3)','     nknij,nknik,nkncs = ', ps%nknij, ps%nknik, ps%nkncs
+    print '(a,6i3)','     ncfij,ncfik,ncfcs = ', ps%ncfij, ps%ncfik, ps%ncfcs
+    print '(a,3f6.3)','     rcij,rcik = ',ps%rcij, ps%rcik
+    write(c,'(i2)') size(ps%knij)
+    print '(a,'//c//'(1x,f7.3))','     knij =',(ps%knij(i),i=1,size(ps%knij))
+    write(c,'(i2)') size(ps%knik)
+    print '(a,'//c//'(1x,f7.3))','     knik =',(ps%knik(i),i=1,size(ps%knik))
+    write(c,'(i2)') size(ps%kncs)
+    print '(a,'//c//'(1x,f7.3))','     kncs =',(ps%kncs(i),i=1,size(ps%kncs))
+    write(c,'(i2)') size(ps%cfij)
+    print '(a,'//trim(c)//'es11.2)','     cfij =',(ps%cfij(i),i=1,size(ps%cfij))
+    write(c,'(i2)') size(ps%cfik)
+    print '(a,'//trim(c)//'es11.2)','     cfik =',(ps%cfik(i),i=1,size(ps%cfik))
+    write(c,'(i2)') size(ps%cfij)
+    print '(a,'//trim(c)//'es11.2)','     cfcs =',(ps%cfcs(i),i=1,size(ps%cfcs))
+
+  end subroutine print_3bd
 !=======================================================================
   function get_mem_uf3() result(dmem)
 !
