@@ -1,0 +1,57 @@
+!
+!  unit of time  = femto sec (fs)
+!  unit of length= Angstrom
+!  unit of mass  = unified atomic mass unit
+!
+
+! print_level: 0-5 (0: none, 5: max verbosity) [default: 1]
+print_level       1
+! io_format: ascii/binary [default: ascii]
+io_format         ascii
+
+! time_interval (in fs; if negative, variable time_interval) [default: 1.0]
+! num_iteration (number of iteration) [default: 0]
+! num_out_energy (number of energy output) [default: 0]
+time_interval     1.0d0
+num_iteration     1
+num_out_energy    1000
+
+! flag_out_pos (format of position output, 1:pmd, 2:dump, 3:extxyz) [default: 3]
+! num_out_pos (number of position output) [default: 0]
+flag_out_pos      3
+num_out_pos       100
+
+! force_type (force/potential type(s) to be used)
+! cutoff_radius (cutoff radius for neighbor search)
+! cutoff_buffer (buffer of cutoff used to avoid making neighbor search every step)
+force_type        uf3l
+cutoff_radius     6.0d0
+cutoff_buffer     0.4d0
+
+! flag_damping (whether or not apply damping, 0:no, 1:velocity-scaling, 2:FIRE) [default: 0]
+! damping_coeff (coeff to be multiplied to velocities every step)
+! converge_eps (convergence criterion of energy in eV)
+! converge_num (number of steps needed to satisfy the criterion before convergence)
+flag_damping      0
+damping_coeff     0.99d0
+converge_eps      1e-5
+
+! initial/final temperature
+! temperature_control: none, Berendsen, Langevin [default: none]
+! temperature_relax_time (in fs)
+initial_temperature     10d0
+# final_temperature       2000d0
+temperature_control     none
+temperature_target      500d0
+temperature_relax_time  100d0
+
+! factors to be multiplied to velocity components
+factor_direction 3 1
+  1.000d0  1.000d0  1.000d0
+
+! stress_control: none, vc-Berendsen, vv-Berendsen [default: none]
+! pressure_target (in GPa)
+! stress_relax_time (in fs)
+stress_control       none
+pressure_target      0.0d0
+

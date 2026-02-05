@@ -1,0 +1,23 @@
+resdir := "result_" + `date "+%y%m%d_%H%M"`
+
+default:
+  @just --list
+
+# Clean output files
+clean:
+	@rm -f dump_[0-9]* pmd_[0-9]* traj.extxyz
+
+veryclean: clean
+	@rm -f out.* {erg,frc,strs}.pmd
+
+NOMP := "1"
+NMPI := "1"
+
+# Run pmd
+run:
+	OMP_NUM_THREADS={{NOMP}} mpirun -np {{NMPI}} pmd 2>&1 | tee out.pmd
+
+# Save the result into result_YYMMDD/ directory
+save:
+	mkdir -p {{resdir}}
+	for f in in.* out.* pmdini pmdfin dump_* traj.extxyz; do cp "$f" {{resdir}}/ 2>/dev/null || true; done
