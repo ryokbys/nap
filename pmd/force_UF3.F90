@@ -3453,17 +3453,19 @@ contains
     real(8),parameter:: tiny = 1d-8
     integer:: i,ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
-         ixyz,jxyz,lcs,lij,ncs
+         ixyz,jxyz,lcs,ncs,nc,lij,nij3,lik,nik,nik3,n0
     integer:: ifcal,jfcal,kfcal,ip,iv,jra,kra
     real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
-         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
+         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3, &
+         bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0)
     real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
-         drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
-    real(8):: dv3rijdgj,dv3rijdgk,dv3rijc, dv3rikdgj,dv3rikdgk,dv3rikc, &
-         dv3csndgj,dv3csndgk,dv3csnc, &
-         dv3rijdcj,dv3rijdck,dv3rikdcj,dv3rikdck,dv3csndcj,dv3csndck
+         drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb, &
+         c3ij,sumcbij,sumcdbij,c3ik,sumcbik,sumcdbik
+    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
+    real(8):: dv3rijdcij,dv3rijdcik,dv3rijdccs, &
+         dv3rikdcij,dv3rikdcik,dv3rikdccs, &
+         dv3csndcij,dv3csndcik,dv3csndccs
     real(8):: rcij,rcik,rcij2,rcik2
     real(8),save:: rcin2 = -1d0
     integer,save,allocatable:: ia2ifcal(:)
@@ -3670,7 +3672,7 @@ contains
 !.....cos terms
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
           csn = max(min(csn, 1d0-tiny), -1d0+tiny)
-          call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
+          call b_spl(-csn, p3%kncs, p3%nkncs, ncs, bcs, dbcs)
           sumcb = 0d0
           sumcdb= 0d0
           do lcs = -3,0
@@ -3776,7 +3778,7 @@ contains
               n0 = n0 +p3%ncfik
               do lcs=-3,0
                 n = ncs +lcs
-                if( n < 1 .or. n > p3%ncoef ) cycle
+                if( n < 1 .or. n > p3%ncfcs ) cycle
                 prm3ds(i3b)%gwf(:,n0+n,jfcal)= prm3ds(i3b)%gwf(:,n0+n,jfcal) &
                      -drijj(:)*dv3rijdccs*bcs(lcs) -dcsnj(:)*dv3csndccs*dbcs(lcs)
               enddo
@@ -3799,7 +3801,7 @@ contains
               n0 = n0 +p3%ncfik
               do lcs=-3,0
                 n = ncs +lcs
-                if( n < 1 .or. n > p3%ncoef ) cycle
+                if( n < 1 .or. n > p3%ncfcs ) cycle
                 prm3ds(i3b)%gwf(:,n0+n,kfcal)= prm3ds(i3b)%gwf(:,n0+n,kfcal) &
                      -drikk(:)*dv3rikdccs*bcs(lcs) -dcsnk(:)*dv3csndccs*dbcs(lcs)
               enddo
@@ -3833,7 +3835,7 @@ contains
                 n0 = n0 +p3%ncfik
                 do lcs=-3,0
                   n = ncs +lcs
-                  if( n < 1 .or. n > p3%ncoef ) cycle
+                  if( n < 1 .or. n > p3%ncfcs ) cycle
                   prm3ds(i3b)%gws(iv,n0+n)= prm3ds(i3b)%gws(iv,n0+n) &
                        -rij(ixyz) &
                        *(drijj(jxyz)*dv3rijdccs*bcs(lcs) +dcsnj(jxyz)*dv3csndccs*dbcs(lcs)) &
@@ -3867,11 +3869,10 @@ contains
       enddo
       do i3b=1,n3b
         p3 = prm3ds(i3b)
-        if( p3%jsp==p3%ksp ) then
-          p3%gwe(1) = (p3%gwe(1)+p3%gwe(2))/2
-          p3%gwe(2) = p3%gwe(1)
-          p3%gwe(3) = (p3%gwe(3)+p3%gwe(4))/2
-          p3%gwe(4) = p3%gwe(3)
+        if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
+          nc = p3%ncfij
+          p3%gwe(1:nc) = (p3%gwe(1:nc) +p3%gwe(nc+1:nc*2))/2
+          p3%gwe(nc+1:nc*2) = p3%gwe(1:nc)
         endif
         n0 = 0
         do i=1,p3%ncfij
@@ -3906,23 +3907,25 @@ contains
         enddo  ! i2b
         do i3b=1,n3b
           p3 = prm3ds(i3b)
-          if( p3%jsp==p3%ksp ) then
-            p3%gwf(1:3,1,ifcal) = (p3%gwf(1:3,1,ifcal)+p3%gwf(1:3,2,ifcal))/2
-            p3%gwf(1:3,2,ifcal) = p3%gwf(1:3,1,ifcal)
-            p3%gwf(1:3,3,ifcal) = (p3%gwf(1:3,3,ifcal)+p3%gwf(1:3,4,ifcal))/2
-            p3%gwf(1:3,4,ifcal) = p3%gwf(1:3,3,ifcal)
+          if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
+            nc = p3%ncfij
+            p3%gwf(1:3,1:nc,ifcal) = (p3%gwf(1:3,1:nc,ifcal)+p3%gwf(1:3,nc+1:nc*2,ifcal))/2
+            p3%gwf(1:3,nc+1:nc*2,ifcal) = p3%gwf(1:3,1:nc,ifcal)
           endif
-          ip = ip +1
-          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,1,ifcal)
-          ip = ip +1
-          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,2,ifcal)
-          ip = ip +1
-          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,3,ifcal)
-          ip = ip +1
-          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,4,ifcal)
-          do i=1,p3%ncoef
+          n0 = 0
+          do i=1,p3%ncfij
             ip = ip +1
-            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,4+i,ifcal)
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
+          enddo
+          n0 = n0 +p3%ncfij
+          do i=1,p3%ncfik
+            ip = ip +1
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
+          enddo
+          n0 = n0 +p3%ncfik
+          do i=1,p3%ncfcs
+            ip = ip +1
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
           enddo
         enddo
       enddo ! ia
@@ -3939,23 +3942,25 @@ contains
       enddo  ! i2b
       do i3b=1,n3b
         p3 = prm3ds(i3b)
-        if( p3%jsp==p3%ksp ) then
-          p3%gws(1:6,1) = (p3%gws(1:6,1)+p3%gws(1:6,2))/2
-          p3%gws(1:6,2) = p3%gws(1:6,1)
-          p3%gws(1:6,3) = (p3%gws(1:6,3)+p3%gws(1:6,4))/2
-          p3%gws(1:6,4) = p3%gws(1:6,3)
+        if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
+          nc = p3%ncfij
+          p3%gws(1:6,1:nc) = (p3%gws(1:6,1:nc)+p3%gws(1:6,nc+1:nc*2))/2
+          p3%gws(1:6,nc+1:nc*2) = p3%gws(1:6,1:nc)
         endif
-        ip = ip +1
-        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,1)
-        ip = ip +1
-        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,2)
-        ip = ip +1
-        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,3)
-        ip = ip +1
-        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,4)
-        do i=1,p3%ncoef
+        n0 = 0
+        do i=1,p3%ncfij
           ip = ip +1
-          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,4+i)
+          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
+        enddo
+        n0 = n0 +p3%ncfij
+        do i=1,p3%ncfik
+          ip = ip +1
+          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
+        enddo
+        n0 = n0 +p3%ncfik
+        do i=1,p3%ncfcs
+          ip = ip +1
+          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
         enddo
       enddo  ! i3b
     endif
@@ -5362,7 +5367,7 @@ contains
       if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
     enddo
     do i3b=1,n3b
-      p3 = prm3ls(i3b)
+      p3 = prm3ds(i3b)
       dmem = dmem +8d0*( size(p3%knij) +size(p3%cfij) &
            +size(p3%knik) +size(p3%cfik) &
            +size(p3%kncs) +size(p3%cfcs) )

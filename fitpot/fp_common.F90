@@ -591,7 +591,8 @@ contains
          vranges,ismask, repul_radii
     use parallel
 !!$    use minimize
-    use UF3,only: get_mem_uf3, get_mem_uf3l, dealloc_gwx_uf3, calc_short_lossgrad
+    use UF3,only: get_mem_uf3, get_mem_uf3l, get_mem_uf3d, &
+         dealloc_gwx_uf3, calc_short_lossgrad
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -910,6 +911,8 @@ contains
         dmem = dmem + get_mem_uf3()
       else if( trim(cpotlow).eq.'uf3l') then
         dmem = dmem + get_mem_uf3l()
+      else if( trim(cpotlow).eq.'uf3d') then
+        dmem = dmem + get_mem_uf3d()
       endif
     endif
 
@@ -938,7 +941,7 @@ contains
     use descriptor,only: set_paramsdir_desc,get_descs,get_ints,set_descs &
          ,lupdate_gsf,set_params_desc_new, lfitpot_desc => lfitpot
     use UF3,only: set_params_uf3, print_1b, print_2b, prm2s, n2b, &
-         set_params_uf3l
+         set_params_uf3l, set_params_uf3d
     implicit none
     type(mdsys),intent(inout):: smpl
     integer,intent(in):: ndim, nff
@@ -985,6 +988,9 @@ contains
       else if( trim(cffs(i))=='uf3l' .or. trim(cffs(i))=='UF3L' ) then
         if( iprint > 10 ) print *,'pre_pmd: into set_params_uf3l...'
         call set_params_uf3l(ndim,x)
+      else if( trim(cffs(i))=='uf3d' .or. trim(cffs(i))=='UF3D' ) then
+        if( iprint > 10 ) print *,'pre_pmd: into set_params_uf3d...'
+        call set_params_uf3d(ndim,x)
       endif
 
       if( index(cffs(i),'NN').ne.0 .or. trim(cffs(i)).eq.'linreg' ) then

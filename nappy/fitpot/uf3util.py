@@ -188,9 +188,9 @@ def read_params_uf3d(infname):
     if not os.path.exists(infname):
         raise FileNotFoundError(infname)
 
-    uf3d_prms = {'1B':{},
-                 '2B':{},
-                 '3B':{}}
+    uf3d_prms = {'1B':[],
+                 '2B':[],
+                 '3B':[]}
     mode = 'none'
     body = 'none'
     with open(infname,'r') as f:
@@ -212,32 +212,32 @@ def read_params_uf3d(infname):
                 if body == '1B':
                     spi = data[1]
                     epot = float(data[2])
-                    uf3d_prms[body][spi] = epot
+                    uf3d_prms[body].append({'species': spi,
+                                            'epot': epot})
                     continue
                 elif body == '2B':
                     spi = data[1]
                     spj = data[2]
-                    uf3d_prms[body][(spi,spj)] = {}
-                    uf3d_prms[body][(spi,spj)]['nlead'] = int(data[3])
-                    uf3d_prms[body][(spi,spj)]['ntrail'] = int(data[4])
-                    uf3d_prms[body][(spi,spj)]['spacing'] = data[5]
+                    d2b = {'pair': (spi,spj)}
+                    d2b['nlead'] = int(data[3])
+                    d2b['ntrail'] = int(data[4])
+                    d2b['spacing'] = data[5]
                     d = f.readline().split()
-                    uf3d_prms[body][(spi,spj)]['rc2b'] = float(d[0])
-                    uf3d_prms[body][(spi,spj)]['nknot'] = int(d[1])
+                    d2b['rc2b'] = float(d[0])
+                    d2b['nknot'] = int(d[1])
                     d = f.readline().split()
-                    uf3d_prms[body][(spi,spj)]['knots'] = \
-                        np.array([ float(x) for x in d])
+                    d2b['knots'] = np.array([ float(x) for x in d])
                     d = f.readline().split()
-                    uf3d_prms[body][(spi,spj)]['ncoef'] = int(d[0])
+                    d2b['ncoef'] = int(d[0])
                     d = f.readline().split()
-                    uf3d_prms[body][(spi,spj)]['coefs'] = \
-                        np.array([ float(x) for x in d])
+                    d2b['coefs'] = np.array([ float(x) for x in d])
+                    uf3d_prms[body].append(d2b)
                     continue
                 elif body == '3B':
                     spi = data[1]
                     spj = data[2]
                     spk = data[3]
-                    d3b = {}
+                    d3b = {'trio': (spi,spj,spk)}
                     d3b['nlead'] = int(data[4])
                     d3b['ntrail'] = int(data[5])
                     d3b['spacing'] = data[6]
@@ -268,8 +268,7 @@ def read_params_uf3d(infname):
                     d3b['cfik'] = np.array([ float(x) for x in d ])
                     d = f.readline().split()
                     d3b['cfcs'] = np.array([ float(x) for x in d ])
-                    
-                    uf3d_prms[body][(spi,spj,spk)] = d3b
+                    uf3d_prms[body].append(d3b)
 
     return uf3d_prms
 
@@ -469,17 +468,15 @@ def write_params_uf3d(uf3dprms,
 
     entry_comment = f'#UF3 POT DATE: {today} AUTHOR: {author} CITATION:\n'
     if data1B is not None:
-        spcs = data1B.keys()
-        for spi in spcs:
-            epot = data1B[spi]
+        for d1 in data1B:
+            spi = d1['species']
+            epot = d1['epot']
             f.write(entry_comment)
             f.write(f'1B  {spi}  {epot:0.4f}\n')
             f.write('#\n')
     if data2B is not None:
-        pairs = data2B.keys()
-        for pair in pairs:
-            spi, spj = pair
-            dp = data2B[pair]
+        for dp in data2B:
+            spi, spj = dp['pair']
             nlead = dp['nlead']
             ntrail = dp['ntrail']
             spacing = dp['spacing']
@@ -500,10 +497,8 @@ def write_params_uf3d(uf3dprms,
             f.write('\n')
             f.write('#\n')
     if data3B is not None:
-        trios = data3B.keys()
-        for trio in trios:
-            spi, spj, spk = trio
-            d3b = data3B[trio]
+        for d3b in data3B:
+            spi, spj, spk = d3b['trio']
             nlead = d3b['nlead']
             ntrail = d3b['ntrail']
             spacing = d3b['spacing']

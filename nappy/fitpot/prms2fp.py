@@ -26,10 +26,10 @@ from datetime import datetime
 from icecream import ic
 ic.disable()
 
-from uf3util import read_params_uf3, read_params_uf3l
+from uf3util import read_params_uf3, read_params_uf3l, read_params_uf3d
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "251017"
+__version__ = "260206"
 
 def write_vars_fitpot(outfname,fpvars,vranges,rc,rc3,hardlim=None):
     with open(outfname,'w') as f:
@@ -413,13 +413,73 @@ def uf3l2fp(outfname, specorder, repul_pairs=[]):
     return None
 
 
-def write_vars_conditions(uf3l_prms, repul_pairs):
+def uf3d2fp(outfname, specorder, repul_pairs=[]):
+    """
+    Create in.vars.fitpot file from parameter file for uf3d potential.
+    Cut-off radii for 2- and 3-body are given in the parameter file.
+    """
+    uf3d_prms = read_params_uf3d('in.params.uf3d')
+
+    fpvars = []
+    vranges = []
+
+    for d1b in uf3d_prms['1B']:
+        spi = d1b['species']
+        epot = d1b['epot']
+        fpvars.append(epot)
+        vranges.append((-1e+10, 1e+10))
+
+    rc2max = 0.0
+    for d2b in uf3d_prms['2B']:
+        pair = d2b['pair']
+        print(pair)
+        ncoef = d2b['ncoef']
+        coefs = d2b['coefs']
+        ntrail = d2b['ntrail']
+        rc2max = max(rc2max, d2b['rc2b'])
+        vmin = -1e+10
+        if any( set(pair) == set(rp) for rp in repul_pairs ):
+            vmin = 0.0
+        for i in range(ncoef-ntrail):
+            fpvars.append(coefs[i])
+            vranges.append((vmin, 1e+10))
+        for i in range(ncoef-ntrail, ncoef):
+            fpvars.append(coefs[i])
+            vranges.append((0.0, 0.0))
+
+    rc3max = 0.0
+    for d3b in uf3d_prms['3B']:
+        trio = d3b['trio']
+        print(trio)
+        ncfij = d3b['ncfij']
+        ncfik = d3b['ncfik']
+        ncfcs = d3b['ncfcs']
+        #...rcij, rcik: cutoff for each pair
+        rcij, rcik = d3b['rcij'], d3b['rcik']
+        rc3max = max(rc3max, rcij, rcik)
+        cfij, cfik, cfcs = d3b['cfij'], d3b['cfik'], d3b['cfcs']
+        for i in range(ncfij):
+            fpvars.append(cfij[i])
+            vranges.append((0.0, 1e+10))
+        for i in range(ncfik):
+            fpvars.append(cfik[i])
+            vranges.append((0.0, 1e+10))
+        for i in range(ncfcs):
+            fpvars.append(cfcs[i])
+            vranges.append((0.0, 1e+10))
+    write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
+    if repul_pairs != []:
+        write_vars_conditions(uf3d_prms, repul_pairs)
+    return None
+
+
+def write_vars_conditions(uf3x_prms, repul_pairs):
     """
     Write in.vars.conditions for vars2cond if repul_pairs != [].
     """
     msgline = []
     msgline.append('# var-ID-LHS,  operator,  var-ID-RHS\n')
-    d2b = uf3l_prms['2B']
+    d2b = uf3x_prms['2B']
     inc = 0
     nconds = 0
     for spi, erg in uf3l_prms['1B'].items():
@@ -490,6 +550,13 @@ def main():
         """
         print(' rc, rc3 are given from in.params.uf3l, even if --rc or --rc3 is given.')
         uf3l2fp(outfname, specorder, repul_pairs=repul_pairs)
+
+    elif potname in ('UF3D', 'uf3d'):
+        """
+        UF3D (decomposed)
+        """
+        print(' rc, rc3 are given from in.params.uf3d, even if --rc or --rc3 is given.')
+        uf3d2fp(outfname, specorder, repul_pairs=repul_pairs)
 
     return None
 
