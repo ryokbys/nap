@@ -7,7 +7,7 @@ Utility functions for UF3, UF3L potential.
 """
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250705"
+__version__ = "260206"
 
 
 def read_params_uf3(infname):
@@ -183,6 +183,97 @@ def read_params_uf3l(infname):
     return uf3l_prms
 
 
+def read_params_uf3d(infname):
+
+    if not os.path.exists(infname):
+        raise FileNotFoundError(infname)
+
+    uf3d_prms = {'1B':{},
+                 '2B':{},
+                 '3B':{}}
+    mode = 'none'
+    body = 'none'
+    with open(infname,'r') as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            if line[0] == '#':
+                if len(line) > 3:
+                    mode = 'read'
+                    continue
+                else:
+                    mode = 'none'
+                    body = 'none'
+                    continue
+            data = line.split()
+            if data[0] in ('1B','2B','3B'):
+                body = data[0]
+                if body == '1B':
+                    spi = data[1]
+                    epot = float(data[2])
+                    uf3d_prms[body][spi] = epot
+                    continue
+                elif body == '2B':
+                    spi = data[1]
+                    spj = data[2]
+                    uf3d_prms[body][(spi,spj)] = {}
+                    uf3d_prms[body][(spi,spj)]['nlead'] = int(data[3])
+                    uf3d_prms[body][(spi,spj)]['ntrail'] = int(data[4])
+                    uf3d_prms[body][(spi,spj)]['spacing'] = data[5]
+                    d = f.readline().split()
+                    uf3d_prms[body][(spi,spj)]['rc2b'] = float(d[0])
+                    uf3d_prms[body][(spi,spj)]['nknot'] = int(d[1])
+                    d = f.readline().split()
+                    uf3d_prms[body][(spi,spj)]['knots'] = \
+                        np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    uf3d_prms[body][(spi,spj)]['ncoef'] = int(d[0])
+                    d = f.readline().split()
+                    uf3d_prms[body][(spi,spj)]['coefs'] = \
+                        np.array([ float(x) for x in d])
+                    continue
+                elif body == '3B':
+                    spi = data[1]
+                    spj = data[2]
+                    spk = data[3]
+                    d3b = {}
+                    d3b['nlead'] = int(data[4])
+                    d3b['ntrail'] = int(data[5])
+                    d3b['spacing'] = data[6]
+                    d = f.readline().split()
+                    rcij, rcik, nknij, nknik, nkncs = \
+                        (float(d[0]),  float(d[1]), int(d[2]),
+                         int(d[3]), int(d[4]))
+                    d3b['rcij'] = rcij
+                    d3b['rcik'] = rcik
+                    d3b['nknij'] = nknij
+                    d3b['nknik'] = nknik
+                    d3b['nkncs'] = nkncs
+                    #...knots
+                    d = f.readline().split()
+                    d3b['knij'] = np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    d3b['knik'] = np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    d3b['kncs'] = np.array([ float(x) for x in d])
+                    d = f.readline().split()
+                    ncfij, ncfik, ncfcs = ( int(d[0]), int(d[1]), int(d[2]) )
+                    d3b['ncfij'] = ncfij
+                    d3b['ncfik'] = ncfik
+                    d3b['ncfcs'] = ncfcs
+                    d = f.readline().split()
+                    d3b['cfij'] = np.array([ float(x) for x in d ])
+                    d = f.readline().split()
+                    d3b['cfik'] = np.array([ float(x) for x in d ])
+                    d = f.readline().split()
+                    d3b['cfcs'] = np.array([ float(x) for x in d ])
+                    
+                    uf3d_prms[body][(spi,spj,spk)] = d3b
+
+    return uf3d_prms
+
+
 def write_params_uf3(uf3prms,
                      outfname='in.params.uf3',
                      author=None,
@@ -352,6 +443,110 @@ def write_params_uf3l(uf3lprms,
             f.write(f'{ncoef}\n')
             for ic in range(ncoef):
                 f.write(f'{coefs[ic]:11.4e} ')
+            f.write('\n')
+            f.write('#\n')
+    f.close()
+    return None
+
+
+def write_params_uf3d(uf3dprms,
+                      outfname='in.params.uf3d',
+                      author=None,
+                      overwrite=False):
+    from datetime import datetime
+    if os.path.exists(outfname) and not overwrite:
+        raise Exception(f'{outfname} already exists.')
+
+    f = open(outfname, 'w')
+
+    data1B = uf3dprms.get('1B', None)
+    data2B = uf3dprms.get('2B', None)
+    data3B = uf3dprms.get('3B', None)
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    if author is None:
+        author = __author__
+
+    entry_comment = f'#UF3 POT DATE: {today} AUTHOR: {author} CITATION:\n'
+    if data1B is not None:
+        spcs = data1B.keys()
+        for spi in spcs:
+            epot = data1B[spi]
+            f.write(entry_comment)
+            f.write(f'1B  {spi}  {epot:0.4f}\n')
+            f.write('#\n')
+    if data2B is not None:
+        pairs = data2B.keys()
+        for pair in pairs:
+            spi, spj = pair
+            dp = data2B[pair]
+            nlead = dp['nlead']
+            ntrail = dp['ntrail']
+            spacing = dp['spacing']
+            rc2b = dp['rc2b']
+            nknot = dp['nknot']
+            knots = dp['knots']
+            ncoef = dp['ncoef']
+            coefs = dp['coefs']
+            f.write(entry_comment)
+            f.write(f'2B  {spi}  {spj}  {nlead}  {ntrail}  {spacing}\n')
+            f.write(f'{rc2b:0.4f}  {nknot}\n')
+            for i in range(nknot):
+                f.write(f'{knots[i]:0.4f} ')
+            f.write('\n')
+            f.write(f'{ncoef}\n')
+            for i in range(ncoef):
+                f.write(f'{coefs[i]:11.4e} ')
+            f.write('\n')
+            f.write('#\n')
+    if data3B is not None:
+        trios = data3B.keys()
+        for trio in trios:
+            spi, spj, spk = trio
+            d3b = data3B[trio]
+            nlead = d3b['nlead']
+            ntrail = d3b['ntrail']
+            spacing = d3b['spacing']
+            rcij = d3b['rcij']
+            rcik = d3b['rcik']
+            #...ij
+            nknij = d3b['nknij']
+            knij = d3b['knij']
+            ncfij = d3b['ncfij']
+            cfij = d3b['cfij']
+            #...ik
+            nknik = d3b['nknik']
+            knik = d3b['knik']
+            ncfik = d3b['ncfik']
+            cfik = d3b['cfik']
+            #...cos
+            nkncs = d3b['nkncs']
+            kncs = d3b['kncs']
+            ncfcs = d3b['ncfcs']
+            cfcs = d3b['cfcs']
+            f.write(entry_comment)
+            f.write(f'3B  {spi}  {spj}  {spk}  {nlead}  {ntrail}  {spacing}\n')
+            f.write(f'{rcij:0.3f}  {rcik:0.3f}  {nknij}  {nknik}  {nkncs}\n')
+            #...knots info
+            for i in range(nknij):
+                f.write(f'{knij[i]:0.4f} ')
+            f.write('\n')
+            for i in range(nknik):
+                f.write(f'{knik[i]:0.4f} ')
+            f.write('\n')
+            for i in range(nkncs):
+                f.write(f'{kncs[i]:0.4f} ')
+            f.write('\n')
+            #...coefs info
+            f.write(f'  {ncfij}  {ncfik}  {ncfcs}\n')
+            for ic in range(ncfij):
+                f.write(f'{cfij[ic]:11.4e} ')
+            f.write('\n')
+            for ic in range(ncfik):
+                f.write(f'{cfik[ic]:11.4e} ')
+            f.write('\n')
+            for ic in range(ncfcs):
+                f.write(f'{cfcs[ic]:11.4e} ')
             f.write('\n')
             f.write('#\n')
     f.close()

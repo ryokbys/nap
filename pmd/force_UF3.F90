@@ -479,7 +479,7 @@ contains
 
     if( myid == 0 ) then
       if( iprint >= ipl_basic ) print '(/,a)',' Read UF3D parameters...'
-      fname = trim(paramsdir)//'/'//trim(cpfname_l)
+      fname = trim(paramsdir)//'/'//trim(cpfname_d)
 !.....read parameters at the 1st call
       inquire(file=trim(fname),exist=lexist)
       if( .not. lexist ) then
@@ -2143,16 +2143,6 @@ contains
         dij = sqrt(dij2)
         diji = 1d0/dij
         drijj(1:3) = rij(1:3)*diji
-        call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-        sumcbij = 0d0
-        sumcdbij= 0d0
-        do lij = -3,0
-          nij = nij3 +lij
-          if( nij < 1 .or. nij > p3%nknij-4 ) cycle
-          c3ij = p3%cfij(nij)
-          sumcbij = sumcbij +c3ij*bij3(lij)
-          sumcdbij= sumcdbij +c3ij*dbij3(lij)
-        enddo
         
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
@@ -2184,6 +2174,17 @@ contains
           drikk(1:3) = rik(1:3)*diki
           drijc = 1d0/(dij-rcij)
           drikc = 1d0/(dik-rcik)
+!.....r_ij term
+          call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+          sumcbij = 0d0
+          sumcdbij= 0d0
+          do lij = -3,0
+            nij = nij3 +lij
+            if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+            c3ij = p3%cfij(nij)
+            sumcbij = sumcbij +c3ij*bij3(lij)
+            sumcdbij= sumcdbij +c3ij*dbij3(lij)
+          enddo
 !.....r_ik term
           call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
           sumcbik = 0d0
@@ -2196,7 +2197,6 @@ contains
             sumcdbik= sumcdbik +c3ik*dbik3(lik)
           enddo
 !.....Cos term
-!!$          vexp = dexp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
           csn = max(min(csn, 1d0-tiny), -1d0+tiny)
           call b_spl(-csn, p3%kncs, p3%nkncs, ncs, bcs, dbcs)
@@ -2210,7 +2210,6 @@ contains
             sumcdb= sumcdb +c3t*dbcs(lcs)
           enddo  ! lcs
 !.....energy
-!!$          tmp = vexp *sumcb
           tmp = sumcbij * sumcbik * sumcb
           epi(ia) = epi(ia) +tmp
           epotl3 = epotl3 +tmp
@@ -2218,8 +2217,8 @@ contains
 !!$          dv3rij = -drijc*drijc *gmj *tmp
 !!$          dv3rik = -drikc*drikc *gmk *tmp
 !!$          dv3csn = -vexp *sumcdb
-          dv3rij = -drijc*drijc *sumcdbij *sumcbik *sumcb
-          dv3rik = -drikc*drikc *sumcdbik *sumcbij *sumcb
+          dv3rij = sumcdbij *sumcbik *sumcb
+          dv3rik = sumcdbik *sumcbij *sumcb
           dv3csn = -sumcdb *sumcbij *sumcbik
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
