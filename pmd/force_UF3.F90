@@ -2162,8 +2162,6 @@ contains
           endif
           if(  dij2 > rcij2 ) exit
           ktot = itotOf(tag(ka))
-!!$          fac3b = 1d0
-!!$          if( js == ks ) fac3b = 0.5d0
           xk(1:3) = ra(1:3,ka)
           xik(1:3) = xk(1:3) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
@@ -2214,15 +2212,11 @@ contains
           epi(ia) = epi(ia) +tmp
           epotl3 = epotl3 +tmp
 !.....force
-!!$          dv3rij = -drijc*drijc *gmj *tmp
-!!$          dv3rik = -drikc*drikc *gmk *tmp
-!!$          dv3csn = -vexp *sumcdb
           dv3rij = sumcdbij *sumcbik *sumcb
           dv3rik = sumcdbik *sumcbij *sumcb
           dv3csn = -sumcdb *sumcbij *sumcbik
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
-!!$          dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
           tmpj(1:3)= dv3rij*drijj(1:3) +dv3csn*dcsnj(1:3)
           tmpk(1:3)= dv3rik*drikk(1:3) +dv3csn*dcsnk(1:3)
           do ixyz=1,3
@@ -3434,6 +3428,541 @@ contains
     return
   end subroutine gradw_uf3l
 !=======================================================================
+  subroutine gradw_uf3d(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+       iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
+       lgrad_done,nfcal,lfrc_eval)
+!
+!  Gradient of UF3D wrt weights.
+!  Note: This routine is always called in single run,
+!  thus no need of parallel implementation.
+!  - iprm0: The starting point -1 in parameter array for this FF.
+!
+    use util, only: itotOf
+    implicit none
+    integer,intent(in):: namax,natm,nnmax,iprint,iprm0
+    integer,intent(in):: lspr(0:nnmax,namax)
+    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(8),intent(inout):: rcin
+    integer,intent(in):: ndimp
+    integer,intent(in):: nfcal
+    logical,intent(in):: lfrc_eval(natm)
+    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
+
+!.....local
+    real(8),parameter:: tiny = 1d-8
+    integer:: i,ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
+         nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
+         ixyz,jxyz,lcs,lij,ncs
+    integer:: ifcal,jfcal,kfcal,ip,iv,jra,kra
+    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+         bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
+    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+         rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
+         drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
+    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
+    real(8):: dv3rijdgj,dv3rijdgk,dv3rijc, dv3rikdgj,dv3rikdgk,dv3rikc, &
+         dv3csndgj,dv3csndgk,dv3csnc, &
+         dv3rijdcj,dv3rijdck,dv3rikdcj,dv3rikdck,dv3csndcj,dv3csndck
+    real(8):: rcij,rcik,rcij2,rcik2
+    real(8),save:: rcin2 = -1d0
+    integer,save,allocatable:: ia2ifcal(:)
+
+    type(prm2):: p2
+    type(prm3d):: p3
+
+!!$    if( lgrad_done ) goto 10
+
+    if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
+    if( rcin2 < 0d0 ) then
+      if( rcin < rcmax ) then
+        call mpi_finalize(ierr)
+        stop
+      endif
+      rcin2 = rcin*rcin
+    endif
+
+    if( .not.allocated(prm2s(1)%gwe) &
+         .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
+      tmp = 0d0
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        if( lematch ) then
+          if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
+          allocate(prm2s(i2b)%gwe(p2%ncoef))
+          tmp = tmp +size(prm2s(i2b)%gwe)*8d0
+        endif
+        if( lfmatch ) then
+          if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
+          allocate(prm2s(i2b)%gwf(3,p2%ncoef,nfcal))
+          tmp = tmp +size(prm2s(i2b)%gwf)*8d0
+        endif
+        if( lsmatch ) then
+          if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
+          allocate(prm2s(i2b)%gws(6,p2%ncoef))
+          tmp = tmp +size(prm2s(i2b)%gws)*8d0
+        endif
+      enddo
+      do i3b=1,n3b
+        p3 = prm3ds(i3b)
+        if( lematch ) then
+          if( allocated(prm3ds(i3b)%gwe) ) deallocate(prm3ds(i3b)%gwe)
+          allocate(prm3ds(i3b)%gwe(p3%ncfij+p3%ncfik+p3%ncfcs))
+          tmp = tmp +size(prm3ds(i3b)%gwe)*8d0
+        endif
+        if( lfmatch ) then
+          if( allocated(prm3ds(i3b)%gwf) ) deallocate(prm3ds(i3b)%gwf)
+          allocate(prm3ds(i3b)%gwf(3,p3%ncfij+p3%ncfik+p3%ncfcs,nfcal))  ! ncoef +4
+          tmp = tmp +size(prm3ds(i3b)%gwf)*8d0
+        endif
+        if( lsmatch ) then
+          if( allocated(prm3ds(i3b)%gws) ) deallocate(prm3ds(i3b)%gws)
+          allocate(prm3ds(i3b)%gws(6,p3%ncfij+p3%ncfik+p3%ncfcs))  ! ncoef +4
+          tmp = tmp +size(prm3ds(i3b)%gws)*8d0
+        endif
+      enddo
+    endif
+
+!!$    if( size(ls3b) < nnmax+1 ) then
+!!$      deallocate(ls3b)
+!!$      allocate(ls3b(0:nnmax))
+!!$    endif
+    if( size(ia2ifcal) < namax ) then
+      deallocate(ia2ifcal)
+      allocate(ia2ifcal(namax))
+    endif
+!.....Construct ia2ifcal
+    ifcal = 0
+    ia2ifcal(:) = 0
+    do ia=1,natm
+      if( lfrc_eval(ia) ) then
+        ifcal = ifcal +1
+        ia2ifcal(ia) = ifcal
+      endif
+    enddo
+
+    if( lematch ) gerg1s(:) = 0d0
+    do i2b=1,n2b
+      if( lematch ) prm2s(i2b)%gwe(:) = 0d0
+      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0d0
+      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0d0
+    enddo
+    do i3b=1,n3b
+      if( lematch ) prm3ds(i3b)%gwe(:) = 0d0
+      if( lfmatch ) prm3ds(i3b)%gwf(:,:,:) = 0d0
+      if( lsmatch ) prm3ds(i3b)%gws(:,:) = 0d0
+    enddo
+
+    do ia=1,natm
+      is = int(tag(ia))
+      gerg1s(is) = gerg1s(is) +1d0
+      xi(1:3) = ra(1:3,ia)
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tag(ja))
+        jra = itotOf(tag(ja))
+!.....Pair terms
+        i2b = interact2(is,js)
+        if( i2b <= 0 ) cycle
+        p2 = prm2s(i2b)
+        xj(1:3) = ra(1:3,ja)
+        xij(1:3) = xj(1:3) -xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        if( dij2 > p2%rc2 ) cycle
+        dij = sqrt(dij2)
+        drijj(1:3) = rij(1:3)/dij
+        call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
+        do lij = -3,0
+          n = nr2 +lij
+          if( n < 1 .or. n > p2%nknot-4 ) cycle
+!.....Energy
+          if( lematch ) prm2s(i2b)%gwe(n) = prm2s(i2b)%gwe(n) +bij(lij)
+!.....Forces
+          if( lfmatch ) then
+            tmp2 = dbij(lij)
+            ifcal = ia2ifcal(ia)
+            jfcal = ia2ifcal(jra)
+            if( ifcal.ne.0 ) prm2s(i2b)%gwf(:,n,ifcal) &
+                 = prm2s(i2b)%gwf(:,n,ifcal) +drijj(:)*tmp2
+            if( jfcal.ne.0 ) prm2s(i2b)%gwf(:,n,jfcal) &
+                 = prm2s(i2b)%gwf(:,n,jfcal) -drijj(:)*tmp2
+          endif
+!.....Stresses
+          if( lsmatch ) then
+            tmp2 = dbij(lij)
+            prm2s(i2b)%gws(1,n)=prm2s(i2b)%gws(1,n) -rij(1)*drijj(1)*tmp2
+            prm2s(i2b)%gws(2,n)=prm2s(i2b)%gws(2,n) -rij(2)*drijj(2)*tmp2
+            prm2s(i2b)%gws(3,n)=prm2s(i2b)%gws(3,n) -rij(3)*drijj(3)*tmp2
+            prm2s(i2b)%gws(4,n)=prm2s(i2b)%gws(4,n) -rij(2)*drijj(3)*tmp2
+            prm2s(i2b)%gws(5,n)=prm2s(i2b)%gws(5,n) -rij(1)*drijj(3)*tmp2
+            prm2s(i2b)%gws(6,n)=prm2s(i2b)%gws(6,n) -rij(1)*drijj(2)*tmp2
+          endif
+        enddo  ! lij
+      enddo
+
+!.....Trio part is separated from pair part,
+!.....which may be slower because of double computation of dij,
+!.....but this code is a bit simpler.
+      if( .not.has_trios ) cycle
+      tmp3 = 0d0
+      do jj=1,lspr(0,ia)
+        ja = lspr(jj,ia)
+        js = int(tag(ja))
+        jra = itotOf(tag(ja))
+        xj(1:3)= ra(1:3,ja)
+        xij(1:3)= xj(1:3) - xi(1:3)
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
+        dij = sqrt(dij2)
+        diji = 1d0/dij
+        drijj(1:3) = rij(1:3)*diji
+        do kk=jj+1,lspr(0,ia)
+          ka = lspr(kk,ia)
+          ks = int(tag(ka))
+          i3b = interact3(is,js,ks)
+          if( i3b <= 0 ) cycle
+          p3 = prm3ds(i3b)
+          rcij = p3%rcij
+          rcij2 = p3%rcij2
+          rcik = p3%rcik
+          rcik2 = p3%rcik2
+          if( js==ks ) then
+            rcij = (rcij+rcik)/2
+            rcik = rcij
+            rcij2= (rcij2+rcik2)/2
+            rcik2= rcij2
+          endif
+          if(  dij2 > rcij2 ) exit
+          kra = itotOf(tag(ka))
+          xk(1:3) = ra(1:3,ka)
+          xik(1:3) = xk(1:3) -xi(1:3)
+          rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
+          dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
+          if( dik2 > rcik2 ) cycle
+          dik = sqrt(dik2)
+          diki = 1d0/dik
+          drikk(1:3) = rik(1:3)*diki
+          drijc = 1d0/(dij-rcij)
+          drikc = 1d0/(dik-rcik)
+!.....r_ij term
+          call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
+          sumcbij = 0d0
+          sumcdbij= 0d0
+          do lij = -3,0
+            nij = nij3 +lij
+            if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+            c3ij = p3%cfij(nij)
+            sumcbij = sumcbij +c3ij*bij3(lij)
+            sumcdbij= sumcdbij +c3ij*dbij3(lij)
+          enddo
+!.....r_ik term
+          call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
+          sumcbik = 0d0
+          sumcdbik= 0d0
+          do lik = -3,0
+            nik = nik3 +lik
+            if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+            c3ik = p3%cfik(nik)
+            sumcbik = sumcbik +c3ik*bik3(lik)
+            sumcdbik= sumcdbik +c3ik*dbik3(lik)
+          enddo
+!.....cos terms
+          csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
+          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
+          call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
+          sumcb = 0d0
+          sumcdb= 0d0
+          do lcs = -3,0
+            n = ncs +lcs
+            if( n < 1 .or. n > p3%ncfcs ) cycle
+            c3t = p3%cfcs(n)
+            sumcb = sumcb +c3t*bcs(lcs)
+            sumcdb= sumcdb +c3t*dbcs(lcs)
+          enddo  ! lcs
+!.....energy
+          tmp = sumcbij * sumcbik * sumcb
+!!$          tmp = vexp *sumcb
+          if( lematch ) then
+!.....deriv. wrt cfij
+            n0 = 0
+            do lij=-3,0
+              nij = nij3 +lij
+              if( nij < 1 .or. nij > p3%nknij ) cycle
+              prm3ds(i3b)%gwe(n0+nij)= prm3ds(i3b)%gwe(n0+nij) &
+                   +bij3(lij)*sumcbik*sumcb
+            enddo
+!.....deriv. wrt cfik
+            n0 = n0 +p3%ncfij
+            do lik=-3,0
+              nik = nik3 +lik
+              if( nik < 1 .or. nik > p3%nknik ) cycle
+              prm3ds(i3b)%gwe(n0+nik)= prm3ds(i3b)%gwe(n0+nik) &
+                   +bik3(lik)*sumcbij*sumcb
+            enddo
+!.....deriv. wrt cfcs
+            n0 = n0 +p3%ncfik
+            do lcs=-3,0
+              n = ncs +lcs
+              if( n < 1 .or. n > p3%ncfcs ) cycle
+              prm3ds(i3b)%gwe(n0+n)= prm3ds(i3b)%gwe(n0+n) &
+                   +bcs(lcs)*sumcbij*sumcbik
+            enddo
+          endif
+!.....force
+          if( .not.lfmatch .and. .not.lsmatch ) cycle
+          dv3rij = sumcdbij *sumcbik *sumcb
+          dv3rik = sumcdbik *sumcbij *sumcb
+          dv3csn = -sumcdb *sumcbij *sumcbik
+          dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
+          dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
+          dv3rijdcij = sumcbik *sumcb
+          dv3rijdcik = sumcdbij *sumcb
+          dv3rijdccs = sumcdbij *sumcbik
+          dv3rikdcij = sumcdbik *sumcb
+          dv3rikdcik = sumcbij *sumcb
+          dv3rikdccs = sumcbij *sumcdbik
+          dv3csndcij  = -sumcdb *sumcbik
+          dv3csndcik  = -sumcdb *sumcbij
+          dv3csndccs  = -sumcbij *sumcbik
+          if( lfmatch ) then
+            ifcal = ia2ifcal(ia)
+            jfcal = ia2ifcal(jra)
+            kfcal = ia2ifcal(kra)
+            if( ifcal.ne.0 ) then
+!.....deriv. wrt cfij
+              n0 = 0
+              do lij = -3,0
+                nij = nij3 +lij
+                if( nij < 1 .or. nij > p3%nknij ) cycle
+                prm3ds(i3b)%gwf(:,n0+nij,ifcal)= prm3ds(i3b)%gwf(:,n0+nij,ifcal) &
+                     +drijj(:)*dv3rijdcij*dbij3(lij) +dcsnj(:)*dv3csndcij*bij3(lij) &
+                     +drikk(:)*dv3rikdcij*dbij3(lij) +dcsnk(:)*dv3csndcij*bij3(lij)
+              enddo
+!.....deriv. wrt cfik
+              n0 = n0 +p3%ncfij
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik ) cycle
+                prm3ds(i3b)%gwf(:,n0+nik,ifcal)= prm3ds(i3b)%gwf(:,n0+nik,ifcal) &
+                     +drijj(:)*dv3rijdcik*dbik3(lik) +dcsnj(:)*dv3csndcik*bik3(lik) &
+                     +drikk(:)*dv3rikdcik*dbik3(lik) +dcsnk(:)*dv3csndcik*bik3(lik)
+              enddo
+!.....deriv. wrt cfcs
+              n0 = n0 +p3%ncfik
+              do lcs=-3,0
+                n = ncs +lcs
+                if( n < 1 .or. n > p3%ncfcs ) cycle
+                prm3ds(i3b)%gwf(:,n0+n,ifcal)= prm3ds(i3b)%gwf(:,n0+n,ifcal) &
+                     +drijj(:)*dv3rijdccs*bcs(lcs) +dcsnj(:)*dv3csndccs*dbcs(lcs) &
+                     +drikk(:)*dv3rikdccs*bcs(lcs) +dcsnk(:)*dv3csndccs*dbcs(lcs)
+              enddo
+            endif
+            if( jfcal.ne.0 ) then
+              n0 = 0
+              do lij = -3,0
+                nij = nij3 +lij
+                if( nij < 1 .or. nij > p3%nknij ) cycle
+                prm3ds(i3b)%gwf(:,n0+nij,jfcal)= prm3ds(i3b)%gwf(:,n0+nij,jfcal) &
+                     -drijj(:)*dv3rijdcij*dbij3(lij) -dcsnj(:)*dv3csndcij*bij3(lij)
+              enddo
+              n0 = n0 +p3%ncfij
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik ) cycle
+                prm3ds(i3b)%gwf(:,n0+nik,jfcal)= prm3ds(i3b)%gwf(:,n0+nik,jfcal) &
+                     -drijj(:)*dv3rijdcik*dbik3(lik) -dcsnj(:)*dv3csndcik*bik3(lik)
+              enddo
+              n0 = n0 +p3%ncfik
+              do lcs=-3,0
+                n = ncs +lcs
+                if( n < 1 .or. n > p3%ncoef ) cycle
+                prm3ds(i3b)%gwf(:,n0+n,jfcal)= prm3ds(i3b)%gwf(:,n0+n,jfcal) &
+                     -drijj(:)*dv3rijdccs*bcs(lcs) -dcsnj(:)*dv3csndccs*dbcs(lcs)
+              enddo
+            endif
+            if( kfcal.ne.0 ) then
+              n0 = 0
+              do lij = -3,0
+                nij = nij3 +lij
+                if( nij < 1 .or. nij > p3%nknij ) cycle
+                prm3ds(i3b)%gwf(:,n0+nij,kfcal)= prm3ds(i3b)%gwf(:,n0+nij,kfcal) &
+                     -drikk(:)*dv3rikdcij*dbij3(lij) -dcsnk(:)*dv3csndcij*bij3(lij)
+              enddo
+              n0 = n0 +p3%ncfij
+              do lik = -3,0
+                nik = nik3 +lik
+                if( nik < 1 .or. nik > p3%nknik ) cycle
+                prm3ds(i3b)%gwf(:,n0+nik,kfcal)= prm3ds(i3b)%gwf(:,n0+nik,kfcal) &
+                     -drikk(:)*dv3rikdcik*dbik3(lik) -dcsnk(:)*dv3csndcik*bik3(lik)
+              enddo
+              n0 = n0 +p3%ncfik
+              do lcs=-3,0
+                n = ncs +lcs
+                if( n < 1 .or. n > p3%ncoef ) cycle
+                prm3ds(i3b)%gwf(:,n0+n,kfcal)= prm3ds(i3b)%gwf(:,n0+n,kfcal) &
+                     -drikk(:)*dv3rikdccs*bcs(lcs) -dcsnk(:)*dv3csndccs*dbcs(lcs)
+              enddo
+            endif
+          endif  ! lfmatch
+!.....stress
+          if( lsmatch ) then
+            do ixyz=1,3
+              do jxyz=ixyz,3
+                iv = ivoigt(ixyz,jxyz)
+                n0 = 0
+                do lij = -3,0
+                  nij = nij3 +lij
+                  if( nij < 1 .or. nij > p3%nknij ) cycle
+                  prm3ds(i3b)%gwf(iv,n0+nij,kfcal)= prm3ds(i3b)%gwf(iv,n0+nij,kfcal) &
+                       -rij(ixyz) &
+                       *(drijj(jxyz)*dv3rijdcij*dbij3(lij) +dcsnj(jxyz)*dv3csndcij*bij3(lij)) &
+                       -rik(ixyz) &
+                       *(drikk(jxyz)*dv3rikdcij*dbij3(lij) +dcsnk(jxyz)*dv3csndcij*bij3(lij))
+                enddo
+                n0 = n0 +p3%ncfij
+                do lik = -3,0
+                  nik = nik3 +lik
+                  if( nik < 1 .or. nik > p3%nknik ) cycle
+                  prm3ds(i3b)%gwf(iv,n0+nik,kfcal)= prm3ds(i3b)%gwf(iv,n0+nik,kfcal) &
+                       -rij(ixyz) &
+                       *(drijj(jxyz)*dv3rijdcik*dbik3(lik) +dcsnj(jxyz)*dv3csndcik*bik3(lik)) &
+                       -rik(ixyz) &
+                       *(drikk(jxyz)*dv3rikdcik*dbik3(lik) +dcsnk(jxyz)*dv3csndcik*bik3(lik))
+                enddo
+                n0 = n0 +p3%ncfik
+                do lcs=-3,0
+                  n = ncs +lcs
+                  if( n < 1 .or. n > p3%ncoef ) cycle
+                  prm3ds(i3b)%gws(iv,n0+n)= prm3ds(i3b)%gws(iv,n0+n) &
+                       -rij(ixyz) &
+                       *(drijj(jxyz)*dv3rijdccs*bcs(lcs) +dcsnj(jxyz)*dv3csndccs*dbcs(lcs)) &
+                       -rik(ixyz) &
+                       *(drikk(jxyz)*dv3rikdccs*bcs(lcs) +dcsnk(jxyz)*dv3csndccs*dbcs(lcs))
+                enddo ! lcs
+              enddo
+            enddo ! ixyz
+          endif  ! lsmatch
+
+        enddo  ! kk
+      enddo  ! jj
+    enddo ! ia
+
+!!$!.....Skip to here if grad calc is already done before.
+!!$10  continue
+
+!.....Tidy up gradient arrays
+    if( lematch ) then  ! energy matching
+      ip = iprm0
+      do i1b=1,n1b
+        ip = ip +1
+        gwe(ip) = gwe(ip) +gerg1s(i1b)
+      enddo
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        do i=1,p2%ncoef
+          ip = ip +1
+          gwe(ip) = gwe(ip) +p2%gwe(i)
+        enddo
+      enddo
+      do i3b=1,n3b
+        p3 = prm3ds(i3b)
+        if( p3%jsp==p3%ksp ) then
+          p3%gwe(1) = (p3%gwe(1)+p3%gwe(2))/2
+          p3%gwe(2) = p3%gwe(1)
+          p3%gwe(3) = (p3%gwe(3)+p3%gwe(4))/2
+          p3%gwe(4) = p3%gwe(3)
+        endif
+        n0 = 0
+        do i=1,p3%ncfij
+          ip = ip +1
+          gwe(ip) = gwe(ip) +p3%gwe(n0+i)
+        enddo
+        n0 = n0 +p3%ncfij
+        do i=1,p3%ncfik
+          ip = ip +1
+          gwe(ip) = gwe(ip) +p3%gwe(n0+i)
+        enddo
+        n0 = n0 +p3%ncfik
+        do i=1,p3%ncfcs
+          ip = ip +1
+          gwe(ip) = gwe(ip) +p3%gwe(n0+i)
+        enddo
+      enddo  ! i3b
+    endif
+
+    if( lfmatch ) then  ! force matching
+      do ia=1,natm
+        if( .not. lfrc_eval(ia) ) cycle
+        ifcal = ia2ifcal(ia)
+        is = int(tag(ia))
+        ip = iprm0 +n1b  ! no contrib. from solo term to forces
+        do i2b=1,n2b
+          p2 = prm2s(i2b)
+          do i=1,p2%ncoef
+            ip = ip +1
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal)  +p2%gwf(1:3,i,ifcal)
+          enddo
+        enddo  ! i2b
+        do i3b=1,n3b
+          p3 = prm3ds(i3b)
+          if( p3%jsp==p3%ksp ) then
+            p3%gwf(1:3,1,ifcal) = (p3%gwf(1:3,1,ifcal)+p3%gwf(1:3,2,ifcal))/2
+            p3%gwf(1:3,2,ifcal) = p3%gwf(1:3,1,ifcal)
+            p3%gwf(1:3,3,ifcal) = (p3%gwf(1:3,3,ifcal)+p3%gwf(1:3,4,ifcal))/2
+            p3%gwf(1:3,4,ifcal) = p3%gwf(1:3,3,ifcal)
+          endif
+          ip = ip +1
+          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,1,ifcal)
+          ip = ip +1
+          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,2,ifcal)
+          ip = ip +1
+          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,3,ifcal)
+          ip = ip +1
+          gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,4,ifcal)
+          do i=1,p3%ncoef
+            ip = ip +1
+            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,4+i,ifcal)
+          enddo
+        enddo
+      enddo ! ia
+    endif
+
+    if( lsmatch ) then  ! stress matching
+      ip = iprm0 +n1b  ! no contrib. from solo term to forces
+      do i2b=1,n2b
+        p2 = prm2s(i2b)
+        do i=1,p2%ncoef
+          ip = ip +1
+          gws(1:6,ip) = gws(1:6,ip) +p2%gws(1:6,i)
+        enddo
+      enddo  ! i2b
+      do i3b=1,n3b
+        p3 = prm3ds(i3b)
+        if( p3%jsp==p3%ksp ) then
+          p3%gws(1:6,1) = (p3%gws(1:6,1)+p3%gws(1:6,2))/2
+          p3%gws(1:6,2) = p3%gws(1:6,1)
+          p3%gws(1:6,3) = (p3%gws(1:6,3)+p3%gws(1:6,4))/2
+          p3%gws(1:6,4) = p3%gws(1:6,3)
+        endif
+        ip = ip +1
+        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,1)
+        ip = ip +1
+        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,2)
+        ip = ip +1
+        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,3)
+        ip = ip +1
+        gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,4)
+        do i=1,p3%ncoef
+          ip = ip +1
+          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,4+i)
+        enddo
+      enddo  ! i3b
+    endif
+
+    return
+  end subroutine gradw_uf3d
+!=======================================================================
   subroutine b_spl(r,ts,nmax,nr,b,db,ddb)
 !
 !  Non-recursive implementation of B-spline function at R.
@@ -3772,6 +4301,83 @@ contains
 
     return
   end subroutine set_params_uf3l
+!=======================================================================
+  subroutine set_params_uf3d(ndimp,params)
+!
+!  Accesor routine to set uf3d parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!  This will compare num of parameters given from outside
+!  and num of coefficients already read in read_params_uf3d().
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp, &
+         nklead, nktrail
+    real(8):: rcij, rcik
+    type(prm2):: p2
+    type(prm3d):: p3
+
+    if( .not. lprms_read_uf3d ) then
+      print *,'ERROR(set_params_uf3d): read_params_uf3d has not been called yet.'
+      stop
+    endif
+
+!.....Count num of coeffs in force_uf3d
+    ncoef = 0
+    do i1b=1,n1b
+      ncoef = ncoef +1
+    enddo
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      ncoef = ncoef +p2%ncoef
+    enddo
+    do i3b=1,n3b
+      p3 = prm3ds(i3b)
+      ncoef = ncoef +p3%ncfij +p3%ncfik +p3%ncfcs
+    enddo
+    if( ncoef.ne.ndimp ) then
+      print *,'ERROR(set_params_uf3d): ncoef != ndimp'
+      print *,'    This error may be caused when in.vars.fitpot and ' &
+           //'in.params.uf3d are not consistent.'
+      stop
+    endif
+
+!.....Replace coefficients with params given from outside.
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params(inc)
+    enddo
+    do i2b=1,n2b
+      ncoef = prm2s(i2b)%ncoef
+      nklead = prm2s(i2b)%nklead
+      nktrail = prm2s(i2b)%nktrail
+      do ic=1,ncoef
+        inc = inc +1
+        prm2s(i2b)%coefs(ic) = params(inc)
+      enddo
+    enddo
+    rc3max = 0d0
+    do i3b=1,n3b
+      p3 = prm3ds(i3b)
+      inc = inc +1
+      do ic=1,p3%ncfij
+        inc = inc + 1
+        prm3ds(i3b)%cfij(ic) = params(inc)
+      enddo
+      do ic=1,p3%ncfik
+        inc = inc + 1
+        prm3ds(i3b)%cfik(ic) = params(inc)
+      enddo
+      do ic=1,p3%ncfcs
+        inc = inc + 1
+        prm3ds(i3b)%cfcs(ic) = params(inc)
+      enddo
+    enddo
+
+    return
+  end subroutine set_params_uf3d
 !=======================================================================
   subroutine symmetrize_params_uf3(ndimp,params)
 !
@@ -4734,7 +5340,40 @@ contains
     return
   end function get_mem_uf3l
 !=======================================================================
-  subroutine dealloc_gwx_uf3()
+  function get_mem_uf3d() result(dmem)
+!
+!  Compute and return memory usage in this module.
+!
+    real(8):: dmem
+    integer:: i2b, i3b
+    type(prm2):: p2
+    type(prm3d):: p3
+
+    dmem = 0d0
+
+    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+!!$    dmem = dmem +4d0*size(ls3b)
+
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
+    enddo
+    do i3b=1,n3b
+      p3 = prm3ls(i3b)
+      dmem = dmem +8d0*( size(p3%knij) +size(p3%cfij) &
+           +size(p3%knik) +size(p3%cfik) &
+           +size(p3%kncs) +size(p3%cfcs) )
+      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
+    enddo
+    return
+  end function get_mem_uf3d
+!=======================================================================
+subroutine dealloc_gwx_uf3()
 !
 !  Release memories for gw{e,f,s} for the purpose of efficiency.
 !
