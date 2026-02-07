@@ -14,7 +14,6 @@ program fitpot
   use linreg,only: set_iglid_linreg
   use time,only: time_stamp
   use DNN,only: write_tgrads_DNN
-  use UF3,only: symmetrize_params_uf3
   use pmdvars,only: specorder_pmd => specorder
   use conditions,only: lconds, read_conds
   implicit none
@@ -146,9 +145,6 @@ program fitpot
 !.....Initial computations of all samples
   if( trim(cpotlow).eq.'linreg' .or. trim(cpotlow).eq.'dnn' &
        .or. cpotlow(1:3).eq.'uf3' ) then
-!.....Some restriction to parameters in case of UF3 potential.
-!.....No need for UF3L.
-    if( trim(cpotlow)=='uf3' ) call symmetrize_params_uf3(nvars,vars)
     call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftrn0,ftst0)
   else
@@ -926,7 +922,6 @@ end subroutine sgd_wrapper
 !=======================================================================
 subroutine check_grad(ftrn0,ftst0)
   use variables
-!!$  use NNd,only:NN_init,NN_func,NN_grad
   use parallel
   use fp_common,only: func_w_pmd, grad_w_pmd, wrap_ranges
   implicit none
@@ -937,7 +932,6 @@ subroutine check_grad(ftrn0,ftst0)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-8
   real(8):: vtmp1,vtmp2
-
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
   vars0(1:nvars)= vars(1:nvars)
@@ -995,6 +989,19 @@ subroutine check_grad(ftrn0,ftst0)
   endif
 
 end subroutine check_grad
+!=======================================================================
+subroutine symmetrize_params()
+  use variables
+  use UF3,only: symmetrize_params_uf3, symmetrize_params_uf3d
+
+!.....no need to symmetrize in case of uf3l
+  if( trim(cpotlow)=='uf3' ) then
+    call symmetrize_params_uf3(nvars,vars)
+  else if( trim(cpotlow) == 'uf3d') then
+    call symmetrize_params_uf3d(nvars,vars)
+  endif
+  
+end subroutine symmetrize_params
 !=======================================================================
 subroutine test(ftrn0,ftst0)
   use variables

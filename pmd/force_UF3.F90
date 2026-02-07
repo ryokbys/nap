@@ -756,6 +756,8 @@ contains
     ps%isp = isp
     ps%jsp = jsp
     ps%ksp = ksp
+!.....Use cfij if jsp==ksp
+    if( ps%jsp .eq. ps%ksp ) ps%cfik(:) = ps%cfij(:)
     interact3(isp,jsp,ksp) = i3b
     interact3(isp,ksp,jsp) = i3b
     rc3max = max(ps%rcij, ps%rcik, rc3max)
@@ -2178,7 +2180,7 @@ contains
           sumcdbij= 0d0
           do lij = -3,0
             nij = nij3 +lij
-            if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+            if( nij < 1 .or. nij > p3%ncfij ) cycle
             c3ij = p3%cfij(nij)
             sumcbij = sumcbij +c3ij*bij3(lij)
             sumcdbij= sumcdbij +c3ij*dbij3(lij)
@@ -2189,7 +2191,7 @@ contains
           sumcdbik= 0d0
           do lik = -3,0
             nik = nik3 +lik
-            if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+            if( nik < 1 .or. nik > p3%ncfik ) cycle
             c3ik = p3%cfik(nik)
             sumcbik = sumcbik +c3ik*bik3(lik)
             sumcdbik= sumcdbik +c3ik*dbik3(lik)
@@ -3577,7 +3579,7 @@ contains
         call b_spl(dij,p2%knots,p2%nknot,nr2,bij,dbij)
         do lij = -3,0
           n = nr2 +lij
-          if( n < 1 .or. n > p2%nknot-4 ) cycle
+          if( n < 1 .or. n > p2%ncoef ) cycle
 !.....Energy
           if( lematch ) prm2s(i2b)%gwe(n) = prm2s(i2b)%gwe(n) +bij(lij)
 !.....Forces
@@ -3653,7 +3655,7 @@ contains
           sumcdbij= 0d0
           do lij = -3,0
             nij = nij3 +lij
-            if( nij < 1 .or. nij > p3%nknij-4 ) cycle
+            if( nij < 1 .or. nij > p3%ncfij ) cycle
             c3ij = p3%cfij(nij)
             sumcbij = sumcbij +c3ij*bij3(lij)
             sumcdbij= sumcdbij +c3ij*dbij3(lij)
@@ -3664,7 +3666,7 @@ contains
           sumcdbik= 0d0
           do lik = -3,0
             nik = nik3 +lik
-            if( nik < 1 .or. nik > p3%nknik-4 ) cycle
+            if( nik < 1 .or. nik > p3%ncfik ) cycle
             c3ik = p3%cfik(nik)
             sumcbik = sumcbik +c3ik*bik3(lik)
             sumcdbik= sumcdbik +c3ik*dbik3(lik)
@@ -3739,7 +3741,7 @@ contains
                 if( nij < 1 .or. nij > p3%ncfij ) cycle
                 prm3ds(i3b)%gwf(:,n0+nij,ifcal)= prm3ds(i3b)%gwf(:,n0+nij,ifcal) &
                      +drijj(:)*dv3rijdcij*dbij3(lij) +dcsnj(:)*dv3csndcij*bij3(lij) &
-                     +drikk(:)*dv3rikdcij*dbij3(lij) +dcsnk(:)*dv3csndcij*bij3(lij)
+                     +drikk(:)*dv3rikdcij*bij3(lij)  +dcsnk(:)*dv3csndcij*bij3(lij)
               enddo
 !.....deriv. wrt cfik
               n0 = n0 +p3%ncfij
@@ -3747,7 +3749,7 @@ contains
                 nik = nik3 +lik
                 if( nik < 1 .or. nik > p3%ncfik ) cycle
                 prm3ds(i3b)%gwf(:,n0+nik,ifcal)= prm3ds(i3b)%gwf(:,n0+nik,ifcal) &
-                     +drijj(:)*dv3rijdcik*dbik3(lik) +dcsnj(:)*dv3csndcik*bik3(lik) &
+                     +drijj(:)*dv3rijdcik*bik3(lik)  +dcsnj(:)*dv3csndcik*bik3(lik) &
                      +drikk(:)*dv3rikdcik*dbik3(lik) +dcsnk(:)*dv3csndcik*bik3(lik)
               enddo
 !.....deriv. wrt cfcs
@@ -3773,7 +3775,7 @@ contains
                 nik = nik3 +lik
                 if( nik < 1 .or. nik > p3%ncfik ) cycle
                 prm3ds(i3b)%gwf(:,n0+nik,jfcal)= prm3ds(i3b)%gwf(:,n0+nik,jfcal) &
-                     -drijj(:)*dv3rijdcik*dbik3(lik) -dcsnj(:)*dv3csndcik*bik3(lik)
+                     -drijj(:)*dv3rijdcik*bik3(lik) -dcsnj(:)*dv3csndcik*bik3(lik)
               enddo
               n0 = n0 +p3%ncfik
               do lcs=-3,0
@@ -3789,7 +3791,7 @@ contains
                 nij = nij3 +lij
                 if( nij < 1 .or. nij > p3%ncfij ) cycle
                 prm3ds(i3b)%gwf(:,n0+nij,kfcal)= prm3ds(i3b)%gwf(:,n0+nij,kfcal) &
-                     -drikk(:)*dv3rikdcij*dbij3(lij) -dcsnk(:)*dv3csndcij*bij3(lij)
+                     -drikk(:)*dv3rikdcij*bij3(lij) -dcsnk(:)*dv3csndcij*bij3(lij)
               enddo
               n0 = n0 +p3%ncfij
               do lik = -3,0
@@ -3816,19 +3818,19 @@ contains
                 do lij = -3,0
                   nij = nij3 +lij
                   if( nij < 1 .or. nij > p3%ncfij ) cycle
-                  prm3ds(i3b)%gwf(iv,n0+nij,kfcal)= prm3ds(i3b)%gwf(iv,n0+nij,kfcal) &
+                  prm3ds(i3b)%gws(iv,n0+nij)= prm3ds(i3b)%gws(iv,n0+nij) &
                        -rij(ixyz) &
                        *(drijj(jxyz)*dv3rijdcij*dbij3(lij) +dcsnj(jxyz)*dv3csndcij*bij3(lij)) &
                        -rik(ixyz) &
-                       *(drikk(jxyz)*dv3rikdcij*dbij3(lij) +dcsnk(jxyz)*dv3csndcij*bij3(lij))
+                       *(drikk(jxyz)*dv3rikdcij*bij3(lij) +dcsnk(jxyz)*dv3csndcij*bij3(lij))
                 enddo
                 n0 = n0 +p3%ncfij
                 do lik = -3,0
                   nik = nik3 +lik
                   if( nik < 1 .or. nik > p3%ncfik ) cycle
-                  prm3ds(i3b)%gwf(iv,n0+nik,kfcal)= prm3ds(i3b)%gwf(iv,n0+nik,kfcal) &
+                  prm3ds(i3b)%gws(iv,n0+nik)= prm3ds(i3b)%gws(iv,n0+nik) &
                        -rij(ixyz) &
-                       *(drijj(jxyz)*dv3rijdcik*dbik3(lik) +dcsnj(jxyz)*dv3csndcik*bik3(lik)) &
+                       *(drijj(jxyz)*dv3rijdcik*bik3(lik) +dcsnj(jxyz)*dv3csndcik*bik3(lik)) &
                        -rik(ixyz) &
                        *(drikk(jxyz)*dv3rikdcik*dbik3(lik) +dcsnk(jxyz)*dv3csndcik*bik3(lik))
                 enddo
@@ -3869,21 +3871,31 @@ contains
       enddo
       do i3b=1,n3b
         p3 = prm3ds(i3b)
-        if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
-          nc = p3%ncfij
-          p3%gwe(1:nc) = (p3%gwe(1:nc) +p3%gwe(nc+1:nc*2))/2
-          p3%gwe(nc+1:nc*2) = p3%gwe(1:nc)
-        endif
+        nc = p3%ncfij
         n0 = 0
-        do i=1,p3%ncfij
-          ip = ip +1
-          gwe(ip) = gwe(ip) +p3%gwe(n0+i)
-        enddo
-        n0 = n0 +p3%ncfij
-        do i=1,p3%ncfik
-          ip = ip +1
-          gwe(ip) = gwe(ip) +p3%gwe(n0+i)
-        enddo
+        if( p3%jsp .eq. p3%ksp ) then
+!.....If the ij and ik are the same species pairs, use sum of gwes
+!     because j < k is assumed above.
+          do i=1,nc  ! ij part
+            ip = ip +1
+            gwe(ip) = gwe(ip) +p3%gwe(i) +p3%gwe(i+nc)
+          enddo
+          n0 = n0 +p3%ncfij
+          do i=1,nc  ! ik part
+            ip = ip +1
+            gwe(ip) = 0d0
+          enddo
+        else
+          do i=1,p3%ncfij
+            ip = ip +1
+            gwe(ip) = gwe(ip) +p3%gwe(n0+i)
+          enddo
+          n0 = n0 +p3%ncfij
+          do i=1,p3%ncfik
+            ip = ip +1
+            gwe(ip) = gwe(ip) +p3%gwe(n0+i)
+          enddo
+        endif
         n0 = n0 +p3%ncfik
         do i=1,p3%ncfcs
           ip = ip +1
@@ -3907,21 +3919,30 @@ contains
         enddo  ! i2b
         do i3b=1,n3b
           p3 = prm3ds(i3b)
-          if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
-            nc = p3%ncfij
-            p3%gwf(1:3,1:nc,ifcal) = (p3%gwf(1:3,1:nc,ifcal)+p3%gwf(1:3,nc+1:nc*2,ifcal))/2
-            p3%gwf(1:3,nc+1:nc*2,ifcal) = p3%gwf(1:3,1:nc,ifcal)
-          endif
+          nc = p3%ncfij
           n0 = 0
-          do i=1,p3%ncfij
-            ip = ip +1
-            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
-          enddo
-          n0 = n0 +p3%ncfij
-          do i=1,p3%ncfik
-            ip = ip +1
-            gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
-          enddo
+          if( p3%jsp .eq. p3%ksp) then
+            do i=1,nc
+              ip = ip +1
+              gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,i,ifcal) &
+                   +p3%gwf(1:3,i+nc,ifcal)
+            enddo
+            n0 = n0 + nc
+            do i=1,nc
+              ip = ip +1
+              gwf(1:3,ip,ifcal) = 0d0
+            enddo
+          else
+            do i=1,p3%ncfij
+              ip = ip +1
+              gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
+            enddo
+            n0 = n0 +p3%ncfij
+            do i=1,p3%ncfik
+              ip = ip +1
+              gwf(1:3,ip,ifcal) = gwf(1:3,ip,ifcal) +p3%gwf(1:3,n0+i,ifcal)
+            enddo
+          endif
           n0 = n0 +p3%ncfik
           do i=1,p3%ncfcs
             ip = ip +1
@@ -3942,21 +3963,29 @@ contains
       enddo  ! i2b
       do i3b=1,n3b
         p3 = prm3ds(i3b)
-        if( p3%jsp==p3%ksp ) then  ! symmetrize if jsp==ksp
-          nc = p3%ncfij
-          p3%gws(1:6,1:nc) = (p3%gws(1:6,1:nc)+p3%gws(1:6,nc+1:nc*2))/2
-          p3%gws(1:6,nc+1:nc*2) = p3%gws(1:6,1:nc)
-        endif
+        nc = p3%ncfij
         n0 = 0
-        do i=1,p3%ncfij
-          ip = ip +1
-          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
-        enddo
-        n0 = n0 +p3%ncfij
-        do i=1,p3%ncfik
-          ip = ip +1
-          gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
-        enddo
+        if( p3%jsp .eq. p3%ksp ) then
+          do i=1,p3%ncfij
+            ip = ip +1
+            gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,i) +p3%gws(1:6,i+nc)
+          enddo
+          n0 = n0 +p3%ncfij
+          do i=1,p3%ncfik
+            ip = ip +1
+            gws(1:6,ip) = 0d0
+          enddo
+        else
+          do i=1,p3%ncfij
+            ip = ip +1
+            gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
+          enddo
+          n0 = n0 +p3%ncfij
+          do i=1,p3%ncfik
+            ip = ip +1
+            gws(1:6,ip) = gws(1:6,ip) +p3%gws(1:6,n0+i)
+          enddo
+        endif
         n0 = n0 +p3%ncfik
         do i=1,p3%ncfcs
           ip = ip +1
@@ -4369,10 +4398,15 @@ contains
         inc = inc + 1
         prm3ds(i3b)%cfij(ic) = params(inc)
       enddo
-      do ic=1,p3%ncfik
-        inc = inc + 1
-        prm3ds(i3b)%cfik(ic) = params(inc)
-      enddo
+      if( p3%jsp == p3%ksp ) then
+        inc = inc + p3%ncfik
+        prm3ds(i3b)%cfik(:) = prm3ds(i3b)%cfij(:)
+      else
+        do ic=1,p3%ncfik
+          inc = inc + 1
+          prm3ds(i3b)%cfik(ic) = params(inc)
+        enddo
+      endif
       do ic=1,p3%ncfcs
         inc = inc + 1
         prm3ds(i3b)%cfcs(ic) = params(inc)
@@ -4395,7 +4429,7 @@ contains
     type(prm3):: p3
 
     if( .not. lprms_read_uf3 ) then
-      print *,'ERROR(set_params_uf3): read_params_uf3 has not been called yet.'
+      print *,'ERROR(symmetrize_params_uf3): read_params_uf3 has not been called yet.'
       stop
     endif
 
@@ -4413,7 +4447,7 @@ contains
       ncoef = ncoef +p3%ncfij *p3%ncfik *p3%ncfjk
     enddo
     if( ncoef.ne.ndimp ) then
-      print *,'ERROR(set_params_uf3): ncoef != ndimp'
+      print *,'ERROR(symmetrize_params_uf3): ncoef != ndimp'
       print *,'    This error may be caused when in.vars.fitpot and ' &
            //'in.params.uf3 are not consistent.'
       stop
@@ -4452,6 +4486,69 @@ contains
 
     return
   end subroutine symmetrize_params_uf3
+!=======================================================================
+  subroutine symmetrize_params_uf3d(ndimp,params)
+!
+!  Accesor routine to set uf3d parameters from outside.
+!  Make the 3-body parameters symmetric when species of j and k are identical.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(inout):: params(ndimp)
+
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp,nc
+    type(prm2):: p2
+    type(prm3d):: p3
+
+    if( .not. lprms_read_uf3d ) then
+      print *,'ERROR(symmetrize_params_uf3d): read_params_uf3d has not been called yet.'
+      stop
+    endif
+
+!.....Count num of coeffs in force_uf3
+    ncoef = 0
+    do i1b=1,n1b
+      ncoef = ncoef +1
+    enddo
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      ncoef = ncoef +p2%ncoef
+    enddo
+    do i3b=1,n3b
+      p3 = prm3ds(i3b)
+      ncoef = ncoef +p3%ncfij +p3%ncfik +p3%ncfcs
+    enddo
+    if( ncoef.ne.ndimp ) then
+      print *,'ERROR(symmetrize_params_uf3d): ncoef != ndimp'
+      print *,'    This error may be caused when in.vars.fitpot and ' &
+           //'in.params.uf3d are not consistent.'
+      stop
+    endif
+
+!.....Replace coefficients with params given from outside.
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+!.....pass
+    enddo
+    do i2b=1,n2b
+      inc = inc +prm2s(i2b)%ncoef
+    enddo
+    do i3b=1,n3b
+      p3 = prm3ds(i3b)
+      if( p3%jsp .ne. p3%ksp) then
+        inc = inc + p3%ncfij +p3%ncfik +p3%ncfcs
+      else
+        nc = p3%ncfij
+        do ic = 1,nc
+          inc = inc +1
+          params(inc)= (params(inc) +params(inc+nc))/2
+        enddo
+        inc = inc +nc +p3%ncfcs
+      endif
+    enddo
+
+    return
+  end subroutine symmetrize_params_uf3d
 !=======================================================================
   subroutine calc_penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
