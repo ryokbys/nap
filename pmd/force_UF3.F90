@@ -3690,7 +3690,7 @@ contains
             n0 = 0
             do lij=-3,0
               nij = nij3 +lij
-              if( nij < 1 .or. nij > p3%nknij ) cycle
+              if( nij < 1 .or. nij > p3%ncfij ) cycle
               prm3ds(i3b)%gwe(n0+nij)= prm3ds(i3b)%gwe(n0+nij) &
                    +bij3(lij)*sumcbik*sumcb
             enddo
@@ -3698,7 +3698,7 @@ contains
             n0 = n0 +p3%ncfij
             do lik=-3,0
               nik = nik3 +lik
-              if( nik < 1 .or. nik > p3%nknik ) cycle
+              if( nik < 1 .or. nik > p3%ncfik ) cycle
               prm3ds(i3b)%gwe(n0+nik)= prm3ds(i3b)%gwe(n0+nik) &
                    +bik3(lik)*sumcbij*sumcb
             enddo
@@ -3736,7 +3736,7 @@ contains
               n0 = 0
               do lij = -3,0
                 nij = nij3 +lij
-                if( nij < 1 .or. nij > p3%nknij ) cycle
+                if( nij < 1 .or. nij > p3%ncfij ) cycle
                 prm3ds(i3b)%gwf(:,n0+nij,ifcal)= prm3ds(i3b)%gwf(:,n0+nij,ifcal) &
                      +drijj(:)*dv3rijdcij*dbij3(lij) +dcsnj(:)*dv3csndcij*bij3(lij) &
                      +drikk(:)*dv3rikdcij*dbij3(lij) +dcsnk(:)*dv3csndcij*bij3(lij)
@@ -3745,7 +3745,7 @@ contains
               n0 = n0 +p3%ncfij
               do lik = -3,0
                 nik = nik3 +lik
-                if( nik < 1 .or. nik > p3%nknik ) cycle
+                if( nik < 1 .or. nik > p3%ncfik ) cycle
                 prm3ds(i3b)%gwf(:,n0+nik,ifcal)= prm3ds(i3b)%gwf(:,n0+nik,ifcal) &
                      +drijj(:)*dv3rijdcik*dbik3(lik) +dcsnj(:)*dv3csndcik*bik3(lik) &
                      +drikk(:)*dv3rikdcik*dbik3(lik) +dcsnk(:)*dv3csndcik*bik3(lik)
@@ -3764,14 +3764,14 @@ contains
               n0 = 0
               do lij = -3,0
                 nij = nij3 +lij
-                if( nij < 1 .or. nij > p3%nknij ) cycle
+                if( nij < 1 .or. nij > p3%ncfij ) cycle
                 prm3ds(i3b)%gwf(:,n0+nij,jfcal)= prm3ds(i3b)%gwf(:,n0+nij,jfcal) &
                      -drijj(:)*dv3rijdcij*dbij3(lij) -dcsnj(:)*dv3csndcij*bij3(lij)
               enddo
               n0 = n0 +p3%ncfij
               do lik = -3,0
                 nik = nik3 +lik
-                if( nik < 1 .or. nik > p3%nknik ) cycle
+                if( nik < 1 .or. nik > p3%ncfik ) cycle
                 prm3ds(i3b)%gwf(:,n0+nik,jfcal)= prm3ds(i3b)%gwf(:,n0+nik,jfcal) &
                      -drijj(:)*dv3rijdcik*dbik3(lik) -dcsnj(:)*dv3csndcik*bik3(lik)
               enddo
@@ -3787,14 +3787,14 @@ contains
               n0 = 0
               do lij = -3,0
                 nij = nij3 +lij
-                if( nij < 1 .or. nij > p3%nknij ) cycle
+                if( nij < 1 .or. nij > p3%ncfij ) cycle
                 prm3ds(i3b)%gwf(:,n0+nij,kfcal)= prm3ds(i3b)%gwf(:,n0+nij,kfcal) &
                      -drikk(:)*dv3rikdcij*dbij3(lij) -dcsnk(:)*dv3csndcij*bij3(lij)
               enddo
               n0 = n0 +p3%ncfij
               do lik = -3,0
                 nik = nik3 +lik
-                if( nik < 1 .or. nik > p3%nknik ) cycle
+                if( nik < 1 .or. nik > p3%ncfik ) cycle
                 prm3ds(i3b)%gwf(:,n0+nik,kfcal)= prm3ds(i3b)%gwf(:,n0+nik,kfcal) &
                      -drikk(:)*dv3rikdcik*dbik3(lik) -dcsnk(:)*dv3csndcik*bik3(lik)
               enddo
@@ -3815,7 +3815,7 @@ contains
                 n0 = 0
                 do lij = -3,0
                   nij = nij3 +lij
-                  if( nij < 1 .or. nij > p3%nknij ) cycle
+                  if( nij < 1 .or. nij > p3%ncfij ) cycle
                   prm3ds(i3b)%gwf(iv,n0+nij,kfcal)= prm3ds(i3b)%gwf(iv,n0+nij,kfcal) &
                        -rij(ixyz) &
                        *(drijj(jxyz)*dv3rijdcij*dbij3(lij) +dcsnj(jxyz)*dv3csndcij*bij3(lij)) &
@@ -3825,7 +3825,7 @@ contains
                 n0 = n0 +p3%ncfij
                 do lik = -3,0
                   nik = nik3 +lik
-                  if( nik < 1 .or. nik > p3%nknik ) cycle
+                  if( nik < 1 .or. nik > p3%ncfik ) cycle
                   prm3ds(i3b)%gwf(iv,n0+nik,kfcal)= prm3ds(i3b)%gwf(iv,n0+nik,kfcal) &
                        -rij(ixyz) &
                        *(drijj(jxyz)*dv3rijdcik*dbik3(lik) +dcsnj(jxyz)*dv3csndcik*bik3(lik)) &
@@ -4363,10 +4363,8 @@ contains
         prm2s(i2b)%coefs(ic) = params(inc)
       enddo
     enddo
-    rc3max = 0d0
     do i3b=1,n3b
       p3 = prm3ds(i3b)
-      inc = inc +1
       do ic=1,p3%ncfij
         inc = inc + 1
         prm3ds(i3b)%cfij(ic) = params(inc)

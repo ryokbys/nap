@@ -1216,7 +1216,7 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   use Coulomb,only: gradw_Coulomb
   use linreg,only: gradw_linreg
   use DNN,only: gradw_DNN
-  use UF3,only: gradw_uf3, gradw_uf3l
+  use UF3,only: gradw_uf3, gradw_uf3l, gradw_uf3d
   use pairlist,only: mk_lspr_para
   implicit none
   include "mpif.h"
@@ -1333,6 +1333,11 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     else if( use_force('UF3L').or.use_force('uf3l') ) then
       iprm0 = 0
       call gradw_uf3l(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+           iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
+           lgrad_done,nfcal,lfrc_eval)
+    else if( use_force('UF3D').or.use_force('uf3d') ) then
+      iprm0 = 0
+      call gradw_uf3d(namax,natm,tag,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
            lgrad_done,nfcal,lfrc_eval)
     endif

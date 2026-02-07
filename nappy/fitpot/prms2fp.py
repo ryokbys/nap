@@ -450,6 +450,7 @@ def uf3d2fp(outfname, specorder, repul_pairs=[]):
     rc3max = 0.0
     for d3b in uf3d_prms['3B']:
         trio = d3b['trio']
+        ntrail = d3b['ntrail']
         print(trio)
         ncfij = d3b['ncfij']
         ncfik = d3b['ncfik']
@@ -460,10 +461,16 @@ def uf3d2fp(outfname, specorder, repul_pairs=[]):
         cfij, cfik, cfcs = d3b['cfij'], d3b['cfik'], d3b['cfcs']
         for i in range(ncfij):
             fpvars.append(cfij[i])
-            vranges.append((0.0, 1e+10))
+            if i < ncfij -ntrail:
+                vranges.append((0.0, 1e+10))
+            else:
+                vranges.append((0.0, 0.0))
         for i in range(ncfik):
             fpvars.append(cfik[i])
-            vranges.append((0.0, 1e+10))
+            if i < ncfik -ntrail:
+                vranges.append((0.0, 1e+10))
+            else:
+                vranges.append((0.0, 0.0))
         for i in range(ncfcs):
             fpvars.append(cfcs[i])
             vranges.append((0.0, 1e+10))

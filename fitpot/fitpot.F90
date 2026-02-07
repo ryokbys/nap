@@ -20,7 +20,7 @@ program fitpot
   implicit none
   integer:: ismpl,ihour,imin,isec,isp,jsp
   real(8):: tmp,ftrn0,ftst0
-
+  
   call mpi_init(ierr)
   time0= mpi_wtime()
   call mpi_comm_size(mpi_comm_world,nnode,ierr)
@@ -849,7 +849,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
   use minimize
   implicit none
   real(8),intent(in):: ftrn0,ftst0
-
+  
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
   if( trim(cpotlow)=='linreg' .or. trim(cpotlow)=='dnn' &
@@ -958,7 +958,6 @@ subroutine check_grad(ftrn0,ftst0)
          '      error [%]'
   endif
   call flush(6)
-
   call wrap_ranges(nvars,vars,vranges)
   call grad_w_pmd(nvars,vars,ganal)
 

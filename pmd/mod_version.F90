@@ -10,7 +10,7 @@ module version
 
   public:: write_revision, write_authors, write_runtime
   
-  character(len=128),parameter:: crevision = 'rev251228'
+  character(len=128),parameter:: crevision = 'v260206'
 
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)
