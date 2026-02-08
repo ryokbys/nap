@@ -411,40 +411,34 @@ def fp2uf3(outfname, vs, uf3_prms, **kwargs):
     print(f' --> {outfname}')
     return None
 
-def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
+def fp2uf3l(outfname, vs, prms, **kwargs):
     from uf3util import write_params_uf3l
     iv = -1
-    for spi in uf3l_prms['1B'].keys():
+    for i,d1b in enumerate(prms['1B']):
         iv += 1
-        uf3l_prms['1B'][spi] = vs[iv]
+        prms['1B'][i]['erg'] = vs[iv]
 
-    for pair in uf3l_prms['2B'].keys():
-        dic = uf3l_prms['2B'][pair]
-        ncoef = dic['ncoef']
-        nlead = dic['nlead']
-        ntrail= dic['ntrail']
-        for i in range(ncoef):
+    for i,d2b in enumerate(prms['2B']):
+        ncoef = d2b['ncoef']
+        for j in range(ncoef):
             iv += 1
-            dic['coefs'][i] = vs[iv]
-        uf3l_prms['2B'][pair] = dic
+            prms['2B'][i]['coefs'][j] = vs[iv]
 
-    for trio in uf3l_prms['3B'].keys():
-        dic = uf3l_prms['3B'][trio]
-        ncoef = dic['ncoef']
+    for i,d3b in enumerate(prms['3B']):
+        ncoef = d3b['ncoef']
         iv += 1
-        dic['rcij'] = vs[iv]
+        prms['3B'][i]['rcij'] = vs[iv]
         iv += 1
-        dic['rcik'] = vs[iv]
+        prms['3B'][i]['rcik'] = vs[iv]
         iv += 1
-        dic['gmj'] = vs[iv]
+        prms['3B'][i]['gmj'] = vs[iv]
         iv += 1
-        dic['gmk'] = vs[iv]
-        for i in range(ncoef):
+        prms['3B'][i]['gmk'] = vs[iv]
+        for j in range(ncoef):
             iv += 1
-            dic['coefs'][i] = vs[iv]
-        uf3l_prms['3B'][trio] = dic
+            prms['3B'][i]['coefs'][j] = vs[iv]
 
-    write_params_uf3l(uf3l_prms,
+    write_params_uf3l(prms,
                       outfname=outfname,
                       overwrite=True)
     print(f' --> {outfname}')

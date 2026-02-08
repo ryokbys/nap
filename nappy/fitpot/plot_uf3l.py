@@ -18,7 +18,7 @@ from icecream import ic
 from nappy.fitpot.uf3util import b_spl, get_bspl_curve
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250705"
+__version__ = "260208"
 
 
 def plot_b_spl(ax, rs, knots, coefs, plot=True, fill=False, **kwargs):
@@ -43,8 +43,7 @@ def plot_b_spl(ax, rs, knots, coefs, plot=True, fill=False, **kwargs):
     return None
 
 
-def plot_uf3l_2b(uf3l_prms,
-                 vline_at=None,
+def plot_uf3l_2b(prms,
                  postfix=''):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -52,14 +51,14 @@ def plot_uf3l_2b(uf3l_prms,
 
     sns.set_theme(context='talk', style='ticks')
     # Analyze 2b
-    pairs = uf3l_prms['2B'].keys()
     miny = -1.0
     maxy =  5.0
     minx = 10.0
     maxx = 0.0
-    for pair in pairs:
-        coefs = uf3l_prms['2B'][pair]['coefs']
-        knots = uf3l_prms['2B'][pair]['knots']
+    for p in prms['2B']:
+        pair = p['pair']
+        coefs = p['coefs']
+        knots = p['knots']
         rs = np.linspace(0.11, max(knots),100)
         minx = min(rs.min(), minx)
         maxx = max(rs.max(), maxx)
@@ -82,14 +81,15 @@ def plot_uf3l_2b(uf3l_prms,
     ylim = (miny*(1.0+0.1), maxy*(1.0+0.1))
     ic(xlim)
     ic(ylim)
-    for pair in pairs:
+    for p in prms['2B']:
+        pair = p['pair']
         si, sj = pair
         fname = f'graph_2b_{si}-{sj}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        coefs = uf3l_prms['2B'][pair]['coefs']
-        knots = uf3l_prms['2B'][pair]['knots']
+        coefs = p['coefs']
+        knots = p['knots']
         rs = np.linspace(0.11, max(knots),100)
         ic(pair, coefs)
         fig, ax = plt.subplots(figsize=(5,4))
@@ -102,12 +102,6 @@ def plot_uf3l_2b(uf3l_prms,
         plot_b_spl(ax, rs, knots, coefs,
                    alpha=1.0, label=f'{si}-{sj}',linewidth=3.0,
                    linestyle='-', color='black')
-        if vline_at:
-            if type(vline_at) is dict:
-                x = vline_at[pair]
-            else:
-                x = vline_at
-            plt.axvline(x=x, color='black', linestyle=':')
         ax.set_xlabel('Distance (Å)')
         ax.set_ylabel('Energy (eV)')
         ax.set_ylim(*ylim)
@@ -121,7 +115,7 @@ def plot_uf3l_2b(uf3l_prms,
     return None
 
 
-def plot_uf3l_3b(uf3l_prms,
+def plot_uf3l_3b(prms,
                  postfix = '',
                  theta = False):
     """
@@ -135,16 +129,16 @@ def plot_uf3l_3b(uf3l_prms,
     sns.set_theme(context='talk', style='ticks')
 
     tiny = 1.0e-8
-    trios = uf3l_prms['3B'].keys()
 
     # Analyze 3B
     miny = -1.0
     maxy = 1.0
     minx = 10.0
     maxx = 0.0
-    for trio in trios:
-        coefs = np.array(uf3l_prms['3B'][trio]['coefs'])
-        knots = uf3l_prms['3B'][trio]['knots']
+    for t in prms['3B']:
+        trio = t['trio']
+        coefs = np.array(t['coefs'])
+        knots = t['knots']
         cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
         ts = np.arccos(cs)
         es = get_bspl_curve(cs, knots, coefs)
@@ -157,15 +151,16 @@ def plot_uf3l_3b(uf3l_prms,
     # Plot
     xlim = (minx, maxx)
     ylim = (miny*(1.0-0.1), maxy*(1.0+0.1))
-    for trio in trios:
+    for t in prms['3B']:
+        trio = t['trio']
         si, sj, sk = trio
         fname = f'graph_3b_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        coefs = np.array(uf3l_prms['3B'][trio]['coefs'])
+        coefs = np.array(t['coefs'])
         ic(trio, coefs)
-        knots = uf3l_prms['3B'][trio]['knots']
+        knots = t['knots']
         cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
         ts = np.arccos(cs)
         fig, ax = plt.subplots(figsize=(5,4))

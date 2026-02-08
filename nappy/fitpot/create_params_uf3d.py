@@ -314,6 +314,7 @@ def main():
     if correct:
         create_conditions(prms_uf3d,
                           outfname=outfcond)
+    return None
 
 
 if __name__ == "__main__":
