@@ -425,8 +425,8 @@ def uf3d2fp(outfname, specorder, repul_pairs=[]):
 
     for d1b in uf3d_prms['1B']:
         spi = d1b['species']
-        epot = d1b['epot']
-        fpvars.append(epot)
+        erg = d1b['erg']
+        fpvars.append(erg)
         vranges.append((-1e+10, 1e+10))
 
     rc2max = 0.0

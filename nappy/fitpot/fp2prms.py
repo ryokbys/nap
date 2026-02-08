@@ -20,12 +20,10 @@ Options:
 import os
 
 from docopt import docopt
-#from prms2fp import read_params_uf3
-from uf3util import read_params_uf3, write_params_uf3, read_params_uf3l, write_params_uf3l
 from datetime import datetime
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "241120"
+__version__ = "260208"
 
 def read_in_fitpot2(infname='in.fitpot'):
     """
@@ -381,7 +379,8 @@ def fp2BVSx(varsfp, **kwargs):
     return None
 
 def fp2uf3(outfname, vs, uf3_prms, **kwargs):
-
+    from uf3util import write_params_uf3
+    
     iv = -1
     for spi in uf3_prms['1B'].keys():
         iv += 1
@@ -413,7 +412,7 @@ def fp2uf3(outfname, vs, uf3_prms, **kwargs):
     return None
 
 def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
-
+    from uf3util import write_params_uf3l
     iv = -1
     for spi in uf3l_prms['1B'].keys():
         iv += 1
@@ -446,6 +445,43 @@ def fp2uf3l(outfname, vs, uf3l_prms, **kwargs):
         uf3l_prms['3B'][trio] = dic
 
     write_params_uf3l(uf3l_prms,
+                      outfname=outfname,
+                      overwrite=True)
+    print(f' --> {outfname}')
+    return None
+
+def fp2uf3d(outfname, vs, prms, **kwargs):
+    from uf3util import write_params_uf3d
+    iv = -1
+    for i,d1 in enumerate(prms['1B']):
+        iv += 1
+        prms['1B'][i]['erg'] = vs[iv]
+
+    for i,d2 in enumerate(prms['2B']):
+        pair = d2['pair']
+        ncoef = d2['ncoef']
+        nlead = d2['nlead']
+        ntrail= d2['ntrail']
+        for j in range(ncoef):
+            iv += 1
+            prms['2B'][i]['coefs'][j] = vs[iv]
+
+    for i,d3 in enumerate(prms['3B']):
+        ncfij = d3['ncfij']
+        ncfik = d3['ncfik']
+        ncfcs = d3['ncfcs']
+        ntrail = d3['ntrail']
+        for j in range(ncfij):
+            iv += 1
+            prms['3B'][i]['cfij'][j] = vs[iv]
+        for k in range(ncfik):
+            iv += 1
+            prms['3B'][i]['cfik'][k] = vs[iv]
+        for l in range(ncfcs):
+            iv += 1
+            prms['3B'][i]['cfcs'][l] = vs[iv]
+
+    write_params_uf3d(prms,
                       outfname=outfname,
                       overwrite=True)
     print(f' --> {outfname}')
@@ -541,6 +577,7 @@ def main():
         print('')
 
     elif pot_type in ('UF3', 'uf3'):
+        from nappy.fitpot.uf3util import read_params_uf3
         prmfname = 'in.params.uf3'
         if not os.path.exists(prmfname):
             raise Exception(f'Cannot find {prmfname}.')
@@ -548,12 +585,21 @@ def main():
         outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
         fp2uf3(outfname, varsfp['variables'], uf3_prms, **kwargs)
     elif pot_type in ('UF3L', 'uf3l'):
+        from nappy.fitpot.uf3util import read_params_uf3l
         prmfname = 'in.params.uf3l'
         if not os.path.exists(prmfname):
             raise Exception(f'Cannot find {prmfname}.')
         uf3l_prms = read_params_uf3l(prmfname)
         outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
         fp2uf3l(outfname, varsfp['variables'], uf3l_prms, **kwargs)
+    elif pot_type in ('UF3D', 'uf3d'):
+        from nappy.fitpot.uf3util import read_params_uf3d
+        prmfname = 'in.params.uf3d'
+        if not os.path.exists(prmfname):
+            raise Exception(f'Cannot find {prmfname}.')
+        uf3d_prms = read_params_uf3d(prmfname)
+        outfname = prmfname +'_'+datetime.now().strftime('%y%m%d')
+        fp2uf3d(outfname, varsfp['variables'], uf3d_prms, **kwargs)
     else:
         if len(pairs) == 0:
             raise ValueError('Pairs must be specified.')

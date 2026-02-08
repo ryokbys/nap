@@ -38,8 +38,8 @@ def read_params_uf3(infname):
                 body = data[0]
                 if body == '1B':
                     spi = data[1]
-                    epot = float(data[2])
-                    uf3_prms[body][spi] = epot
+                    erg = float(data[2])
+                    uf3_prms[body][spi] = erg
                     continue
                 elif body == '2B':
                     spi = data[1]
@@ -131,8 +131,8 @@ def read_params_uf3l(infname):
                 body = data[0]
                 if body == '1B':
                     spi = data[1]
-                    epot = float(data[2])
-                    uf3l_prms[body][spi] = epot
+                    erg = float(data[2])
+                    uf3l_prms[body][spi] = erg
                     continue
                 elif body == '2B':
                     spi = data[1]
@@ -211,9 +211,9 @@ def read_params_uf3d(infname):
                 body = data[0]
                 if body == '1B':
                     spi = data[1]
-                    epot = float(data[2])
+                    erg = float(data[2])
                     uf3d_prms[body].append({'species': spi,
-                                            'epot': epot})
+                                            'erg': erg})
                     continue
                 elif body == '2B':
                     spi = data[1]
@@ -295,9 +295,9 @@ def write_params_uf3(uf3prms,
     if data1B is not None:
         spcs = data1B.keys()
         for spi in spcs:
-            epot = data1B[spi]
+            erg = data1B[spi]
             f.write(entry_comment)
-            f.write(f'1B  {spi}  {epot:0.4f}\n')
+            f.write(f'1B  {spi}  {erg:0.4f}\n')
             f.write('#\n')
     if data2B is not None:
         pairs = data2B.keys()
@@ -389,9 +389,9 @@ def write_params_uf3l(uf3lprms,
     if data1B is not None:
         spcs = data1B.keys()
         for spi in spcs:
-            epot = data1B[spi]
+            erg = data1B[spi]
             f.write(entry_comment)
-            f.write(f'1B  {spi}  {epot:0.4f}\n')
+            f.write(f'1B  {spi}  {erg:0.4f}\n')
             f.write('#\n')
     if data2B is not None:
         pairs = data2B.keys()
@@ -470,9 +470,9 @@ def write_params_uf3d(uf3dprms,
     if data1B is not None:
         for d1 in data1B:
             spi = d1['species']
-            epot = d1['epot']
+            erg = d1['erg']
             f.write(entry_comment)
-            f.write(f'1B  {spi}  {epot:0.4f}\n')
+            f.write(f'1B  {spi}  {erg:0.4f}\n')
             f.write('#\n')
     if data2B is not None:
         for dp in data2B:
