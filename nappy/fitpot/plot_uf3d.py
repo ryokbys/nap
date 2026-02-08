@@ -197,7 +197,7 @@ def plot_uf3d_3b(prms,
         cfij = t['cfij']
         knij = t['knij']
         rs = np.linspace(0.11, max(knij), 100)
-        print(xlimij, ylimij, rs)
+        #print(xlimij, ylimij, rs)
         plot_2b(fname, label, knij, cfij, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...bond ik part

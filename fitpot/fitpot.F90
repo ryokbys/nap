@@ -927,25 +927,21 @@ subroutine check_grad(ftrn0,ftst0)
   implicit none
   real(8),intent(in):: ftrn0,ftst0
   integer:: iv
-  real(8):: dv,vmax,ftst,ftmp1,ftmp2, absgnum, absgana
+  real(8):: dv,vmax,ftst,ftmp1,ftmp2, absgnum, absgana, true_dv
   real(8),allocatable:: ganal(:),gnumer(:),vars0(:)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-8
+  real(8),parameter:: mach_eps = 1d-14
   real(8):: vtmp1,vtmp2
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
   vars0(1:nvars)= vars(1:nvars)
-  vmax= 0d0
-  do iv=1,nvars
-    vmax= max(vmax,abs(vars0(iv)))
-  enddo
-  dv= vmax *dev
 
   if( myid.eq.0 ) then
     print *,''
     write(6,'(a)') '------------------------------ check_grad '&
          //'------------------------------'
-    print '(a,es12.4)',' Deviation for numerical derivative =',dv
+    print '(a,es12.4)',' Deviation ratio to variable =',dev
     print *,''
     write(6,'(a)') '     #,          x,    analytical,'// &
          '     numerical,'// &
@@ -969,8 +965,14 @@ subroutine check_grad(ftrn0,ftst0)
     vars(iv)= vars(iv) -dv/2
     call wrap_ranges(nvars,vars,vranges)
     call func_w_pmd(nvars,vars,ftmp2,ftst)
-    gnumer(iv)= (ftmp1-ftmp2)/dv
     vtmp2 = vars(iv)
+    true_dv = vtmp1-vtmp2
+    if( true_dv .gt. -mach_eps .and. true_dv .lt.mach_eps ) then
+! true_dv is too small, it is probably 0
+      gnumer(iv)= 0d0
+    else
+      gnumer(iv)= (ftmp1-ftmp2)/true_dv
+    endif
     if( myid.eq.0 ) then
       absgnum = abs(gnumer(iv))
       absgana = abs(ganal(iv))
