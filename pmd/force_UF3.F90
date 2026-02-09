@@ -1002,6 +1002,12 @@ contains
         call mpi_bcast(prm3ds(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%rcij2,1,mpi_real8,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%rcik2,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%nknij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%nknik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%nkncs,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%ncfij,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%ncfik,1,mpi_integer,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%ncfcs,1,mpi_integer,0,mpi_world,ierr)
         if( .not.allocated(prm3ds(i3b)%knij) ) &
              allocate(prm3ds(i3b)%knij(prm3ds(i3b)%nknij), &
              prm3ds(i3b)%knik(prm3ds(i3b)%nknik), &
