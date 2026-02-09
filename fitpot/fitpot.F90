@@ -266,7 +266,7 @@ program fitpot
     if( iprint.gt.1 ) then
       print '(a,3(2x,f0.3))',' Time for erg,frc,strs in xxx_w_pmd = ', &
            terg,tfrc,tstrs
-      call write_tgrads_DNN(myid)
+      if( trim(cpotlow).eq.'dnn' ) call write_tgrads_DNN(myid)
     endif
     call time_stamp(' Job finished')
   endif

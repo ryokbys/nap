@@ -19,6 +19,9 @@ Options:
                  by comma-separated two values, e.g., -3.0,3.0. [default: None]
   --refname REFNAME
                  Specify the name of the reference data. [default: DFT]
+  --max-plot-num NUM
+                 Max num of plotting points. If the data is over it,
+                 use KDE plot instead of plotting all the data. [default: 5000]
 """
 import os,sys
 from docopt import docopt
@@ -69,7 +72,7 @@ def calc_stats(reference, predicted):
 
 def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
          loc='best', bbox_to_anchor=None, outfname="graph_parity.png",
-         refname = "DFT"):
+         refname = "DFT", max_plot_num=5000):
     import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set_theme(context='talk', style='ticks')
@@ -96,7 +99,7 @@ def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
             label="", zorder=1)
     tst_rmse, tst_r2 = calc_stats(tst_data[:,0], tst_data[:,1])
     
-    if len(tst_data)< 5000:
+    if len(tst_data) < max_plot_num:
         # データ数が少ない場合のみ，trainingとtestの両方をフルデータで表示．
         ax.plot(trn_data[:,0], trn_data[:,1], 
                 'ro', mec='k', ms=6, label='training', zorder=2)
@@ -110,7 +113,7 @@ def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
 
     else:
         # データ数が多い場合は，testデータだけをKDEを使って表示．
-        sample_size = 5000  # サンプルする点の数
+        sample_size = max_plot_num  # サンプルする点の数
         indices = np.random.choice(len(tst_data), sample_size, replace=False)  # ランダムサンプリング
         x_sampled = tst_data[indices,0]
         y_sampled = tst_data[indices,1]
@@ -146,6 +149,8 @@ def main():
         ic.enable()
         ic("Verbose mode ON.")
 
+    maxnum = int(args['--max-plot-num'])
+
     erg_trn, erg_tst = read_trn_tst_data('erg')
     frc_trn, frc_tst = read_trn_tst_data('frc')
     strs_trn, strs_tst = read_trn_tst_data('strs')
@@ -172,11 +177,11 @@ def main():
     refname = args['--refname']
     
     plot('erg', erg_trn, erg_tst, loc='best', xylim=erange,
-         outfname='graph_parity_E.png', refname=refname)
+         outfname='graph_parity_E.png', refname=refname, max_plot_num=maxnum)
     plot('frc', frc_trn, frc_tst, xylim=frange,
-         outfname='graph_parity_F.png', refname=refname)
+         outfname='graph_parity_F.png', refname=refname, max_plot_num=maxnum)
     plot('strs', strs_trn, strs_tst, loc='center right', xylim=srange,
-         outfname='graph_parity_S.png', refname=refname)
+         outfname='graph_parity_S.png', refname=refname, max_plot_num=maxnum)
     return None
 
         
