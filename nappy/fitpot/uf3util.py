@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-import os, sys
-import numpy as np
-
 __description__="""
 Utility functions for UF3, UF3L potential.
 """
+import os, sys
+import numpy as np
+from nappy import get_git_hash
 
 __author__ = "RYO KOBAYASHI"
 __version__ = "260206"
@@ -385,7 +385,8 @@ def write_params_uf3l(uf3lprms,
     if author is None:
         author = __author__
 
-    entry_comment = f'#UF3 POT UNITS: metal DATE: {today} AUTHOR: {author} CITATION:\n'
+    entry_comment = f'#UF3 POT DATE: {today} AUTHOR: {author} ' \
+        + f'GIT_HASH: {get_git_hash()}\n'
     if data1B is not None:
         for d1 in data1B:
             spi = d1['species']
@@ -462,7 +463,8 @@ def write_params_uf3d(uf3dprms,
     if author is None:
         author = __author__
 
-    entry_comment = f'#UF3 POT DATE: {today} AUTHOR: {author} CITATION:\n'
+    entry_comment = f'#UF3 POT DATE: {today} AUTHOR: {author} ' \
+        + f'GIT_HASH: {get_git_hash()}\n'
     if data1B is not None:
         for d1 in data1B:
             spi = d1['species']
