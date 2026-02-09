@@ -10,15 +10,16 @@ module version
 
   public:: write_revision, write_authors, write_runtime
   
-  character(len=128),parameter:: crevision = 'v260206'
-
+  character(len=128),parameter:: crevision = 'rev260208'
+  character(len=128),parameter:: cgithash = GIT_HASH
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)
   
 contains
 !=======================================================================
   subroutine write_revision()
-    write(6,'(a)') '   Revision: '//trim(crevision)
+!!$    write(6,'(a)') '   Revision: '//trim(crevision)
+    write(6,'(a)') '   Git commit-ID: '//trim(cgithash)
     return
   end subroutine write_revision
 !=======================================================================
