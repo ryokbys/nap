@@ -35,12 +35,14 @@ program fitpot
 
   if( myid.eq.0 ) then
     write(6,'(a)') '========================================================================'
-    write(6,'(a)') ' FITPOT: A program for FITting interatomic POTential parameters'
+    write(6,*) ''
+    write(6,'(a)') ' FITPOT: program for FITting interatomic POTential parameters'
     write(6,*) ''
     call write_revision()
     call write_authors()
+    write(6,*) ''
     write(6,'(a)') '========================================================================'
-
+if( trim(cpotlow).eq.'dnn' ) 
     write(6,*) ''
     call time_stamp(' Job started')
     write(6,*) ''
@@ -266,7 +268,7 @@ program fitpot
     if( iprint.gt.1 ) then
       print '(a,3(2x,f0.3))',' Time for erg,frc,strs in xxx_w_pmd = ', &
            terg,tfrc,tstrs
-      if( trim(cpotlow).eq.'dnn' ) call write_tgrads_DNN(myid)
+      call write_tgrads_DNN(myid)
     endif
     call time_stamp(' Job finished')
   endif
