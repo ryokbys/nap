@@ -44,7 +44,7 @@ def plot_b_spl(ax, rs, knots, coefs, plot=True, fill=False, **kwargs):
     return None
 
 
-def plot_2b(fname,label,knots,coefs,rs,xlim=None,ylim=None):
+def plot_2b(fname, label, knots, coefs, rs, xlim=None, ylim=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import copy
@@ -58,15 +58,16 @@ def plot_2b(fname,label,knots,coefs,rs,xlim=None,ylim=None):
         plot_b_spl(ax, rs, knots, coefs_tmp, plot=False, fill=True,
                    alpha=0.2, color='gray')
     plot_b_spl(ax, rs, knots, coefs,
-               alpha=1.0, label=label, linewidth=3.0,
+               alpha=1.0, linewidth=3.0, label=label,
                linestyle='-', color='black')
+    #ax.set_title(title)
     ax.set_xlabel('Distance (Å)')
     ax.set_ylabel('Energy (eV)')
     if xlim is not None:
         ax.set_xlim(*xlim)
     if ylim is not None:
         ax.set_ylim(*ylim)
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, handlelength=0, handletextpad=0)
     #plt.show()
     plt.savefig(fname, dpi=150,
                 bbox_inches='tight',
@@ -117,7 +118,7 @@ def plot_uf3d_2b(prms,
     ic(ylim)
     for p in prms['2B']:
         si, sj = p['pair']
-        fname = f'graph_2b_{si}-{sj}'
+        fname = f'graph_2B_{si}-{sj}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
@@ -126,7 +127,7 @@ def plot_uf3d_2b(prms,
         rs = np.linspace(0.11, max(knots),100)
         ic(pair, coefs)
         label = f'{si}-{sj}'
-        plot_2b(fname,label,knots,coefs,rs,xlim,ylim)
+        plot_2b(fname, label, knots, coefs,rs,xlim,ylim)
     return None
 
 
@@ -189,34 +190,34 @@ def plot_uf3d_3b(prms,
     for t in prms['3B']:
         si, sj, sk = t['trio']
         #...bond ij part
-        fname = f'graph_3bij_{si}-{sj}'
+        fname = f'graph_3B_{si}-{sj}_in_{sj}-{si}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        label = f'3Bij {si}-{sj}'
         cfij = t['cfij']
         knij = t['knij']
         rs = np.linspace(0.11, max(knij), 100)
         #print(xlimij, ylimij, rs)
+        label = f'{si}-{sj}\nin {sj}-{si}-{sk}'
         plot_2b(fname, label, knij, cfij, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...bond ik part
-        fname = f'graph_3bik_{si}-{sk}'
+        fname = f'graph_3B_{si}-{sk}_in_{sj}-{si}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        label = f'3Bik {si}-{sk}'
         cfik = t['cfik']
         knik = t['knik']
         rs = np.linspace(0.11, max(knik), 100)
+        label = f'{si}-{sk}\nin {sj}-{si}-{sk}'
         plot_2b(fname, label, knik, cfik, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...angular part
-        fname = f'graph_3b_{si}-{sj}-{sk}'
+        fname = f'graph_3B_{sj}-{si}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        label = f'{si}-{sj}-{sk}'
+        label = f'{sj}-{si}-{sk}'
         coefs = np.array(t['cfcs'])
         ic((si,sj,sk), coefs)
         knots = t['kncs']
@@ -230,8 +231,9 @@ def plot_uf3d_3b(prms,
             plot_b_spl(ax, cs, knots, coefs_tmp,
                        alpha=0.2, color='gray', fill=True)
         plot_b_spl(ax, cs, knots, coefs,
-                   alpha=1.0, label=label, linewidth=3.0,
+                   alpha=1.0, linewidth=3.0, label=label,
                    linestyle='-', color='black')
+        #ax.set_title(title)
         ax.set_xlabel(r'$\cos \theta_{ijk}$')
         ax.set_ylabel('Energy (eV)')
         ax.set_ylim(*ylimcs)
@@ -240,7 +242,7 @@ def plot_uf3d_3b(prms,
         tick_labels = [ 1.0, 0.5, 0, -0.5, -1.0]
         ax.set_xticks(tick_positions)
         ax.set_xticklabels(tick_labels)
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, handlelength=0, handletextpad=0)
         if theta:
             ax_top = ax.secondary_xaxis('top',)
             ax_top.set_xlabel(r'$\theta_{ijk}$ (rad)')
