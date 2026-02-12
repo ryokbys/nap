@@ -197,13 +197,15 @@ def prms_to_fp(prms,
         for i in range(ncfij):
             fpvars.append(cfij[i])
             if i < ncfij -ntrail:
-                vranges.append((0.0, 1e+10))
+                #...limit range (0.1, 1.0)
+                vranges.append((0.1, 1.0))
             else:
                 vranges.append((0.0, 0.0))
         for i in range(ncfik):
             fpvars.append(cfik[i])
             if i < ncfik -ntrail:
-                vranges.append((0.0, 1e+10))
+                #...limit range (0.1, 1.0)
+                vranges.append((0.1, 1.0))
             else:
                 vranges.append((0.0, 0.0))
         for i in range(ncfcs):
