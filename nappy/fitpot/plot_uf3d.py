@@ -190,7 +190,7 @@ def plot_uf3d_3b(prms,
     for t in prms['3B']:
         si, sj, sk = t['trio']
         #...bond ij part
-        fname = f'graph_3B_{si}-{sj}_in_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sj}_in_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
@@ -198,26 +198,26 @@ def plot_uf3d_3b(prms,
         knij = t['knij']
         rs = np.linspace(0.11, max(knij), 100)
         #print(xlimij, ylimij, rs)
-        label = f'{si}-{sj}\nin {sj}-{si}-{sk}'
+        label = f'{si}-{sj}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knij, cfij, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...bond ik part
-        fname = f'graph_3B_{si}-{sk}_in_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sk}_in_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
         cfik = t['cfik']
         knik = t['knik']
         rs = np.linspace(0.11, max(knik), 100)
-        label = f'{si}-{sk}\nin {sj}-{si}-{sk}'
+        label = f'{si}-{sk}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knik, cfik, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...angular part
-        fname = f'graph_3B_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        label = f'{sj}-{si}-{sk}'
+        label = f'{si}-{sj}-{sk}'
         coefs = np.array(t['cfcs'])
         ic((si,sj,sk), coefs)
         knots = t['kncs']
@@ -239,7 +239,7 @@ def plot_uf3d_3b(prms,
         ax.set_ylim(*ylimcs)
         tick_indices = np.linspace(0, len(cs)-1, 5, dtype=int)
         tick_positions = cs[tick_indices]
-        tick_labels = [ 1.0, 0.5, 0, -0.5, -1.0]
+        tick_labels = [ -1.0, -0.5, 0, 0.5, 1.0]
         ax.set_xticks(tick_positions)
         ax.set_xticklabels(tick_labels)
         ax.legend(frameon=False, handlelength=0, handletextpad=0)
