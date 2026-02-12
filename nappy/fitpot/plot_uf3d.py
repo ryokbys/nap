@@ -190,7 +190,7 @@ def plot_uf3d_3b(prms,
     for t in prms['3B']:
         si, sj, sk = t['trio']
         #...bond ij part
-        fname = f'graph_3B_{si}-{sj}_in_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sj}_in_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
@@ -198,30 +198,30 @@ def plot_uf3d_3b(prms,
         knij = t['knij']
         rs = np.linspace(0.11, max(knij), 100)
         #print(xlimij, ylimij, rs)
-        label = f'{si}-{sj}\nin {sj}-{si}-{sk}'
+        label = f'{si}-{sj}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knij, cfij, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...bond ik part
-        fname = f'graph_3B_{si}-{sk}_in_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sk}_in_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
         cfik = t['cfik']
         knik = t['knik']
         rs = np.linspace(0.11, max(knik), 100)
-        label = f'{si}-{sk}\nin {sj}-{si}-{sk}'
+        label = f'{si}-{sk}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knik, cfik, rs, xlimij, ylimij)
         print(f' --> {fname}')
         #...angular part
-        fname = f'graph_3B_{sj}-{si}-{sk}'
+        fname = f'graph_3B_{si}-{sj}-{sk}'
         if len(postfix) > 0:
             fname += f'_{postfix}'
         fname += '.png'
-        label = f'{sj}-{si}-{sk}'
+        label = f'{si}-{sj}-{sk}'
         coefs = np.array(t['cfcs'])
         ic((si,sj,sk), coefs)
         knots = t['kncs']
-        cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
+        cs = np.linspace( -1.0+tiny, +1.0-tiny, 100)
         ts = np.arccos(cs)
         fig, ax = plt.subplots(figsize=(5,4))
         for i in range(len(coefs)):
@@ -246,9 +246,10 @@ def plot_uf3d_3b(prms,
         if theta:
             ax_top = ax.secondary_xaxis('top',)
             ax_top.set_xlabel(r'$\theta_{ijk}$ (rad)')
-            tick_indices = np.linspace(0, len(cs)-1, 3, dtype=int)
+            tick_indices = np.linspace(0, len(cs)-1, 5, dtype=int)
             tick_positions = cs[tick_indices]
-            tick_labels = [  '0', r'$\pi/2$', r'$\pi$',]
+            tick_labels = [  '0', r'$\pi/3$', r'$\pi/2$', r'$2\pi/3$', r'$\pi$',]
+            #tick_labels = [  '0', r'$\pi/2$', r'$\pi$',]
             ax_top.set_xticks(tick_positions)
             ax_top.set_xticklabels(tick_labels)
         #plt.show()

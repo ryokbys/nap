@@ -185,9 +185,9 @@ def plot_uf3l_3b(prms,
         if theta:
             ax_top = ax.secondary_xaxis('top',)
             ax_top.set_xlabel(r'$\theta_{ijk}$ (rad)')
-            tick_indices = np.linspace(0, len(cs)-1, 3, dtype=int)
+            tick_indices = np.linspace(0, len(cs)-1, 5, dtype=int)
             tick_positions = cs[tick_indices]
-            tick_labels = [  '0', r'$\pi/2$', r'$\pi$',]
+            tick_labels = [  '0', r'$\pi/3$', r'$\pi/2$', r'$2\pi/3$', r'$\pi$',]
             ax_top.set_xticks(tick_positions)
             ax_top.set_xticklabels(tick_labels)
         #plt.show()
