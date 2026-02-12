@@ -239,7 +239,7 @@ def plot_uf3d_3b(prms,
         ax.set_ylim(*ylimcs)
         tick_indices = np.linspace(0, len(cs)-1, 5, dtype=int)
         tick_positions = cs[tick_indices]
-        tick_labels = [ 1.0, 0.5, 0, -0.5, -1.0]
+        tick_labels = [ -1.0, -0.5, 0, 0.5, 1.0]
         ax.set_xticks(tick_positions)
         ax.set_xticklabels(tick_labels)
         ax.legend(frameon=False, handlelength=0, handletextpad=0)
