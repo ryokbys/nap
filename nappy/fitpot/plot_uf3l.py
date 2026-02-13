@@ -20,6 +20,7 @@ from nappy.fitpot.uf3util import b_spl, get_bspl_curve
 __author__ = "RYO KOBAYASHI"
 __version__ = "260208"
 
+__npoint__ = 200
 
 def plot_b_spl(ax, rs, knots, coefs, plot=True, fill=False, **kwargs):
     es = np.zeros(len(rs))
@@ -59,7 +60,7 @@ def plot_uf3l_2b(prms,
         pair = p['pair']
         coefs = p['coefs']
         knots = p['knots']
-        rs = np.linspace(0.11, max(knots),100)
+        rs = np.linspace(0.11, max(knots),__npoint__)
         minx = min(rs.min(), minx)
         maxx = max(rs.max(), maxx)
         es = get_bspl_curve(rs, knots, coefs)
@@ -90,7 +91,7 @@ def plot_uf3l_2b(prms,
         fname += '.png'
         coefs = p['coefs']
         knots = p['knots']
-        rs = np.linspace(0.11, max(knots),100)
+        rs = np.linspace(0.11, max(knots),__npoint__)
         ic(pair, coefs)
         fig, ax = plt.subplots(figsize=(5,4))
         for i in range(len(coefs)):
@@ -139,7 +140,7 @@ def plot_uf3l_3b(prms,
         trio = t['trio']
         coefs = np.array(t['coefs'])
         knots = t['knots']
-        cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
+        cs = np.linspace(-1.0+tiny, 1.0-tiny, __npoint__)
         ts = np.arccos(cs)
         es = get_bspl_curve(cs, knots, coefs)
         miny = min(miny, es.min())
@@ -161,7 +162,7 @@ def plot_uf3l_3b(prms,
         coefs = np.array(t['coefs'])
         ic(trio, coefs)
         knots = t['knots']
-        cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
+        cs = np.linspace(-1.0+tiny, 1.0-tiny, __npoint__)
         ts = np.arccos(cs)
         fig, ax = plt.subplots(figsize=(5,4))
         for i in range(len(coefs)):

@@ -21,6 +21,7 @@ ic.disable()
 __author__ = "RYO KOBAYASHI"
 __version__ = "260208"
 
+__npoint__ = 200
 
 def plot_b_spl(ax, rs, knots, coefs, plot=True, fill=False, **kwargs):
     es = np.zeros(len(rs))
@@ -94,7 +95,7 @@ def plot_uf3d_2b(prms,
         pair = p['pair']
         coefs = p['coefs']
         knots = p['knots']
-        rs = np.linspace(0.11, max(knots),100)
+        rs = np.linspace(0.11, max(knots),__npoint__)
         minx = min(rs.min(), minx)
         maxx = max(rs.max(), maxx)
         es = get_bspl_curve(rs, knots, coefs)
@@ -124,7 +125,7 @@ def plot_uf3d_2b(prms,
         fname += '.png'
         coefs = p['coefs']
         knots = p['knots']
-        rs = np.linspace(0.11, max(knots),100)
+        rs = np.linspace(0.11, max(knots),__npoint__)
         ic(pair, coefs)
         label = f'{si}-{sj}'
         plot_2b(fname, label, knots, coefs,rs,xlim,ylim)
@@ -163,15 +164,15 @@ def plot_uf3d_3b(prms,
         cfcs = np.array(t['cfcs'])
         kncs = np.array(t['kncs'])
         
-        rsij = np.linspace(0.11, max(knij),100)
+        rsij = np.linspace(0.11, max(knij),__npoint__)
         esij = get_bspl_curve(rsij,knij,cfij)
-        rsik = np.linspace(0.11, max(knik),100)
+        rsik = np.linspace(0.11, max(knik),__npoint__)
         esik = get_bspl_curve(rsik,knik,cfik)
         minxij = min(minxij, knij.min(), knik.min())
         maxxij = max(maxxij, knij.max(), knik.max())
         minyij = min(minyij, esij.min(), esik.min())
         maxyij = max(maxyij, esij.max(), esik.max())
-        cs = np.linspace(-1.0+tiny, 1.0-tiny, 100)
+        cs = np.linspace(-1.0+tiny, 1.0-tiny, __npoint__)
         ts = np.arccos(cs)
         escs = get_bspl_curve(cs, kncs, cfcs)
         minxcs = min(minxcs, cs.min())
@@ -196,7 +197,7 @@ def plot_uf3d_3b(prms,
         fname += '.png'
         cfij = t['cfij']
         knij = t['knij']
-        rs = np.linspace(0.11, max(knij), 100)
+        rs = np.linspace(0.11, max(knij), __npoint__)
         #print(xlimij, ylimij, rs)
         label = f'{si}-{sj}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knij, cfij, rs, xlimij, ylimij)
@@ -208,7 +209,7 @@ def plot_uf3d_3b(prms,
         fname += '.png'
         cfik = t['cfik']
         knik = t['knik']
-        rs = np.linspace(0.11, max(knik), 100)
+        rs = np.linspace(0.11, max(knik), __npoint__)
         label = f'{si}-{sk}\nin {si}-{sj}-{sk}'
         plot_2b(fname, label, knik, cfik, rs, xlimij, ylimij)
         print(f' --> {fname}')
@@ -221,7 +222,7 @@ def plot_uf3d_3b(prms,
         coefs = np.array(t['cfcs'])
         ic((si,sj,sk), coefs)
         knots = t['kncs']
-        cs = np.linspace( -1.0+tiny, +1.0-tiny, 100)
+        cs = np.linspace( -1.0+tiny, +1.0-tiny, __npoint__)
         ts = np.arccos(cs)
         fig, ax = plt.subplots(figsize=(5,4))
         for i in range(len(coefs)):
