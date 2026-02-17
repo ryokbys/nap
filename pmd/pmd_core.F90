@@ -2926,7 +2926,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   logical,intent(in):: l1st
 
   integer:: istat(mpi_status_size)
-  integer:: i,j,ixyz,n,ierr,nacc,ir,namax0,nbmax0
+  integer:: i,j,ixyz,n,ierr,nacc,ir,newnamax,newnbmax
   integer:: myxt,myyt,myzt,nmin
   real(8):: sxogt,syogt,szogt
   real(8):: t0
@@ -3000,27 +3000,29 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
     call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
     call alloc_namax_related()
     eki(1:3,1:3,1:namax) = 0d0
+
   else  ! if already allocated(ra)
 !.....Even if ra is already allocated, natm could change a lot abruptly
 !     especially in the case of fitpot.
     if( ntot0 .gt. namax-nbmax ) then
-      namax0 = namax
-      nbmax0 = nbmax
-      nalmax = ntot0
-      call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,nbmax,boundary)
-      namax = max(int(nalmax*1.2), 200) + nbmax
-      if( iprint.ne.0 ) then
-        print '(a,2i0)', ' space_decomp: old_namax,new_namax = ',namax0,namax
-        print '(a,2i0)', ' space_decomp: old_nbmax,new_nbmax = ',nbmax0,nbmax
-      endif
+      if( myid_md.eq.0  ) then
+        nalmax = ntot0
+        newnbmax = nbmax
+        call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,newnbmax,boundary)
+        newnamax = max(int(nalmax*1.2), 200) + newnbmax
+        if( iprint.ne.0 ) then
+          print '(a,2i0)', ' space_decomp: old_namax,new_namax = ',namax,newnamax
+          print '(a,2i0)', ' space_decomp: old_nbmax,new_nbmax = ',nbmax,newnbmax
+        endif
 !.....Reset the tags positive
-      do i=1,ntot0
-        tagtot(i) = abs(tagtot(i))
-      enddo
-      call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
-      call realloc_namax_related(namax-nbmax,nbmax)
-      ! call realloc_namax_related()
+        do i=1,ntot0
+          tagtot(i) = abs(tagtot(i))
+        enddo
+      endif
+      call mpi_bcast(newnamax,1,mpi_integer,0,mpi_md_world,ierr)
+      call mpi_bcast(newnbmax,1,mpi_integer,0,mpi_md_world,ierr)
+      call realloc_namax_related(newnamax-newnbmax,newnbmax)
+! call realloc_namax_related()
       eki(1:3,1:3,1:namax) = 0d0
     endif  ! (ntot0.gt.namax-nbmax)
   endif  ! (.not.allocated(ra))
@@ -3397,6 +3399,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 !
   use pmdvars
   use memory, only: accum_mem
+  use util, only: resize_darr2
   implicit none
   integer,intent(in):: newnalmax,newnbmax
 
@@ -3427,8 +3430,9 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(ra(3,newnamax))
   call copy_arr(ndim,arr,ra)
   deallocate(arr)
+!!$  call resize_darr2(ra, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
-
+  
 !.....va
   ndim = size(va)
   allocate(arr(ndim))
@@ -3437,6 +3441,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(va(3,newnamax))
   call copy_arr(ndim,arr,va)
   deallocate(arr)
+!!$  call resize_darr2(va, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
 
 !.....aa
@@ -3447,6 +3452,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   allocate(aa(3,newnamax))
   call copy_arr(ndim,arr,aa)
   deallocate(arr)
+!!$  call resize_darr2(aa, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
 
 !.....ra0

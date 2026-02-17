@@ -702,10 +702,10 @@ subroutine read_vwall(ionum)
 
   nvwall = nvwall + 1
   if( allocated(ivwall) ) then
-    call resize_iarr(ivwall, nvwall, 0)
-    call resize_darr(spos_vwall, nvwall, 0d0)
-    call resize_iarr(iside_vwall, nvwall, 0)
-    call resize_darr(frc_vwall, nvwall, 0d0)
+    call resize_iarr(ivwall, [nvwall])
+    call resize_darr(spos_vwall, [nvwall])
+    call resize_iarr(iside_vwall, [nvwall])
+    call resize_darr(frc_vwall, [nvwall])
   else
     allocate(ivwall(nvwall), spos_vwall(nvwall), iside_vwall(nvwall), &
          frc_vwall(nvwall))

@@ -393,46 +393,99 @@ contains
     return
   end function to_upper
 !=======================================================================
-  subroutine resize_iarr(iarr, new_size, default_value)
+  subroutine resize_iarr(iarr, new_size)
 !
 !  Resize 1D int array.
 !
     integer,allocatable:: iarr(:)
-    integer,intent(in):: new_size, default_value
-    integer,allocatable:: itemp(:)
-
-    allocate(itemp(new_size))
-
-    if( size(iarr) > 0 ) then
-      itemp(:min(size(iarr), new_size)) = iarr(:min(size(iarr),new_size))
+    integer,intent(in):: new_size(:)
+    
+    if( allocated(iarr) ) then
+      block
+        integer,allocatable:: itemp(:)
+        allocate(itemp(new_size(1)))
+        itemp(1:size(iarr)) = iarr(1:size(iarr))
+        itemp(size(iarr)+1:) = 0
+        call move_alloc(itemp, iarr)
+      end block
     endif
-    if( new_size > size(iarr) ) then
-      itemp(size(iarr)+1:new_size) = default_value
-    endif
 
-    call move_alloc(itemp, iarr)
   end subroutine resize_iarr
 !=======================================================================
-  subroutine resize_darr(arr, new_size, default_value)
+  subroutine resize_iarr2(iarr, new_size)
 !
-!  Resize 1D int array.
+!  Resize 2D int array.
 !
-    real(8),allocatable:: arr(:)
-    integer,intent(in):: new_size
-    real(8),allocatable:: temp(:)
-    real(8):: default_value
+    integer,allocatable:: iarr(:,:)
+    integer,intent(in):: new_size(:)
 
-    allocate(temp(new_size))
-
-    if( size(arr) > 0 ) then
-      temp(:min(size(arr), new_size)) = arr(:min(size(arr),new_size))
+    if( allocated(iarr) ) then
+      block
+        integer,allocatable:: itemp(:,:)
+        allocate(itemp(new_size(1),new_size(2)))
+        itemp(:,1:size(iarr)) = iarr(:,1:size(iarr))
+        itemp(:,size(iarr)+1:) = 0
+        call move_alloc(itemp, iarr)
+      end block
     endif
-    if( new_size > size(arr) ) then
-      temp(size(arr)+1:new_size) = default_value
+
+  end subroutine resize_iarr2
+!=======================================================================
+  subroutine resize_iarr3(iarr, new_size)
+!
+!  Resize 3D int array.
+!
+    integer,allocatable:: iarr(:,:,:)
+    integer,intent(in):: new_size(:)
+
+    if( allocated(iarr) ) then
+      block
+        integer,allocatable:: itemp(:,:,:)
+        allocate(itemp(new_size(1),new_size(2),new_size(3)))
+        itemp(:,:,1:size(iarr)) = iarr(:,:,1:size(iarr))
+        call move_alloc(itemp, iarr)
+      end block
     endif
 
-    call move_alloc(temp, arr)
+  end subroutine resize_iarr3
+!=======================================================================
+  subroutine resize_darr(darr, new_size)
+!
+!  Resize 1D double array.
+!
+    real(8),allocatable:: darr(:)
+    integer,intent(in):: new_size(:)
+
+    if( allocated(darr) ) then
+      block
+        real(8),allocatable:: tmp(:)
+        allocate(tmp(new_size(1)))
+        tmp(1:size(darr)) = darr(1:size(darr))
+        tmp(size(darr)+1:) = 0d0
+        call move_alloc(tmp, darr)
+      end block
+    endif
+
   end subroutine resize_darr
+!=======================================================================
+  subroutine resize_darr2(darr, new_size)
+!
+!  Resize 2D double array.
+!
+    real(8),allocatable:: darr(:,:)
+    integer,intent(in):: new_size(:)
+
+    if( allocated(darr) ) then
+      block
+        real(8),allocatable:: tmp(:,:)
+        allocate(tmp(new_size(1),new_size(2)))
+        tmp(:,1:size(darr)) = darr(:,1:size(darr))
+        tmp(:,size(darr)+1:) = 0d0
+        call move_alloc(tmp, darr)
+      end block
+    endif
+
+  end subroutine resize_darr2
 !=======================================================================
   function basename(path) result(name)
 !
