@@ -275,6 +275,9 @@ def read_pmd(fname:str = 'pmdini',
             nsys.atoms['vx']= vels[:,0]
             nsys.atoms['vy']= vels[:,1]
             nsys.atoms['vz']= vels[:,2]
+            nsys.atoms['fx']= frcs[:,0]
+            nsys.atoms['fy']= frcs[:,1]
+            nsys.atoms['fz']= frcs[:,2]
             for aux in aux_names:
                 nsys.atoms[aux]= auxs[aux]
             nsys.atoms['sid'] = sids
