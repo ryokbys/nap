@@ -479,13 +479,32 @@ contains
       block
         real(8),allocatable:: tmp(:,:)
         allocate(tmp(new_size(1),new_size(2)))
-        tmp(:,1:size(darr)) = darr(:,1:size(darr))
-        tmp(:,size(darr)+1:) = 0d0
+        tmp(:,1:size(darr,2)) = darr(:,1:size(darr,2))
+        tmp(:,size(darr,2)+1:) = 0d0
         call move_alloc(tmp, darr)
       end block
     endif
 
   end subroutine resize_darr2
+!=======================================================================
+  subroutine resize_darr3(darr, new_size)
+!
+!  Resize 3D double array.
+!
+    real(8),allocatable:: darr(:,:,:)
+    integer,intent(in):: new_size(:)
+
+    if( allocated(darr) ) then
+      block
+        real(8),allocatable:: tmp(:,:,:)
+        allocate(tmp(new_size(1),new_size(2),new_size(3)))
+        tmp(:,:,1:size(darr,3)) = darr(:,:,1:size(darr,3))
+        tmp(:,:,size(darr,3)+1:) = 0d0
+        call move_alloc(tmp, darr)
+      end block
+    endif
+
+  end subroutine resize_darr3
 !=======================================================================
   function basename(path) result(name)
 !

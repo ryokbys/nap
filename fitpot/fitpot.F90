@@ -2,7 +2,6 @@ program fitpot
 !-----------------------------------------------------------------------
 !                     Last modified: <2025-05-27 18:06:03 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
-
   use variables
   use parallel
 !!$  use NNd,only:NN_init,NN_func,NN_grad

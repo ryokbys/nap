@@ -3399,7 +3399,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 !
   use pmdvars
   use memory, only: accum_mem
-  use util, only: resize_darr2
+  use util, only: resize_darr, resize_darr2, resize_darr3
   implicit none
   integer,intent(in):: newnalmax,newnbmax
 
@@ -3423,133 +3423,39 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 
   mem = 0
 !.....ra
-  ndim = size(ra)
-  allocate(arr(ndim))
-  call copy_arr(ndim,ra,arr)
-  deallocate(ra)
-  allocate(ra(3,newnamax))
-  call copy_arr(ndim,arr,ra)
-  deallocate(arr)
-!!$  call resize_darr2(ra, [3,newnamax])
+  call resize_darr2(ra, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
   
 !.....va
-  ndim = size(va)
-  allocate(arr(ndim))
-  call copy_arr(ndim,va,arr)
-  deallocate(va)
-  allocate(va(3,newnamax))
-  call copy_arr(ndim,arr,va)
-  deallocate(arr)
-!!$  call resize_darr2(va, [3,newnamax])
+  call resize_darr2(va, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
 
 !.....aa
-  ndim = size(aa)
-  allocate(arr(ndim))
-  call copy_arr(ndim,aa,arr)
-  deallocate(aa)
-  allocate(aa(3,newnamax))
-  call copy_arr(ndim,arr,aa)
-  deallocate(arr)
-!!$  call resize_darr2(aa, [3,newnamax])
+  call resize_darr2(aa, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
 
 !.....ra0
-  ndim = size(ra0)
-  allocate(arr(ndim))
-  call copy_arr(ndim,ra0,arr)
-  deallocate(ra0)
-  allocate(ra0(3,newnamax))
-  call copy_arr(ndim,arr,ra0)
-  deallocate(arr)
+  call resize_darr2(ra0, [3,newnamax])
   mem = mem -8*ndim +3*8*newnamax
 
 !.....strs
-  ndim = size(strs)
-  allocate(arr(ndim))
-  call copy_arr(ndim,strs,arr)
-  deallocate(strs)
-  allocate(strs(3,3,newnamax))
-  call copy_arr(ndim,arr,strs)
-  deallocate(arr)
+  call resize_darr3(strs, [3,3,newnamax])
   mem = mem -8*ndim +8*9*newnamax
 
-!!$!.....stt
-!!$  ndim = size(stt)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,stt,arr)
-!!$  deallocate(stt)
-!!$  allocate(stt(3,3,newnamax))
-!!$  call copy_arr(ndim,arr,stt)
-!!$  deallocate(arr)
-
 !.....tag
-  ndim = size(tag)
-  allocate(arr(ndim))
-  call copy_arr(ndim,tag,arr)
-  deallocate(tag)
-  allocate(tag(newnamax))
-  call copy_arr(ndim,arr,tag)
-  deallocate(arr)
+  call resize_darr(tag, [newnamax])
   mem = mem -8*ndim +8*newnamax
 
-!!$!.....lspr
-!!$  ndim = size(lspr)
-!!$  allocate(iarr(ndim))
-!!$  call copy_iarr(ndim,lspr,iarr)
-!!$  deallocate(lspr)
-!!$  allocate(lspr(0:nnmax,newnamax))
-!!$  call copy_iarr(ndim,iarr,lspr)
-!!$  deallocate(iarr)
-!!$  mem = mem -4*ndim +4*(nnmax+1)*newnamax
-
 !.....epi
-  ndim = size(epi)
-  allocate(arr(ndim))
-  call copy_arr(ndim,epi,arr)
-  deallocate(epi)
-  allocate(epi(newnamax))
-  call copy_arr(ndim,arr,epi)
-  deallocate(arr)
+  call resize_darr(epi, [newnamax])
   mem = mem -8*ndim +8*newnamax
 
 !.....eki
-  ndim = size(eki)
-  allocate(arr(ndim))
-  call copy_arr(ndim,eki,arr)
-  deallocate(eki)
-  allocate(eki(3,3,newnamax))
-  call copy_arr(ndim,arr,eki)
-  deallocate(arr)
+  call resize_darr3(eki, [3,3,newnamax])
   mem = mem -8*ndim +8*9*newnamax
 
-!!$!.....stp
-!!$  ndim = size(stp)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,stp,arr)
-!!$  deallocate(stp)
-!!$  allocate(stp(3,3,newnamax))
-!!$  call copy_arr(ndim,arr,stp)
-!!$  deallocate(arr)
-
-!!$!.....stn
-!!$  ndim = size(stn)
-!!$  allocate(arr(ndim))
-!!$  call copy_arr(ndim,stn,arr)
-!!$  deallocate(stn)
-!!$  allocate(stn(3,3,newnamax))
-!!$  call copy_arr(ndim,arr,stn)
-!!$  deallocate(arr)
-
 !.....aux
-  ndim = size(aux)
-  allocate(arr(ndim))
-  call copy_arr(ndim,aux,arr)
-  deallocate(aux)
-  allocate(aux(naux,newnamax))
-  call copy_arr(ndim,arr,aux)
-  deallocate(arr)
+  call resize_darr2(aux, [naux,newnamax])
   mem = mem -8*ndim +8*naux*newnamax
 
 !.....lsb
