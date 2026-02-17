@@ -2166,7 +2166,7 @@ subroutine bacopy(l1st)
 !.....Update nbmax if nex(i)>1,
   if( nex(1).gt.1 .or. nex(2).gt.1 .or.nex(3).gt.1 ) then
     maxb = ((2*nex(1)+1)*(2*nex(2)+1)*(2*nex(3)+1)-1)*natm
-    if( maxb.gt.nbmax ) then
+    if( maxb.gt.nbmax .and. lrealloc ) then
       if (myid_md.eq.0 .and. iprint.ne.0 ) then
         print *,'Updated namax and array since nbmax changed' &
              //' from ',nbmax,' to ',int(maxb*1.2), &
@@ -2924,18 +2924,12 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   real(8),intent(in):: vtot(3,ntot0)
   real(8),intent(in):: auxtot(naux,ntot0)
   logical,intent(in):: l1st
-!!$  real(8),intent(in):: hunit,h(3,3,0:1)
-!!$  real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
-!!$  integer,intent(in):: ntot0,naux
-!!$  real(8),intent(in):: vtot(3,ntot0),rcut,rbuf
-!!$  real(8),intent(in):: auxtot(naux,ntot0)
 
   integer:: istat(mpi_status_size)
-  integer:: i,j,ixyz,n,ierr,nacc,ir
+  integer:: i,j,ixyz,n,ierr,nacc,ir,namax0,nbmax0
   integer:: myxt,myyt,myzt,nmin
   real(8):: sxogt,syogt,szogt
   real(8):: t0
-!!$  logical,save:: l1st = .true.
 
   t0 = mpi_wtime()
 
@@ -3006,10 +3000,30 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
     call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
     call alloc_namax_related()
     eki(1:3,1:3,1:namax) = 0d0
-  endif  ! .not. allocated(ra)
-
-!!$  call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
-!!$  call mpi_bcast(h,9*2,mpi_real8,0,mpi_md_world,ierr)
+  else  ! if already allocated(ra)
+!.....Even if ra is already allocated, natm could change a lot abruptly
+!     especially in the case of fitpot.
+    if( ntot0 .gt. namax-nbmax ) then
+      namax0 = namax
+      nbmax0 = nbmax
+      nalmax = ntot0
+      call estimate_nbmax(nalmax,h,nx,ny,nz,vol,rc,rbuf,nbmax,boundary)
+      namax = max(int(nalmax*1.2), 200) + nbmax
+      if( iprint.ne.0 ) then
+        print '(a,2i0)', ' space_decomp: old_namax,new_namax = ',namax0,namax
+        print '(a,2i0)', ' space_decomp: old_nbmax,new_nbmax = ',nbmax0,nbmax
+      endif
+!.....Reset the tags positive
+      do i=1,ntot0
+        tagtot(i) = abs(tagtot(i))
+      enddo
+      call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
+      call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
+      call realloc_namax_related(namax-nbmax,nbmax)
+      ! call realloc_namax_related()
+      eki(1:3,1:3,1:namax) = 0d0
+    endif  ! (ntot0.gt.namax-nbmax)
+  endif  ! (.not.allocated(ra))
 
   ixyz= 0
   if( myid_md.eq.0 ) then

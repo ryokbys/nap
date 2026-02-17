@@ -26,12 +26,10 @@ def main():
     fmt = args['--in-format']
 
     nsyss = []
-    for f in files:
-        print('.',end='',flush=True)
-        nsyss.append(nappy.io.read(f, format=fmt))
-
     with open(outfname, 'w') as f:
-        for nsys in nsyss:
+        for fin in files:
+            print('.',end='',flush=True)
+            nsys = nappy.io.read(fin, format=fmt)
             nappy.io.write_extxyz(f, nsys)
     return None
 

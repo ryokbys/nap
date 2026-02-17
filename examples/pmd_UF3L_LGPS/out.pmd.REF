@@ -1,0 +1,257 @@
+ 
+ PMD --- Parallel Molecular Dynamics ---
+ 
+   Git commit-ID: 3063619
+   Contributors: 
+     - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
+
+   Compiler: GCC version 15.1.0
+   Machine: Darwin Mac-mini.local 25.2.0 arm64
+ 
+ Job started at 21:29:22 on 2026-02-17
+ 
+ Read pmdini in ascii mode.
+ Species order read from pmdini option: 
+    1:   Li
+    2:   Ge
+    3:    P
+    4:    S
+ 
+ Lattice vectors:
+   a = [       17.675       0.000       0.000 ]
+   b = [       -0.000      17.688       0.000 ]
+   c = [        0.000       0.000      12.699 ]
+ Lattice parameters:
+   |a| =     17.675 Ang.,  alpha =   90.00 deg.
+   |b| =     17.688 Ang.,  beta  =   90.00 deg.
+   |c| =     12.699 Ang.,  gamma =   90.00 deg.
+ Cell volume = 3970.02 Ang^3
+ Number of each species in the initial configuration
+   Li :  80
+   Ge :  8
+   P  :  16
+   S  :  96
+ 
+ Num of MPI processes = 1
+ 
+ Number of ifmvs = 1
+ 
+------------------------------------------------------------------------
+           Initial setting   
+------------------------------------------------------------------------
+  num_nodes_x     -1
+  num_nodes_y     -1
+  num_nodes_z     -1
+  
+  io_format     ascii 
+  print_level     1
+  
+  time_interval     1.000
+  num_iteration     1
+  num_out_energy     1000
+  
+  flag_out_pmd     3
+  num_out_pmd     100
+  
+  force_type     uf3l
+  cutoff_radius      6.000
+  cutoff_buffer      0.400
+  
+  flag_damping     0
+  damping_coeff     .9900
+  converge_eps       1.0E-05
+  converge_num     1
+  min_iteration     0
+  
+  temperature_control     none
+  initial_temperature        10.00
+  remove_translation     0
+  
+  stress_control     none
+ 
+  
+  factor_direction
+     0:   0   0   0
+     1:   1   1   1
+  
+  mass
+       1 Li     6.9400
+       2 Ge    72.6310
+       3 P     30.9740
+       4 S     32.0600
+  
+  boundary     ppp
+  
+------------------------------------------------------------------------
+ 
+
+ Broadcast data to be shared with all the nodes.
+ 
+ Number of total atoms = 200
+ Number of species     = 4
+ 
+ Force-fields:  uf3l 
+
+ Read UF3L parameters...
+   UF3 parameters of 1B for Li: erg1 =     -1.670
+   UF3 parameters of 1B for Ge: erg1 =     -0.167
+   UF3 parameters of 1B for P: erg1 =     -0.334
+   UF3 parameters of 1B for S: erg1 =     -2.004
+
+   UF3 parameters of 2B for Li-Li
+     cb,csi,csj,cknot =  2B Li Li nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    2.64E+05    1.14E+03    1.34E+02    3.24E+01    1.09E+01    4.39E+00    1.96E+00    8.10E-01    5.31E-01    3.57E-01    2.53E-01    1.84E-01    1.35E-01    9.82E-02    6.85E-02    4.70E-02    3.00E-02    1.90E-02    1.01E-02    4.86E-03    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Li-Ge
+     cb,csi,csj,cknot =  2B Li Ge nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    2.74E+06    9.97E+03    9.48E+02    1.97E+02    5.80E+01    2.05E+01    8.12E+00    2.66E+00    4.92E-01    2.51E-01    1.33E-01    6.79E-02    3.41E-02    7.49E-03    0.00E+00    0.00E+00    2.39E-04    5.58E-04    0.00E+00    0.00E+00    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Li-P
+     cb,csi,csj,cknot =  2B Li P  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    1.30E+06    5.04E+03    5.18E+02    1.13E+02    3.51E+01    1.30E+01    5.40E+00    1.18E+00    7.16E-01    4.40E-01    3.12E-01    2.17E-01    1.50E-01    9.81E-02    6.32E-02    4.00E-02    2.67E-02    1.36E-02    4.76E-03    1.66E-05    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Li-S
+     cb,csi,csj,cknot =  2B Li S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    1.39E+06    5.34E+03    5.46E+02    1.19E+02    3.67E+01    1.36E+01    5.22E-01   -3.54E-01   -5.27E-01   -4.79E-01   -3.80E-01   -2.85E-01   -2.10E-01   -1.52E-01   -1.08E-01   -7.36E-02   -4.76E-02   -2.76E-02   -1.36E-02   -5.80E-03    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Ge-Ge
+     cb,csi,csj,cknot =  2B Ge Ge nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    2.83E+07    8.71E+04    6.94E+03    1.26E+03    3.26E+02    1.02E+02    3.67E+01    1.47E+01    6.37E+00    2.93E+00    1.59E+00    1.33E+00    1.15E+00    1.14E+00    5.69E-01    4.72E-01    2.36E-01    1.65E-01    1.12E-01    5.53E-02    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Ge-P
+     cb,csi,csj,cknot =  2B Ge P  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    1.35E+07    4.41E+04    3.74E+03    7.15E+02    1.94E+02    6.35E+01    2.36E+01    9.71E+00    4.32E+00    2.03E+00    1.50E+00    1.37E+00    3.97E-01    2.85E-01    2.83E-01    9.91E-03    6.32E-03    4.25E-03    5.35E-03    7.06E-03    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for Ge-S
+     cb,csi,csj,cknot =  2B Ge S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    1.43E+07    4.67E+04    3.94E+03    7.51E+02    2.03E+02    6.62E+01    6.94E-01   -9.44E-01   -1.06E+00   -5.72E-01    7.51E-02    3.20E-01    2.12E-01    1.73E-01    1.45E-01    1.19E-01    8.35E-02    5.97E-02    3.76E-02    1.79E-02    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for P-P
+     cb,csi,csj,cknot =  2B P  P  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    6.38E+06    2.23E+04    2.03E+03    4.07E+02    1.16E+02    3.98E+01    1.54E+01    6.52E+00    2.97E+00    1.43E+00    1.25E+00    8.01E-01    6.63E-01    4.49E-01    1.59E-01    7.69E-02    3.13E-03    0.00E+00    0.00E+00    3.30E-03    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for P-S
+     cb,csi,csj,cknot =  2B P  S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    6.80E+06    2.36E+04    2.14E+03    4.27E+02    1.22E+02    4.00E+01   -2.47E+00   -3.18E+00   -2.69E+00   -1.79E+00   -7.42E-01    6.99E-02    1.04E-01    7.82E-02    7.70E-02    6.43E-02    4.47E-02    2.88E-02    1.50E-02    5.23E-03    0.00E+00    0.00E+00    0.00E+00
+
+   UF3 parameters of 2B for S-S
+     cb,csi,csj,cknot =  2B S  S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  27 23
+     rc =  6.000
+     knots =   0.100   0.100   0.100   0.100   0.395   0.690   0.985   1.280   1.575   1.870   2.165   2.460   2.755   3.050   3.345   3.640   3.935   4.230   4.525   4.820   5.115   5.410   5.705   6.000   6.000   6.000   6.000
+     coefs =    7.25E+06    2.50E+04    2.25E+03    4.49E+02    1.27E+02    4.33E+01    1.66E+01    7.01E+00    3.18E+00    8.71E-01    4.47E-01    2.62E-01    1.57E-01    9.11E-02    4.62E-02    2.00E-02    7.66E-03    4.29E-03    2.54E-03    0.00E+00    0.00E+00    0.00E+00    0.00E+00
+
+   UF3L parameters of 3B for Ge-S-S
+     cb,csi,csj,csk,cknot =  3B Ge S  S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  17 13
+     rcij,rcik =  3.000 3.000
+     knots =  -1.000  -1.000  -1.000  -1.000  -0.800  -0.600  -0.400  -0.200   0.000   0.200   0.400   0.600   0.800   1.000   1.000   1.000   1.000
+     coefs =   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.02E+01   1.10E+01   7.64E+00   5.07E+00   4.26E+00   4.44E+00   6.35E+00   9.79E+00   1.00E+01
+
+   UF3L parameters of 3B for P-S-S
+     cb,csi,csj,csk,cknot =  3B P  S  S  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  17 13
+     rcij,rcik =  3.000 3.000
+     knots =  -1.000  -1.000  -1.000  -1.000  -0.800  -0.600  -0.400  -0.200   0.000   0.200   0.400   0.600   0.800   1.000   1.000   1.000   1.000
+     coefs =   1.00E+01   1.00E+01   1.00E+01   9.99E+00   9.81E+00   1.26E+01   9.46E+00   6.73E+00   5.50E+00   5.15E+00   6.54E+00   9.64E+00   9.77E+00
+
+   UF3L parameters of 3B for S-Ge-P
+     cb,csi,csj,csk,cknot =  3B S  Ge P  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  17 13
+     rcij,rcik =  3.000 3.000
+     knots =  -1.000  -1.000  -1.000  -1.000  -0.800  -0.600  -0.400  -0.200   0.000   0.200   0.400   0.600   0.800   1.000   1.000   1.000   1.000
+     coefs =   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   9.95E+00   9.77E+00   1.03E+01   1.01E+01   1.00E+01   1.00E+01
+
+   UF3L parameters of 3B for S-P-P
+     cb,csi,csj,csk,cknot =  3B S  P  P  nk
+     nklead,nktrail =   0  3
+     nknot,ncoef =  17 13
+     rcij,rcik =  3.000 3.000
+     knots =  -1.000  -1.000  -1.000  -1.000  -0.800  -0.600  -0.400  -0.200   0.000   0.200   0.400   0.600   0.800   1.000   1.000   1.000   1.000
+     coefs =   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   1.00E+01   9.95E+00   9.66E+00   9.70E+00   1.11E+01
+
+   Total num of UF3L coefficients =  286
+
+ Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
+ 
+ Ensemble = NVE
+ 
+ space_decomp:
+   rcut, rbuf =  6.000 0.400
+   Min number of local atoms =        200
+   Max number of local atoms =        200
+     nbmax =       1972
+     namax = nalmax*1.2 + nbmax  =       2212
+
+ Degrees of freedom for each ifmv =  1) 600
+ 
+ Estimation of num of neighbors:
+   Max num in link-list cell =    51
+   Cell volume and density = 992.5   0.0504
+   Max num of neighbors, that incl. margin (nnmax) =   56  61
+
+ Max num of neighbors =    56
+ 
+ Initial values:
+   Kinetic energy  =          0.26048 eV =      0.001 eV/atom
+   Potential energy=       -862.64573 eV =     -4.313 eV/atom
+   Temperature     =         10.12628 K
+   Pressure        =          0.07397 GPa (compressive)
+   Stress tensor   =     0.034     0.030     0.158     0.033    -0.035     0.066
+ 
+ istp,etime,temp,epot,vol,prss= 0        0.00       10.13  -8.6265E+02  3.970E+03  7.397E-02
+ istp,etime,temp,epot,vol,prss= 1        0.00       10.11  -8.6265E+02  3.970E+03  7.566E-02
+ 
+ Final values:
+   Kinetic energy  =          0.26003 eV =      0.001 eV/atom
+   Potential energy=       -862.64529 eV =     -4.313 eV/atom
+   Temperature     =         10.10891 K
+   Pressure        =          0.07566 GPa (compressive)
+ 
+ Max num of neighbors during MD and nnmax =   56  61
+ Max num of boundary atoms during MD = 825
+ 
+ Time   total =      0.010 sec =   0h00m00s
+ Memory per MPI-proc =    982.664 kB  
+ 
+ Job finished at 21:29:22 on 2026-02-17
