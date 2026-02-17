@@ -73,6 +73,7 @@ def create_params(config,
         d2b['ntrail'] = trailing_trim
         d2b['spacing'] = spacing
         d2b['rc2b'] = p['cutoff']
+        d2b['rin'] = p.get('rin', None)
         res = p['resolution']
         d2b['ncoef'] = res +3  # カットオフで値が０となるように３を加える
         d2b['nknot'] = d2b['ncoef'] +4  # 最短距離にpaddingするため４を加える
@@ -145,10 +146,13 @@ def prms_to_fp(prms,
         coefs = d2b['coefs']
         ntrail = d2b['ntrail']
         rc2max = max(rc2max, d2b['rc2b'])
+        rin = d2b.get('rin', None)
+        if rin == None:
+            rin = knots[-1]
         if correct:
             zi = get_number_from_symbol(si)
             zj = get_number_from_symbol(sj)
-            coefs = correct_wZBL(knots[-1], knots, coefs,
+            coefs = correct_wZBL(rin, knots, coefs,
                                  zi=zi, zj=zj)
         vmin = -1e+10
         if d2b.get('repulsive',False) and correct:
