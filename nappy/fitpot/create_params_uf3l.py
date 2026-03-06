@@ -296,8 +296,10 @@ def main():
                specorder=specorder,
                correct=correct)
     if correct:
-        create_conditions(prms_uf3l,
-                          outfname=outfcond)
+        # create_conditions(prms_uf3l,
+        #                   outfname=outfcond)
+        write_vars_conditions(prms_uf3l,
+                              outfname=outfcond)
     return None
 
 

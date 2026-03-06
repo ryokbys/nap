@@ -603,7 +603,7 @@ contains
 
     read(ioprms,*) ps%cb, ps%csi, ps%csj, ps%nklead, ps%nktrail, ps%cknot
     if( ps%cb /= '2B' ) stop 'ERROR@read_2b: CB should be 2B.'
-    if( ps%nktrail /= 3 ) stop 'ERROR@read_2b: nktrail must be 2 !'
+    ! if( ps%nktrail /= 3 ) stop 'ERROR@read_2b: nktrail must be 3 !'
     read(ioprms,*) ps%rc, ps%nknot
     ps%rc2 = ps%rc**2
     if( allocated(ps%knots) ) deallocate(ps%knots)

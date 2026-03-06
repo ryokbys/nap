@@ -350,21 +350,41 @@ class NAPSystem(object):
         return None
 
     def tidy_specorder(self):
-        """Tidy up the specorder by removing species of 0 atoms."""
+        """Tidy up the specorder by removing species of 0 atoms
+        and removing non-uniq species."""
+        old_specorder = self.specorder
+        if len(old_specorder) == 0:
+            print(f'len(specorder) == 0, so skip tidy_specorder().')
+            return None
+
+        #...Make the specorder uniq list 
+        uniq_spec = []
+        for i,s in enumerate(self.specorder):
+            if s not in uniq_spec:
+                uniq_spec.append(s)
+        old_sids = self.atoms.sid
+        new_sids = np.zeros_like(old_sids, dtype=int)
+        for i,sid in enumerate(old_sids):
+            si = old_specorder[sid-1]
+            new_sids[i] = uniq_spec.index(si) + 1
+        self.specorder = uniq_spec
+        self.atoms.sid = new_sids
+
+        #...Remove species that has no member in this system
+        old_specorder = self.specorder
         natoms = self.natm_per_species()
         to_remove = []
-        for i,s in enumerate(self.specorder):
+        for i,s in enumerate(old_specorder):
             if natoms[i] == 0:
                 to_remove.append(s)
         if not len(to_remove) == 0:
-            now_specorder = self.specorder
-            now_symbols = self.get_symbols()
-            new_specorder = copy.copy(now_specorder)
+            old_symbols = self.get_symbols()
+            new_specorder = copy.copy(old_specorder)
             for r in to_remove:
                 new_specorder.remove(r)
-            sids = [ new_specorder.index(s)+1 for s in now_symbols ]
+            new_sids = [ new_specorder.index(s)+1 for s in old_symbols ]
             self.specorder = new_specorder
-            self.atoms['sid'] = sids
+            self.atoms.sid = new_sids
 
         return None
 
@@ -552,7 +572,7 @@ class NAPSystem(object):
         if not self.specorder:
             raise ValueError('specorder is not available.')
         symbols = []
-        for sid in self.atoms.sid:
+        for i,sid in enumerate(self.atoms.sid):
             symbols.append(self.specorder[sid-1])
         return symbols
 

@@ -16,8 +16,6 @@ Options:
               Output file name. [default: in.vars.fitpot_YYMMDD]
   --specorder SPECORDER
               Species order in comma-seperated format, e.g.) Li,P,O. [default: None]
-  --repul-pairs PAIRS
-              Pairs that should be repulsive. Hyphen-connected, comma-separated, e.g.) Li-O,P-O  [default: None]
 """
 import os
 from docopt import docopt
@@ -26,7 +24,7 @@ from datetime import datetime
 from icecream import ic
 ic.disable()
 
-from uf3util import read_params_uf3, read_params_uf3l, read_params_uf3d
+from nappy.fitpot.uf3util import read_params_uf3, read_params_uf3l, read_params_uf3d
 
 __author__ = "Ryo KOBAYASHI"
 __version__ = "260206"
@@ -352,12 +350,81 @@ def uf32fp(outfname,specorder):
     write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
     return None
 
-def uf3l2fp(outfname, specorder, repul_pairs=[]):
+def uf3l_to_fp(prms,
+               outfname='in.vars.fitpot',
+               specorder=[]):
+    from nappy.elements import get_number_from_symbol
+    
+    fpvars = []
+    vranges = []
+
+    for d1b in prms['1B']:
+        erg = d1b['erg']
+        fpvars.append(erg)
+        vranges.append((-1e+10, 1e+10))
+
+    rc2max = 0.0
+    for d2b in prms['2B']:
+        pair = d2b['pair']
+        si, sj = pair
+        #print(pair)
+        knots = d2b['knots']
+        ncoef = d2b['ncoef']
+        coefs = d2b['coefs']
+        ntrail = d2b['ntrail']
+        rc2max = max(rc2max, d2b['rc2b'])
+        rin = d2b.get('rin', None)
+        if rin == None:
+            rin = knots[-1]
+        vmin = -1e+10
+        if d2b.get('repulsive',False):
+            vmin = 0.0
+        for i in range(ncoef-ntrail):
+            fpvars.append(coefs[i])
+            vranges.append((vmin, 1e+10))
+        for i in range(ncoef-ntrail, ncoef):
+            fpvars.append(coefs[i])
+            vranges.append((0.0, 0.0))
+
+    rc3max = 0.0
+    for d3b in prms['3B']:
+        trio = d3b['trio']
+        ntrail = d3b['ntrail']
+        #print(trio)
+        #...rcij, rcik: cutoff for each pair
+        rcij, rcik = d3b['rcij'], d3b['rcik']
+        rc3max = max(rc3max, rcij, rcik)
+        ncoef = d3b['ncoef']
+        coefs = d3b['coefs']
+        # rcij, rcik are cutoff parameters for each pair
+        fpvars.append(d3b['rcij'])
+        vranges.append((rc3max, rc3max))
+        fpvars.append(d3b['rcik'])
+        vranges.append((rc3max, rc3max))
+        # gmj, gmk should be greater than 0.0
+        # gmj, gmk are parameters in exp.
+        # Too small values cause violation of energy conservation,
+        # and too large values make them negligibly small.
+        # But for now, we fix it to 1.0.
+        fpvars.append(d3b['gmj'])
+        vranges.append((1.0, 1.0)) # gmj, gmk should be greater than 0.0
+        fpvars.append(d3b['gmk'])
+        vranges.append((1.0, 1.0))
+        for i in range(ncoef):
+            fpvars.append(coefs[i])
+            vranges.append((0.0, 1e+10))
+        
+    write_vars_fitpot(outfname, fpvars, vranges, rc2max, rc3max)
+    return None
+
+
+
+
+def uf3l2fp_old(outfname, specorder, repul_pairs=[]):
     """
     Create in.vars.fitpot file from parameter file for uf3l potential.
     Cut-off radii for 2- and 3-body are given in the parameter file.
     """
-    uf3l_prms = read_params_uf3l('in.params.uf3l')
 
     fpvars = []
     vranges = []
@@ -480,23 +547,24 @@ def uf3d2fp(outfname, specorder, repul_pairs=[]):
     return None
 
 
-def write_vars_conditions(uf3x_prms, repul_pairs):
+def write_vars_conditions(prms,
+                          outfname='in.vars.conditions'):
     """
     Write in.vars.conditions for vars2cond if repul_pairs != [].
     """
     msgline = []
     msgline.append('# var-ID-LHS,  operator,  var-ID-RHS\n')
-    d2b = uf3x_prms['2B']
+    
     inc = 0
     nconds = 0
-    for spi, erg in uf3l_prms['1B'].items():
+    for d1b in prms['1B']:
         inc += 1
-    for pair in d2b.keys():
-        ncoef = d2b[pair]['ncoef']
-        ntrail = d2b[pair]['ntrail']
+    for d2b in prms['2B']:
+        ncoef = d2b['ncoef']
+        ntrail = d2b['ntrail']
         for i in range(ncoef-ntrail):
             inc += 1
-            if any( set(pair) == set(rp) for rp in repul_pairs ):
+            if d2b.get('repulsive', False):
                 if i != 0:
                     msgline.append(f'   {inc:d}  <  {inc-1:d}\n')
                     nconds += 1
@@ -504,8 +572,8 @@ def write_vars_conditions(uf3x_prms, repul_pairs):
             inc += 1
     wgt = 1.0
     msgline.insert(1, f'  {nconds:d}  {wgt:.3f}\n')
-    print(' --> in.vars.conditions')
-    with open('in.vars.conditions', 'w') as f:
+    print(f' --> {outfname}')
+    with open(outfname, 'w') as f:
         for l in msgline:
             f.write(l)
     return None
@@ -523,13 +591,14 @@ def main():
     specorder = args['--specorder'].split(',')
     if specorder[0] == 'None':
         raise Exception('specorder must be specified.')
-    repul_pairs0 = args['--repul-pairs'].split(',')
-    repul_pairs = []
-    if repul_pairs0[0] != 'None':
-        for rp in repul_pairs0:
-            spi, spj = rp.split('-')
-            repul_pairs.append((spi, spj))
-    print(' repulsive pairs = ', repul_pairs)
+
+    # repul_pairs0 = args['--repul-pairs'].split(',')
+    # repul_pairs = []
+    # if repul_pairs0[0] != 'None':
+    #     for rp in repul_pairs0:
+    #         spi, spj = rp.split('-')
+    #         repul_pairs.append((spi, spj))
+    # print(' repulsive pairs = ', repul_pairs)
 
     ic(args)
     if potname == 'Morse':
@@ -556,7 +625,10 @@ def main():
         UF3L (light)
         """
         print(' rc, rc3 are given from in.params.uf3l, even if --rc or --rc3 is given.')
-        uf3l2fp(outfname, specorder, repul_pairs=repul_pairs)
+        prms = read_params_uf3l('in.params.uf3l')
+        uf3l_to_fp(prms,
+                   outfname=outfname,
+                   specorder=specorder,)
 
     elif potname in ('UF3D', 'uf3d'):
         """

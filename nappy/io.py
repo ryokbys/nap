@@ -395,7 +395,10 @@ def read_POSCAR(fname='POSCAR',specorder=[],):
                 for s in spcs:
                     if s not in nsys.specorder:
                         nsys.specorder.append(s)
-        num_species= np.array([ int(n) for n in buff])
+            num_species= np.array([ int(n) for n in buff])
+        else:
+            assert len(nsys.specorder) > 0, f'specorder is wrong, {nsys.specorder}'
+            num_species= np.array([ int(n) for n in buff])
         try:
             spcs
         except NameError:
@@ -409,6 +412,7 @@ need to specify the species order correctly with --specorder option.
             '''.format(len(num_species))
             raise ValueError(msg)
         natm = np.sum(num_species)
+        #print('natm = ',natm)
         sids = [ 0 for i in range(natm) ]
         ifmvs = [ 1 for i in range(natm) ]
         # poss = [ np.zeros(3) for i in range(natm) ]
@@ -431,6 +435,7 @@ need to specify the species order correctly with --specorder option.
         #...Atom positions
         for i in range(natm):
             buff= f.readline().split()
+            #print('i,buff=',i,buff)
             sid= 1
             m= 0
             sindex=0
@@ -461,6 +466,7 @@ need to specify the species order correctly with --specorder option.
     nsys.atoms['fz']= frcs[:,2]
     nsys.atoms['sid'] = sids
     nsys.atoms['ifmv']= ifmvs
+    nsys.tidy_specorder()
     return nsys
 
 def write_POSCAR(nsys,fname='POSCAR',):
@@ -1738,7 +1744,9 @@ def get_nglview(nsys):
     import nglview as nv
     return nv.show_ase(nsys.to_ase_atoms())
 
-def read_vasprun_xml(fname='vasprun.xml', velocity=False):
+def read_vasprun_xml(fname='vasprun.xml',
+                     velocity=False,
+                     specorder=[]):
     """
     Based on read_vasp_xml in ase.io.vasp.py.
     """
@@ -1747,7 +1755,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
     tree = ET.iterparse(fname, events=['start', 'end'])
     calcs = []
     dt = -1.0
-    specorder = []
+    specorder_vasp = []
     try:
         inc = 0
         for event, elem in tree:
@@ -1757,7 +1765,7 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
                     for entry in elem.find("array[@name='atoms']/set"):
                         species.append(entry[0].text.strip())
                     natoms = len(species)
-                    specorder = sorted(list(set(species)),key=species.index)
+                    specorder_vasp = sorted(list(set(species)),key=species.index)
                 elif elem.tag == 'incar':
                     for e in elem.iter():
                         if 'name' in e.attrib.keys() \
@@ -1777,6 +1785,11 @@ def read_vasprun_xml(fname='vasprun.xml', velocity=False):
         raise ValueError(f'There is no calculation in {fname}')
     else:
         print(f' Num of calculations in vasprun.xml = {len(calcs):d}')
+
+    # specorderを整理
+    for s in specorder_vasp:
+        if s not in specorder:
+            specorder.append(s)
 
     nsyss = []
     for calc in calcs:

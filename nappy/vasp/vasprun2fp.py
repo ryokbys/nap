@@ -110,7 +110,8 @@ def main():
         #atoms= read('vasprun.xml',index=ase_index,format='vasp-xml')
         #...read_vasprun_xml always returns a list object
         nsyss = nappy.io.read_vasprun_xml(fname='vasprun.xml',
-                                          velocity=velocity)
+                                          velocity=velocity,
+                                          specorder=specorder)
     except Exception as e:
         print(f' Failed to read vasprun.xml because of {e}.')
         raise
