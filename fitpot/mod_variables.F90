@@ -252,6 +252,9 @@ module variables
   real(8):: pwgt2bs= 0d0
   real(8):: pwgt3b = 0d0
   real(8):: pwgt3bd= 0d0
+  real(8):: pwgt_curv = 0d0   ! pwgt for curvature penalty
+  real(8):: pwgt_min3b = 0d0  ! pwgt for softmin3b in uf3l
+  real(8):: beta_min3b = 1d0  ! beta for exp(-beta*fi) in uf3l
 
   real(8):: pwgt_repul = 1d-15  ! penalty for repulsion
   real(8):: valence_chgs(nspmax), core_chgs(nspmax)

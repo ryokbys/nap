@@ -9,7 +9,7 @@ program fitpot
        ,subtract_FF, restore_FF, normalize, wrap_ranges, init_fp_common
   use composition
   use minimize
-  use version
+  use version, only: write_revision, write_authors, write_runtime
 !!$  use NN2,only: set_iglid_NN2
   use linreg,only: set_iglid_linreg
   use time,only: time_stamp
@@ -40,6 +40,7 @@ program fitpot
     write(6,*) ''
     call write_revision()
     call write_authors()
+    call write_runtime()
     write(6,*) ''
     write(6,'(a)') '========================================================================'
     write(6,*) ''

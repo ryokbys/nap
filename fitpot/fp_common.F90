@@ -5,8 +5,9 @@ module fp_common
 !
 ! Module that contains common functions/subroutines for fitpot.
 !
-  use variables,only: cpenalty,penalty,pwgt2b,pwgt2bd,pwgt2bs, &
-       pwgt3b,pwgt3bd,repul_radii
+  use variables,only: cpenalty, penalty, pwgt2b, &
+       pwgt3b, pwgt_curv, pwgt_min3b, beta_min3b, &
+       repul_radii, pwgt2bs
   use pmdvars,only: nspmax
   implicit none
   save
@@ -261,7 +262,7 @@ contains
       stop
     endif
 
-    if( trim(cpotlow).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+    if( cpotlow(1:3).eq.'uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
       repul_radii(:,:) = 1d+10
     endif
 
@@ -306,7 +307,7 @@ contains
         call get_descs(samples(ismpl)%nsf,samples(ismpl)%nal, &
              samples(ismpl)%nnl,samples(ismpl)%gsf)
       endif
-      if( trim(cpotlow)=='uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
+      if( cpotlow(1:3)=='uf3' .and. l1st .and. abs(pwgt2bs)>1d-14 ) then
         call get_shortest_distances(repul_radii)  ! in pmd_core
       endif
 !!$      print '(a,2i5,f8.4)','func: myid,ismpl,tsmpl=',myid,ismpl,mpi_wtime()-tsmp0
@@ -1069,54 +1070,103 @@ contains
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow
-    use UF3,only: calc_penalty_uf3, calc_penalty_uf3l
+    use UF3,only: penalty_uf3, penalty_curv_uf3l, &
+         penalty_min3b_uf3l
     use conditions,only: lconds, calc_fpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
 
     integer:: i
+    real(8):: fptmp
 
     fp = 0d0
-    if( trim(cpenalty).eq.'ridge' ) then
+    
+!.....Simple ridge penalty
+    if( index(cpenalty,'ridge').ne.0 ) then
+      fptmp = 0d0
       do i=1,ndim
-        fp = fp +x(i)*x(i)
+        fptmp = fptmp +x(i)*x(i)
       enddo
-      fp = fp *penalty
-    else if( trim(cpenalty).eq.'uf3' ) then
-      if( trim(cpotlow).ne.'uf3' ) stop 'potential and penalty is not consistent !'
-      call calc_penalty_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
-           pwgt3b,pwgt3bd,repul_radii,fp)
-    else if( trim(cpenalty).eq.'uf3l' ) then
-      if( trim(cpotlow).ne.'uf3l' ) stop 'potential and penalty is not consistent !'
-      call calc_penalty_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
-           pwgt3b,pwgt3bd,repul_radii,fp)
-    else if( lconds ) then
-      call calc_fpenal_conds(ndim, x, fp)
+      fp = fp + fptmp *penalty
     endif
+
+!!$ TODO implement curvature penalty...    
+!!$!.....Penalty on curvature
+!!$    if( index(cpenalty,'curv').ne.0 ) then
+!!$      if( trim(cpotlow).eq.'uf3' ) then
+!!$        call penalty_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+!!$             pwgt3b,pwgt3bd,repul_radii,fptmp)
+!!$      else if( trim(cpotlow).eq.'uf3l') then
+!!$        call penalty_curv_uf3l(ndim,x,pwgt2b,pwgt3b,fp)
+!!$      endif
+!!$      fp = fp +fptmp
+!!$    endif
+
+!.....Penalty on softmax3b
+    if( index(cpenalty,'min3b').ne.0 ) then
+      if( trim(cpotlow).eq.'uf3l' ) then
+        call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,fptmp)
+      endif
+      fp = fp +fptmp
+    endif
+
+!.....Direct conditions
+    if( lconds ) then
+      call calc_fpenal_conds(ndim, x, fptmp)
+      fp = fp +fptmp
+    endif
+    
     return
   end subroutine func_penalty
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
-    use UF3,only: calc_penalty_grad_uf3,calc_penalty_grad_uf3l
+    use variables,only: cpotlow
+    use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
+         penalty_grad_min3b_uf3l
     use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gp(ndim)
 
     integer:: i
+    real(8),allocatable,save:: gptmp(:)
+
+    if( .not.allocated(gptmp) ) allocate(gptmp(ndim))
 
     gp(:) = 0d0
-    if( trim(cpenalty).eq.'ridge' ) then
-      gp(:) = 2d0*penalty*x(:)
-    else if( trim(cpenalty).eq.'uf3' ) then
-      call calc_penalty_grad_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
-           pwgt3b,pwgt3bd,repul_radii,gp)
-    else if( trim(cpenalty).eq.'uf3l' ) then
-      call calc_penalty_grad_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
-           pwgt3b,pwgt3bd,repul_radii,gp)
-    else if( lconds ) then
-      call calc_gpenal_conds(ndim, x, gp)
+
+!.....Simple ridge penalty
+    if( index(cpenalty,'ridge').ne.0 ) then
+      gp(:) = gp(:) +2d0*penalty*x(:)
+    endif
+
+!!$ TODO implement curvature penalty...
+!!$!.....Penalty on curvature
+!!$    if( index(cpenalty,'curv').ne.0 ) then
+!!$      gptmp(:) = 0d0
+!!$      if( trim(cpotlow).eq.'uf3' ) then
+!!$        call penalty_grad_uf3(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+!!$             pwgt3b,pwgt3bd,repul_radii,gp)
+!!$      else if( trim(cpotlow).eq.'uf3l' ) then
+!!$        call penalty_grad_curv_uf3l(ndim,x,pwgt2b,pwgt2bd,pwgt2bs, &
+!!$             pwgt3b,pwgt3bd,repul_radii,gp)
+!!$      endif
+!!$      gp(:) = gp(:) + gptmp(:)
+!!$    endif
+
+!.....Penalty on softmax3b
+    if( index(cpenalty,'min3b').ne.0 ) then
+      if( trim(cpotlow).eq.'uf3l' ) then
+        call penalty_grad_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,gptmp)
+      endif
+      gp(:) = gp(:) +gptmp(:)
+    endif
+
+!.....Direct conditions
+    if( lconds ) then
+      call calc_gpenal_conds(ndim, x, gptmp)
+      gp(:) = gp(:) +gptmp(:)
     endif
     return
   end subroutine grad_penalty

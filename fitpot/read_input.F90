@@ -169,6 +169,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pwgt_3b_diff' ) then
     call read_r1(ionum,pwgt3bd)
     return
+  elseif( trim(cname).eq.'pwgt_min3b' ) then
+    call read_r1(ionum,pwgt_min3b)
+    return
   elseif( trim(cname).eq.'potential' .or. &
        trim(cname).eq.'force_field' ) then
     call read_c1(ionum,cpot)

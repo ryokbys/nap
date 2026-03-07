@@ -100,7 +100,12 @@ module UF3
   real(8):: rcmax = 0.0d0
   real(8):: rc3max = 0.0d0
   real(8):: rc3max2 = 0.0d0
-
+!.....Common for angular softmax penalty
+  integer,parameter:: npnts = 100
+  integer:: nc2max = 0
+  integer:: nc3max = 0
+  real(8),allocatable:: sumbexp(:,:), sumexp(:)
+  
   real(8),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
   integer,allocatable:: ls3b(:)
 
@@ -4556,7 +4561,7 @@ contains
     return
   end subroutine symmetrize_params_uf3d
 !=======================================================================
-  subroutine calc_penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
+  subroutine penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
 !
 !  Accesor routine to set uf3 parameters from outside.
@@ -4666,9 +4671,9 @@ contains
     penalty = p2b +p2bd +p2bs +p3b +p3bd
 
     return
-  end subroutine calc_penalty_uf3
+  end subroutine penalty_uf3
 !=======================================================================
-  subroutine calc_penalty_grad_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
+  subroutine penalty_grad_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,grad)
 !
 !  Accesor routine to get gradient of uf3 ridge penalty.
@@ -4845,20 +4850,22 @@ contains
     grad(:) = gp2b(:) +gp2bd(:) +gp2bs(:) +gp3b(:) +gp3bd(:)
 
     return
-  end subroutine calc_penalty_grad_uf3
+  end subroutine penalty_grad_uf3
 !=======================================================================
-  subroutine calc_penalty_uf3l(ndimp,params_in,pwgt2b,pwgt2bd, &
-       pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
+  subroutine penalty_curv_uf3l(ndimp,params_in,pwgt2b, &
+       pwgt3b,penalty)
 !
 !  Accesor routine to set uf3l parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
 !
+!  Penalty about curvature of B-spline.
+!
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
-         repul_radii(nspmax,nspmax)
+    real(8),intent(in):: pwgt2b,pwgt3b
     real(8),intent(out):: penalty
 
+    real(8):: pwgt2bd,pwgt2bs,pwgt3bd,repul_radii(nspmax,nspmax)
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail
     type(prm2):: p2
@@ -4948,9 +4955,9 @@ contains
     penalty = p2b +p2bd +p2bs +p3b +p3bd
 
     return
-  end subroutine calc_penalty_uf3l
+  end subroutine penalty_curv_uf3l
 !=======================================================================
-  subroutine calc_penalty_grad_uf3l(ndimp,params_in,pwgt2b,pwgt2bd, &
+  subroutine penalty_grad_curv_uf3l(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,grad)
 !
 !  Accesor routine to get gradient of uf3 ridge penalty.
@@ -4969,7 +4976,6 @@ contains
     real(8):: tmp,dc1,dc2,rc
     logical:: ledge
     real(8),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
-    integer,save:: nc2max, nc3max
     integer,save,allocatable:: ic2ip(:),ic3ip(:)
 
     if( .not.allocated(gp2b) ) then
@@ -5101,7 +5107,165 @@ contains
     grad(:) = gp2b(:) +gp2bd(:) +gp2bs(:) +gp3b(:) +gp3bd(:)
 
     return
-  end subroutine calc_penalty_grad_uf3l
+  end subroutine penalty_grad_curv_uf3l
+!=======================================================================
+  subroutine penalty_min3b_uf3l(ndimp,params_in,pwgt,beta,penalty)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Penalty for 3B using softmin function (log-sum-exp)
+!  so to make the min of angular term become 0.
+!  
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt,beta
+    real(8),intent(out):: penalty
+
+    real(8),parameter:: tiny = 1d-8
+    
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
+         nklead, nktrail,ncs,lcs,ix,j
+    type(prm2):: p2
+    type(prm3l):: p3
+    real(8):: tmp,p3b,x(npnts),fi, &
+         bcs(-3:0),dbcs(-3:0),dx
+    real(8),allocatable,save:: bspl(:,:),expbf(:)
+
+    if( .not.allocated(bspl) ) then
+      nc3max = 0
+      do i3b=1,n3b
+        nc3max = max(nc3max, prm3ls(i3b)%ncoef)
+      enddo
+      allocate(bspl(npnts,nc3max),expbf(npnts), &
+           sumexp(n3b),sumbexp(nc3max,n3b))
+    endif
+    
+    inc = 0
+!.....skip element parameters
+    do i1b=1,n1b
+      inc = inc +1
+    enddo
+!.....skip 2-body parameters
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      do ic=1,p2%ncoef
+        inc = inc +1
+      enddo
+    enddo
+
+!.....This penalty works on only 3-body.
+    x(1) = -1d0+tiny
+    dx = (1d0-tiny -(-1d0+tiny))/npnts
+    do ix=2,npnts
+      x(ix) = x(ix-1) +dx
+    enddo
+    p3b = 0d0
+    do i3b=1,n3b
+      p3 = prm3ls(i3b)
+      inc = inc +1
+      prm3ls(i3b)%gmj = params_in(inc)
+      inc = inc +1
+      prm3ls(i3b)%gmk = params_in(inc)
+      do ic=1,p3%ncoef
+        inc = inc +1
+        prm3ls(i3b)%coefs(ic) = params_in(inc)
+      enddo
+!.....Compute f(x_i) and B_j(x_i)
+      sumexp(i3b) = 0d0
+      sumbexp(:,i3b) = 0d0
+      do ix=1,npnts
+        call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
+        fi = 0d0
+        do lcs=-3,0
+          j = ncs +lcs
+          if( j < 1 .or. j > p3%ncoef ) cycle
+          fi = fi +p3%coefs(j) * bcs(lcs)
+          bspl(ix,j) = bcs(lcs)
+        enddo
+!.....Compute each exp(-beta*f(x_i)), Bj(xi)*exp(-)
+        expbf(ix) = exp(-beta*fi)
+!.....Sum_i exp(-beta*f(x_i))
+        sumexp(i3b) = sumexp(i3b) +expbf(ix)
+        do lcs=-3,0
+          j = ncs +lcs
+          if( j < 1 .or. j > p3%ncoef ) cycle
+          sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(ix,j)*expbf(ix)
+        enddo ! lcs
+      enddo
+!.....Compute -log(sum exp) /beta
+      p3b = p3b -log(sumexp(i3b)) /beta
+    enddo
+    penalty = pwgt * p3b**2
+
+    return
+  end subroutine penalty_min3b_uf3l
+!=======================================================================
+  subroutine penalty_grad_min3b_uf3l(ndimp,params_in,pwgt,beta,grad)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Gradient of the penalty for 3B using softmin function (log-sum-exp)
+!  so to make the min of angular term become 0.
+!  
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt,beta
+    real(8),intent(out):: grad(ndimp)
+
+    integer,parameter:: npnts = 100
+    real(8),parameter:: tiny = 1d-8
+    
+    integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
+         nklead, nktrail,ncs,lcs,ix,j
+    type(prm2):: p2
+    type(prm3l):: p3
+    real(8):: tmp,p3b,x(npnts),fi, &
+         bcs(-3:0),dbcs(-3:0),dx
+    real(8),allocatable,save:: gp3b(:),bspl(:,:)
+
+    if( .not.allocated(gp3b) ) then
+      allocate(gp3b(ndimp), bspl(npnts,nc3max))
+    endif
+
+    inc = 0
+!.....skip element parameters
+    do i1b=1,n1b
+      inc = inc +1
+    enddo
+!.....skip 2-body parameters
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      do ic=1,p2%ncoef
+        inc = inc +1
+      enddo
+    enddo
+
+!.....This penalty works on only 3-body.
+    x(1) = -1d0+tiny
+    dx = (1d0-tiny -(-1d0+tiny))/npnts
+    do ix=2,npnts
+      x(ix) = x(ix-1) +dx
+    enddo
+    gp3b(:) = 0d0
+    do i3b=1,n3b
+      p3 = prm3ls(i3b)
+      inc = inc +1
+      prm3ls(i3b)%gmj = params_in(inc)
+      inc = inc +1
+      prm3ls(i3b)%gmk = params_in(inc)
+!.....Compute grads
+      do ic=1,p3%ncoef
+        inc = inc +1
+        prm3ls(i3b)%coefs(ic) = params_in(inc)
+        gp3b(inc) = sumbexp(ic,i3b)/sumexp(i3b)
+      enddo
+    enddo
+    grad(:) = gp3b(:)*pwgt
+
+    return
+  end subroutine penalty_grad_min3b_uf3l
 !=======================================================================
   subroutine calc_short_lossfunc(npnts,radii,drepul,floss)
 !
