@@ -72,7 +72,7 @@ def calc_stats(reference, predicted):
 
 def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
          loc='best', bbox_to_anchor=None, outfname="graph_parity.png",
-         refname = "DFT", max_plot_num=5000):
+         refname = "DFT", predname = 'FF', max_plot_num=5000):
     import matplotlib.pyplot as plt
     import seaborn as sns
     sns.set_theme(context='talk', style='ticks')
@@ -131,7 +131,73 @@ def plot(target, trn_data, tst_data, limit_ratio=1.0, xylim=None,
                 transform=ax.transAxes, ha='right', va='bottom')
     
     ax.set_xlabel(f'{refname} {label}')
-    ax.set_ylabel(f'FF {label}')
+    ax.set_ylabel(f'{predname} {label}')
+    ax.set_xlim(limits)
+    ax.set_ylim(limits)
+    ax.set_aspect("equal")
+    plt.savefig(outfname, format='png', dpi=300, bbox_inches='tight')
+    print(f' --> {outfname}')
+    return None
+
+
+def plot_test_only(target, ref_data, pred_data, limit_ratio=1.0, xylim=None,
+         loc='best', bbox_to_anchor=None, outfname="graph_parity.png",
+         refname = "DFT", predname = 'FF', max_plot_num=5000):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    sns.set_theme(context='talk', style='ticks')
+    
+    from scipy.stats import gaussian_kde
+    if target == 'erg':
+        label = 'energy (eV/atom)'
+    elif target == 'frc':
+        label = r'force (eV/$\mathrm{\AA}$)'
+    elif target == 'strs':
+        label = 'stress (GPa)'
+    
+    fig, ax = plt.subplots(figsize=(5,5), )
+    if xylim:
+        limits = np.array(xylim)
+    else:
+        minval = min(ref_data[:].min(), pred_data[:].min())
+        maxval = max(ref_data[:].max(), pred_data[:].max())
+        padding = ( maxval - minval ) * 0.05
+        limits = np.array([ minval - padding, maxval + padding ]) * limit_ratio
+    ax.plot(limits, limits, linestyle="--", color="k", linewidth=2, 
+            label="", zorder=1)
+    tst_rmse, tst_r2 = calc_stats(ref_data[:], pred_data[:])
+    
+    if len(ref_data) < max_plot_num:
+        # データ数が少ない場合のみ，trainingとtestの両方をフルデータで表示．
+        ax.plot(ref_data[:], pred_data[:], 
+                'ro', mec='k', ms=6, label='', zorder=2)
+        margin = 0.05
+        ax.text(1-margin, 0+margin, f'RMSE = {tst_rmse:0.3f}\nR^2 = {tst_r2:0.3f}', 
+                transform=ax.transAxes, ha='right', va='bottom')
+        #ax.legend(frameon=False, handletextpad=0, 
+        #          loc=loc, bbox_to_anchor=bbox_to_anchor)
+
+    else:
+        # データ数が多い場合は，testデータだけをKDEを使って表示．
+        sample_size = max_plot_num  # サンプルする点の数
+        indices = np.random.choice(len(ref_data), sample_size, replace=False)  # ランダムサンプリング
+        x_sampled = ref_data[indices]
+        y_sampled = pred_data[indices]
+
+        # ② KDE（カーネル密度推定）を計算
+        xy = np.vstack([x_sampled, y_sampled])
+        kde = gaussian_kde(xy)(xy)  # 各点の密度を計算
+        
+        # ③ KDE の値に基づいて散布図をプロット（色付け）
+        ax.scatter(x_sampled, y_sampled, c=kde, 
+                   cmap='jet', s=10, edgecolors='none', zorder=2)
+        margin = 0.05
+        ax.text(1-margin, 0+margin, 
+                f'RMSE = {tst_rmse:0.3f}\nR^2 = {tst_r2:0.3f}', 
+                transform=ax.transAxes, ha='right', va='bottom')
+    
+    ax.set_xlabel(f'{refname} {label}')
+    ax.set_ylabel(f'{predname} {label}')
     ax.set_xlim(limits)
     ax.set_ylim(limits)
     ax.set_aspect("equal")
