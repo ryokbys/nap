@@ -1157,7 +1157,7 @@ contains
 
 !.....Penalty on softmax3b
     if( index(cpenalty,'min3b').ne.0 ) then
-      if( trim(cpotlow).eq.'uf3l' ) then
+      if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,gptmp)
       endif
       gp(:) = gp(:) +gptmp(:)
