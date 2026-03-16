@@ -162,26 +162,26 @@ contains
       xp(:) = x(:)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid)
+        call quad_interpolate(ndim,x,d,ftrn,ftst,pval, &
+             xtol,gtol,ftol,alpha,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid)
+          call golden_section(ndim,x,d,ftrn,ftst,pval, &
+               xtol,gtol,ftol,alpha,iprint,iflag,myid)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,d,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid)
+        call golden_section(ndim,x,d,ftrn,ftst,pval, &
+             xtol,gtol,ftol,alpha,iprint,iflag,myid)
       else if( trim(clinmin).eq.'two-point' ) then
 !.....Like backtrack, but once alpha is defined, not to perform line minimization
 !     no matter the func value gets larger.
 !.....Currently this does NOT work well...
         if( iter.le.1 ) then  ! only 1st call, perform line minimization a bit
-          call backtrack(ndim,x,xranges,d,ftrn,ftst,alpha,iprint &
+          call backtrack(ndim,x,xranges,d,ftrn,ftst,pval,alpha,iprint &
                ,iflag,myid,niter)
         else
           alpha = sprod(ndim,s,s)/sprod(ndim,s,y)
@@ -191,15 +191,15 @@ contains
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
-        call armijo_search(ndim,x,xranges,d,ftrn,ftst,g,alpha,iprint &
-             ,iflag,myid,niter)
+        call armijo_search(ndim,x,xranges,d,ftrn,ftst,pval, &
+             g,alpha,iprint,iflag,myid,niter)
       else ! Default = backtrack
 !.....Increase alpha a bit every step,
 !.....alpha is to be decreased in subroutine backtrack to decrease func value.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
-        call backtrack(ndim,x,xranges,d,ftrn,ftst,alpha,iprint &
+        call backtrack(ndim,x,xranges,d,ftrn,ftst,pval,alpha,iprint &
              ,iflag,myid,niter)
       endif
       if( iflag/100.ne.0 ) then
@@ -595,7 +595,7 @@ contains
 !!$      uu(1:ndim) = u(1:ndim)/unorm
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,ftrn,ftst,xtol,gtol,ftol &
+        call quad_interpolate(ndim,x,u,ftrn,ftst,pval,xtol,gtol,ftol &
              ,alpha,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
@@ -603,11 +603,11 @@ contains
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol &
+          call golden_section(ndim,x,u,ftrn,ftst,pval,xtol,gtol,ftol &
                ,alpha,iprint,iflag,myid)
         endif
       else if ( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
+        call golden_section(ndim,x,u,ftrn,ftst,pval,xtol,gtol,ftol,alpha &
              ,iprint,iflag,myid)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
@@ -616,13 +616,13 @@ contains
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
-        call armijo_search(ndim,x,xranges,u,ftrn,ftst,g,alpha,iprint &
+        call armijo_search(ndim,x,xranges,u,ftrn,ftst,pval,g,alpha,iprint &
              ,iflag,myid,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol/gnorm)*2d0
         alpha = alpha *fac_inc
-        call backtrack(ndim,x,xranges,u,ftrn,ftst,alpha,iprint &
+        call backtrack(ndim,x,xranges,u,ftrn,ftst,pval,alpha,iprint &
              ,iflag,myid,niter)
       endif
 
@@ -820,20 +820,20 @@ contains
       gp(1:ndim)= g(1:ndim)
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
-        call quad_interpolate(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid)
+        call quad_interpolate(ndim,x,u,ftrn,ftst,pval, &
+             xtol,gtol,ftol,alpha,iprint,iflag,myid)
 !.....if quad interpolation failed, perform golden section
         if( iflag/100.ne.0 ) then
           iflag= iflag -(iflag/100)*100
           if(myid.eq.0) then
             print *,'since quad_interpolate failed, call golden_section.'
           endif
-          call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-               ,iprint,iflag,myid)
+          call golden_section(ndim,x,u,ftrn,ftst,pval, &
+               xtol,gtol,ftol,alpha,iprint,iflag,myid)
         endif
       else if( trim(clinmin).eq.'golden') then
-        call golden_section(ndim,x,u,ftrn,ftst,xtol,gtol,ftol,alpha &
-             ,iprint,iflag,myid)
+        call golden_section(ndim,x,u,ftrn,ftst,pval, &
+             xtol,gtol,ftol,alpha,iprint,iflag,myid)
       else if( trim(clinmin).eq.'armijo' ) then
 !.....To enhance the convergence in Armijo search,
 !.....use the history of previous alpha by multiplying 2
@@ -841,14 +841,14 @@ contains
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol)*2d0
         alpha = alpha *fac_inc
-        call armijo_search(ndim,x,xranges,u,ftrn,ftst,g,alpha,iprint &
-             ,iflag,myid,niter)
+        call armijo_search(ndim,x,xranges,u,ftrn,ftst,pval, &
+             g,alpha,iprint,iflag,myid,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !        alpha = max(alpha,xtol)*2d0
         alpha = alpha *fac_inc
-        call backtrack(ndim,x,xranges,u,ftrn,ftst,alpha,iprint &
-             ,iflag,myid,niter)
+        call backtrack(ndim,x,xranges,u,ftrn,ftst,pval, &
+             alpha,iprint,iflag,myid,niter)
       endif
 !!$      if(myid.eq.0) print *,'armijo steps, alpha=',niter,alpha
       if( iflag/100.ne.0 ) then
@@ -1080,21 +1080,21 @@ contains
     return
   end subroutine exchange
 !=======================================================================
-  subroutine quad_interpolate(ndim,x0,g,ftrn,ftst,xtol,gtol,ftol,a,iprint &
-       ,iflag,myid)
+  subroutine quad_interpolate(ndim,x0,g,ftrn,ftst,pval, &
+       xtol,gtol,ftol,a,iprint, iflag,myid)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
 
     real(8),intent(in):: x0(ndim),xtol,gtol,ftol,g(ndim)
-    real(8),intent(out):: ftrn,a,ftst
+    real(8),intent(out):: ftrn,a,ftst,pval
 
     real(8),parameter:: STP0    = 1d-1
     real(8),parameter:: STPMAX  = 1d+1
     real(8),parameter:: TINY    = 1d-15
 
     integer:: iter,imin,imax,ix
-    real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin,pval
+    real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
     real(8):: xi(4),fi(4),fti(4)
     
     xi(1)= 0d0
@@ -1215,13 +1215,13 @@ contains
 
   end subroutine quad_interpolate
 !=======================================================================
-  subroutine golden_section(ndim,x0,g,ftrn,ftst,xtol,gtol,ftol,alpha,iprint &
-       ,iflag,myid)
+  subroutine golden_section(ndim,x0,g,ftrn,ftst,pval, &
+       xtol,gtol,ftol,alpha,iprint,iflag,myid)
     implicit none
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag
     real(8),intent(in):: xtol,gtol,ftol,x0(ndim),g(ndim)
-    real(8),intent(inout):: ftrn,alpha,ftst
+    real(8),intent(inout):: ftrn,alpha,ftst,pval
 
     real(8),parameter:: STP0 = 1d-1
     real(8),parameter:: GR   = 0.61803398875d0
@@ -1229,7 +1229,7 @@ contains
 
     integer:: iter
     real(8):: a,b1,b2,c,fa,fb1,fb2,fc,xl
-    real(8):: ftb1,ftb2,fta,ftc,pval
+    real(8):: ftb1,ftb2,fta,ftc
 
     a= 0d0
     b1= STP0
@@ -1294,8 +1294,8 @@ contains
 
   end subroutine golden_section
 !=======================================================================
-  subroutine armijo_search(ndim,x0,xranges,d,ftrn,ftst,g,alpha,iprint &
-       ,iflag,myid,niter)
+  subroutine armijo_search(ndim,x0,xranges,d,ftrn,ftst,pval, &
+       g,alpha,iprint,iflag,myid,niter)
 !  
 !  1D search using Armijo rule.
 !
@@ -1303,12 +1303,12 @@ contains
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
-    real(8),intent(inout):: ftrn,alpha,ftst
+    real(8),intent(inout):: ftrn,alpha,ftst,pval
 
 !!$  real(8),external:: sprod
     real(8),parameter:: xtiny  = 1d-14
     integer:: iter
-    real(8):: alphai,xigd,f0,fi,pval,fp,pvalp,alphap,ftsti
+    real(8):: alphai,xigd,f0,fi,fp,pvalp,alphap,ftsti
     real(8),allocatable,dimension(:):: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1370,8 +1370,8 @@ contains
 
   end subroutine armijo_search
 !=======================================================================
-  subroutine backtrack(ndim,x0,xranges,d,ftrn,ftst,alpha,iprint &
-       ,iflag,myid,niter)
+  subroutine backtrack(ndim,x0,xranges,d,ftrn,ftst,pval, &
+       alpha,iprint,iflag,myid,niter)
 !
 !  Simply move onestep towards current direction with max length
 !  that can decreases function value.
@@ -1380,12 +1380,12 @@ contains
     integer,intent(in):: ndim,iprint,myid
     integer,intent(inout):: iflag,niter
     real(8),intent(in):: x0(ndim),d(ndim),xranges(2,ndim)
-    real(8),intent(inout):: ftrn,alpha,ftst
+    real(8),intent(inout):: ftrn,alpha,ftst,pval
 
 !.....Precision
     real(8),parameter:: tiny = 1d-15
     integer:: iter,iterp
-    real(8):: alphai,alphap,f0,fi,fp,ftsti,fpi,fti,pval
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,fpi,fti
     real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1722,7 +1722,7 @@ contains
 !!$      call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
 !!$           ,iflag,myid,niter)
         alpha = min(max(alpha,xtol*10d0)*2d0, 1d0)
-        call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
+        call armijo_search(ndim,xt,xranges,u,f,ftst,pval,g,alpha,iprint &
              ,iflag,myid,niter)
 !!$        print *,'ig,f,f-fp=',ig,f,f-fp
         gmaxgl0(ig) = -(f-fp)
@@ -1926,18 +1926,18 @@ contains
 !.....line minimization
         if( trim(clinmin).eq.'armijo' ) then
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-          call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
-               ,iflag,myid,niter)
+          call armijo_search(ndim,xt,xranges,u,f,ftst,pval, &
+               g,alpha,iprint,iflag,myid,niter)
 !.....if something wrong with armijo search, try opposite direction
           if( iflag/100.ne.0 ) then
             alpha= -1d0
             if(myid.eq.0) print *,'trying opposite direction...'
-            call armijo_search(ndim,xt,xranges,u,f,ftst,g,alpha,iprint &
-                 ,iflag,myid,niter)
+            call armijo_search(ndim,xt,xranges,u,f,ftst,pval, &
+                 g,alpha,iprint,iflag,myid,niter)
           endif
         else   ! backtrack (default)
           alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-          call backtrack(ndim,xt,xranges,u,f,ftst,alpha,iprint &
+          call backtrack(ndim,xt,xranges,u,f,ftst,pval,alpha,iprint &
                ,iflag,myid,niter)
         endif
 !.....get out of bfgs loop
