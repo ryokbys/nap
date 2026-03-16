@@ -18,7 +18,7 @@ program fitpot
   use conditions,only: lconds, read_conds
   implicit none
   integer:: ismpl,ihour,imin,isec,isp,jsp
-  real(8):: tmp,ftrn0,ftst0
+  real(8):: tmp,ftrn0,ftst0,fpena0
   
   call mpi_init(ierr)
   time0= mpi_wtime()
@@ -148,7 +148,7 @@ program fitpot
   if( trim(cpotlow).eq.'linreg' .or. trim(cpotlow).eq.'dnn' &
        .or. cpotlow(1:3).eq.'uf3' ) then
     call wrap_ranges(nvars,vars,vranges)
-    call func_w_pmd(nvars,vars,ftrn0,ftst0)
+    call func_w_pmd(nvars,vars,ftrn0,ftst0,fpena0)
   else
     print *,'ERROR: '//trim(cpot)//' is not available.'
     stop
@@ -202,10 +202,10 @@ program fitpot
   endif
 
 !.....Compute func value of the best vars
-  call func_w_pmd(nvars,vbest,ftrn0,ftst0)
+  call func_w_pmd(nvars,vbest,ftrn0,ftst0,fpena0)
   if( myid.eq.0 ) then
-    print '(a,i0,f8.4)', ' Best of test loss (iter,loss): ', &
-         ibest,ftst0
+    print '(a,i0,2f8.4)', ' Best of test loss (iter,loss,penalty): ', &
+         ibest,ftst0,fpena0
   endif
   call write_stats(ibest)
 
@@ -348,6 +348,9 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_short',pwgt2bs
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b',pwgt3b
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b_diff',pwgt3bd
+  else if( index(cpenalty,'min3b').ne.0 ) then
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_min3b',pwgt_min3b
+    write(6,'(2x,a25,2x,es12.3)') 'beta_min3b',beta_min3b
   endif
   if( lconds ) then
     write(6,'(2x,a25,2x,l3)') 'conditions',lconds
@@ -840,13 +843,12 @@ subroutine get_base_energies()
 
 end subroutine get_base_energies
 !=======================================================================
-subroutine qn_wrapper(ftrn0,ftst0)
+subroutine qn_wrapper()
   use variables
 !!$  use NNd,only:NN_init,NN_func,NN_grad,NN_restore_standard,NN_analyze
   use parallel
   use minimize
   implicit none
-  real(8),intent(in):: ftrn0,ftst0
   
 !!$  if( trim(cpot).eq.'Morse' .or. trim(cpot).eq.'BVS' &
 !!$       .or. trim(cpot).eq.'linreg' .or. trim(cpot).eq.'dnn' ) then
@@ -865,7 +867,7 @@ subroutine qn_wrapper(ftrn0,ftst0)
   return
 end subroutine qn_wrapper
 !=======================================================================
-subroutine sd_wrapper(ftrn0,ftst0)
+subroutine sd_wrapper()
 !
 !  Steepest descent minimization
 !
@@ -874,7 +876,6 @@ subroutine sd_wrapper(ftrn0,ftst0)
   use parallel
   use minimize
   implicit none
-  real(8),intent(in):: ftrn0,ftst0
 
   call steepest_descent(nvars,vars,vbest,ibest,fbest,gvar,dvar,vranges,xtol,gtol &
        ,ftol,niter,iprint,iflag,myid,cfmethod &
@@ -934,7 +935,7 @@ subroutine check_grad(ftrn0,ftst0)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-8
   real(8),parameter:: mach_eps = 1d-14
-  real(8):: vtmp1,vtmp2
+  real(8):: vtmp1,vtmp2,pval
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
   vars0(1:nvars)= vars(1:nvars)
@@ -961,12 +962,12 @@ subroutine check_grad(ftrn0,ftst0)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
     call wrap_ranges(nvars,vars,vranges)
-    call func_w_pmd(nvars,vars,ftmp1,ftst)
+    call func_w_pmd(nvars,vars,ftmp1,ftst,pval)
     vtmp1 = vars(iv)
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
     call wrap_ranges(nvars,vars,vranges)
-    call func_w_pmd(nvars,vars,ftmp2,ftst)
+    call func_w_pmd(nvars,vars,ftmp2,ftst,pval)
     vtmp2 = vars(iv)
     true_dv = vtmp1-vtmp2
     if( true_dv .gt. -mach_eps .and. true_dv .lt.mach_eps ) then

@@ -29,15 +29,15 @@ contains
     
     if( myid.eq.0 ) then
       if( iprint.ge.1 ) then
-        if( trim(cpena).eq.'ridge' ) then
+        if( cpena.eq.'' ) then
+          write(6,'(a,i5,i4,7es11.3)') &
+               ' iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
+               ,iter,ninner,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
+        else
           write(6,'(a,i5,i4,7es11.3)') &
                ' iter,ninner,ftrn,ftst,penalty,|x|,|g|,|dx|,|df|=' &
                ,iter,ninner,ftrn-pval,ftst &
                ,pval,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
-        else
-          write(6,'(a,i5,i4,7es11.3)') &
-               ' iter,ninner,ftrn,ftst,|x|,|g|,|dx|,|df|=' &
-               ,iter,ninner,ftrn,ftst,xnorm,gnorm,dxnorm,abs(ftrn-fprev)
         endif
         call flush(6)
       endif
@@ -145,7 +145,7 @@ contains
     niter = 0
     x(:) = x0(:)
     call wrap_ranges(ndim,x,xranges)
-    call func(ndim,x,ftrn,ftst)
+    call func(ndim,x,ftrn,ftst,pval)
     call grad(ndim,x,g)
     gnorm= sqrt(sprod(ndim,g,g))
     vnorm= sqrt(sprod(ndim,x,x))
@@ -333,7 +333,7 @@ contains
 !.....Unset mask to compute all the samples at the first evaluation
     ismask(:) = 0
     call wrap_ranges(ndim,x0,xranges)
-    call func(ndim,x0,ftrn,ftst)
+    call func(ndim,x0,ftrn,ftst,pval)
     fbest = ftst
     xbest(:) = x0(:)
     ibest = 0
@@ -378,7 +378,7 @@ contains
         enddo
 
         call wrap_ranges(ndim,x,xranges)
-        call func(ndim,x,ftrn,ftst)
+        call func(ndim,x,ftrn,ftst,pval)
         call grad(ndim,x,g)
         gnorm= sqrt(sprod(ndim,g,g))
 !!$        print *,'myid,innerstp,gnorm=',myid,innerstp,gnorm
@@ -431,7 +431,7 @@ contains
           ismask(ismpl) = mod(ismask(ismpl)+1,2)
         enddo
         call wrap_ranges(ndim,x,xranges)
-        call func(ndim,x,ftmp,ftst)
+        call func(ndim,x,ftmp,ftst,pval)
 !!$        call grad(ndim,x,gtmp)  ! grad call for all the samples maybe time consuming
 !!$        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
         if( iter.ne.maxiter ) call write_stats(iter)  ! Write (ENERGY:, FORCE:, STRESS: ...)
@@ -574,7 +574,7 @@ contains
     gpena(1:ndim)= 0d0
     x(:) = x0(:)
     call wrap_ranges(ndim,x,xranges)
-    call func(ndim,x,ftrn,ftst)
+    call func(ndim,x,ftrn,ftst,pval)
     fbest = ftst
     xbest(:) = x0(:)
     ibest = 0
@@ -790,7 +790,7 @@ contains
     endif
 
     call wrap_ranges(ndim,x0,xranges)
-    call func(ndim,x0,ftrn,ftst)
+    call func(ndim,x0,ftrn,ftst,pval)
     call grad(ndim,x0,g)
     gnorm= sqrt(sprod(ndim,g,g))
     x(1:ndim)= x0(1:ndim)
@@ -1015,9 +1015,10 @@ contains
     real(8),parameter:: GLIMIT= 100d0
     real(8),parameter:: MAXITER= 50
     integer:: iter
+    real(8):: pval
 
-    call func(ndim,x0+a*d,fa,fta)
-    call func(ndim,x0+b*d,fb,ftb)
+    call func(ndim,x0+a*d,fa,fta,pval)
+    call func(ndim,x0+b*d,fb,ftb,pval)
     iter= 0
 10  continue
     iter= iter +1
@@ -1041,7 +1042,7 @@ contains
     endif
     if( fa.lt.fb ) then
       c= a +RATIOI*(b-a)
-      call func(ndim,x0+c*d,fc,ftc)
+      call func(ndim,x0+c*d,fc,ftc,pval)
       call exchange(c,b)
       call exchange(fc,fb)
       call exchange(ftc,ftb)
@@ -1051,10 +1052,10 @@ contains
       goto 10
     else
       c= a +RATIO*(b-a)
-      call func(ndim,x0+c*d,fc,ftc)
+      call func(ndim,x0+c*d,fc,ftc,pval)
       if( fb.gt.fc ) then
         b= a +RATIO*(c-a)
-        call func(ndim,x0+b*d,fb,ftb)
+        call func(ndim,x0+b*d,fb,ftb,pval)
         call exchange(b,c)
         call exchange(fb,fc)
         call exchange(ftb,ftc)
@@ -1093,7 +1094,7 @@ contains
     real(8),parameter:: TINY    = 1d-15
 
     integer:: iter,imin,imax,ix
-    real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin
+    real(8):: r,q,fmin,fmax,dmin,dmax,d,xmin,pval
     real(8):: xi(4),fi(4),fti(4)
     
     xi(1)= 0d0
@@ -1120,7 +1121,7 @@ contains
     q= (xi(2)-xi(3))*(fi(2)-fi(1))
     xi(4)= xi(2) -((xi(2)-xi(3))*q -(xi(2)-xi(1))*r) &
          /(2d0*sign(max(abs(q-r),TINY),q-r))
-    call func(ndim,x0+xi(4)*g,fi(4),fti(4))
+    call func(ndim,x0+xi(4)*g,fi(4),fti(4),pval)
 !!$    write(6,'(a,2(2x,4f11.2))') ' xi,fi=',xi(1:4),fi(1:4)
 
     !.....step4
@@ -1157,7 +1158,7 @@ contains
       else
         xi(3)= xi(2) +STPMAX
       endif
-      call func(ndim,x0+xi(3)*g,fi(3),fti(3))
+      call func(ndim,x0+xi(3)*g,fi(3),fti(3),pval)
       goto 10
     else if( fi(4).gt.fmax ) then ! fi(4) is maximum
 !!$      print *,' 02'
@@ -1178,7 +1179,7 @@ contains
         fti(ix-1)= fti(ix)
       enddo
       xi(3)= (xmin +xi(4))*0.5
-      call func(ndim,x0+xi(3)*g,fi(3),fti(3))
+      call func(ndim,x0+xi(3)*g,fi(3),fti(3),pval)
       goto 10
     endif
 
@@ -1228,7 +1229,7 @@ contains
 
     integer:: iter
     real(8):: a,b1,b2,c,fa,fb1,fb2,fc,xl
-    real(8):: ftb1,ftb2,fta,ftc
+    real(8):: ftb1,ftb2,fta,ftc,pval
 
     a= 0d0
     b1= STP0
@@ -1238,8 +1239,8 @@ contains
     xl= (c-a)
     b1= a +GR2*xl
     b2= a +GR *xl
-    call func(ndim,x0+b1*g,fb1,ftb1)
-    call func(ndim,x0+b2*g,fb2,ftb2)
+    call func(ndim,x0+b1*g,fb1,ftb1,pval)
+    call func(ndim,x0+b2*g,fb2,ftb2,pval)
 
     iter= 0
 10  continue
@@ -1264,7 +1265,7 @@ contains
       ftb1= ftb2
       xl= (c-a)
       b2= a +GR*xl
-      call func(ndim,x0+b2*g,fb2,ftb2)
+      call func(ndim,x0+b2*g,fb2,ftb2,pval)
     else
       c= b2
       fc= fb2
@@ -1274,7 +1275,7 @@ contains
       ftb2= ftb1
       xl= (c-a)
       b1= a +GR2*xl
-      call func(ndim,x0+b1*g,fb1,ftb1)
+      call func(ndim,x0+b1*g,fb1,ftb1,pval)
     endif
 !!$    print *,' xl,c,a,xtol=',xl,c,a,xtol
     if( xl.lt.xtol ) then
@@ -1336,7 +1337,7 @@ contains
       x1(1:ndim)= x0(1:ndim)
       x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
       call wrap_ranges(ndim,x1,xranges)
-      call func(ndim,x1,fi,ftsti)
+      call func(ndim,x1,fi,ftsti,pval)
       if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,5es12.4)') &
            ' armijo: iter,fi,fi-f0,fi-fp,xigd*alphai,alphai=',&
            iter,fi,fi-fp,xigd*alphai,alphai
@@ -1384,7 +1385,7 @@ contains
 !.....Precision
     real(8),parameter:: tiny = 1d-15
     integer:: iter,iterp
-    real(8):: alphai,alphap,f0,fi,fp,ftsti,fpi,fti
+    real(8):: alphai,alphap,f0,fi,fp,ftsti,fpi,fti,pval
     real(8),save,allocatable:: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
@@ -1401,7 +1402,7 @@ contains
       x1(:) = x0(:)
       x1(1:ndim) = x1(1:ndim) +alphai*d(1:ndim)
       call wrap_ranges(ndim,x1,xranges)
-      call func(ndim,x1,fi,ftsti)
+      call func(ndim,x1,fi,ftsti,pval)
       if( myid.eq.0 .and. iprint.gt.2 ) then
         print '(a,i8,5es12.4)','   iter,alphai,fi,fti,fi-f0,fi-fp = ' &
              ,iter,alphai,fi,fti,fi-f0,fi-fp
@@ -1513,7 +1514,7 @@ contains
     do iter=1,maxiter
       fp= f
 !.....find maximum contribution in g
-      call func(ndim,xt,f,ftst)
+      call func(ndim,xt,f,ftst,pval)
       call grad(ndim,xt,g)
       pval= 0d0
       gpena(1:ndim)= 0d0
@@ -1703,7 +1704,7 @@ contains
 
 !.....cfsmode==df0corr, loss-func decrease of each descriptor
     if( index(cfsmode,'df0').ne.0 ) then
-      call func(ndim,xt,f,ftst)
+      call func(ndim,xt,f,ftst,pval)
       call grad(ndim,xt,g)
       fp = f
       gp(:) = g(:)
@@ -1727,7 +1728,7 @@ contains
         gmaxgl0(ig) = -(f-fp)
       enddo
     else if( index(cfsmode,'grad0').ne.0 ) then
-      call func(ndim,xt,f,ftst)
+      call func(ndim,xt,f,ftst,pval)
       call grad(ndim,xt,g)
       f0 = f
       g0(:) = g(:)
@@ -1749,7 +1750,7 @@ contains
 !     because it is used to find another new basis
         msktmp(1:ngl)= mskgfs(1:ngl)
         mskgfs(1:ngl)= 0
-        call func(ndim,xt,f,ftst)
+        call func(ndim,xt,f,ftst,pval)
         call grad(ndim,xt,g)
 !.....Restore mask
         mskgfs(1:ngl)= msktmp(1:ngl)
@@ -1870,7 +1871,7 @@ contains
       else
 !.....Do nothing, use current variable values.
       endif
-      call func(ndim,xt,f,ftst)
+      call func(ndim,xt,f,ftst,pval)
       call grad(ndim,xt,g)
 !!$!.....Penalty
 !!$      if( trim(cpena).eq.'ridge' ) then

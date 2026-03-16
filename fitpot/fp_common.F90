@@ -190,7 +190,7 @@ contains
     return
   end subroutine mask_grad
 !=======================================================================
-  subroutine func_w_pmd(ndim,x,ftrn,ftst)
+  subroutine func_w_pmd(ndim,x,ftrn,ftst,fpena)
 !
 !  Evaluate loss function value using pmd (actually one_shot routine.)
 !
@@ -211,7 +211,7 @@ contains
     implicit none
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
-    real(8),intent(out):: ftrn,ftst
+    real(8),intent(out):: ftrn,ftst,fpena
 
     integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,ir
     integer:: isp,jsp
@@ -219,7 +219,7 @@ contains
     real(8):: ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
-    real(8):: ftrnl,ftstl,ftmp,gdw,fpena,fetmp,fftmp,fstmp, &
+    real(8):: ftrnl,ftstl,ftmp,gdw,fetmp,fftmp,fstmp, &
          fftmp_trn, fftmp_tst
     real(8):: fetstl,fftstl,fststl,fetst,fftst,fstst
     real(8):: fetrnl,fftrnl,fstrnl,fetrn,fftrn,fstrn
@@ -1073,22 +1073,23 @@ contains
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
          penalty_min3b_uf3l
     use conditions,only: lconds, calc_fpenal_conds
+    use parallel
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
 
     integer:: i
-    real(8):: fptmp
+    real(8):: pridge,pmin3b,pcond
 
     fp = 0d0
     
 !.....Simple ridge penalty
     if( index(cpenalty,'ridge').ne.0 ) then
-      fptmp = 0d0
+      pridge = 0d0
       do i=1,ndim
-        fptmp = fptmp +x(i)*x(i)
+        pridge = pridge +x(i)*x(i)
       enddo
-      fp = fp + fptmp *penalty
+      fp = fp + pridge *penalty
     endif
 
 !!$ TODO implement curvature penalty...    
@@ -1105,17 +1106,20 @@ contains
 
 !.....Penalty on softmax3b
     if( index(cpenalty,'min3b').ne.0 ) then
+      pmin3b = 0d0
       if( trim(cpotlow).eq.'uf3l' ) then
-        call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,fptmp)
+        call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,pmin3b)
       endif
-      fp = fp +fptmp
+      fp = fp +pmin3b
     endif
 
 !.....Direct conditions
     if( lconds ) then
-      call calc_fpenal_conds(ndim, x, fptmp)
-      fp = fp +fptmp
+      pcond = 0d0
+      call calc_fpenal_conds(ndim, x, pcond)
+      fp = fp +pcond
     endif
+!!$    if( myid.eq.0 ) print '(a,2es12.3)', '  min3b,cond = ',pmin3b,pcond
     
     return
   end subroutine func_penalty

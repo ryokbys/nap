@@ -5134,7 +5134,7 @@ contains
          nklead, nktrail,ncs,lcs,ix,j
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,p3b,x(npnts),fi, &
+    real(8):: tmp,p3b,p3bi,x(npnts),fi, &
          bcs(-3:0),dbcs(-3:0),dx
     real(8),allocatable,save:: bspl(:,:),expbf(:)
 
@@ -5195,6 +5195,7 @@ contains
         enddo
 !.....Compute each exp(-beta*f(x_i)), Bj(xi)*exp(-)
         expbf(ix) = exp(-beta*fi)
+!!$        if( i3b.eq.1 ) print '(i4,2es12.2)',ix,fi,expbf(ix)
 !.....Sum_i exp(-beta*f(x_i))
         sumexp(i3b) = sumexp(i3b) +expbf(ix)
         do lcs=-3,0
@@ -5204,7 +5205,9 @@ contains
         enddo ! lcs
       enddo
 !.....Compute -log(sum exp) /beta
-      p3b = p3b + pwgt * (-log(sumexp(i3b)) /beta)**2
+      p3bi = pwgt * (-log(sumexp(i3b)) /beta)
+      p3b = p3b + p3bi
+!!$      print '(a,i4,2es12.3)', '  i3b,pmin3b,sumexp=',i3b,p3bi,sumexp(i3b)
     enddo
     penalty = p3b
 
@@ -5270,11 +5273,12 @@ contains
       inc = inc +1
       prm3ls(i3b)%gmk = params_in(inc)
 !.....Compute grads
-      tmp = 2d0 * pwgt * (-log(sumexp(i3b)) /beta)
+!!$      tmp = 2d0 * pwgt * (-log(sumexp(i3b)) /beta)
       do ic=1,p3%ncoef
         inc = inc +1
         prm3ls(i3b)%coefs(ic) = params_in(inc)
-        gp3b(inc) = tmp * sumbexp(ic,i3b)/sumexp(i3b)
+        gp3b(inc) = pwgt * sumbexp(ic,i3b)/sumexp(i3b)
+!!$        if( i3b.eq.1 ) print '(a,i5,es12.3)','  inc,gp3b=',inc,gp3b(inc)
       enddo
       
     enddo

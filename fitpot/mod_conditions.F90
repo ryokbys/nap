@@ -52,6 +52,7 @@ contains
         if( c1(1:1).eq.'!' .or. c1(1:1).eq.'#') cycle
         backspace(ionum)
         read(ionum, *) nconds, wgt
+!!$        print '(a,i5,es12.3)', 'nconds,wgt=',nconds,wgt
 !.....Exit this loop after reading the 1st non-comment line
 !     that should be "num and weight of conditions".
 10      exit
