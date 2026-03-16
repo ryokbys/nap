@@ -4930,6 +4930,12 @@ contains
       do i3b=1,n3b
         p3 = prm3ls(i3b)
         inc = inc +1
+        prm3ls(i3b)%rcij = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%rcij**2
+        inc = inc +1
+        prm3ls(i3b)%rcik = params_in(inc)
+        p3b = p3b + prm3ls(i3b)%rcik**2
+        inc = inc +1
         prm3ls(i3b)%gmj = params_in(inc)
         p3b = p3b + prm3ls(i3b)%gmj**2
         inc = inc +1
@@ -5164,6 +5170,10 @@ contains
     do i3b=1,n3b
       p3 = prm3ls(i3b)
       inc = inc +1
+      prm3ls(i3b)%rcij = params_in(inc)
+      inc = inc +1
+      prm3ls(i3b)%rcik = params_in(inc)
+      inc = inc +1
       prm3ls(i3b)%gmj = params_in(inc)
       inc = inc +1
       prm3ls(i3b)%gmk = params_in(inc)
@@ -5194,9 +5204,9 @@ contains
         enddo ! lcs
       enddo
 !.....Compute -log(sum exp) /beta
-      p3b = p3b -log(sumexp(i3b)) /beta
+      p3b = p3b + pwgt * (-log(sumexp(i3b)) /beta)**2
     enddo
-    penalty = pwgt * p3b**2
+    penalty = p3b
 
     return
   end subroutine penalty_min3b_uf3l
@@ -5252,17 +5262,23 @@ contains
     do i3b=1,n3b
       p3 = prm3ls(i3b)
       inc = inc +1
+      prm3ls(i3b)%rcij = params_in(inc)
+      inc = inc +1
+      prm3ls(i3b)%rcik = params_in(inc)
+      inc = inc +1
       prm3ls(i3b)%gmj = params_in(inc)
       inc = inc +1
       prm3ls(i3b)%gmk = params_in(inc)
 !.....Compute grads
+      tmp = 2d0 * pwgt * (-log(sumexp(i3b)) /beta)
       do ic=1,p3%ncoef
         inc = inc +1
         prm3ls(i3b)%coefs(ic) = params_in(inc)
-        gp3b(inc) = sumbexp(ic,i3b)/sumexp(i3b)
+        gp3b(inc) = tmp * sumbexp(ic,i3b)/sumexp(i3b)
       enddo
+      
     enddo
-    grad(:) = gp3b(:)*pwgt
+    grad(:) = gp3b(:)
 
     return
   end subroutine penalty_grad_min3b_uf3l
