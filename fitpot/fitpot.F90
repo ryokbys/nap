@@ -935,7 +935,7 @@ subroutine check_grad(ftrn0,ftst0)
   real(8),parameter:: dev  = 1d-5
   real(8),parameter:: tiny = 1d-8
   real(8),parameter:: mach_eps = 1d-14
-  real(8):: vtmp1,vtmp2,pval
+  real(8):: vtmp1,vtmp2,pval1,pval2
   allocate(gnumer(nvars),ganal(nvars),vars0(nvars))
 
   vars0(1:nvars)= vars(1:nvars)
@@ -962,12 +962,12 @@ subroutine check_grad(ftrn0,ftst0)
     dv = max(abs(vars(iv)*dev),dev)
     vars(iv)= vars(iv) +dv/2
     call wrap_ranges(nvars,vars,vranges)
-    call func_w_pmd(nvars,vars,ftmp1,ftst,pval)
+    call func_w_pmd(nvars,vars,ftmp1,ftst,pval1)
     vtmp1 = vars(iv)
     vars(1:nvars)= vars0(1:nvars)
     vars(iv)= vars(iv) -dv/2
     call wrap_ranges(nvars,vars,vranges)
-    call func_w_pmd(nvars,vars,ftmp2,ftst,pval)
+    call func_w_pmd(nvars,vars,ftmp2,ftst,pval2)
     vtmp2 = vars(iv)
     true_dv = vtmp1-vtmp2
     if( true_dv .gt. -mach_eps .and. true_dv .lt.mach_eps ) then
@@ -979,7 +979,7 @@ subroutine check_grad(ftrn0,ftst0)
     if( myid.eq.0 ) then
       absgnum = abs(gnumer(iv))
       absgana = abs(ganal(iv))
-      write(6,'(i6,es12.4,2es15.4,f15.3)') iv,vars0(iv), &
+      write(6,'(i6,es12.4,2es15.4,f15.3,es12.3)') iv,vars0(iv), &
            ganal(iv) ,gnumer(iv), &
            abs(ganal(iv)-gnumer(iv)) &
            /(max(max(absgnum,absgana),tiny)) *100

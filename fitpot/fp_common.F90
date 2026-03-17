@@ -1084,8 +1084,8 @@ contains
     fp = 0d0
     
 !.....Simple ridge penalty
+    pridge = 0d0
     if( index(cpenalty,'ridge').ne.0 ) then
-      pridge = 0d0
       do i=1,ndim
         pridge = pridge +x(i)*x(i)
       enddo
@@ -1105,21 +1105,22 @@ contains
 !!$    endif
 
 !.....Penalty on softmax3b
+    pmin3b = 0d0
     if( index(cpenalty,'min3b').ne.0 ) then
-      pmin3b = 0d0
       if( trim(cpotlow).eq.'uf3l' ) then
         call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,pmin3b)
       endif
       fp = fp +pmin3b
     endif
 
+    
 !.....Direct conditions
+    pcond = 0d0
     if( lconds ) then
-      pcond = 0d0
       call calc_fpenal_conds(ndim, x, pcond)
       fp = fp +pcond
     endif
-!!$    if( myid.eq.0 ) print '(a,2es12.3)', '  min3b,cond = ',pmin3b,pcond
+!!$    if( myid.eq.0 ) print '(a,2es24.14)', '  pmin3b,pcond = ',pmin3b,pcond
     
     return
   end subroutine func_penalty

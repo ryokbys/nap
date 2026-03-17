@@ -31,6 +31,8 @@ module UF3
 !!$  logical:: lprmset_uf3l = .false.
 !!$  logical:: lprmset_uf3d = .false.
 
+  real(8),parameter:: tiny = 1d-8
+
 !.....uf2 parameters
   type prm2
     character(2):: cb, csi, csj, cknot
@@ -1644,7 +1646,6 @@ contains
     use impulse,only: ftaul, itot_impls, tau_impls
 #endif
     implicit none
-    real(8),parameter:: tiny = 1d-8
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
@@ -2003,7 +2004,6 @@ contains
     use impulse,only: ftaul, itot_impls, tau_impls
 #endif
     implicit none
-    real(8),parameter:: tiny = 1d-8
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
@@ -2980,7 +2980,6 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
-    real(8),parameter:: tiny = 1d-8
     integer:: i,ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs
@@ -3463,7 +3462,6 @@ contains
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
-    real(8),parameter:: tiny = 1d-8
     integer:: i,ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,ncs,nc,lij,nij3,lik,nik,nik3,n0
@@ -4578,7 +4576,6 @@ contains
     type(prm3):: p3
     real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
     logical:: ledge
-    real(8),parameter:: tiny = 1d-8
 
     inc = 0
     do i1b=1,n1b
@@ -4872,7 +4869,6 @@ contains
     type(prm3l):: p3
     real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
     logical:: ledge
-    real(8),parameter:: tiny = 1d-8
 
     inc = 0
     do i1b=1,n1b
@@ -5128,13 +5124,11 @@ contains
     real(8),intent(in):: pwgt,beta
     real(8),intent(out):: penalty
 
-    real(8),parameter:: tiny = 1d-8
-    
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail,ncs,lcs,ix,j
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,p3b,p3bi,x(npnts),fi, &
+    real(8):: tmp,p3b,p3bi,x(npnts),fi,fs(npnts),fmin, &
          bcs(-3:0),dbcs(-3:0),dx
     real(8),allocatable,save:: bspl(:,:),expbf(:)
 
@@ -5143,7 +5137,7 @@ contains
       do i3b=1,n3b
         nc3max = max(nc3max, prm3ls(i3b)%ncoef)
       enddo
-      allocate(bspl(npnts,nc3max),expbf(npnts), &
+      allocate(bspl(nc3max,npnts),expbf(npnts), &
            sumexp(n3b),sumbexp(nc3max,n3b))
     endif
     
@@ -5168,7 +5162,6 @@ contains
     enddo
     p3b = 0d0
     do i3b=1,n3b
-      p3 = prm3ls(i3b)
       inc = inc +1
       prm3ls(i3b)%rcij = params_in(inc)
       inc = inc +1
@@ -5177,38 +5170,48 @@ contains
       prm3ls(i3b)%gmj = params_in(inc)
       inc = inc +1
       prm3ls(i3b)%gmk = params_in(inc)
-      do ic=1,p3%ncoef
+      do ic=1,prm3ls(i3b)%ncoef
         inc = inc +1
         prm3ls(i3b)%coefs(ic) = params_in(inc)
       enddo
+      p3 = prm3ls(i3b)
 !.....Compute f(x_i) and B_j(x_i)
+      fs(:) = 0d0
+      bspl(:,:) = 0d0
+      do ix=1,npnts
+        call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
+        do lcs=-3,0
+          j = ncs +lcs
+          if( j < 1 .or. j > p3%ncoef ) cycle
+          fs(ix) = fs(ix) +p3%coefs(j) * bcs(lcs)
+          bspl(j,ix) = bcs(lcs)
+        enddo
+      enddo ! ix
+!.....Use fmin to stabilize exp() calculation (possible over/under-flow)
+      fmin = minval(fs)
+!.....Compute each exp(-beta*f(x_i)), Bj(xi)*exp(-)
       sumexp(i3b) = 0d0
       sumbexp(:,i3b) = 0d0
       do ix=1,npnts
-        call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
-        fi = 0d0
-        do lcs=-3,0
-          j = ncs +lcs
-          if( j < 1 .or. j > p3%ncoef ) cycle
-          fi = fi +p3%coefs(j) * bcs(lcs)
-          bspl(ix,j) = bcs(lcs)
-        enddo
-!.....Compute each exp(-beta*f(x_i)), Bj(xi)*exp(-)
-        expbf(ix) = exp(-beta*fi)
+        expbf(ix) = exp(-beta*(fs(ix)-fmin))
 !!$        if( i3b.eq.1 ) print '(i4,2es12.2)',ix,fi,expbf(ix)
 !.....Sum_i exp(-beta*f(x_i))
         sumexp(i3b) = sumexp(i3b) +expbf(ix)
-        do lcs=-3,0
-          j = ncs +lcs
-          if( j < 1 .or. j > p3%ncoef ) cycle
-          sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(ix,j)*expbf(ix)
-        enddo ! lcs
-      enddo
-!.....Compute -log(sum exp) /beta
-      p3bi = pwgt * (-log(sumexp(i3b)) /beta)
+!!$        call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
+!!$        do lcs=-3,0
+!!$          j = ncs +lcs
+!!$          if( j < 1 .or. j > p3%ncoef ) cycle
+!!$          sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(j,ix)*expbf(ix)
+!!$        enddo ! lcs
+        do j=1,p3%ncoef
+          sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(j,ix)*expbf(ix)
+        enddo
+      enddo ! ix
+!.....Compute (fmin-log(sum exp)/beta)
+      p3bi = pwgt * (fmin -log(sumexp(i3b))/beta)
       p3b = p3b + p3bi
 !!$      print '(a,i4,2es12.3)', '  i3b,pmin3b,sumexp=',i3b,p3bi,sumexp(i3b)
-    enddo
+    enddo ! i3b
     penalty = p3b
 
     return
@@ -5220,15 +5223,12 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !
 !  Gradient of the penalty for 3B using softmin function (log-sum-exp)
-!  so to make the min of angular term become 0.
+!  so to make the min of angular term tends to 0.
 !  
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     real(8),intent(in):: pwgt,beta
     real(8),intent(out):: grad(ndimp)
-
-    integer,parameter:: npnts = 100
-    real(8),parameter:: tiny = 1d-8
     
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail,ncs,lcs,ix,j
@@ -5236,10 +5236,10 @@ contains
     type(prm3l):: p3
     real(8):: tmp,p3b,x(npnts),fi, &
          bcs(-3:0),dbcs(-3:0),dx
-    real(8),allocatable,save:: gp3b(:),bspl(:,:)
+    real(8),allocatable,save:: gp3b(:)
 
     if( .not.allocated(gp3b) ) then
-      allocate(gp3b(ndimp), bspl(npnts,nc3max))
+      allocate(gp3b(ndimp))
     endif
 
     inc = 0
@@ -5287,12 +5287,12 @@ contains
     return
   end subroutine penalty_grad_min3b_uf3l
 !=======================================================================
-  subroutine calc_short_lossfunc(npnts,radii,drepul,floss)
+  subroutine calc_short_lossfunc(np,radii,drepul,floss)
 !
 !  Compute loss function for short-distance repulsion correction.
 !
-    integer,intent(in):: npnts
-    real(8),intent(in):: radii(nspmax,nspmax),drepul(npnts,nspmax,nspmax)
+    integer,intent(in):: np
+    real(8),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
     real(8),intent(out):: floss
 
     integer:: i2b,isp,jsp,ir,lij,n,nr2
@@ -5305,9 +5305,9 @@ contains
       isp = csp2isp(p2%csi)
       jsp = csp2isp(p2%csj)
       fli = 0d0
-      do ir=1,npnts
+      do ir=1,np
 !.....r-point to be evaluated as mid-point of the section
-        ri = radii(isp,jsp)/npnts *(dble(ir)-0.5d0)
+        ri = radii(isp,jsp)/np *(dble(ir)-0.5d0)
         call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
         tmp = 0d0
         do lij = -3,0
@@ -5318,18 +5318,18 @@ contains
         enddo
         fli = fli +(tmp -drepul(ir,isp,jsp))**2
       enddo
-      floss = floss +fli/npnts
+      floss = floss +fli/np
     enddo
     floss = floss/n2b *0.5d0
     return
   end subroutine calc_short_lossfunc
 !=======================================================================
-  subroutine calc_short_lossgrad(npnts,radii,drepul,ndimp,gloss)
+  subroutine calc_short_lossgrad(np,radii,drepul,ndimp,gloss)
 !
 !  Compute loss function gradient for short-distance repulsion correction.
 !
-    integer,intent(in):: npnts,ndimp
-    real(8),intent(in):: radii(nspmax,nspmax),drepul(npnts,nspmax,nspmax)
+    integer,intent(in):: np,ndimp
+    real(8),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
     real(8),intent(out):: gloss(ndimp)
 
     integer:: i2b,isp,jsp,ir,lij,n,i1b,inc,ic,ip,nr2
@@ -5362,9 +5362,9 @@ contains
         ic2ip(ic) = inc
       enddo
 
-      do ir=1,npnts
+      do ir=1,np
 !.....r-point to be evaluated as mid-point of the section
-        ri = radii(isp,jsp)/npnts *(dble(ir)-0.5d0)
+        ri = radii(isp,jsp)/np *(dble(ir)-0.5d0)
         call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
         tmp = 0d0
         do lij = -3,0
@@ -5378,7 +5378,7 @@ contains
           n = nr2 +lij
           if( n < 1 .or. n > p2%nknot-4 ) cycle
           ip = ic2ip(n)
-          gloss(ip) = gloss(ip) +fli*dbij(lij)/npnts/n2b
+          gloss(ip) = gloss(ip) +fli*dbij(lij)/np/n2b
         enddo  ! lij
       enddo  ! ir
     enddo  ! i2b

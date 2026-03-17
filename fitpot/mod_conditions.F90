@@ -157,8 +157,8 @@ contains
     integer:: ic, iop, ivl, ivr
     real(8):: vl, vr
 
-!.....gp is initialized before this is called.
-!    gp(:) = 0d0
+!.....gp is not initialized before this is called.
+    gp(:) = 0d0
     do ic=1,nconds
       ivl = ivls(ic)
       ivr = ivrs(ic)
