@@ -5197,12 +5197,6 @@ contains
 !!$        if( i3b.eq.1 ) print '(i4,2es12.2)',ix,fi,expbf(ix)
 !.....Sum_i exp(-beta*f(x_i))
         sumexp(i3b) = sumexp(i3b) +expbf(ix)
-!!$        call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
-!!$        do lcs=-3,0
-!!$          j = ncs +lcs
-!!$          if( j < 1 .or. j > p3%ncoef ) cycle
-!!$          sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(j,ix)*expbf(ix)
-!!$        enddo ! lcs
         do j=1,p3%ncoef
           sumbexp(j,i3b) = sumbexp(j,i3b) +bspl(j,ix)*expbf(ix)
         enddo
@@ -5286,6 +5280,83 @@ contains
 
     return
   end subroutine penalty_grad_min3b_uf3l
+!=======================================================================
+  subroutine penalty_nmin2b_uf3l(ndimp,params_in,pwgt2b, &
+       eps2b,tau2b,scl2b,penalty)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Penalty about the effective number of minimum in 2B curve.
+!
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
+    real(8),intent(out):: penalty
+
+    type(prm2):: p2
+    integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
+    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,qs(npnts),qsum, &
+         deli,sigi,wi,ps(npnts),hp,cr
+    real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
+
+    penalty = 0d0
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      nk = p2%nknot
+      nc = p2%ncoef
+      
+      do ic=1,nc
+        inc = inc +1
+!.....p2 cannot be used for substitution
+        prm2s(i2b)%coefs(ic) = params_in(inc)
+      enddo
+
+!.....Sampling points
+      rc = p2%knots(nk)
+      r0 = p2%knots(1)
+      rs(1) = r0
+      dr = (rc-r0)/npnts
+      do ir = 2, npnts
+        rs(ir) = rs(ir-1) + dr
+      enddo
+
+      qs(:) = 0d0
+      qsum = 0d0
+      do ir=1,npnts
+        call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
+        do lr = -3,0
+          j = nr + lr
+          if( j < 1 .or. j > nk-4 ) cycle
+          cr = p2%coefs(j)
+          fi = fi + cr *br(lr)
+          dfi = dfi + cr *dbr(lr)
+          ddfi = ddfi + cr *ddbr(lr)
+        enddo
+        deli = exp(-dfi**2 / (2d0*eps2b))
+        sigi = 1d0 / (1d0 + exp(-ddfi/tau2b))
+        wi = log( 1d0 + exp(-fi/scl2b))
+        qs(ir) = deli * sigi * wi
+        qsum = qsum + qs(ir)
+      enddo
+      ps(:) = 0d0
+      hp = 0d0
+      do ir=1,npnts
+        ps(ir) = qs(ir) / qsum
+        hp = hp - ps(ir) * log(ps(ir)+tiny)
+      enddo
+      penalty = penalty +pwgt2b * exp(hp)
+    enddo
+
+    return
+  end subroutine penalty_nmin2b_uf3l
 !=======================================================================
   subroutine calc_short_lossfunc(np,radii,drepul,floss)
 !
