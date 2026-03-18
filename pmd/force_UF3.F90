@@ -31,7 +31,8 @@ module UF3
 !!$  logical:: lprmset_uf3l = .false.
 !!$  logical:: lprmset_uf3d = .false.
 
-  real(8),parameter:: tiny = 1d-8
+  real(8),parameter:: huge = 1d+100
+  real(8),parameter:: tiny = 1d-12
 
 !.....uf2 parameters
   type prm2
@@ -5230,11 +5231,6 @@ contains
     type(prm3l):: p3
     real(8):: tmp,p3b,x(npnts),fi, &
          bcs(-3:0),dbcs(-3:0),dx
-    real(8),allocatable,save:: gp3b(:)
-
-    if( .not.allocated(gp3b) ) then
-      allocate(gp3b(ndimp))
-    endif
 
     inc = 0
 !.....skip element parameters
@@ -5255,7 +5251,7 @@ contains
     do ix=2,npnts
       x(ix) = x(ix-1) +dx
     enddo
-    gp3b(:) = 0d0
+    grad(:) = 0d0
     do i3b=1,n3b
       p3 = prm3ls(i3b)
       inc = inc +1
@@ -5271,12 +5267,11 @@ contains
       do ic=1,p3%ncoef
         inc = inc +1
         prm3ls(i3b)%coefs(ic) = params_in(inc)
-        gp3b(inc) = pwgt * sumbexp(ic,i3b)/sumexp(i3b)
+        grad(inc) = pwgt * sumbexp(ic,i3b)/sumexp(i3b)
 !!$        if( i3b.eq.1 ) print '(a,i5,es12.3)','  inc,gp3b=',inc,gp3b(inc)
       enddo
       
     enddo
-    grad(:) = gp3b(:)
 
     return
   end subroutine penalty_grad_min3b_uf3l
@@ -5289,6 +5284,7 @@ contains
 !
 !  Penalty about the effective number of minimum in 2B curve.
 !
+    use util,only: expit,log1p
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
@@ -5297,7 +5293,7 @@ contains
     type(prm2):: p2
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
     real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,qs(npnts),qsum, &
-         deli,sigi,wi,ps(npnts),hp,cr
+         deli,sgmi,wi,ps(npnts),hp,cr,exp1,exp2,exp3,effnum
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
     penalty = 0d0
@@ -5332,6 +5328,9 @@ contains
       qsum = 0d0
       do ir=1,npnts
         call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
+        fi = 0d0
+        dfi = 0d0
+        ddfi = 0d0
         do lr = -3,0
           j = nr + lr
           if( j < 1 .or. j > nk-4 ) cycle
@@ -5340,10 +5339,14 @@ contains
           dfi = dfi + cr *dbr(lr)
           ddfi = ddfi + cr *ddbr(lr)
         enddo
-        deli = exp(-dfi**2 / (2d0*eps2b))
-        sigi = 1d0 / (1d0 + exp(-ddfi/tau2b))
-        wi = log( 1d0 + exp(-fi/scl2b))
-        qs(ir) = deli * sigi * wi
+        exp1 = exp(-dfi**2 / (2d0*eps2b**2))
+!!$        exp2 = min(max(exp(-ddfi/tau2b), tiny), huge)
+        exp3 = min(max(exp(-fi/scl2b), tiny), huge)
+!!$        exp3 = exp(-fi/scl2b)
+        deli = exp1
+        sgmi = expit(-ddfi/tau2b)
+        wi = log1p(exp3)
+        qs(ir) = deli * sgmi * wi
         qsum = qsum + qs(ir)
       enddo
       ps(:) = 0d0
@@ -5352,11 +5355,123 @@ contains
         ps(ir) = qs(ir) / qsum
         hp = hp - ps(ir) * log(ps(ir)+tiny)
       enddo
-      penalty = penalty +pwgt2b * exp(hp)
+      effnum = exp(hp)
+!!$      print '(a,i5,es12.3)', 'i2b,effnum = ',i2b,effnum
+      if( effnum > 1d0 ) penalty = penalty +pwgt2b * effnum
     enddo
 
     return
   end subroutine penalty_nmin2b_uf3l
+!=======================================================================
+  subroutine penalty_grad_nmin2b_uf3l(ndimp,params_in,pwgt2b, &
+       eps2b,tau2b,scl2b,grad)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Penalty about the effective number of minimum in 2B curve.
+!
+    use util,only: expit,dexpit,log1p
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
+    real(8),intent(out):: grad(ndimp)
+
+    type(prm2):: p2
+    integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic,ibase
+    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,qs(npnts),qsum, &
+         deli,sgmi,wi,ps(npnts),hp,cr,tmp,dpdc,dqdc(ndimp,npnts), &
+         ddeli,dsgmi,dwi,p2b, exp1,exp2,exp3,effnum
+    real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
+
+    grad(:) = 0d0
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+    enddo
+!.....2-body
+    do i2b=1,n2b
+      p2 = prm2s(i2b)
+      nk = p2%nknot
+      nc = p2%ncoef
+      ibase = inc
+      do ic=1,nc
+        inc = inc +1
+!.....p2 cannot be used for substitution
+        prm2s(i2b)%coefs(ic) = params_in(inc)
+      enddo
+
+!.....Sampling points
+      rc = p2%knots(nk)
+      r0 = p2%knots(1)
+      rs(1) = r0
+      dr = (rc-r0)/npnts
+      do ir = 2, npnts
+        rs(ir) = rs(ir-1) + dr
+      enddo
+
+      qs(:) = 0d0
+      qsum = 0d0
+      dqdc(:,:) = 0d0
+      do ir=1,npnts
+        call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
+        fi = 0d0
+        dfi = 0d0
+        ddfi = 0d0
+        do lr = -3,0
+          j = nr + lr
+          if( j < 1 .or. j > nk-4 ) cycle
+          cr = p2%coefs(j)
+          fi = fi + cr *br(lr)
+          dfi = dfi + cr *dbr(lr)
+          ddfi = ddfi + cr *ddbr(lr)
+        enddo
+        exp1 = exp(-dfi**2 / (2d0*eps2b**2))
+!!$        exp2 = min(max(exp(-ddfi/tau2b), tiny), huge)
+        exp3 = min(max(exp(-fi/scl2b), tiny), huge)
+!!$        exp3 = exp(-fi/scl2b)
+        deli = exp1
+        sgmi = expit(-ddfi/tau2b)
+        wi = log1p(exp3)
+        qs(ir) = deli * sgmi * wi
+        qsum = qsum + qs(ir)
+        do lr = -3,0
+          j = nr + lr
+          if( j < 1 .or. j > nk-4) cycle
+          dqdc(ibase+j,ir) = qs(ir) * (-dbr(lr)*dfi/eps2b**2 &
+               + ddbr(lr)*(1d0- expit(-ddfi/tau2b))/tau2b &
+               - br(lr)*expit(-fi/scl2b)/(scl2b*wi) )
+        enddo
+      enddo  ! ir
+      ps(:) = 0d0
+      hp = 0d0
+      do ir=1,npnts
+        ps(ir) = qs(ir) / qsum
+        hp = hp - ps(ir) * log(ps(ir)+tiny)
+!!$        print '(a,2i5,5es12.3)', ' i2b,ir,ps,hp=',i2b,ir,ps(ir),hp
+      enddo  ! ir
+      effnum = exp(hp)
+!!$      print '(a,i5,es12.3)', '  i2b,effnum = ',i2b,effnum
+      if( effnum < 1d0 ) cycle
+      p2b = pwgt2b * effnum
+
+      do ic=1,nc
+        tmp = 0d0
+        do ir=1,npnts
+          tmp = tmp +dqdc(ibase+ic,ir)
+        enddo
+        do ir=1,npnts
+          dpdc = (dqdc(ibase+ic,ir) -ps(ir)*tmp)/qsum
+          grad(ibase+ic) = grad(ibase+ic) &
+               -p2b *dpdc *(log(ps(ir)+tiny) +1d0)
+        enddo  ! ir
+      enddo  ! ic
+    enddo  ! i2b
+
+    return
+  end subroutine penalty_grad_nmin2b_uf3l
 !=======================================================================
   subroutine calc_short_lossfunc(np,radii,drepul,floss)
 !

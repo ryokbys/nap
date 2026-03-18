@@ -169,6 +169,15 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pwgt_3b_diff' ) then
     call read_r1(ionum,pwgt3bd)
     return
+  elseif( trim(cname).eq.'eps2b' ) then
+    call read_r1(ionum,eps2b)
+    return
+  elseif( trim(cname).eq.'tau2b' ) then
+    call read_r1(ionum,tau2b)
+    return
+  elseif( trim(cname).eq.'scl2b' ) then
+    call read_r1(ionum,scl2b)
+    return
   elseif( trim(cname).eq.'pwgt_min3b' ) then
     call read_r1(ionum,pwgt_min3b)
     return

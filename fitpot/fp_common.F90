@@ -7,7 +7,7 @@ module fp_common
 !
   use variables,only: cpenalty, penalty, pwgt2b, &
        pwgt3b, pwgt_curv, pwgt_min3b, beta_min3b, &
-       repul_radii, pwgt2bs
+       repul_radii, pwgt2bs, eps2b, tau2b, scl2b
   use pmdvars,only: nspmax
   implicit none
   save
@@ -1071,7 +1071,7 @@ contains
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
-         penalty_min3b_uf3l
+         penalty_min3b_uf3l, penalty_nmin2b_uf3l
     use conditions,only: lconds, calc_fpenal_conds
     use parallel
     integer,intent(in):: ndim
@@ -1079,7 +1079,7 @@ contains
     real(8),intent(out):: fp
 
     integer:: i
-    real(8):: pridge,pmin3b,pcond
+    real(8):: pridge,pmin3b,pcond,pnmin2b
 
     fp = 0d0
     
@@ -1104,6 +1104,16 @@ contains
 !!$      fp = fp +fptmp
 !!$    endif
 
+!.....Penalty on nmin2b
+    pnmin2b = 0d0
+    if( index(cpenalty,'nmin2b').ne.0 ) then
+      if( trim(cpotlow).eq.'uf3l' ) then
+        call penalty_nmin2b_uf3l(ndim,x,pwgt2b, &
+             eps2b,tau2b,scl2b,pnmin2b)
+      endif
+      fp = fp +pnmin2b
+    endif
+
 !.....Penalty on softmax3b
     pmin3b = 0d0
     if( index(cpenalty,'min3b').ne.0 ) then
@@ -1113,7 +1123,6 @@ contains
       fp = fp +pmin3b
     endif
 
-    
 !.....Direct conditions
     pcond = 0d0
     if( lconds ) then
@@ -1128,7 +1137,7 @@ contains
   subroutine grad_penalty(ndim,x,gp)
     use variables,only: cpotlow
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
-         penalty_grad_min3b_uf3l
+         penalty_grad_min3b_uf3l, penalty_grad_nmin2b_uf3l
     use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -1140,7 +1149,6 @@ contains
     if( .not.allocated(gptmp) ) allocate(gptmp(ndim))
 
     gp(:) = 0d0
-
 !.....Simple ridge penalty
     if( index(cpenalty,'ridge').ne.0 ) then
       gp(:) = gp(:) +2d0*penalty*x(:)
@@ -1160,6 +1168,15 @@ contains
 !!$      gp(:) = gp(:) + gptmp(:)
 !!$    endif
 
+!.....Penalty on softmax3b
+    if( index(cpenalty,'nmin2b').ne.0 ) then
+      if( index(cpotlow,'uf3l').ne.0 ) then
+        call penalty_grad_nmin2b_uf3l(ndim,x,pwgt2b, &
+             eps2b,tau2b,scl2b,gptmp)
+      endif
+      gp(:) = gp(:) +gptmp(:)
+    endif
+    
 !.....Penalty on softmax3b
     if( index(cpenalty,'min3b').ne.0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then

@@ -529,7 +529,51 @@ contains
       name = tmp
     end if
   end function basename
+!=======================================================================
+  function expit(x)
+!
+!  logistic sigmoid function (1 / (1 + exp(x)))
+!
+    real(8),intent(in):: x
+    real(8):: expit
 
+    if( x.ge.0d0 ) then
+      expit = 1d0 / (1d0 + exp(-x))
+    else
+      expit = exp(x) / (1d0 + exp(x))
+    endif
+    return
+  end function expit
+!=======================================================================
+  function dexpit(x)
+!
+!  derivative of the logistic sigmoid function (1 / (1 + exp(x)))
+!
+    real(8),intent(in):: x
+    real(8):: dexpit
+
+    if( x.ge.0d0 ) then
+      dexpit = exp(-x) / (1d0 + exp(-x))**2
+    else
+      dexpit = exp(x) / (1d0 + exp(x))**2
+    endif
+    return
+  end function dexpit
+!=======================================================================
+  function log1p(x)
+!
+!  precise computation of log(1+x) when x ~= 0.
+!
+    real(8),intent(in):: x
+    real(8):: log1p
+
+    if( abs(x) .le. 1d-8 ) then
+      log1p = x - 0.5d0*x*x
+    else
+      log1p = log(1d0 + x)
+    endif
+    return
+  end function log1p
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:

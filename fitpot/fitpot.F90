@@ -340,15 +340,23 @@ subroutine write_initial_setting()
 
   write(6,'(a)') ''
   if( trim(cpenalty).ne.'none' ) write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
-  if( trim(cpenalty).eq.'ridge' ) then
+  if( index(cpenalty,'ridge').ne.0 ) then
     write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
-  else if( trim(cpenalty).eq.'uf3' ) then
+  endif
+  if( index(cpenalty,'uf3').ne.0 ) then
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_diff',pwgt2bd
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_short',pwgt2bs
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b',pwgt3b
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b_diff',pwgt3bd
-  else if( index(cpenalty,'min3b').ne.0 ) then
+  endif
+  if( index(cpenalty,'nmin2b').ne.0 ) then
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
+    write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
+    write(6,'(2x,a25,2x,es12.3)') 'tau2b',tau2b
+    write(6,'(2x,a25,2x,es12.3)') 'scl2b',scl2b
+  endif
+  if( index(cpenalty,'min3b').ne.0 ) then
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_min3b',pwgt_min3b
     write(6,'(2x,a25,2x,es12.3)') 'beta_min3b',beta_min3b
   endif
@@ -1926,6 +1934,9 @@ subroutine sync_input()
   call mpi_bcast(pwgt3bd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(pwgt_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(beta_min3b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(eps2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(tau2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(scl2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(f_scale,1,mpi_real8,0,mpi_world,ierr)
