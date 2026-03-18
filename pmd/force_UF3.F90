@@ -32,7 +32,7 @@ module UF3
 !!$  logical:: lprmset_uf3d = .false.
 
   real(8),parameter:: huge = 1d+100
-  real(8),parameter:: tiny = 1d-12
+  real(8),parameter:: tiny = 1d-8
 
 !.....uf2 parameters
   type prm2
@@ -2304,249 +2304,6 @@ contains
     return
   end subroutine force_uf3d
 !=======================================================================
-  subroutine force_uf3_rec(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
-       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
-       ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
-!
-!  Recursive implementation of force_uf3.
-!
-    use util, only: itotOf
-    implicit none
-    integer,intent(in):: namax,natm,nnmax,iprint
-    integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
-         ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
-         ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    logical,intent(in):: l1st
-    logical:: lstrs
-
-!.....local
-    integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
-         nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
-         ixyz,jxyz,lij,lik,ljk
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij,dbij, &
-         bij3(4),dbij3(4),bik3,dbik3,bjk3,dbjk3, &
-         c2t,c3t
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
-         rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
-         drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save:: rcin2
-
-    type(prm2):: p2
-    type(prm3):: p3
-
-    if( l1st ) then
-      if( allocated(aal2) ) deallocate(aal2,strsl)
-      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
-      if( rcin < rcmax ) then
-        if( myid == 0 ) then
-          write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
-          write(6,'(1x,a,f0.3)') "  rc should be longer than ", rcmax
-        endif
-        call mpi_finalize(ierr)
-        stop
-      endif
-      rcin2 = rcin*rcin
-    endif
-
-    if( size(aal2) < 3*namax ) then
-      deallocate(aal2,aal3,strsl)
-      allocate(aal2(3,namax),aal3(3,namax),strsl(3,3,namax))
-    endif
-
-    aal2(:,:) = 0d0
-    aal3(:,:) = 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
-    epotl2 = 0d0
-    epotl3 = 0d0
-!$omp parallel
-!$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij,drijj,nr2, &
-!$omp      n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
-!$omp      jsp,ksp,i3b,p3,nij3,inc,bij3,dbij3, &
-!$omp      kk,ka,ks,xk,xik,xjk,rik,dik2,dik,rjk,djk2,djk, &
-!$omp      drikk,drjkk,nik3,njk3,nik,bik3,dbik3,njk,bjk3,dbjk3, &
-!$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
-!$omp      reduction(+:epotl2,epotl3)
-    do ia=1,natm
-      is = int(tag(ia))
-      xi(1:3) = ra(1:3,ia)
-      do jj=1,lspr(0,ia)
-        ja = lspr(jj,ia)
-!!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
-!.....Pair terms
-        i2b = interact2(is,js)
-        if( i2b <= 0 ) cycle
-        p2 = prm2s(i2b)
-        xj(1:3) = ra(1:3,ja)
-        xij(1:3) = xj(1:3) -xi(1:3)
-        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-        dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        if( dij2 > p2%rc2 ) cycle
-        dij = sqrt(dij2)
-        drijj(1:3) = rij(1:3)/dij
-!.....Look for nr2 from knots data
-        nr2 = knot_index(dij, p2%nknot, p2%knots)
-        do n=max(1,nr2-3),min(nr2,p2%nknot-4)
-          bij = b_spl_rec(n,3,dij,p2%knots,p2%nknot)
-          c2t = p2%coefs(n)
-          tmp = c2t *bij
-          epi(ia) = epi(ia) +tmp
-          epotl2 = epotl2 + tmp
-!.....Forces
-          dbij = db_spl(n,3,dij,p2%knots,p2%nknot)
-          tmp2 = dbij*c2t
-          do ixyz=1,3
-!$omp atomic
-            aal2(ixyz,ia) = aal2(ixyz,ia) +drijj(ixyz)*tmp2
-!$omp atomic
-            aal2(ixyz,ja) = aal2(ixyz,ja) -drijj(ixyz)*tmp2
-          enddo
-!.....Stresses
-          do ixyz=1,3
-            do jxyz=1,3
-!$omp atomic
-              strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
-!$omp atomic
-              strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
-            enddo
-          enddo
-        enddo
-      enddo
-
-!.....Trio part is separated from pair part,
-!.....which may be slower because of double computation of dij,
-!.....but this code is a bit simpler.
-      if( .not.has_trios ) cycle
-      do jsp=1,nspmax
-        do ksp=jsp,nspmax
-          i3b = interact3(is,jsp,ksp)
-          if( i3b <= 0 ) cycle
-          p3 = prm3s(i3b)
-          do jj=1,lspr(0,ia)
-            ja = lspr(jj,ia)
-            js = int(tag(ja))
-            if( js /= jsp ) cycle
-            xj(1:3) = ra(1:3,ja)
-            xij(1:3) = xj(1:3) -xi(1:3)
-            rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
-            dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-            if( dij2 > p3%rcij2 ) cycle
-            dij = sqrt(dij2)
-            drijj(1:3) = rij(1:3)/dij
-!!$            call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-            nij3 = knot_index(dij, p3%nknij, p3%knij)
-            inc = 0
-            bij3(:) = 0d0
-            dbij3(:) = 0d0
-            do n=nij3-3,nij3
-              inc = inc +1
-              if( n < 1 .or. n > p3%nknij-4 ) cycle
-              bij3(inc) = b_spl_rec(n,3,dij, p3%knij, p3%nknij)
-              dbij3(inc) = db_spl(n,3,dij, p3%knij, p3%nknij)
-            enddo
-
-            do kk=1,lspr(0,ia)
-              ka = lspr(kk,ia)
-              if( jsp == ksp .and. ka <= ja ) cycle
-              ks = int(tag(ka))
-              if( ks /= ksp ) cycle
-              xk(1:3) = ra(1:3,ka)
-              xik(1:3) = xk(1:3) -xi(1:3)
-              xjk(1:3) = xk(1:3) -xj(1:3)
-              rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
-              dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-              if( dik2 > p3%rcik2 ) cycle
-              dik = sqrt(dik2)
-              rjk(1:3) = h(1:3,1)*xjk(1) +h(1:3,2)*xjk(2) +h(1:3,3)*xjk(3)
-              djk2 = rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
-              if( djk2 > p3%rcjk2 ) cycle
-              djk = sqrt(djk2)
-              nik3 = knot_index(dik, p3%nknik, p3%knik)
-              njk3 = knot_index(djk, p3%nknjk, p3%knjk)
-!.....B-spline part
-              do nik=nik3-3,nik3
-                if( nik < 1 .or. nik > p3%nknik-4 ) cycle
-                bik3 = b_spl_rec(nik,3,dik, p3%knik, p3%nknik)
-                dbik3 = db_spl(nik,3,dik, p3%knik, p3%nknik)
-                do njk=njk3-3,njk3
-                  if( njk < 1 .or. njk > p3%nknjk-4 ) cycle
-                  bjk3 = b_spl_rec(njk,3,djk, p3%knjk, p3%nknjk)
-                  dbjk3 = db_spl(njk,3,djk, p3%knjk, p3%nknjk)
-                  l = 0
-                  do nij=nij3-3,nij3
-                    l = l +1
-                    if( nij < 1 .or. nij > p3%nknij-4 ) cycle
-!.....Energy
-                    c3t = p3%coefs(njk,nik,nij)
-                    tmp = c3t*bij3(l)*bik3*bjk3
-                    epi(ia) = epi(ia) +tmp
-                    epotl3 = epotl3 +tmp
-!.....Force
-                    tmpij(1:3) = dbij3(l)*bik3*bjk3*drijj(1:3)
-                    tmpik(1:3) = bij3(l)*dbik3*bjk3*drikk(1:3)
-                    tmpjk(1:3) = bij3(l)*bik3*dbjk3*drjkk(1:3)
-                    do ixyz=1,3
-!$omp atomic
-                      aal3(ixyz,ia)= aal3(ixyz,ia) +c3t*(tmpij(ixyz) +tmpik(ixyz))
-!$omp atomic
-                      aal3(ixyz,ja)= aal3(ixyz,ja) +c3t*(-tmpij(ixyz) +tmpjk(ixyz))
-!$omp atomic
-                      aal3(ixyz,ka)= aal3(ixyz,ka) +c3t*(-tmpik(ixyz) -tmpjk(ixyz))
-                    enddo
-!.....Stresses
-                    do jxyz=1,3
-                      do ixyz=1,3
-!$omp atomic
-                        strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) &
-                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xik(jxyz)*tmpik(ixyz))
-!$omp atomic
-                        strsl(ixyz,jxyz,ja)= strsl(ixyz,jxyz,ja) &
-                             -0.5d0 *c3t *(xij(jxyz)*tmpij(ixyz) +xjk(jxyz)*tmpjk(ixyz))
-!$omp atomic
-                        strsl(ixyz,jxyz,ka)= strsl(ixyz,jxyz,ka) &
-                             -0.5d0 *c3t *(xik(jxyz)*tmpik(ixyz) +xjk(jxyz)*tmpjk(ixyz))
-                      enddo
-                    enddo
-                  enddo ! nij
-                enddo ! njk
-              enddo ! nik
-
-            enddo  ! kk
-          enddo  ! jj
-        enddo  ! ksp
-      enddo  ! jsp
-
-    enddo ! ia
-!$omp end do
-!$omp end parallel
-
-    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,aal2,3)
-    if( has_trios ) call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,aal3,3)
-    aa(1:3,1:natm) = aa(1:3,1:natm) +aal2(1:3,1:natm) +aal3(1:3,1:natm)
-
-    call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
-         ,nn,mpi_world,strsl,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
-
-!-----gather epot
-    epot2 = 0d0
-    epot3 = 0d0
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    epot= epot +epot2 +epot3
-    if( myid == 0 .and. iprint > 2 ) &
-         print '(a,2es12.4)',' force_uf3 epot2,epot3 = ',epot2,epot3
-
-    return
-  end subroutine force_uf3_rec
-!=======================================================================
   subroutine gradw_uf3(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
        iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
        lgrad_done,nfcal,lfrc_eval)
@@ -4029,11 +3786,10 @@ contains
     real(8),intent(out):: b(-3:0), db(-3:0)
     real(8),intent(out),optional:: ddb(-3:0)
 !.....local variables
-    real(8):: btmp(-3:+1,0:3)  ! Temporal B(n,d) array with n in (-3,+1)
-    real(8):: dbtmp(-3:0), ddbtmp(-3:0)
+    real(8):: btmp(-3:+2,0:3)  ! Temporal B(n,d) array with n in (-3,+2)
+    real(8):: dbtmp(-3:+1), ddbtmp(-3:0)
     integer:: id, n, l
     real(8):: tn0,tn1,tn2,tn3,tn4,dt1,dt2,tmp1,tmp2
-    real(8),parameter:: teps = 1d-8  ! epsilon for neighboring knot distance
 
 !...index in the knot where ts(nr) <= r < ts(nr+1)
     nr = knot_index(r,nmax,ts)
@@ -4042,18 +3798,18 @@ contains
     btmp(:,:) = 0d0
     btmp(0,0) = 1d0
     do id = 1,3
-      do l = -id,0
+      do l = -id,1
         n = nr +l
         tn0 = ts(n)
         tn1 = ts(n+id)
-        dt1 = tn1 -tn0
-        tmp1 = 0d0
-        if( abs(dt1) > teps ) tmp1 = (r-tn0)/dt1 *btmp(l,id-1)
         tn2 = ts(n+1)
         tn3 = ts(n+id+1)
+        dt1 = tn1 -tn0
         dt2 = tn3 -tn2
+        tmp1 = 0d0
         tmp2 = 0d0
-        if( abs(dt2) > teps ) tmp2 = (tn3-r)/dt2 *btmp(l+1,id-1)
+        if( abs(dt1) > tiny ) tmp1 = (r-tn0)/dt1 *btmp(l,id-1)
+        if( abs(dt2) > tiny ) tmp2 = (tn3-r)/dt2 *btmp(l+1,id-1)
         btmp(l,id) = tmp1 + tmp2
       enddo
     enddo
@@ -4067,9 +3823,9 @@ contains
       tn3 = ts(n+3)
       tn4 = ts(n+1+3)
       tmp1 = 0d0
-      if( abs(tn3-tn0) > teps ) tmp1 = btmp(l,2)/(tn3 -tn0)
       tmp2 = 0d0
-      if( abs(tn4-tn1) > teps ) tmp2 = btmp(l+1,2)/(tn4 -tn1)
+      if( abs(tn3-tn0) > tiny ) tmp1 = btmp(l,2)/(tn3 -tn0)
+      if( abs(tn4-tn1) > tiny ) tmp2 = btmp(l+1,2)/(tn4 -tn1)
       dbtmp(l) = 3d0 *(tmp1 -tmp2)
     enddo
 
@@ -4080,15 +3836,17 @@ contains
 !.....Optional: 2nd derivative
     dbtmp(:) = 0d0
 !.....Compute dB_{n,d-1} and dB_{n+1,d-1} first
-    do l= -3,0
+    do l= -3,1
       n = nr +l
       tn0 = ts(n)
       tn1 = ts(n+1)
       tn2 = ts(n+2)
       tn3 = ts(n+3)
-      if( abs(tn2-tn0) > teps ) tmp1 = btmp(l,1)/(tn2 -tn0)
-      if( abs(tn3-tn1) > teps ) tmp2 = btmp(l+1,1)/(tn3 -tn1)
-      dbtmp(l) = 2d0 *(tmp1 -tmp2)
+      tmp1 = 0d0
+      tmp2 = 0d0
+      if( abs(tn2-tn0) > tiny ) tmp1 = btmp(l,1)/(tn2 -tn0)
+      if( abs(tn3-tn1) > tiny ) tmp2 = btmp(l+1,1)/(tn3 -tn1)
+      dbtmp(l) = (3d0-1d0) *(tmp1 -tmp2)
     enddo
 !.....Then, compute ddB_{n,d} using dBs
     ddbtmp(:) = 0d0
@@ -4098,67 +3856,16 @@ contains
       tn1 = ts(n+1)
       tn3 = ts(n+3)
       tn4 = ts(n+1+3)
-      if( abs(tn3-tn0) > teps ) tmp1 = dbtmp(l)/(tn3 -tn0)
-      if( abs(tn4-tn1) > teps ) tmp2 = dbtmp(l+1)/(tn4 -tn1)
+      tmp1 = 0d0
+      tmp2 = 0d0
+      if( abs(tn3-tn0) > tiny ) tmp1 = dbtmp(l)/(tn3 -tn0)
+      if( abs(tn4-tn1) > tiny ) tmp2 = dbtmp(l+1)/(tn4 -tn1)
       ddbtmp(l) = 3d0 *(tmp1 -tmp2)
     enddo
     ddb(-3:0) = ddbtmp(-3:0)
 
     return
   end subroutine b_spl
-!=======================================================================
-  recursive function b_spl_rec(n,d,r,ts,nmax) result(val)
-!
-!  TODO: check the efficiency of recursive func
-!
-!  Recursive implementation of B-spline function with N and D as indices
-!  and R as an argument.
-!  TS --- a list of {t_n}
-!
-    integer,intent(in):: n,d,nmax
-    real(8),intent(in):: r,ts(nmax)
-    real(8):: val
-    real(8):: denom1,denom2
-
-    if( d == 0 ) then
-      if( r >= ts(n) .and. r < ts(n+1) ) then
-        val = 1d0
-        return
-      else
-        val = 0d0
-        return
-      endif
-    else
-      val = 0d0
-      denom1 = ts(n+d)-ts(n)
-      if( abs(denom1) > 1d-8 ) then
-        val = val +(r-ts(n))/denom1 *b_spl_rec(n,d-1,r,ts,nmax)
-      endif
-      denom2 = ts(n+d+1)-ts(n+1)
-      if( abs(denom2) > 1d-8 ) then
-        val = val +(ts(n+d+1)-r)/denom2 *b_spl_rec(n+1,d-1,r,ts,nmax)
-      endif
-    endif
-    return
-  end function b_spl_rec
-!=======================================================================
-  function db_spl(n,d,r,ts,nmax)
-    integer,intent(in):: n,d,nmax
-    real(8),intent(in):: r,ts(nmax)
-    real(8):: db_spl
-    real(8):: denom1, denom2
-
-    db_spl = 0d0
-    denom1 = ts(n+d)-ts(n)
-    if( denom1 > 1d-8 ) then
-      db_spl = db_spl +d*b_spl_rec(n,d-1,r,ts,nmax) /denom1
-    endif
-    denom2 = ts(n+d+1)-ts(n+1)
-    if( denom2 > 1d-8 ) then
-      db_spl = db_spl -d*b_spl_rec(n+1,d-1,r,ts,nmax)/denom2
-    endif
-    return
-  end function db_spl
 !=======================================================================
   function knot_index(r, nknot, knots) result(n)
     real(8),intent(in):: r
@@ -5284,7 +4991,7 @@ contains
 !
 !  Penalty about the effective number of minimum in 2B curve.
 !
-    use util,only: expit,log1p
+    use util,only: expit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
@@ -5318,8 +5025,8 @@ contains
 !.....Sampling points
       rc = p2%knots(nk)
       r0 = p2%knots(1)
-      rs(1) = r0
-      dr = (rc-r0)/npnts
+      rs(1) = r0+tiny
+      dr = ((rc-tiny)-(r0+tiny))/npnts
       do ir = 2, npnts
         rs(ir) = rs(ir-1) + dr
       enddo
@@ -5334,15 +5041,13 @@ contains
         do lr = -3,0
           j = nr + lr
           if( j < 1 .or. j > nk-4 ) cycle
-          cr = p2%coefs(j)
+          cr = prm2s(i2b)%coefs(j)
           fi = fi + cr *br(lr)
           dfi = dfi + cr *dbr(lr)
           ddfi = ddfi + cr *ddbr(lr)
         enddo
         exp1 = exp(-dfi**2 / (2d0*eps2b**2))
-!!$        exp2 = min(max(exp(-ddfi/tau2b), tiny), huge)
         exp3 = min(max(exp(-fi/scl2b), tiny), huge)
-!!$        exp3 = exp(-fi/scl2b)
         deli = exp1
         sgmi = expit(-ddfi/tau2b)
         wi = log1p(exp3)
@@ -5371,7 +5076,7 @@ contains
 !
 !  Penalty about the effective number of minimum in 2B curve.
 !
-    use util,only: expit,dexpit,log1p
+    use util,only: expit,dexpit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
     real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
@@ -5406,8 +5111,8 @@ contains
 !.....Sampling points
       rc = p2%knots(nk)
       r0 = p2%knots(1)
-      rs(1) = r0
-      dr = (rc-r0)/npnts
+      rs(1) = r0+tiny
+      dr = ((rc-tiny)-(r0+tiny))/npnts
       do ir = 2, npnts
         rs(ir) = rs(ir-1) + dr
       enddo
@@ -5423,15 +5128,13 @@ contains
         do lr = -3,0
           j = nr + lr
           if( j < 1 .or. j > nk-4 ) cycle
-          cr = p2%coefs(j)
+          cr = prm2s(i2b)%coefs(j)
           fi = fi + cr *br(lr)
           dfi = dfi + cr *dbr(lr)
           ddfi = ddfi + cr *ddbr(lr)
         enddo
         exp1 = exp(-dfi**2 / (2d0*eps2b**2))
-!!$        exp2 = min(max(exp(-ddfi/tau2b), tiny), huge)
         exp3 = min(max(exp(-fi/scl2b), tiny), huge)
-!!$        exp3 = exp(-fi/scl2b)
         deli = exp1
         sgmi = expit(-ddfi/tau2b)
         wi = log1p(exp3)
@@ -5450,7 +5153,8 @@ contains
       do ir=1,npnts
         ps(ir) = qs(ir) / qsum
         hp = hp - ps(ir) * log(ps(ir)+tiny)
-!!$        print '(a,2i5,5es12.3)', ' i2b,ir,ps,hp=',i2b,ir,ps(ir),hp
+!!$        print '(a,2i5,5es12.3)', ' i2b,ir,qs,ps,hp=', &
+!!$             i2b,ir,qs(ir),ps(ir),hp
       enddo  ! ir
       effnum = exp(hp)
 !!$      print '(a,i5,es12.3)', '  i2b,effnum = ',i2b,effnum

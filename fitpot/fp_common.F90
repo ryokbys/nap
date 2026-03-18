@@ -1082,7 +1082,6 @@ contains
     real(8):: pridge,pmin3b,pcond,pnmin2b
 
     fp = 0d0
-    
 !.....Simple ridge penalty
     pridge = 0d0
     if( index(cpenalty,'ridge').ne.0 ) then
@@ -1176,7 +1175,7 @@ contains
       endif
       gp(:) = gp(:) +gptmp(:)
     endif
-    
+
 !.....Penalty on softmax3b
     if( index(cpenalty,'min3b').ne.0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then

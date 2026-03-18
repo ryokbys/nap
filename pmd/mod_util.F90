@@ -574,6 +574,28 @@ contains
     endif
     return
   end function log1p
+!=======================================================================
+  subroutine num_deriv(n,xs,fs,dfs)
+!
+!  Numerical derivative of 1D function f(x).
+!
+    integer,intent(in):: n
+    real(8),intent(in):: xs(n),fs(n)
+    real(8),intent(out):: dfs(n)
+
+    integer:: i
+    real(8):: dx,dx2
+
+!.....Assuming equi-partition
+    dx = xs(2) -xs(1)
+    dfs(1) = (fs(2)-fs(1))/dx
+    dx2 = 2d0*dx
+    do i=2,n-1
+      dfs(i) = (fs(i+1)-fs(i-1))/dx2
+    enddo
+    dfs(n) = (fs(n)-fs(n-1))/dx
+    return
+  end subroutine num_deriv
 end module util
 !-----------------------------------------------------------------------
 !     Local Variables:
