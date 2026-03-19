@@ -980,12 +980,12 @@ subroutine check_grad(ftrn0,ftst0)
     call func_w_pmd(nvars,vars,ftmp2,ftst,pval2)
     vtmp2 = vars(iv)
     true_dv = vtmp1-vtmp2
-    if( true_dv .gt. -mach_eps .and. true_dv .lt.mach_eps ) then
-! true_dv is too small, it is probably 0
-      gnumer(iv)= 0d0
-    else
-      gnumer(iv)= (ftmp1-ftmp2)/true_dv
-    endif
+    gnumer(iv)= 0d0
+    if( abs(true_dv).gt.mach_eps ) gnumer(iv)= (ftmp1-ftmp2)/true_dv
+!.....The same treatment as mask_grad in fp_common.F90 should be applied
+    if( gnumer(iv) > 0d0 .and. abs(vars0(iv)-vranges(1,iv))<mach_eps ) gnumer(iv) = 0d0
+    if( gnumer(iv) < 0d0 .and. abs(vars0(iv)-vranges(2,iv))<mach_eps ) gnumer(iv) = 0d0
+
     if( myid.eq.0 ) then
       absgnum = abs(gnumer(iv))
       absgana = abs(ganal(iv))

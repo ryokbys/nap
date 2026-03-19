@@ -180,12 +180,12 @@ contains
     real(8),intent(in):: x(ndim),xranges(2,ndim)
     real(8),intent(inout):: grad(ndim)
 
-    real(8),parameter:: eps = 1.0d-14
+    real(8),parameter:: tiny = 1.0d-14
     integer:: i
 
     do i=1,ndim
-      if( grad(i) > 0d0 .and. abs(x(i)-xranges(1,i)) < eps ) grad(i) = 0d0
-      if( grad(i) < 0d0 .and. abs(x(i)-xranges(2,i)) < eps ) grad(i) = 0d0
+      if( grad(i) > 0d0 .and. abs(x(i)-xranges(1,i)) < tiny ) grad(i) = 0d0
+      if( grad(i) < 0d0 .and. abs(x(i)-xranges(2,i)) < tiny ) grad(i) = 0d0
     enddo
     return
   end subroutine mask_grad
@@ -695,6 +695,7 @@ contains
 !.....Note: since lgrad==.true., epot, frcs, strs are not calculated in this run_pmd.
         call run_pmd(samples(ismpl),lgrad,lgrad_done,ndim,epot,frcs,strs,rcut &
              ,lfdsgnmat,gwe,gwf,gws)
+        
         if( (trim(cpotlow).eq.'uf3' .or. trim(cpotlow).eq.'linreg') ) then
 !!$          allocate(samples(ismpl)%gwe(ndim), samples(ismpl)%gwf(3,ndim,maxnf), &
 !!$               samples(ismpl)%gws(6,ndim))
@@ -879,6 +880,7 @@ contains
     if( .not.allocated(gpena) ) allocate(gpena(ndim))
     call grad_penalty(ndim,x,gpena)
     gtrn(:) = gtrn(:) +gpena(:)
+
 !!$    if( trim(cpot).eq.'uf3' .and. n_repul_pnts > 0 ) then
 !!$      if( .not.allocated(grepul) ) allocate(grepul(ndim))
 !!$      call calc_short_lossgrad(n_repul_pnts,repul_radii,drepul_tbl, &
@@ -1072,7 +1074,7 @@ contains
     use variables,only: cpot,cpotlow
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
          penalty_min3b_uf3l, penalty_nmin2b_uf3l, &
-         penalty_ridge1b
+         penalty_ridge1b, penalty_curv2b_uf3l
     use conditions,only: lconds, calc_fpenal_conds
     use parallel
     integer,intent(in):: ndim
@@ -1080,7 +1082,7 @@ contains
     real(8),intent(out):: fp
 
     integer:: i
-    real(8):: pridge,pmin3b,pcond,pnmin2b
+    real(8):: pridge,pmin3b,pcond,pnmin2b,pcurv2b
 
     fp = 0d0
 !.....Simple ridge penalty
@@ -1109,6 +1111,16 @@ contains
 !!$      fp = fp +fptmp
 !!$    endif
 
+!.....Penalty on nmin2b
+    pcurv2b = 0d0
+    if( index(cpenalty,'curv2b').ne.0 ) then
+      if( trim(cpotlow).eq.'uf3l' ) then
+        call penalty_curv2b_uf3l(ndim,x,pwgt2b, &
+             eps2b,del2b,scl2b,pcurv2b)
+      endif
+      fp = fp +pcurv2b
+    endif
+    
 !.....Penalty on nmin2b
     pnmin2b = 0d0
     if( index(cpenalty,'nmin2b').ne.0 ) then
@@ -1143,7 +1155,7 @@ contains
     use variables,only: cpotlow
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
          penalty_grad_min3b_uf3l, penalty_grad_nmin2b_uf3l, &
-         penalty_grad_ridge1b
+         penalty_grad_ridge1b, penalty_grad_curv2b_uf3l
     use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -1179,7 +1191,16 @@ contains
 !!$      gp(:) = gp(:) + gptmp(:)
 !!$    endif
 
-!.....Penalty on softmax3b
+!.....Penalty on curv2b
+    if( index(cpenalty,'curv2b').ne.0 ) then
+      if( index(cpotlow,'uf3l').ne.0 ) then
+        call penalty_grad_curv2b_uf3l(ndim,x,pwgt2b, &
+             eps2b,del2b,scl2b,gptmp)
+      endif
+      gp(:) = gp(:) +gptmp(:)
+    endif
+
+!.....Penalty on nmin2b
     if( index(cpenalty,'nmin2b').ne.0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_nmin2b_uf3l(ndim,x,pwgt2b, &
