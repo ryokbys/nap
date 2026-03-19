@@ -1029,7 +1029,8 @@ subroutine test(ftrn0,ftst0)
 
   allocate(g(nvars))
 
-  if( trim(cpotlow).eq.'linreg' .or. index(cpotlow,'nn').ne.0 ) then
+  if( trim(cpotlow).eq.'linreg' .or. index(cpotlow,'nn').ne.0 .or. &
+       index(cpotlow,'uf3').ne.0 ) then
 !!$    call func_w_pmd(nvars,vars,ftrn,ftst)
     call grad_w_pmd(nvars,vars,g)
   else

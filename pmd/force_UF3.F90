@@ -5114,17 +5114,11 @@ contains
       rmin = rmin / expsum
       pl = 0d0  ! left penalty
       pr = 0d0  ! right penalty
-!!$      if( i2b.eq.12 ) print '(a,i5,2a,es12.2)',' i2b,csi,csj=', &
-!!$           i2b,p2%csi,p2%csj,rmin
       do ir=1,npnts
         sgml = expit((rmin -del2b -rs(ir))/scl2b)
         sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
-        pl = pl +sgml *max(0d0, -ddfs(ir))**2
+        pl = pl +sgml *max(0d0, dfs(ir))**2
         pr = pr +sgmr *dfs(ir)**2
-!!$        if( i2b.eq.12 ) then
-!!$          print '(a,i5,10es12.2e3)',' ir,ri,sgml,sgmr,pl,pr=', &
-!!$               ir,rs(ir),sgml,sgmr, sgml*max(0d0, dfs(ir)), sgmr*max(0d0,-dfs(ir))
-!!$        endif
       enddo
       penalty = penalty +pwgt2b*(pl+pr)
     enddo
@@ -5196,15 +5190,15 @@ contains
       do ir=1,npnts
         call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
         do l = -3,0
-          j = nr + l
-          if( j < 1 .or. j > nk-4 ) cycle
-          cr = prm2s(i2b)%coefs(j)
+          ic = nr + l
+          if( ic < 1 .or. ic > nc ) cycle
+          cr = prm2s(i2b)%coefs(ic)
           fs(ir) = fs(ir) + cr *br(l)
           dfs(ir) = dfs(ir) + cr *dbr(l)
           ddfs(ir) = ddfs(ir) + cr *ddbr(l)
-          blj(j,ir) = br(l)
-          dblj(j,ir) = dbr(l)
-          ddblj(j,ir) = ddbr(l)
+          blj(ic,ir) = br(l)
+          dblj(ic,ir) = dbr(l)
+          ddblj(ic,ir) = ddbr(l)
         enddo
         ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
         expsum = expsum + ws(ir)
@@ -5217,7 +5211,7 @@ contains
       do j=1,npnts
         sgmls(j) = expit((rmin -del2b -rs(j))/scl2b)
         sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
-        rels(j) = max(0.0, -ddfs(j))
+        rels(j) = max(0.0, dfs(j))
         drmdf(j) = ws(j) /eps2b *(rmin - rs(j))
       enddo
       dpldf(:) = 0d0
@@ -5233,11 +5227,11 @@ contains
         enddo
         dpldf(j) = dpldf(j) *drmdf(j)
         dprdf(j) = dprdf(j) *drmdf(j)
-        dplddf = sgmls(j) *2d0 *(-rels(j))
+        dplddf = sgmls(j) *2d0 *rels(j)
         dprddf = sgmrs(j) *2d0 *dfs(j)
         do ic=1,nc
           dpldc(ic) = dpldc(ic) +blj(ic,j)*dpldf(j) &
-               +ddblj(ic,j)*dplddf
+               +dblj(ic,j)*dplddf
           dprdc(ic) = dprdc(ic) +blj(ic,j)*dprdf(j) &
                +dblj(ic,j)*dprddf
         enddo
