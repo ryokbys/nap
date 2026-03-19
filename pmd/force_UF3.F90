@@ -4984,23 +4984,23 @@ contains
   end subroutine penalty_grad_min3b_uf3l
 !=======================================================================
   subroutine penalty_nmin2b_uf3l(ndimp,params_in,pwgt2b, &
-       eps2b,tau2b,scl2b,penalty)
+       eps2b,del2b,scl2b,penalty)
 !
 !  Accesor routine to set uf3l parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
 !
-!  Penalty about the effective number of minimum in 2B curve.
+!  Penalty about the one-minimum in 2B curve.
 !
     use util,only: expit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
+    real(8),intent(in):: pwgt2b,eps2b,del2b,scl2b
     real(8),intent(out):: penalty
 
     type(prm2):: p2
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
-    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,qs(npnts),qsum, &
-         deli,sgmi,wi,ps(npnts),hp,cr,exp1,exp2,exp3,effnum
+    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
+         fs(npnts),dfs(npnts),rmin,pl,pr,sgml,sgmr,cr,exp1
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
     penalty = 0d0
@@ -5031,45 +5031,43 @@ contains
         rs(ir) = rs(ir-1) + dr
       enddo
 
-      qs(:) = 0d0
-      qsum = 0d0
+      ws(:) = 0d0
+      expsum = 0d0
+      fs(:) = 0d0
+      dfs(:) = 0d0
+      rmin = 0d0
       do ir=1,npnts
-        call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
-        fi = 0d0
-        dfi = 0d0
-        ddfi = 0d0
+        call b_spl(rs(ir),p2%knots, nk, nr, br, dbr)
+!!$        fi = 0d0
+!!$        dfi = 0d0
         do lr = -3,0
           j = nr + lr
           if( j < 1 .or. j > nk-4 ) cycle
           cr = prm2s(i2b)%coefs(j)
-          fi = fi + cr *br(lr)
-          dfi = dfi + cr *dbr(lr)
-          ddfi = ddfi + cr *ddbr(lr)
+          fs(ir) = fs(ir) + cr *br(lr)
+          dfs(ir) = dfs(ir) + cr *dbr(lr)
         enddo
-        exp1 = exp(-dfi**2 / (2d0*eps2b**2))
-        exp3 = min(max(exp(-fi/scl2b), tiny), huge)
-        deli = exp1
-        sgmi = expit(ddfi/tau2b)
-        wi = log1p(exp3)
-        qs(ir) = deli * sgmi * wi
-        qsum = qsum + qs(ir)
+        ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
+        expsum = expsum + ws(ir)
+        rmin = rmin +ws(ir)*rs(ir)
       enddo
-      ps(:) = 0d0
-      hp = 0d0
+      rmin = rmin / expsum
+      pl = 0d0  ! left penalty
+      pr = 0d0  ! right penalty
       do ir=1,npnts
-        ps(ir) = qs(ir) / qsum
-        hp = hp - ps(ir) * log(ps(ir)+tiny)
+        sgml = expit((rmin -del2b -rs(ir))/scl2b)
+        sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
+        pl = pl +sgml *max(0.0, dfs(ir))**2
+        pr = pr +sgmr *max(0.0, -dfs(ir))**2
       enddo
-      effnum = exp(hp)
-!!$      print '(a,i5,es12.3)', 'i2b,effnum = ',i2b,effnum
-      if( effnum > 1d0 ) penalty = penalty +pwgt2b * effnum
+      penalty = penalty +pwgt2b*(pl+pr)
     enddo
 
     return
   end subroutine penalty_nmin2b_uf3l
 !=======================================================================
   subroutine penalty_grad_nmin2b_uf3l(ndimp,params_in,pwgt2b, &
-       eps2b,tau2b,scl2b,grad)
+       eps2b,del2b,scl2b,grad)
 !
 !  Accesor routine to set uf3l parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
@@ -5079,14 +5077,17 @@ contains
     use util,only: expit,dexpit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,tau2b,scl2b
+    real(8),intent(in):: pwgt2b,eps2b,del2b,scl2b
     real(8),intent(out):: grad(ndimp)
 
     type(prm2):: p2
-    integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic,ibase
-    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,qs(npnts),qsum, &
-         deli,sgmi,wi,ps(npnts),hp,cr,tmp,dpdc,dqdc(ndimp,npnts), &
-         ddeli,dsgmi,dwi,p2b, exp1,exp2,exp3,effnum
+    integer:: inc,i1b,i2b,ir,nr,nk,nc,j,l,ic,ibase
+    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
+         cr,tmp,p2b, exp1, rmin,pl,pr,sgmls(npnts),sgmrs(npnts), &
+         rels(npnts),rers(npnts),drmdf(npnts),fs(npnts),dfs(npnts), &
+         dpldf(npnts),dprdf(npnts),dsgldrm,dsgrdrm, &
+         dplddf,dprddf,dpldc(ndimp),dprdc(ndimp), &
+         blj(ndimp,npnts),dblj(ndimp,npnts)
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
     grad(:) = 0d0
@@ -5117,65 +5118,66 @@ contains
         rs(ir) = rs(ir-1) + dr
       enddo
 
-      qs(:) = 0d0
-      qsum = 0d0
-      dqdc(:,:) = 0d0
+      expsum = 0d0
+      ws(:) = 0d0
+      fs(:) = 0d0
+      dfs(:) = 0d0
+      rmin = 0d0
+      blj(:,:) = 0d0
+      dblj(:,:) = 0d0
       do ir=1,npnts
         call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
-        fi = 0d0
-        dfi = 0d0
-        ddfi = 0d0
-        do lr = -3,0
-          j = nr + lr
+        do l = -3,0
+          j = nr + l
           if( j < 1 .or. j > nk-4 ) cycle
           cr = prm2s(i2b)%coefs(j)
-          fi = fi + cr *br(lr)
-          dfi = dfi + cr *dbr(lr)
-          ddfi = ddfi + cr *ddbr(lr)
+          fs(ir) = fs(ir) + cr *br(l)
+          dfs(ir) = dfs(ir) + cr *dbr(l)
+          blj(j,ir) = br(l)
+          dblj(j,ir) = dbr(l)
         enddo
-        exp1 = exp(-dfi**2 / (2d0*eps2b**2))
-        exp3 = min(max(exp(-fi/scl2b), tiny), huge)
-        deli = exp1
-        sgmi = expit(ddfi/tau2b)
-        wi = log1p(exp3)
-        qs(ir) = deli * sgmi * wi
-        qsum = qsum + qs(ir)
-!!$        if( i2b==1 ) then
-!!$          print '(a,i5,10es11.2)', ' ir,fi,dfi,ddfi,deli,sgmi,wi,qi=', &
-!!$               ir,fi,dfi,ddfi,deli,sgmi,wi,qs(ir)
-!!$        endif
-        do lr = -3,0
-          j = nr + lr
-          if( j < 1 .or. j > nk-4) cycle
-          dqdc(ibase+j,ir) = qs(ir) * (-dbr(lr)*dfi/eps2b**2 &
-               + ddbr(lr)*(1d0- expit(ddfi/tau2b))/tau2b &
-               - br(lr)*expit(fi/scl2b)/(scl2b*wi) )
+        ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
+        expsum = expsum + ws(ir)
+        rmin = rmin +ws(ir)*rs(ir)
+      enddo
+      rmin = rmin / expsum
+      ws(:) = ws(:) /expsum
+      pl = 0d0
+      pr = 0d0
+      do j=1,npnts
+        sgmls(j) = expit((rmin -del2b -rs(j))/scl2b)
+        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
+        rels(j) = max(0.0, dfs(j))
+        rers(j) = max(0.0, -dfs(j))
+        drmdf(j) = ws(j) /eps2b *(rmin - rs(j))
+      enddo
+      dpldf(:) = 0d0
+      dprdf(:) = 0d0
+      dpldc(:) = 0d0
+      dprdc(:) = 0d0
+      do j=1,npnts
+        do l=1,npnts
+          dsgldrm = sgmls(l) * (1d0 - sgmls(l)) / scl2b
+          dsgrdrm = sgmrs(l) * (1d0 - sgmrs(l)) / scl2b
+          dpldf(j) = dpldf(j) +dsgldrm*rels(l)
+          dprdf(j) = dprdf(j) +dsgrdrm*rers(l)
         enddo
-      enddo  ! ir
-      ps(:) = 0d0
-      hp = 0d0
-      do ir=1,npnts
-        ps(ir) = qs(ir) / qsum
-        hp = hp - ps(ir) * log(ps(ir)+tiny)
-!!$        print '(a,2i5,5es12.3)', ' i2b,ir,qs,ps,hp=', &
-!!$             i2b,ir,qs(ir),ps(ir),hp
-      enddo  ! ir
-      effnum = exp(hp)
-!!$      print '(a,i5,es12.3)', '  i2b,effnum = ',i2b,effnum
-      if( effnum < 1d0 ) cycle
-      p2b = pwgt2b * effnum
+        dpldf(j) = dpldf(j) *drmdf(j)
+        dprdf(j) = dprdf(j) *drmdf(j)
+        dplddf = sgmls(j) *2d0 *rels(j)
+        dprddf = sgmrs(j) *2d0 *rers(j)
+        do ic=1,nc
+          dpldc(ic) = dpldc(ic) +blj(ic,j)*dpldf(j) &
+               +dblj(ic,j)*dplddf
+          dprdc(ic) = dprdc(ic) +blj(ic,j)*dprdf(j) &
+               +dblj(ic,j)*dprddf
+        enddo
+      enddo
 
       do ic=1,nc
-        tmp = 0d0
-        do ir=1,npnts
-          tmp = tmp +dqdc(ibase+ic,ir)
-        enddo
-        do ir=1,npnts
-          dpdc = (dqdc(ibase+ic,ir) -ps(ir)*tmp)/qsum
-          grad(ibase+ic) = grad(ibase+ic) &
-               -p2b *dpdc *(log(ps(ir)+tiny) +1d0)
-        enddo  ! ir
-      enddo  ! ic
+        grad(ibase+ic) = grad(ibase+ic) &
+             +pwgt2b *(dpldc(ic) +dprdc(ic))
+      enddo
     enddo  ! i2b
 
     return

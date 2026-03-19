@@ -172,8 +172,8 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'eps2b' ) then
     call read_r1(ionum,eps2b)
     return
-  elseif( trim(cname).eq.'tau2b' ) then
-    call read_r1(ionum,tau2b)
+  elseif( trim(cname).eq.'del2b' ) then
+    call read_r1(ionum,del2b)
     return
   elseif( trim(cname).eq.'scl2b' ) then
     call read_r1(ionum,scl2b)

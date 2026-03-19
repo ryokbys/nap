@@ -353,7 +353,7 @@ subroutine write_initial_setting()
   if( index(cpenalty,'nmin2b').ne.0 ) then
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
     write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
-    write(6,'(2x,a25,2x,es12.3)') 'tau2b',tau2b
+    write(6,'(2x,a25,2x,es12.3)') 'del2b',del2b
     write(6,'(2x,a25,2x,es12.3)') 'scl2b',scl2b
   endif
   if( index(cpenalty,'min3b').ne.0 ) then
@@ -1935,7 +1935,7 @@ subroutine sync_input()
   call mpi_bcast(pwgt_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(beta_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(eps2b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(tau2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(del2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(scl2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)

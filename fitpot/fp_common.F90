@@ -7,7 +7,7 @@ module fp_common
 !
   use variables,only: cpenalty, penalty, pwgt2b, &
        pwgt3b, pwgt_curv, pwgt_min3b, beta_min3b, &
-       repul_radii, pwgt2bs, eps2b, tau2b, scl2b
+       repul_radii, pwgt2bs, eps2b, del2b, scl2b
   use pmdvars,only: nspmax
   implicit none
   save
@@ -1108,7 +1108,7 @@ contains
     if( index(cpenalty,'nmin2b').ne.0 ) then
       if( trim(cpotlow).eq.'uf3l' ) then
         call penalty_nmin2b_uf3l(ndim,x,pwgt2b, &
-             eps2b,tau2b,scl2b,pnmin2b)
+             eps2b,del2b,scl2b,pnmin2b)
       endif
       fp = fp +pnmin2b
     endif
@@ -1171,7 +1171,7 @@ contains
     if( index(cpenalty,'nmin2b').ne.0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_nmin2b_uf3l(ndim,x,pwgt2b, &
-             eps2b,tau2b,scl2b,gptmp)
+             eps2b,del2b,scl2b,gptmp)
       endif
       gp(:) = gp(:) +gptmp(:)
     endif
