@@ -532,7 +532,7 @@ contains
 !=======================================================================
   function expit(x)
 !
-!  logistic sigmoid function (1 / (1 + exp(x)))
+!  logistic sigmoid function (1 / (1 + exp(-x)))
 !
     real(8),intent(in):: x
     real(8):: expit
@@ -547,7 +547,7 @@ contains
 !=======================================================================
   function dexpit(x)
 !
-!  derivative of the logistic sigmoid function (1 / (1 + exp(x)))
+!  derivative of the logistic sigmoid function (1 / (1 + exp(-x)))
 !
     real(8),intent(in):: x
     real(8):: dexpit

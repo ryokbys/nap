@@ -5049,7 +5049,7 @@ contains
         exp1 = exp(-dfi**2 / (2d0*eps2b**2))
         exp3 = min(max(exp(-fi/scl2b), tiny), huge)
         deli = exp1
-        sgmi = expit(-ddfi/tau2b)
+        sgmi = expit(ddfi/tau2b)
         wi = log1p(exp3)
         qs(ir) = deli * sgmi * wi
         qsum = qsum + qs(ir)
@@ -5136,7 +5136,7 @@ contains
         exp1 = exp(-dfi**2 / (2d0*eps2b**2))
         exp3 = min(max(exp(-fi/scl2b), tiny), huge)
         deli = exp1
-        sgmi = expit(-ddfi/tau2b)
+        sgmi = expit(ddfi/tau2b)
         wi = log1p(exp3)
         qs(ir) = deli * sgmi * wi
         qsum = qsum + qs(ir)
@@ -5148,8 +5148,8 @@ contains
           j = nr + lr
           if( j < 1 .or. j > nk-4) cycle
           dqdc(ibase+j,ir) = qs(ir) * (-dbr(lr)*dfi/eps2b**2 &
-               + ddbr(lr)*(1d0- expit(-ddfi/tau2b))/tau2b &
-               - br(lr)*expit(-fi/scl2b)/(scl2b*wi) )
+               + ddbr(lr)*(1d0- expit(ddfi/tau2b))/tau2b &
+               - br(lr)*expit(fi/scl2b)/(scl2b*wi) )
         enddo
       enddo  ! ir
       ps(:) = 0d0
