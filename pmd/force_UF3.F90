@@ -5140,6 +5140,10 @@ contains
         wi = log1p(exp3)
         qs(ir) = deli * sgmi * wi
         qsum = qsum + qs(ir)
+!!$        if( i2b==1 ) then
+!!$          print '(a,i5,10es11.2)', ' ir,fi,dfi,ddfi,deli,sgmi,wi,qi=', &
+!!$               ir,fi,dfi,ddfi,deli,sgmi,wi,qs(ir)
+!!$        endif
         do lr = -3,0
           j = nr + lr
           if( j < 1 .or. j > nk-4) cycle
