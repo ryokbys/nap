@@ -247,6 +247,7 @@ module variables
 !.....Repulsion correction for short distances in UF3 potential
   logical:: l_correct_short = .false.
   real(8):: short_radii(nspmax,nspmax)
+  real(8):: pwgt1b = 0d0
   real(8):: pwgt2b = 0d0
   real(8):: pwgt2bd= 0d0
   real(8):: pwgt2bs= 0d0

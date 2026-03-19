@@ -4267,6 +4267,62 @@ contains
     return
   end subroutine symmetrize_params_uf3d
 !=======================================================================
+  subroutine penalty_ridge1b(ndimp,params_in,pwgt1b,penalty)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Ridge penalty for 1B energies.
+!
+    use util,only: expit,log1p,num_deriv
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt1b
+    real(8),intent(out):: penalty
+
+    type(prm2):: p2
+    integer:: inc,i1b
+
+    penalty = 0d0
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+      penalty = penalty + pwgt1b *erg1s(i1b)**2
+    enddo
+
+    return
+  end subroutine penalty_ridge1b
+!=======================================================================
+  subroutine penalty_grad_ridge1b(ndimp,params_in,pwgt1b,grad)
+!
+!  Accesor routine to set uf3l parameters from outside.
+!  It is supposed to be called from fitpot in a seriral process.
+!
+!  Penalty about the effective number of minimum in 2B curve.
+!
+    use util,only: expit,dexpit,log1p,num_deriv
+    integer,intent(in):: ndimp
+    real(8),intent(in):: params_in(ndimp)
+    real(8),intent(in):: pwgt1b
+    real(8),intent(out):: grad(ndimp)
+
+    type(prm2):: p2
+    integer:: inc,i1b
+
+    grad(:) = 0d0
+
+    inc = 0
+    do i1b=1,n1b
+      inc = inc +1
+      erg1s(i1b) = params_in(inc)
+      grad(inc) = grad(inc) +2d0 *erg1s(i1b) *pwgt1b
+    enddo
+
+    return
+  end subroutine penalty_grad_ridge1b
+!=======================================================================
   subroutine penalty_uf3(ndimp,params_in,pwgt2b,pwgt2bd, &
        pwgt2bs,pwgt3b,pwgt3bd,repul_radii,penalty)
 !
@@ -5054,11 +5110,17 @@ contains
       rmin = rmin / expsum
       pl = 0d0  ! left penalty
       pr = 0d0  ! right penalty
+!!$      if( i2b.eq.12 ) print '(a,i5,2a,es12.2)',' i2b,csi,csj=', &
+!!$           i2b,p2%csi,p2%csj,rmin
       do ir=1,npnts
         sgml = expit((rmin -del2b -rs(ir))/scl2b)
         sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
-        pl = pl +sgml *max(0.0, dfs(ir))**2
-        pr = pr +sgmr *max(0.0, -dfs(ir))**2
+        pl = pl +sgml *max(0d0, dfs(ir))**2
+        pr = pr +sgmr *max(0d0, -dfs(ir))**2
+!!$        if( i2b.eq.12 ) then
+!!$          print '(a,i5,10es12.2e3)',' ir,ri,sgml,sgmr,pl,pr=', &
+!!$               ir,rs(ir),sgml,sgmr, sgml*max(0d0, dfs(ir)), sgmr*max(0d0,-dfs(ir))
+!!$        endif
       enddo
       penalty = penalty +pwgt2b*(pl+pr)
     enddo

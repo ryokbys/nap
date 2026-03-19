@@ -7,7 +7,7 @@ module fp_common
 !
   use variables,only: cpenalty, penalty, pwgt2b, &
        pwgt3b, pwgt_curv, pwgt_min3b, beta_min3b, &
-       repul_radii, pwgt2bs, eps2b, del2b, scl2b
+       repul_radii, pwgt2bs, eps2b, del2b, scl2b, pwgt1b
   use pmdvars,only: nspmax
   implicit none
   save
@@ -1071,7 +1071,8 @@ contains
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
-         penalty_min3b_uf3l, penalty_nmin2b_uf3l
+         penalty_min3b_uf3l, penalty_nmin2b_uf3l, &
+         penalty_ridge1b
     use conditions,only: lconds, calc_fpenal_conds
     use parallel
     integer,intent(in):: ndim
@@ -1085,10 +1086,15 @@ contains
 !.....Simple ridge penalty
     pridge = 0d0
     if( index(cpenalty,'ridge').ne.0 ) then
-      do i=1,ndim
-        pridge = pridge +x(i)*x(i)
-      enddo
-      fp = fp + pridge *penalty
+      if( index(cpotlow,'uf3').ne.0 ) then
+        call penalty_ridge1b(ndim,x,pwgt1b,pridge)
+        fp = fp +pridge
+      else
+        do i=1,ndim
+          pridge = pridge +x(i)*x(i)
+        enddo
+        fp = fp + pridge *penalty
+      endif
     endif
 
 !!$ TODO implement curvature penalty...    
@@ -1136,7 +1142,8 @@ contains
   subroutine grad_penalty(ndim,x,gp)
     use variables,only: cpotlow
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
-         penalty_grad_min3b_uf3l, penalty_grad_nmin2b_uf3l
+         penalty_grad_min3b_uf3l, penalty_grad_nmin2b_uf3l, &
+         penalty_grad_ridge1b
     use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -1150,7 +1157,12 @@ contains
     gp(:) = 0d0
 !.....Simple ridge penalty
     if( index(cpenalty,'ridge').ne.0 ) then
-      gp(:) = gp(:) +2d0*penalty*x(:)
+      if( index(cpotlow,'uf3').ne.0 ) then
+        call penalty_grad_ridge1b(ndim,x,pwgt1b,gptmp)
+        gp(:) = gp(:) +gptmp(:)
+      else
+        gp(:) = gp(:) +2d0*penalty*x(:)
+      endif
     endif
 
 !!$ TODO implement curvature penalty...

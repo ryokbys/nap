@@ -154,6 +154,9 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'penalty_weight' ) then
     call read_r1(ionum,penalty)
     return
+  elseif( trim(cname).eq.'pwgt_1b' ) then
+    call read_r1(ionum,pwgt1b)
+    return
   elseif( trim(cname).eq.'pwgt_2b' ) then
     call read_r1(ionum,pwgt2b)
     return

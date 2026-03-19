@@ -340,7 +340,9 @@ subroutine write_initial_setting()
 
   write(6,'(a)') ''
   if( trim(cpenalty).ne.'none' ) write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
-  if( index(cpenalty,'ridge').ne.0 ) then
+  if( index(cpenalty,'ridge1b').ne.0 ) then
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_1b',pwgt1b
+  else if( index(cpenalty,'ridge').ne.0 ) then
     write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
   endif
   if( index(cpenalty,'uf3').ne.0 ) then
@@ -1927,6 +1929,7 @@ subroutine sync_input()
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(penalty,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt1b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(pwgt2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(pwgt2bd,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(pwgt2bs,1,mpi_real8,0,mpi_world,ierr)
