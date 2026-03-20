@@ -282,6 +282,7 @@ subroutine write_initial_setting()
   use random
   use composition
   use conditions,only: lconds
+  use fp_common,only: apply_penalty
   implicit none
   integer:: i,isp,jsp
 
@@ -339,26 +340,24 @@ subroutine write_initial_setting()
   write(6,'(2x,a25,2x,es12.3)') 'fval_upper_limit',fupper_lim
 
   write(6,'(a)') ''
-  if( trim(cpenalty).ne.'none' ) write(6,'(2x,a25,2x,a)') 'penalty',trim(cpenalty)
-  if( index(cpenalty,'ridge1b').ne.0 ) then
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_1b',pwgt1b
-  else if( index(cpenalty,'ridge').ne.0 ) then
-    write(6,'(2x,a25,2x,es12.3)') 'penalty_weight',penalty
+  if( npenal > 0 ) write(6,'(2x,a25,2x,a)') 'penalties:'
+  if( apply_penalty('ridge1b') ) then
+    write(6,'(2x,a25)') '[ridge1b]'
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_ridge1b',pwgt_ridge1b
   endif
-  if( index(cpenalty,'uf3').ne.0 ) then
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_diff',pwgt2bd
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b_short',pwgt2bs
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b',pwgt3b
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_3b_diff',pwgt3bd
+  if( apply_penalty('ridge') ) then
+    write(6,'(2x,a25)') '[ridge]'
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_ridge',pwgt_ridge
   endif
-  if( index(cpenalty,'nmin2b').ne.0 ) then
-    write(6,'(2x,a25,2x,es12.3)') 'pwgt_2b',pwgt2b
+  if( apply_penalty('curv2b') ) then
+    write(6,'(2x,a25)') '[curv2b]'
+    write(6,'(2x,a25,2x,es12.3)') 'pwgt_curv2b',pwgt_curv2b
     write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
     write(6,'(2x,a25,2x,es12.3)') 'del2b',del2b
     write(6,'(2x,a25,2x,es12.3)') 'scl2b',scl2b
   endif
-  if( index(cpenalty,'min3b').ne.0 ) then
+  if( apply_penalty('min3b') ) then
+    write(6,'(2x,a25)') '[min3b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_min3b',pwgt_min3b
     write(6,'(2x,a25,2x,es12.3)') 'beta_min3b',beta_min3b
   endif
@@ -1914,7 +1913,6 @@ subroutine sync_input()
   call mpi_bcast(csmplftype,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpot,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cpotlow,128,mpi_character,0,mpi_world,ierr)
-  call mpi_bcast(cpenalty,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(clinmin,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(cfsmode,128,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(crefstrct,128,mpi_character,0,mpi_world,ierr)
@@ -1929,13 +1927,13 @@ subroutine sync_input()
   call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpi_world,ierr)
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
-  call mpi_bcast(penalty,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt1b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt2b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt2bd,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt2bs,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt3b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(pwgt3bd,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(npenal,1,mpi_integer,0,mpi_world,ierr)
+  if( npenal>0 ) then
+    call mpi_bcast(cpenals,20*npenal,mpi_character,0,mpi_world,ierr)
+  endif
+  call mpi_bcast(pwgt_ridge,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt_ridge1b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(pwgt_curv2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(pwgt_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(beta_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(eps2b,1,mpi_real8,0,mpi_world,ierr)

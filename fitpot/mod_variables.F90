@@ -242,24 +242,25 @@ module variables
   real(8):: zbl_ro(1:nspmax) = -1d0
 
 !.....Penalty is moved from minimize module
-  character(len=128):: cpenalty = 'none'
-  real(8):: penalty = 1d-15
+  integer:: npenal = 0
+  character(len=20),allocatable:: cpenals(:)
+  real(8):: pwgt_ridge = 1d-15
 !.....Repulsion correction for short distances in UF3 potential
   logical:: l_correct_short = .false.
   real(8):: short_radii(nspmax,nspmax)
-  real(8):: pwgt1b = 0d0
-  real(8):: pwgt2b = 0d0
-  real(8):: pwgt2bd= 0d0
-  real(8):: pwgt2bs= 0d0
-  real(8):: pwgt3b = 0d0
-  real(8):: pwgt3bd= 0d0
-  real(8):: pwgt_curv = 0d0   ! pwgt for curvature penalty
-  real(8):: pwgt_min3b = 0d0  ! pwgt for softmin3b in uf3l
-  real(8):: beta_min3b = 1d0  ! beta for exp(-beta*fi) in uf3l
-!.....Parameters for nmin2b penalty
+  real(8):: pwgt_ridge1b = 0d0
+  real(8):: pwgt_curv2b = 0d0
+!!$  real(8):: pwgt2bd= 0d0
+!!$  real(8):: pwgt2bs= 0d0
+!!$  real(8):: pwgt3b = 0d0
+!!$  real(8):: pwgt3bd= 0d0
+!.....Parameters for curv2b penalty
   real(8):: eps2b  = 0.5d0
   real(8):: del2b  = 0.1d0
   real(8):: scl2b  = 0.1d0
+!.....Parameters for min3b penalty
+  real(8):: pwgt_min3b = 0d0  ! pwgt for softmin3b in uf3l
+  real(8):: beta_min3b = 1d0  ! beta for exp(-beta*fi) in uf3l
 
   real(8):: pwgt_repul = 1d-15  ! penalty for repulsion
   real(8):: valence_chgs(nspmax), core_chgs(nspmax)

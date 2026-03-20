@@ -147,31 +147,31 @@ subroutine set_variable(ionum,cname)
     call read_c1(ionum,cstrs_scale)
     cstrs_scale = to_lower(cstrs_scale)
     return
-  elseif( trim(cname).eq.'penalty' ) then
-    call read_c1(ionum,cpenalty)
-    cpenalty = to_lower(cpenalty)
+  elseif( trim(cname).eq.'penalty' .or. &
+       & trim(cname).eq.'penalties' ) then ! penalty or penalties
+    call read_penalties(ionum)
     return
-  elseif( trim(cname).eq.'penalty_weight' ) then
-    call read_r1(ionum,penalty)
+  elseif( trim(cname).eq.'pwgt_ridge' ) then
+    call read_r1(ionum,pwgt_ridge)
     return
-  elseif( trim(cname).eq.'pwgt_1b' ) then
-    call read_r1(ionum,pwgt1b)
+  elseif( trim(cname).eq.'pwgt_ridge1b' ) then
+    call read_r1(ionum,pwgt_ridge1b)
     return
-  elseif( trim(cname).eq.'pwgt_2b' ) then
-    call read_r1(ionum,pwgt2b)
+  elseif( trim(cname).eq.'pwgt_curv2b' ) then
+    call read_r1(ionum,pwgt_curv2b)
     return
-  elseif( trim(cname).eq.'pwgt_2b_diff' ) then
-    call read_r1(ionum,pwgt2bd)
-    return
-  elseif( trim(cname).eq.'pwgt_2b_short' ) then
-    call read_r1(ionum,pwgt2bs)
-    return
-  elseif( trim(cname).eq.'pwgt_3b' ) then
-    call read_r1(ionum,pwgt3b)
-    return
-  elseif( trim(cname).eq.'pwgt_3b_diff' ) then
-    call read_r1(ionum,pwgt3bd)
-    return
+!!$  elseif( trim(cname).eq.'pwgt_2b_diff' ) then
+!!$    call read_r1(ionum,pwgt2bd)
+!!$    return
+!!$  elseif( trim(cname).eq.'pwgt_2b_short' ) then
+!!$    call read_r1(ionum,pwgt2bs)
+!!$    return
+!!$  elseif( trim(cname).eq.'pwgt_3b' ) then
+!!$    call read_r1(ionum,pwgt3b)
+!!$    return
+!!$  elseif( trim(cname).eq.'pwgt_3b_diff' ) then
+!!$    call read_r1(ionum,pwgt3bd)
+!!$    return
   elseif( trim(cname).eq.'eps2b' ) then
     call read_r1(ionum,eps2b)
     return
@@ -733,6 +733,34 @@ subroutine read_vals_nsp(ionum,vals)
   read(ctmp,*) c1, (vals(i),i=1,nsp)
 
 end subroutine read_vals_nsp
+!=======================================================================
+subroutine read_penalties(ionum)
+!
+!  Read penalties that can be plural.
+!
+  use variables,only: npenal,cpenals
+  use util,only: num_data, to_lower
+  implicit none
+  integer,intent(in):: ionum
+
+  integer:: i,ndat
+  character(len=1024):: ctmp
+!      integer,external:: num_data
+
+  backspace(ionum)
+  read(ionum,'(a)') ctmp
+  ndat = num_data(trim(ctmp),' ')
+  npenal = ndat -1
+  allocate(cpenals(npenal))
+  backspace(ionum)
+  read(ionum,*) ctmp, (cpenals(i),i=1,npenal)
+  do i=1,npenal
+    cpenals(i) = to_lower(cpenals(i))
+  enddo
+  
+end subroutine read_penalties
+!=======================================================================
+
 !-----------------------------------------------------------------------
 ! Local Variables:
 ! compile-command: "make fitpot"
