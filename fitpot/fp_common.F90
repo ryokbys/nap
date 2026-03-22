@@ -1029,7 +1029,8 @@ contains
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow,pwgt_ridge, pwgt_ridge1b, &
-         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b
+         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b, &
+         iprint, npenal, cpenals
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
          penalty_min3b_uf3l, &
          penalty_ridge1b, penalty_curv2b_uf3l
@@ -1039,23 +1040,26 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: fp
 
-    integer:: i
-    real(8):: pridge,pmin3b,pcond,pnmin2b,pcurv2b
+    integer:: i,idx
+    real(8):: pvals(npenal),pcond
 
     fp = 0d0
+    pvals(:) = 0d0
+    
 !.....Simple ridge penalty
-    pridge = 0d0
-    if( apply_penalty('ridge1b') ) then
+    idx = index_penalty('ridge1b')
+    if( idx > 0 ) then
       if( index(cpotlow,'uf3').ne.0 ) then
-        call penalty_ridge1b(ndim,x,pwgt_ridge1b,pridge)
-        fp = fp +pridge
+        call penalty_ridge1b(ndim,x,pwgt_ridge1b,pvals(idx))
+        fp = fp +pvals(idx)
       endif
     endif
-    if( apply_penalty('ridge') ) then
+    idx = index_penalty('ridge')
+    if( idx > 0 ) then
       do i=1,ndim
-        pridge = pridge +x(i)*x(i)
+        pvals(idx) = pvals(idx) +x(i)*x(i)
       enddo
-      fp = fp + pridge *pwgt_ridge
+      fp = fp + pwgt_ridge *pvals(idx)
     endif
 
 !!$ TODO implement curvature penalty...    
@@ -1071,21 +1075,21 @@ contains
 !!$    endif
 
 !.....Penalty on curv2b
-    pcurv2b = 0d0
-    if( apply_penalty('curv2b') ) then
+    idx = index_penalty('curv2b')
+    if( idx > 0 ) then
       if( trim(cpotlow).eq.'uf3l' ) then
         call penalty_curv2b_uf3l(ndim,x,pwgt_curv2b, &
-             eps2b,del2b,scl2b,pcurv2b)
-        fp = fp +pcurv2b
+             eps2b,del2b,scl2b,pvals(idx))
+        fp = fp +pvals(idx)
       endif
     endif
     
 !.....Penalty on softmax3b
-    pmin3b = 0d0
-    if( apply_penalty('min3b') ) then
+    idx = index_penalty('min3b')
+    if( idx > 0 ) then
       if( trim(cpotlow).eq.'uf3l' ) then
-        call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,pmin3b)
-        fp = fp +pmin3b
+        call penalty_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,pvals(idx))
+        fp = fp +pvals(idx)
       endif
     endif
 
@@ -1096,13 +1100,23 @@ contains
       fp = fp +pcond
     endif
 !!$    if( myid.eq.0 ) print '(a,2es24.14)', '  pmin3b,pcond = ',pmin3b,pcond
+
+!.....Output
+    if( iprint.gt.1 .and. myid.eq.0 .and. npenal.ne.0 ) then
+      write(6, '(a)', advance='no')  ' Penalties ('
+      write(6,'(10(a,","))', advance='no') (trim(cpenals(idx)),idx=1,npenal)
+      write(6,'(a)', advance='no') '): '
+      write(6,'(10f8.4)', advance='no') (pvals(idx),idx=1,npenal)
+      write(6,'(a)') ''
+    endif
     
     return
   end subroutine func_penalty
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
     use variables,only: cpot,cpotlow,pwgt_ridge, pwgt_ridge1b, &
-         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b
+         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b, &
+         npenal
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
          penalty_grad_min3b_uf3l, &
          penalty_grad_ridge1b, penalty_grad_curv2b_uf3l
@@ -1111,20 +1125,22 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gp(ndim)
 
-    integer:: i
+    integer:: i,idx
     real(8),allocatable,save:: gptmp(:)
 
     if( .not.allocated(gptmp) ) allocate(gptmp(ndim))
 
     gp(:) = 0d0
 !.....Simple ridge penalty
-    if( apply_penalty('ridge1b') ) then
+    idx = index_penalty('ridge1b')
+    if( idx > 0 ) then
       if( index(cpotlow,'uf3').ne.0 ) then
         call penalty_grad_ridge1b(ndim,x,pwgt_ridge1b,gptmp)
         gp(:) = gp(:) +gptmp(:)
       endif
     endif
-    if( apply_penalty('ridge')) then
+    idx = index_penalty('ridge')
+    if( idx > 0 ) then
       gp(:) = gp(:) +2d0*pwgt_ridge*x(:)
     endif
 
@@ -1143,7 +1159,8 @@ contains
 !!$    endif
 
 !.....Penalty on curv2b
-    if( apply_penalty('curv2b') ) then
+    idx = index_penalty('curv2b')
+    if( idx > 0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_curv2b_uf3l(ndim,x,pwgt_curv2b, &
              eps2b,del2b,scl2b,gptmp)
@@ -1152,7 +1169,8 @@ contains
     endif
 
 !.....Penalty on softmax3b
-    if( apply_penalty('min3b') ) then
+    idx = index_penalty('min3b')
+    if( idx > 0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_min3b_uf3l(ndim,x,pwgt_min3b,beta_min3b,gptmp)
       endif
@@ -1167,22 +1185,22 @@ contains
     return
   end subroutine grad_penalty
 !=======================================================================
-  function apply_penalty(pname)
+  function index_penalty(pname)
     use variables,only: npenal, cpenals
     implicit none
     character(len=*),intent(in):: pname
-    logical:: apply_penalty
+    integer:: index_penalty
     integer:: i
 
-    apply_penalty = .false.
+    index_penalty = 0
     do i=1,npenal
       if( trim(pname).eq.trim(cpenals(i)) ) then
-        apply_penalty = .true.
+        index_penalty = i
         return
       endif
     enddo
     return
-  end function apply_penalty
+  end function index_penalty
 !=======================================================================
   subroutine create_mpi_comm_pmd()
 !

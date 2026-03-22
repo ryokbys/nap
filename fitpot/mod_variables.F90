@@ -245,9 +245,6 @@ module variables
   integer:: npenal = 0
   character(len=20),allocatable:: cpenals(:)
   real(8):: pwgt_ridge = 1d-15
-!.....Repulsion correction for short distances in UF3 potential
-  logical:: l_correct_short = .false.
-  real(8):: short_radii(nspmax,nspmax)
   real(8):: pwgt_ridge1b = 0d0
   real(8):: pwgt_curv2b = 0d0
 !!$  real(8):: pwgt2bd= 0d0
@@ -261,6 +258,9 @@ module variables
 !.....Parameters for min3b penalty
   real(8):: pwgt_min3b = 0d0  ! pwgt for softmin3b in uf3l
   real(8):: beta_min3b = 1d0  ! beta for exp(-beta*fi) in uf3l
+!.....Repulsion correction for short distances in UF3 potential
+  logical:: l_correct_short = .false.
+  real(8):: short_radii(nspmax,nspmax)
 
   real(8):: pwgt_repul = 1d-15  ! penalty for repulsion
   real(8):: valence_chgs(nspmax), core_chgs(nspmax)

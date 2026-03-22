@@ -104,7 +104,7 @@ module UF3
   real(8):: rc3max = 0.0d0
   real(8):: rc3max2 = 0.0d0
 !.....Common for angular softmax penalty
-  integer,parameter:: npnts = 100
+  integer,parameter:: npnts = 50
   integer:: nc2max = 0
   integer:: nc3max = 0
   real(8),allocatable:: sumbexp(:,:), sumexp(:)
@@ -5058,10 +5058,13 @@ contains
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
     real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
          fs(npnts),dfs(npnts),ddfs(npnts), &
-         rmin,pl,pr,sgml,sgmr,cr,exp1
+         rmin,pl,pr,sgml,sgmr,cr,exp1,rd
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
+    real(8),parameter:: sgmin = 1d-2
+
     penalty = 0d0
+    rd = scl2b *4.6d0
 
     inc = 0
     do i1b=1,n1b
@@ -5070,15 +5073,14 @@ contains
     enddo
 !.....2-body
     do i2b=1,n2b
-      p2 = prm2s(i2b)
-      nk = p2%nknot
-      nc = p2%ncoef
-      
-      do ic=1,nc
+      do ic=1,prm2s(i2b)%ncoef
         inc = inc +1
 !.....p2 cannot be used for substitution
         prm2s(i2b)%coefs(ic) = params_in(inc)
       enddo
+      p2 = prm2s(i2b)
+      nk = p2%nknot
+      nc = p2%ncoef
 
 !.....Sampling points
       rc = p2%knots(nk)
@@ -5115,12 +5117,30 @@ contains
       pl = 0d0  ! left penalty
       pr = 0d0  ! right penalty
       do ir=1,npnts
-        sgml = expit((rmin -del2b -rs(ir))/scl2b)
-        sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
-        pl = pl +sgml *max(0d0, dfs(ir))**2
-        pr = pr +sgmr *dfs(ir)**2
+!!$        sgml = expit((rmin -del2b -rs(ir))/scl2b)
+!!$        if( sgml < sgmin ) sgml = 0d0
+        if( rs(ir) > rmin ) then
+          sgml = 0d0
+        else
+          sgml = expit((rmin -rd -rs(ir))/scl2b)
+        endif
+        pl = pl +sgml *max(0d0, -ddfs(ir))**2
+!!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgml,pli,ddfs=',&
+!!$             i2b,ir,rs(ir),sgml,sgml*max(0d0, -ddfs(ir))**2,ddfs(ir)
       enddo
-      penalty = penalty +pwgt2b*(pl+pr)
+      do ir=1,npnts
+!!$        sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
+!!$        if( sgmr < sgmin ) sgmr = 0d0
+        if( rs(ir) < rmin ) then
+          sgmr = 0d0
+        else
+          sgmr = expit((rs(ir) -rmin -rd)/scl2b)
+        endif
+        pr = pr +sgmr *ddfs(ir)**2
+!!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgmr,pri=',&
+!!$             i2b,ir,rs(ir),sgmr,sgmr*ddfs(ir)**2
+      enddo
+      penalty = penalty +pwgt2b *(pl+pr)
     enddo
 
     return
@@ -5148,10 +5168,14 @@ contains
          fs(npnts),dfs(npnts),ddfs(npnts), &
          dpldf(npnts),dprdf(npnts),dsgldrm,dsgrdrm, &
          dplddf,dprddf,dpldc(ndimp),dprdc(ndimp), &
-         blj(ndimp,npnts),dblj(ndimp,npnts),ddblj(ndimp,npnts)
+         blj(ndimp,npnts),dblj(ndimp,npnts),ddblj(ndimp,npnts), &
+         xl,xr,rd
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
+    real(8),parameter:: sgmin = 1d-2
+
     grad(:) = 0d0
+    rd = scl2b *4.6d0
 
     inc = 0
     do i1b=1,n1b
@@ -5160,15 +5184,15 @@ contains
     enddo
 !.....2-body
     do i2b=1,n2b
-      p2 = prm2s(i2b)
-      nk = p2%nknot
-      nc = p2%ncoef
       ibase = inc
-      do ic=1,nc
+      do ic=1,prm2s(i2b)%ncoef
         inc = inc +1
 !.....p2 cannot be used for substitution
         prm2s(i2b)%coefs(ic) = params_in(inc)
       enddo
+      p2 = prm2s(i2b)
+      nk = p2%nknot
+      nc = p2%ncoef
 
 !.....Sampling points
       rc = p2%knots(nk)
@@ -5183,6 +5207,7 @@ contains
       ws(:) = 0d0
       fs(:) = 0d0
       dfs(:) = 0d0
+      ddfs(:) = 0d0
       rmin = 0d0
       blj(:,:) = 0d0
       dblj(:,:) = 0d0
@@ -5203,15 +5228,22 @@ contains
         ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
         expsum = expsum + ws(ir)
         rmin = rmin +ws(ir)*rs(ir)
-      enddo
+      enddo  ! ir
       rmin = rmin / expsum
+!!$      print '(a,2i5,es12.3)','i2b,ibase,rmin=',i2b,ibase,rmin
       ws(:) = ws(:) /expsum
-      pl = 0d0
-      pr = 0d0
+      sgmls(:) = 0d0
+      sgmrs(:) = 0d0
       do j=1,npnts
-        sgmls(j) = expit((rmin -del2b -rs(j))/scl2b)
-        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
-        rels(j) = max(0.0, dfs(j))
+!!$        sgmls(j) = expit((rmin -del2b -rs(j))/scl2b)
+!!$        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
+!!$        if( sgmls(j) < sgmin ) sgmls(j) = 0d0
+!!$        if( sgmrs(j) < sgmin ) sgmrs(j) = 0d0
+        sgmls(j) = expit((rmin -rd -rs(j))/scl2b)
+        sgmrs(j) = expit((rs(j) -rmin -rd)/scl2b)
+        if( rs(j) > rmin ) sgmls(j) = 0d0
+        if( rs(j) < rmin ) sgmrs(j) = 0d0
+        rels(j) = max(0.0, -ddfs(j))
         drmdf(j) = ws(j) /eps2b *(rmin - rs(j))
       enddo
       dpldf(:) = 0d0
@@ -5220,28 +5252,33 @@ contains
       dprdc(:) = 0d0
       do j=1,npnts
         do l=1,npnts
-          dsgldrm = sgmls(l) * (1d0 - sgmls(l)) / scl2b
-          dsgrdrm = sgmrs(l) * (1d0 - sgmrs(l)) / scl2b
+          dsgldrm =  sgmls(l) * (1d0 - sgmls(l)) / scl2b
+          dsgrdrm = -sgmrs(l) * (1d0 - sgmrs(l)) / scl2b
           dpldf(j) = dpldf(j) +dsgldrm*rels(l)**2
-          dprdf(j) = dprdf(j) -dsgrdrm*dfs(l)**2
+          dprdf(j) = dprdf(j) +dsgrdrm*ddfs(l)**2
         enddo
         dpldf(j) = dpldf(j) *drmdf(j)
         dprdf(j) = dprdf(j) *drmdf(j)
-        dplddf = sgmls(j) *2d0 *rels(j)
-        dprddf = sgmrs(j) *2d0 *dfs(j)
+        dplddf = sgmls(j) *2d0 *(-rels(j))
+        dprddf = sgmrs(j) *2d0 *ddfs(j)
+!!$        if( i2b==6 ) print '(a,2i5,10es12.2)','i2b,j,sgmls(j),rels(j),dplddf,ddfs=',&
+!!$             i2b,j,sgmls(j),rels(j),dplddf,ddfs(j)
         do ic=1,nc
           dpldc(ic) = dpldc(ic) +blj(ic,j)*dpldf(j) &
-               +dblj(ic,j)*dplddf
+               +ddblj(ic,j)*dplddf
           dprdc(ic) = dprdc(ic) +blj(ic,j)*dprdf(j) &
-               +dblj(ic,j)*dprddf
+               +ddblj(ic,j)*dprddf
         enddo
       enddo
 
       do ic=1,nc
         grad(ibase+ic) = grad(ibase+ic) &
              +pwgt2b *(dpldc(ic) +dprdc(ic))
+!!$        if( i2b==6 ) print '(a,3i5,5es12.2)','i2b,ic,ibase+ic,dpldc,grad=',&
+!!$             i2b,ic,ibase+ic,dpldc(ic),grad(ibase+ic)
       enddo
     enddo  ! i2b
+!!$    print '(a,es12.2)',' grad(130)=',grad(130)
 
     return
   end subroutine penalty_grad_curv2b_uf3l

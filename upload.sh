@@ -10,6 +10,6 @@ src=$(cd $(dirname $0); pwd)
 dst=$1
 echo "${src} ==> ${dst}:src/nap/"
 
-rsync -avvv -z --progress --stats --exclude=".git/" --exclude=".venv/" --exclude="*.dSYM/" --exclude="subdir_*/" --exclude="doc/" --include="*/" --exclude="*.o" --exclude="*/*.mod" --exclude="*~" --exclude="makefile" --exclude="pmd" --exclude="fitpot" --exclude="*.pyc" --exclude="libpmd.a" ${src}/ ${dst}:src/nap/
+rsync -avz --stats --exclude=".venv/" --exclude="*.dSYM/" --exclude="subdir_*/" --exclude="doc/" --include="*/" --exclude="*.o" --exclude="*/*.mod" --exclude="*~" --exclude="makefile" --exclude="pmd" --exclude="fitpot" --exclude="*.pyc" --exclude="libpmd.a" ${src}/ ${dst}:src/nap/
 #...Only selected makefiles are uploaded to the remote host
 rsync -avz --include="examples/*/makefile" --include="makefile" --exclude="*" ${src}/ ${dst}:src/nap/

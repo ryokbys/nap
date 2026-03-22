@@ -282,7 +282,7 @@ subroutine write_initial_setting()
   use random
   use composition
   use conditions,only: lconds
-  use fp_common,only: apply_penalty
+  use fp_common,only: index_penalty
   implicit none
   integer:: i,isp,jsp
 
@@ -341,26 +341,28 @@ subroutine write_initial_setting()
 
   write(6,'(a)') ''
   if( npenal > 0 ) write(6,'(2x,a25,2x,a)') 'penalties:'
-  if( apply_penalty('ridge1b') ) then
-    write(6,'(2x,a25)') '[ridge1b]'
+  if( index_penalty('ridge1b')>0 ) then
+    write(6,'(2x,a25,2x,a)') '', '[ridge1b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_ridge1b',pwgt_ridge1b
   endif
-  if( apply_penalty('ridge') ) then
-    write(6,'(2x,a25)') '[ridge]'
+  if( index_penalty('ridge')>0 ) then
+    write(6,'(2x,a25,2x,a)') '', '[ridge]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_ridge',pwgt_ridge
   endif
-  if( apply_penalty('curv2b') ) then
-    write(6,'(2x,a25)') '[curv2b]'
+  if( index_penalty('curv2b')>0 ) then
+    write(6,'(2x,a25,2x,a)') '', '[curv2b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_curv2b',pwgt_curv2b
     write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
     write(6,'(2x,a25,2x,es12.3)') 'del2b',del2b
     write(6,'(2x,a25,2x,es12.3)') 'scl2b',scl2b
   endif
-  if( apply_penalty('min3b') ) then
-    write(6,'(2x,a25)') '[min3b]'
+  if( index_penalty('min3b')>0 ) then
+    write(6,'(2x,a25,2x,a)') '', '[min3b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_min3b',pwgt_min3b
     write(6,'(2x,a25,2x,es12.3)') 'beta_min3b',beta_min3b
   endif
+  
+  write(6,'(a)') ''
   if( lconds ) then
     write(6,'(2x,a25,2x,l3)') 'conditions',lconds
   endif
@@ -1928,7 +1930,8 @@ subroutine sync_input()
   call mpi_bcast(gscl,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nfpsmpl,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(npenal,1,mpi_integer,0,mpi_world,ierr)
-  if( npenal>0 ) then
+  if( npenal > 0 ) then
+    if( .not. allocated(cpenals) ) allocate(cpenals(npenal))
     call mpi_bcast(cpenals,20*npenal,mpi_character,0,mpi_world,ierr)
   endif
   call mpi_bcast(pwgt_ridge,1,mpi_real8,0,mpi_world,ierr)
