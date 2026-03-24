@@ -1029,7 +1029,7 @@ contains
 !=======================================================================
   subroutine func_penalty(ndim,x,fp)
     use variables,only: cpot,cpotlow,pwgt_ridge, pwgt_ridge1b, &
-         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b, &
+         pwgt_curv2b,eps2b,sl2b,sr2b,pwgt_min3b,beta_min3b, &
          iprint, npenal, cpenals
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
          penalty_min3b_uf3l, &
@@ -1079,7 +1079,7 @@ contains
     if( idx > 0 ) then
       if( trim(cpotlow).eq.'uf3l' ) then
         call penalty_curv2b_uf3l(ndim,x,pwgt_curv2b, &
-             eps2b,del2b,scl2b,pvals(idx))
+             eps2b,sl2b,sr2b,pvals(idx))
         fp = fp +pvals(idx)
       endif
     endif
@@ -1115,7 +1115,7 @@ contains
 !=======================================================================
   subroutine grad_penalty(ndim,x,gp)
     use variables,only: cpot,cpotlow,pwgt_ridge, pwgt_ridge1b, &
-         pwgt_curv2b,eps2b,del2b,scl2b,pwgt_min3b,beta_min3b, &
+         pwgt_curv2b,eps2b,sl2b,sr2b,pwgt_min3b,beta_min3b, &
          npenal
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
          penalty_grad_min3b_uf3l, &
@@ -1163,7 +1163,7 @@ contains
     if( idx > 0 ) then
       if( index(cpotlow,'uf3l').ne.0 ) then
         call penalty_grad_curv2b_uf3l(ndim,x,pwgt_curv2b, &
-             eps2b,del2b,scl2b,gptmp)
+             eps2b,sl2b,sr2b,gptmp)
       endif
       gp(:) = gp(:) +gptmp(:)
     endif

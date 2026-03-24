@@ -5041,7 +5041,7 @@ contains
   end subroutine penalty_grad_min3b_uf3l
 !=======================================================================
   subroutine penalty_curv2b_uf3l(ndimp,params_in,pwgt2b, &
-       eps2b,del2b,scl2b,penalty)
+       eps2b,sl2b,sr2b,penalty)
 !
 !  Accesor routine to set uf3l parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
@@ -5051,20 +5051,21 @@ contains
     use util,only: expit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,del2b,scl2b
+    real(8),intent(in):: pwgt2b,eps2b,sl2b,sr2b
     real(8),intent(out):: penalty
 
     type(prm2):: p2
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
     real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
          fs(npnts),dfs(npnts),ddfs(npnts), &
-         rmin,pl,pr,sgml,sgmr,cr,exp1,rd
+         rmin,pl,pr,sgml,sgmr,cr,exp1,rdl,rdr
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
     real(8),parameter:: sgmin = 1d-2
 
     penalty = 0d0
-    rd = scl2b *4.6d0
+    rdl = sl2b *4.6d0
+    rdr = sr2b *4.6d0
 
     inc = 0
     do i1b=1,n1b
@@ -5117,37 +5118,37 @@ contains
       pl = 0d0  ! left penalty
       pr = 0d0  ! right penalty
       do ir=1,npnts
-!!$        sgml = expit((rmin -del2b -rs(ir))/scl2b)
+!!$        sgml = expit((rmin -rdl -rs(ir))/sl2b)
 !!$        if( sgml < sgmin ) sgml = 0d0
         if( rs(ir) > rmin ) then
           sgml = 0d0
         else
-          sgml = expit((rmin -rd -rs(ir))/scl2b)
+          sgml = expit((rmin -rdl -rs(ir))/sl2b)
         endif
         pl = pl +sgml *max(0d0, -ddfs(ir))**2
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgml,pli,ddfs=',&
 !!$             i2b,ir,rs(ir),sgml,sgml*max(0d0, -ddfs(ir))**2,ddfs(ir)
       enddo
       do ir=1,npnts
-!!$        sgmr = expit((rs(ir) -rmin -del2b)/scl2b)
+!!$        sgmr = expit((rs(ir) -rmin -sr2b)/sr2b)
 !!$        if( sgmr < sgmin ) sgmr = 0d0
         if( rs(ir) < rmin ) then
           sgmr = 0d0
         else
-          sgmr = expit((rs(ir) -rmin -rd)/scl2b)
+          sgmr = expit((rs(ir) -rmin -rdr)/sr2b)
         endif
         pr = pr +sgmr *ddfs(ir)**2
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgmr,pri=',&
 !!$             i2b,ir,rs(ir),sgmr,sgmr*ddfs(ir)**2
       enddo
-      penalty = penalty +pwgt2b *(pl+pr)
+      penalty = penalty +pwgt2b *pl !*(pl+pr)
     enddo
 
     return
   end subroutine penalty_curv2b_uf3l
 !=======================================================================
   subroutine penalty_grad_curv2b_uf3l(ndimp,params_in,pwgt2b, &
-       eps2b,del2b,scl2b,grad)
+       eps2b,sl2b,sr2b,grad)
 !
 !  Accesor routine to set uf3l parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
@@ -5157,7 +5158,7 @@ contains
     use util,only: expit,dexpit,log1p,num_deriv
     integer,intent(in):: ndimp
     real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,del2b,scl2b
+    real(8),intent(in):: pwgt2b,eps2b,sl2b,sr2b
     real(8),intent(out):: grad(ndimp)
 
     type(prm2):: p2
@@ -5169,13 +5170,14 @@ contains
          dpldf(npnts),dprdf(npnts),dsgldrm,dsgrdrm, &
          dplddf,dprddf,dpldc(ndimp),dprdc(ndimp), &
          blj(ndimp,npnts),dblj(ndimp,npnts),ddblj(ndimp,npnts), &
-         xl,xr,rd
+         xl,xr,rdl,rdr
     real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
     real(8),parameter:: sgmin = 1d-2
 
     grad(:) = 0d0
-    rd = scl2b *4.6d0
+    rdl = sl2b *4.6d0
+    rdr = sr2b *4.6d0
 
     inc = 0
     do i1b=1,n1b
@@ -5239,8 +5241,8 @@ contains
 !!$        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
 !!$        if( sgmls(j) < sgmin ) sgmls(j) = 0d0
 !!$        if( sgmrs(j) < sgmin ) sgmrs(j) = 0d0
-        sgmls(j) = expit((rmin -rd -rs(j))/scl2b)
-        sgmrs(j) = expit((rs(j) -rmin -rd)/scl2b)
+        sgmls(j) = expit((rmin -rdl -rs(j))/sl2b)
+        sgmrs(j) = expit((rs(j) -rmin -rdr)/sr2b)
         if( rs(j) > rmin ) sgmls(j) = 0d0
         if( rs(j) < rmin ) sgmrs(j) = 0d0
         rels(j) = max(0.0, -ddfs(j))
@@ -5252,8 +5254,8 @@ contains
       dprdc(:) = 0d0
       do j=1,npnts
         do l=1,npnts
-          dsgldrm =  sgmls(l) * (1d0 - sgmls(l)) / scl2b
-          dsgrdrm = -sgmrs(l) * (1d0 - sgmrs(l)) / scl2b
+          dsgldrm =  sgmls(l) * (1d0 - sgmls(l)) / sl2b
+          dsgrdrm = -sgmrs(l) * (1d0 - sgmrs(l)) / sr2b
           dpldf(j) = dpldf(j) +dsgldrm*rels(l)**2
           dprdf(j) = dprdf(j) +dsgrdrm*ddfs(l)**2
         enddo
@@ -5273,7 +5275,7 @@ contains
 
       do ic=1,nc
         grad(ibase+ic) = grad(ibase+ic) &
-             +pwgt2b *(dpldc(ic) +dprdc(ic))
+             +pwgt2b *dpldc(ic) !*(dpldc(ic) +dprdc(ic))
 !!$        if( i2b==6 ) print '(a,3i5,5es12.2)','i2b,ic,ibase+ic,dpldc,grad=',&
 !!$             i2b,ic,ibase+ic,dpldc(ic),grad(ibase+ic)
       enddo

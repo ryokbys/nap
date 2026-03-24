@@ -353,8 +353,8 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,a)') '', '[curv2b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_curv2b',pwgt_curv2b
     write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
-    write(6,'(2x,a25,2x,es12.3)') 'del2b',del2b
-    write(6,'(2x,a25,2x,es12.3)') 'scl2b',scl2b
+    write(6,'(2x,a25,2x,es12.3)') 'sl2b',sl2b
+    write(6,'(2x,a25,2x,es12.3)') 'sr2b',sr2b
   endif
   if( index_penalty('min3b')>0 ) then
     write(6,'(2x,a25,2x,a)') '', '[min3b]'
@@ -1940,8 +1940,10 @@ subroutine sync_input()
   call mpi_bcast(pwgt_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(beta_min3b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(eps2b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(del2b,1,mpi_real8,0,mpi_world,ierr)
-  call mpi_bcast(scl2b,1,mpi_real8,0,mpi_world,ierr)
+!!$  call mpi_bcast(del2b,1,mpi_real8,0,mpi_world,ierr)
+!!$  call mpi_bcast(scl2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sl2b,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sr2b,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ratio_test,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(rseed,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(f_scale,1,mpi_real8,0,mpi_world,ierr)

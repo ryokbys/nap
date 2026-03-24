@@ -253,8 +253,9 @@ module variables
 !!$  real(8):: pwgt3bd= 0d0
 !.....Parameters for curv2b penalty
   real(8):: eps2b  = 0.5d0
-  real(8):: del2b  = 0.1d0
-  real(8):: scl2b  = 0.1d0
+!!$  real(8):: del2b  = 0.1d0
+  real(8):: sl2b  = 0.1d0
+  real(8):: sr2b  = 0.1d0
 !.....Parameters for min3b penalty
   real(8):: pwgt_min3b = 0d0  ! pwgt for softmin3b in uf3l
   real(8):: beta_min3b = 1d0  ! beta for exp(-beta*fi) in uf3l
