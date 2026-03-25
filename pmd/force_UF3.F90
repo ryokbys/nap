@@ -104,7 +104,7 @@ module UF3
   real(8):: rc3max = 0.0d0
   real(8):: rc3max2 = 0.0d0
 !.....Common for angular softmax penalty
-  integer,parameter:: npnts = 50
+  integer,parameter:: npnts = 100
   integer:: nc2max = 0
   integer:: nc3max = 0
   real(8),allocatable:: sumbexp(:,:), sumexp(:)
@@ -5141,7 +5141,7 @@ contains
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgmr,pri=',&
 !!$             i2b,ir,rs(ir),sgmr,sgmr*ddfs(ir)**2
       enddo
-      penalty = penalty +pwgt2b *pl !*(pl+pr)
+      penalty = penalty +pwgt2b *pl /npnts !*(pl+pr)
     enddo
 
     return
@@ -5275,7 +5275,7 @@ contains
 
       do ic=1,nc
         grad(ibase+ic) = grad(ibase+ic) &
-             +pwgt2b *dpldc(ic) !*(dpldc(ic) +dprdc(ic))
+             +pwgt2b *dpldc(ic) /npnts !*(dpldc(ic) +dprdc(ic))
 !!$        if( i2b==6 ) print '(a,3i5,5es12.2)','i2b,ic,ibase+ic,dpldc,grad=',&
 !!$             i2b,ic,ibase+ic,dpldc(ic),grad(ibase+ic)
       enddo
