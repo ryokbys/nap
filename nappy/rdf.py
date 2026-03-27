@@ -563,7 +563,7 @@ def plot_figures(specorder,rd,agr):
     x = rd
     y = agr[0,0,:]
     plt.plot(x,y,'r-',label='Total RDF')
-    plt.xlabel('Distance (A)')
+    plt.xlabel(r'Distance ($\mathrm{\AA}$)')
     plt.ylabel('RDF')
     plt.legend()
     plt.savefig("graph_rdf_total.png", format='png', dpi=300, bbox_inches='tight')
@@ -586,7 +586,7 @@ def plot_figures(specorder,rd,agr):
             ax.text(0.05, 0.8, '{0:s}-{1:s}'.format(specorder[i],specorder[j]),
                     transform=ax.transAxes, ha="left")
             if isp==jsp:
-                ax.set_xlabel('Distance (A)')
+                ax.set_xlabel(r'Distance ($\mathrm{\AA}$)')
             if isp==1 and jsp==1:
                 ax.set_ylabel('RDF')
     plt.savefig("graph_rdfs.png", format='png', dpi=300, bbox_inches='tight')
@@ -653,7 +653,7 @@ def nbplot(nsys,dr=0.1,rmin=0.0,rmax=5.0,nnmax=200,pairs=None,sigma=0):
     y = gr[0,0,:]
     plt.plot(x,y,'r--',label='Total RDF')
 
-    plt.xlabel('Distance ($\mathrm{\AA}$)')
+    plt.xlabel(r'Distance ($\mathrm{\AA}$)')
     plt.ylabel('RDF')
     plt.legend(bbox_to_anchor=(1.05,1))
     plt.show()
