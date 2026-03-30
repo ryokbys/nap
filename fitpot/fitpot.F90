@@ -353,8 +353,8 @@ subroutine write_initial_setting()
     write(6,'(2x,a25,2x,a)') '', '[curv2b]'
     write(6,'(2x,a25,2x,es12.3)') 'pwgt_curv2b',pwgt_curv2b
     write(6,'(2x,a25,2x,es12.3)') 'eps2b',eps2b
-    write(6,'(2x,a25,2x,es12.3)') 'sl2b',sl2b
-    write(6,'(2x,a25,2x,es12.3)') 'sr2b',sr2b
+    if(sl2b > 0d0) write(6,'(2x,a25,2x,es12.3)') 'sl2b',sl2b
+    if(sr2b > 0d0) write(6,'(2x,a25,2x,es12.3)') 'sr2b',sr2b
   endif
   if( index_penalty('min3b')>0 ) then
     write(6,'(2x,a25,2x,a)') '', '[min3b]'

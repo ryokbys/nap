@@ -5064,8 +5064,8 @@ contains
     real(8),parameter:: sgmin = 1d-2
 
     penalty = 0d0
-    rdl = sl2b *4.6d0
-    rdr = sr2b *4.6d0
+    rdl = abs(sl2b *4.6d0)
+    rdr = abs(sr2b *4.6d0)
 
     inc = 0
     do i1b=1,n1b
@@ -5120,7 +5120,7 @@ contains
       do ir=1,npnts
 !!$        sgml = expit((rmin -rdl -rs(ir))/sl2b)
 !!$        if( sgml < sgmin ) sgml = 0d0
-        if( rs(ir) > rmin ) then
+        if( rs(ir) > rmin .or. sl2b <= 0d0 ) then
           sgml = 0d0
         else
           sgml = expit((rmin -rdl -rs(ir))/sl2b)
@@ -5132,7 +5132,7 @@ contains
       do ir=1,npnts
 !!$        sgmr = expit((rs(ir) -rmin -sr2b)/sr2b)
 !!$        if( sgmr < sgmin ) sgmr = 0d0
-        if( rs(ir) < rmin ) then
+        if( rs(ir) < rmin .or. sr2b <= 0d0 ) then
           sgmr = 0d0
         else
           sgmr = expit((rs(ir) -rmin -rdr)/sr2b)
@@ -5141,7 +5141,9 @@ contains
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgmr,pri=',&
 !!$             i2b,ir,rs(ir),sgmr,sgmr*ddfs(ir)**2
       enddo
-      penalty = penalty +pwgt2b *pl /npnts !*(pl+pr)
+      if( sl2b > 0d0 ) penalty = penalty +pwgt2b *pl/npnts
+      if( sr2b > 0d0 ) penalty = penalty +pwgt2b *pr/npnts
+!!$      penalty = penalty +pwgt2b *pl /npnts !*(pl+pr)
     enddo
 
     return
@@ -5176,8 +5178,8 @@ contains
     real(8),parameter:: sgmin = 1d-2
 
     grad(:) = 0d0
-    rdl = sl2b *4.6d0
-    rdr = sr2b *4.6d0
+    rdl = abs(sl2b *4.6d0)
+    rdr = abs(sr2b *4.6d0)
 
     inc = 0
     do i1b=1,n1b
@@ -5241,10 +5243,16 @@ contains
 !!$        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
 !!$        if( sgmls(j) < sgmin ) sgmls(j) = 0d0
 !!$        if( sgmrs(j) < sgmin ) sgmrs(j) = 0d0
-        sgmls(j) = expit((rmin -rdl -rs(j))/sl2b)
-        sgmrs(j) = expit((rs(j) -rmin -rdr)/sr2b)
-        if( rs(j) > rmin ) sgmls(j) = 0d0
-        if( rs(j) < rmin ) sgmrs(j) = 0d0
+        if( rs(j) > rmin .or. sl2b <= 0d0 ) then
+          sgmls(j) = 0d0
+        else
+          sgmls(j) = expit((rmin -rdl -rs(j))/sl2b)
+        endif
+        if( rs(j) < rmin .or. sr2b <= 0d0 ) then
+          sgmrs(j) = 0d0
+        else
+          sgmrs(j) = expit((rs(j) -rmin -rdr)/sr2b)
+        endif
         rels(j) = max(0.0, -ddfs(j))
         drmdf(j) = ws(j) /eps2b *(rmin - rs(j))
       enddo
@@ -5274,8 +5282,10 @@ contains
       enddo
 
       do ic=1,nc
-        grad(ibase+ic) = grad(ibase+ic) &
-             +pwgt2b *dpldc(ic) /npnts !*(dpldc(ic) +dprdc(ic))
+        if( sl2b > 0d0 ) grad(ibase+ic) = grad(ibase+ic) &
+             +pwgt2b *dpldc(ic) /npnts
+        if( sr2b > 0d0 ) grad(ibase+ic) = grad(ibase+ic) &
+             +pwgt2b *dprdc(ic) /npnts
 !!$        if( i2b==6 ) print '(a,3i5,5es12.2)','i2b,ic,ibase+ic,dpldc,grad=',&
 !!$             i2b,ic,ibase+ic,dpldc(ic),grad(ibase+ic)
       enddo
