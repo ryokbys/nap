@@ -40,26 +40,33 @@ contains
 
     integer:: nterms,i,isp
     logical:: update_force_list
+    real(8),parameter:: tiny = 1d-14
 
     fac_etrn = wgte
     fac_ftrn = wgtf
     fac_strn = wgts
 !.....evtrn, fvtrn, svtrn are variances of E,F,S
-    if( netrn > 1 ) fac_etrn = wgte /(evtrn*netrn)
-    if( nftrn > 1 ) fac_ftrn = wgtf /(fvtrn*nftrn)
-    if( nstrn > 1 ) fac_strn = wgts /(svtrn*nstrn)
+!!$    if( netrn > 1 ) fac_etrn = wgte /(evtrn*netrn)
+!!$    if( nftrn > 1 ) fac_ftrn = wgtf /(fvtrn*nftrn)
+!!$    if( nstrn > 1 ) fac_strn = wgts /(svtrn*nstrn)
+    if( evtrn > tiny ) fac_etrn = wgte /evtrn
+    if( fvtrn > tiny ) fac_ftrn = wgtf /fvtrn
+    if( svtrn > tiny ) fac_strn = wgts /svtrn
     fac_etst = wgte
     fac_ftst = wgtf
     fac_stst = wgts
-    if( netst > 1 ) fac_etst = wgte /(evtst*netst)
-    if( nftst > 1 ) fac_ftst = wgtf /(fvtst*nftst)
-    if( nstst > 1 ) fac_stst = wgts /(svtst*nstst)
+!!$    if( netst > 1 ) fac_etst = wgte /(evtst*netst)
+!!$    if( nftst > 1 ) fac_ftst = wgtf /(fvtst*nftst)
+!!$    if( nstst > 1 ) fac_stst = wgts /(svtst*nstst)
+    if( evtst > tiny ) fac_etst = wgte /evtst
+    if( fvtst > tiny ) fac_ftst = wgtf /fvtst
+    if( svtst > tiny ) fac_stst = wgts /svtst
     if( myid.eq.0 ) then
-      write(6,'(/a)') ' Prefactors for loss function by terms (train,test):'
+      write(6,'(/a)') ' Prefactors for loss functions (wgt/var) for (train,test):'
       write(6,'(a,2es14.3)') '   Energy: ', fac_etrn, fac_etst
       write(6,'(a,2es14.3)') '   Force:  ', fac_ftrn, fac_ftst
       write(6,'(a,2es14.3)') '   Stress: ', fac_strn, fac_stst
-      write(6,'(/a)') ' Species-wise force standard deviations:'
+      write(6,'(/a)') ' Species-wise force stdevs for (train,test):'
       do isp=1,nspmax
         if( nftrnp(isp) .eq. 0 ) cycle
         write(6,'(a,i1,a,2es14.3)') '   ',isp,': ', fsdvtrnp(isp), fsdvtstp(isp)
@@ -206,7 +213,8 @@ contains
          nn_nl, nn_nhl, nn_sigtype, nn_asig, &
          wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn, &
          esdvtrn, fsdvtrnp, sdvtrn, &
-         repul_radii,nsp,specorder
+         repul_radii,nsp,specorder, &
+         netrn,netst,nftrn,nftst,nstrn,nstst
     use parallel
     use descriptor,only: lupdate_gsf,get_descs,get_ints
     use DNN,only: nlayer, nhl, itypesig, asig
@@ -218,6 +226,7 @@ contains
 
     integer:: ismpl,natm,ia,ixyz,jxyz,k,nsf,nal,nnl,ir
     integer:: isp,jsp
+    integer:: netrnl,netstl,nftrnl,nftstl,nstrnl,nststl
     character(len=3):: csi,csj
     real(8):: ediff,eref,epot,swgt,esub,gsfmem
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
@@ -339,6 +348,12 @@ contains
     tergl = 0d0
     tfrcl = 0d0
     tstrsl= 0d0
+    netrnl = 0
+    netstl = 0
+    nftrnl = 0
+    nftstl = 0
+    nstrnl = 0
+    nststl = 0
     do ismpl=isid0,isid1
       if( allocated(ismask) ) then
         if( ismask(ismpl).ne.0 ) cycle
@@ -416,8 +431,10 @@ contains
             endif
             if( smpl%iclass.eq.1 .and. smpl%lfrc_eval(ia) ) then
               fftmp_trn = fftmp_trn +fdiff(ixyz,ia) *swgt *gdw *ferri
+              nftrnl = nftrnl + 1
             else
               fftmp_tst = fftmp_tst +fdiff(ixyz,ia) *swgt *gdw *ferri
+              nftstl = nftstl + 1
             endif
 !!$            fftmp= fftmp +fdiff(ixyz,ia) *swgt *gdw *ferri
           enddo
@@ -469,20 +486,24 @@ contains
       endif  ! stress matching
 
       if( smpl%iclass.eq.1 ) then
-        ftrnl = ftrnl +fetmp*fac_etrn +fstmp*fac_strn
-!.....For debugging
+        netrnl = netrnl + 1
+        nstrnl = nstrnl + 6
+!!$        ftrnl = ftrnl +fetmp*fac_etrn +fstmp*fac_strn
+!!$!.....For debugging
         fetrnl = fetrnl +fetmp*fac_etrn
         fstrnl = fstrnl +fstmp*fac_strn
       else if( smpl%iclass.eq.2 ) then
-        ftstl = ftstl +fetmp*fac_etst +fstmp*fac_stst
-!.....For debugging
+        netstl = netstl + 1
+        nststl = nststl + 6
+!!$        ftstl = ftstl +fetmp*fac_etst +fstmp*fac_stst
+!!$!.....For debugging
         fetstl = fetstl +fetmp*fac_etst
         fststl = fststl +fstmp*fac_stst
       endif
-!.....Not all the forces in iclass==1 are for train data.
-      ftrnl = ftrnl +fftmp_trn*fac_ftrn
-      ftstl = ftstl +fftmp_tst*fac_ftst
-!.....For debugging
+!!$!.....Not all the forces in iclass==1 are for train data.
+!!$      ftrnl = ftrnl +fftmp_trn*fac_ftrn
+!!$      ftstl = ftstl +fftmp_tst*fac_ftst
+!!$!.....For debugging
       fftrnl = fftrnl +fftmp_trn*fac_ftrn
       fftstl = fftstl +fftmp_tst*fac_ftst
     enddo  ! ismpl
@@ -497,20 +518,35 @@ contains
     call mpi_barrier(mpi_world,ierr)
     twl = mpi_wtime() -tw0
 
-    ftrn= 0d0
-    ftst = 0d0
     tc0= mpi_wtime()
-    call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(netrnl,netrn,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(netstl,netst,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nftrnl,nftrn,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nftstl,nftst,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nstrnl,nstrn,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(nststl,nstst,1,mpi_integer,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fetrnl,fetrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fftrnl,fftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fstrnl,fstrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fetstl,fetst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fftstl,fftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(fststl,fstst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( netrn > 0 ) fetrn = fetrn / netrn
+    if( netst > 0 ) fetst = fetst / netst
+    if( nftrn > 0 ) fftrn = fftrn / nftrn
+    if( nftst > 0 ) fftst = fftst / nftst
+    if( nstrn > 0 ) fstrn = fstrn / nstrn
+    if( nstst > 0 ) fstst = fstst / nstst
+    ftrn = fetrn + fftrn + fstrn
+    ftst = fetst + fftst + fstst
+!!$    ftrn= 0d0
+!!$    ftst = 0d0
+!!$    call mpi_allreduce(ftrnl,ftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
+!!$    call mpi_allreduce(ftstl,ftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    
 !.....For debugging
-    if( iprint.gt.1 ) then
-      call mpi_allreduce(fetrnl,fetrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(fftrnl,fftrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(fstrnl,fstrn,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(fetstl,fetst,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(fftstl,fftst,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      call mpi_allreduce(fststl,fstst,1,mpi_real8,mpi_sum,mpi_world,ierr)
-      if( myid.eq.0 ) print '(a,2(2x,3f8.4))',' Losses train(E,F,S), test(E,F,S) = ', &
+    if( iprint.gt.1 .and. myid.eq.0 ) then
+      print '(a,2(2x,3f8.4))',' Losses train(E,F,S), test(E,F,S) = ', &
            fetrn,fftrn,fstrn,fetst,fftst,fstst
     endif
     tcl = tcl + (mpi_wtime() -tc0)
@@ -580,6 +616,8 @@ contains
     real(8),parameter:: small = 1d-3
     character(len=128):: csmplname
     real(8),allocatable,save:: gpena(:)
+    real(8),allocatable,save:: getrnl(:),getrn(:),gftrnl(:),gftrn(:) ,&
+         gstrnl(:),gstrn(:)
 
     logical,external:: string_in_arr
 
@@ -590,7 +628,10 @@ contains
     endif
     if( .not.allocated(gwe) ) then
       allocate(gwe(ndim),gwf(3,ndim,maxnf),gws(6,ndim))
-      dmem = dmem +8d0*size(gwe) +8d0*size(gwf) +8d0*size(gws)
+      allocate(getrnl(ndim),getrn(ndim),gftrnl(ndim),gftrn(ndim), &
+           gstrnl(ndim),gstrn(ndim))
+      dmem = dmem +8d0*size(gwe) +8d0*size(gwf) +8d0*size(gws) &
+           +8d0*(size(getrnl)*6)
 !!$      if( myid.eq.0 ) print *,'grad_w_pmd: dmem,size(gwf)=',dmem,size(gwf)
     endif
     if( len(trim(crefstrct)).gt.5 ) then
@@ -625,6 +666,9 @@ contains
     endif
 
     gtrnl(1:ndim) = 0d0
+    getrnl(:) = 0d0
+    gftrnl(:) = 0d0
+    gstrnl(:) = 0d0
     tergl = 0d0
     tfrcl = 0d0
     tstrsl = 0d0
@@ -719,7 +763,7 @@ contains
           else  ! LS as default
             tmp = 2d0 *ediff
           endif
-          gtrnl(1:ndim) = gtrnl(1:ndim) &
+          getrnl(1:ndim) = getrnl(1:ndim) &
                +tmp/natm/eerr *swgt *fac_etrn &
                *(gwe(1:ndim) -gwesub(1:ndim))
 !!$               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
@@ -734,7 +778,7 @@ contains
           else  ! LS as default
             tmp = 2d0 *ediff
           endif
-          gtrnl(1:ndim) = gtrnl(1:ndim) &
+          getrnl(1:ndim) = getrnl(1:ndim) &
                +tmp*gwe(1:ndim)/natm/eerr *swgt *fac_etrn
 !!$               +tmp*smpl%gwe(1:ndim)/natm/eerr *swgt
         endif
@@ -774,7 +818,7 @@ contains
             else  ! LS as default
               tmp = 2d0 *fdiff(ixyz,ia)
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
+            gftrnl(1:ndim)= gftrnl(1:ndim) +tmp &
                  *gwf(ixyz,1:ndim,jfcal) *swgt *gdw *fac_ftrn &
                  *ferri
           enddo  ! ixyz=1,3
@@ -813,7 +857,7 @@ contains
             else  ! LS as default
               tmp = 2d0 *pdiff(k)
             endif
-            gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) &
+            gstrnl(1:ndim)= gstrnl(1:ndim) +tmp *gws(k,1:ndim) &
                  *swgt *fac_strn *serri
           enddo
         tstrsl = tstrsl +mpi_wtime() -ttmp
@@ -831,11 +875,18 @@ contains
     call mpi_barrier(mpi_world,ierr)
     twl = mpi_wtime() -tw0
 
-    gtrn(1:ndim) = 0d0
     tc0= mpi_wtime()
 !.....TODO: allreduce may be redundant,  only reducing to node-0 is enough
 !           if the minimization routine is wrtten so...
-    call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
+!!$    gtrn(1:ndim) = 0d0
+!!$    call mpi_allreduce(gtrnl,gtrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(getrnl,getrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(gftrnl,gftrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(gstrnl,gstrn,ndim,mpi_real8,mpi_sum,mpi_world,ierr)
+    if( netrn > 0 ) getrn(:) = getrn(:) / netrn
+    if( nftrn > 0 ) gftrn(:) = gftrn(:) / nftrn
+    if( nstrn > 0 ) gstrn(:) = gstrn(:) / nstrn
+    gtrn(:) = getrn(:) + gftrn(:) + gstrn(:)
     tcl= tcl +mpi_wtime() -tc0
 
 !!$    gtrn(1:ndim)= gtrn(1:ndim) /swgt2trn

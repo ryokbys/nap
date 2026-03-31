@@ -308,6 +308,17 @@ subroutine write_initial_setting()
   endif
   print *,''
   write(6,'(2x,a25,2x,a)') 'fitting_method',trim(cfmethod)
+  if( trim(cfmethod).eq.'sgd') then
+    write(6,'(2x,a25,2x,a)') 'sgd_update',trim(csgdupdate)
+    write(6,'(2x,a25,2x,i0)') 'batchsize_per_node', nsgdbsnode
+    write(6,'(2x,a25,2x,es12.3)') 'sgd_rate_ini', sgd_rate_ini
+    write(6,'(2x,a25,2x,es12.3)') 'sgd_rate_fin', sgd_rate_fin
+    write(6,'(2x,a25,2x,es12.3)') 'sgd_eps', sgd_eps
+    if( index(csgdupdate,'adam').ne.0 ) then
+      write(6,'(2x,a25,2x,es12.3)') 'adam_beta1', adam_b1
+      write(6,'(2x,a25,2x,es12.3)') 'adam_beta2', adam_b2
+    endif
+  endif
   write(6,'(2x,a25,2x,a)') 'loss_function',trim(ctype_loss)
   write(6,'(2x,a25,2x,es12.3)') 'xtol',xtol
   write(6,'(2x,a25,2x,es12.3)') 'ftol',ftol

@@ -269,7 +269,7 @@ contains
     include 'mpif.h'
     real(8),parameter:: tiny  = 1d-14
 
-    integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol
+    integer:: i,ismpl,iter,niter,nftol,ngtol,nxtol,inc
     integer:: ninnerstp,innerstp,ierr,itmp
     real(8):: gnorm,xnorm,dxnorm,pval,sgd_rate,sgd_ratei,pvaltmp
     real(8):: fp,ftmp,ftrn,ftst,ftsttmp
@@ -324,7 +324,7 @@ contains
     rm(:) = 0d0
     v(:) = 0d0
     x(1:ndim)= x0(1:ndim)
-    allocate(imaskarr(mynsmpl))
+    if( .not.allocated(imaskarr) ) allocate(imaskarr(mynsmpl))
     ninnerstp = myntrn /nsgdbsize
     if( mod(myntrn,nsgdbsize) .ne. 0 ) ninnerstp = ninnerstp + 1
     itmp = ninnerstp
@@ -369,10 +369,12 @@ contains
       do innerstp = 1,ninnerstp
 !.....Unmask only the samples whose imaskarr(i)==innerstp
         ismask(:) = 1
+        inc = 0
         do i=1,myntrn  ! All the test samples remain masked
           ismpl = isid0 + i -1
           if( imaskarr(i).eq.innerstp ) then
             ismask(ismpl) = 0
+            inc = inc + 1
 !!$            print *,'myid,ismpl= ',myid,ismpl
           endif
         enddo
@@ -404,7 +406,7 @@ contains
             dx(i) = -sgd_ratei*rmh(i)
           enddo
         else  ! normal SGD
-          if( gnorm/xnorm .gt. 1d0 ) g(:) = g(:) /gnorm *xnorm
+!!$          if( gnorm/xnorm .gt. 1d0 ) g(:) = g(:) /gnorm *xnorm
           dx(:) = -sgd_rate *g(:)
         endif
 
@@ -450,13 +452,13 @@ contains
       if( lconverged ) then
         x0(:) = x(:)
         maxiter = iter
-        deallocate(x,dx,rm,rmh,gpena)
+        deallocate(x,dx,rm,rmh,gpena,gp,gtmp,v,vh,xp,gpenatmp,imaskarr)
         return
       endif
     enddo  ! iter
 
     x0(1:ndim)= x(1:ndim)
-    deallocate(x,dx,rm,rmh,gpena,imaskarr)
+    deallocate(x,dx,rm,rmh,gpena,gp,gtmp,v,vh,xp,gpenatmp,imaskarr)
     return
   end subroutine sgd
 !=======================================================================
