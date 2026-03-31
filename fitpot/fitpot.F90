@@ -1651,13 +1651,19 @@ subroutine get_data_stats()
   use parallel
   implicit none
 
-  integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst,ntrnl,ntstl
+  integer:: ismpl,ia,l,ixyz,jxyz,natm,nfcal,ntrn,ntst, &
+       ntrnlp(nspmax),ntstlp(nspmax),ntrnl,ntstl
+  integer:: isp
   type(mdsys)::smpl
   real(8):: eref,esub,tmp
   real(8):: esumltrn,esumltst,esumtrn,esumtst,emtrn,emtst
   real(8):: e2sumltrn,e2sumltst,e2sumtrn,e2sumtst,e2mtrn,e2mtst
-  real(8):: fsumltrn,fsumltst,fsumtrn,fsumtst,fmtrn,fmtst
-  real(8):: f2sumltrn,f2sumltst,f2sumtrn,f2sumtst,f2mtrn,f2mtst
+  real(8):: fsumltrnp(nspmax),fsumltstp(nspmax),fsumtrnp(nspmax), &
+       fsumtstp(nspmax),fmtrnp(nspmax),fmtstp(nspmax),fmtrn,fmtst
+  real(8):: f2sumltrnp(nspmax),f2sumltstp(nspmax),f2sumtrnp(nspmax), &
+       f2sumtstp(nspmax),f2mtrnp(nspmax),f2mtstp(nspmax),&
+       f2mtrn,f2mtst,fvtrnp(nspmax),fvtstp(nspmax)
+  integer:: nftrnlp(nspmax),nftrnp(nspmax),nftstlp(nspmax),nftstp(nspmax)
   real(8):: ssumltrn,ssumltst,ssumtrn,ssumtst,smtrn,smtst
   real(8):: s2sumltrn,s2sumltst,s2sumtrn,s2sumtst,s2mtrn,s2mtst
 
@@ -1703,12 +1709,14 @@ subroutine get_data_stats()
     print *,'emtst,emtst^2,e2mtst,nsmpl_tst =',emtst,emtst**2,e2mtst,nsmpl_tst
   endif
   evtrn = (e2mtrn -emtrn**2)
+  esdvtrn = sqrt(evtrn)
   evtst = (e2mtst -emtst**2)
   etrndnm = evtrn *nsmpl_trn
   etstdnm = evtst *nsmpl_tst
   netrn = nsmpl_trn
   netst = nsmpl_tst
   call mpi_bcast(evtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(esdvtrn,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(evtst,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(etrndnm,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(etstdnm,1,mpi_real8,0,mpi_world,ierr)
@@ -1716,12 +1724,12 @@ subroutine get_data_stats()
   call mpi_bcast(netst,1,mpi_integer,0,mpi_world,ierr)
 
 !.....Force
-  fsumltrn = 0d0
-  f2sumltrn = 0d0
-  fsumltst = 0d0
-  f2sumltst = 0d0
-  ntrnl = 0
-  ntstl = 0
+  fsumltrnp(:) = 0d0
+  f2sumltrnp(:) = 0d0
+  fsumltstp(:) = 0d0
+  f2sumltstp(:) = 0d0
+  ntrnlp(:) = 0
+  ntstlp(:) = 0
   do ismpl=isid0,isid1
     smpl= samples(ismpl)
     nfcal= smpl%nfcal
@@ -1729,56 +1737,76 @@ subroutine get_data_stats()
     natm = smpl%natm
     if( smpl%iclass.eq.1 ) then
       do ia=1,natm
+        isp = int(smpl%tag(ia))
         if( smpl%lfrc_eval(ia) ) then
           do l=1,3
             tmp = smpl%fref(l,ia)
-            fsumltrn = fsumltrn +tmp
-            f2sumltrn= f2sumltrn +tmp*tmp
-            ntrnl=ntrnl +1
+            fsumltrnp(isp) = fsumltrnp(isp) +tmp
+            f2sumltrnp(isp)= f2sumltrnp(isp) +tmp*tmp
+            ntrnlp(isp) = ntrnlp(isp) +1
           enddo
         else
           do l=1,3
             tmp = smpl%fref(l,ia)
-            fsumltst = fsumltst +tmp
-            f2sumltst= f2sumltst +tmp*tmp
-            ntstl=ntstl +1
+            fsumltstp(isp) = fsumltstp(isp) +tmp
+            f2sumltstp(isp)= f2sumltstp(isp) +tmp*tmp
+            ntstlp(isp) = ntstlp(isp) +1
           enddo
         endif
       enddo
     else if( smpl%iclass.eq.2 ) then
       do ia=1,natm
+        isp = int(smpl%tag(ia))
         do l=1,3
           tmp = smpl%fref(l,ia)
-          fsumltst = fsumltst +tmp
-          f2sumltst= f2sumltst +tmp*tmp
-          ntstl=ntstl +1
+          fsumltstp(isp) = fsumltstp(isp) +tmp
+          f2sumltstp(isp)= f2sumltstp(isp) +tmp*tmp
+          ntstlp(isp) = ntstlp(isp) +1
         enddo
       enddo
     endif
   enddo
-  fsumtrn = 0d0
-  f2sumtrn = 0d0
-  fsumtst = 0d0
-  f2sumtst = 0d0
-  call mpi_reduce(fsumltrn,fsumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(f2sumltrn,f2sumtrn,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(fsumltst,fsumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(f2sumltst,f2sumtst,1,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  fsumtrnp(:) = 0d0
+  f2sumtrnp(:) = 0d0
+  fsumtstp(:) = 0d0
+  f2sumtstp(:) = 0d0
+  call mpi_reduce(fsumltrnp,fsumtrnp,nspmax,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(f2sumltrnp,f2sumtrnp,nspmax,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(fsumltstp,fsumtstp,nspmax,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(f2sumltstp,f2sumtstp,nspmax,mpi_real8,mpi_sum,0,mpi_world,ierr)
+  nftrnp(:) = 0
+  nftstp(:) = 0
+  call mpi_reduce(ntrnlp,nftrnp,nspmax, &
+       mpi_integer,mpi_sum,0,mpi_world,ierr)
+  call mpi_reduce(ntstlp,nftstp,nspmax, &
+       mpi_integer,mpi_sum,0,mpi_world,ierr)
+
+  fmtrnp(:) = 0d0
+  f2mtrnp(:)= 0d0
+  fmtstp(:) = 0d0
+  f2mtstp(:)= 0d0
+  fsdvtrnp(:) = 0d0
+  fsdvtstp(:) = 0d0
   nftrn = 0
   nftst = 0
-  call mpi_reduce(ntrnl,nftrn,1 &
-       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  call mpi_reduce(ntstl,nftst,1 &
-       ,mpi_integer,mpi_sum,0,mpi_world,ierr)
-  fmtrn = fsumtrn/nftrn
-  f2mtrn= f2sumtrn/nftrn
-  if( nftst.ne.0 ) then
-    fmtst = fsumtst/nftst
-    f2mtst= f2sumtst/nftst
-  else
-    fmtst = 0d0
-    f2mtst= 0d0
-  endif
+  do isp=1,nspmax
+    if( nftrnp(isp).ne.0 ) then
+      fmtrnp(isp) = fsumtrnp(isp)/nftrnp(isp)
+      f2mtrnp(isp)= f2sumtrnp(isp)/nftrnp(isp)
+    endif
+    if( nftstp(isp).ne.0 ) then
+      fmtstp(isp) = fsumtstp(isp)/nftstp(isp)
+      f2mtstp(isp)= f2sumtstp(isp)/nftstp(isp)
+    endif
+    nftrn = nftrn + nftrnp(isp)
+    nftst = nftst + nftstp(isp)
+    fmtrn = fmtrn + fmtrnp(isp)
+    f2mtrn= f2mtrn+ f2mtrnp(isp)
+    fmtst = fmtst + fmtstp(isp)
+    f2mtst= f2mtst+ f2mtstp(isp)
+    fsdvtrnp(isp) = sqrt(f2mtrnp(isp) - fmtrnp(isp)**2)
+    fsdvtstp(isp) = sqrt(f2mtstp(isp) - fmtstp(isp)**2)
+  enddo
   if( iprint.gt.1 .and. myid.eq.0 ) then
     print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,nftrn
     print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,nftst
@@ -1787,6 +1815,8 @@ subroutine get_data_stats()
   fvtst = (f2mtst -fmtst**2)
   ftrndnm = fvtrn *nftrn
   ftstdnm = fvtst *nftst
+  call mpi_bcast(fsdvtrnp,nspmax,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(fsdvtstp,nspmax,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(fvtrn,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(fvtst,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ftrndnm,1,mpi_real8,0,mpi_world,ierr)
@@ -1853,10 +1883,12 @@ subroutine get_data_stats()
     print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,nstst
   endif
   svtrn = (s2mtrn -smtrn**2)
+  sdvtrn= sqrt(svtrn)
   svtst = (s2mtst -smtst**2)
   strndnm = svtrn *nstrn
   ststdnm = svtst *nstst
   call mpi_bcast(svtrn,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(sdvtrn,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(svtst,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(strndnm,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(ststdnm,1,mpi_real8,0,mpi_world,ierr)

@@ -200,6 +200,7 @@ contains
          lnormalize,lnormalized,lgdw,lgdwed,terg,tfrc,tstrs, &
          nn_nl, nn_nhl, nn_sigtype, nn_asig, &
          wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn, &
+         esdvtrn, fsdvtrnp, sdvtrn, &
          repul_radii,nsp,specorder
     use parallel
     use descriptor,only: lupdate_gsf,get_descs,get_ints
@@ -217,13 +218,14 @@ contains
     real(8):: eerr,ferr,ferri,serr,serri,strs(3,3),absfref,abssref, &
          sref(3,3),ssub(3,3)
     real(8):: ftrnl,ftstl,ftmp,gdw,fetmp,fftmp,fstmp, &
-         fftmp_trn, fftmp_tst
+         fftmp_trn, fftmp_tst, fsdvtrn
     real(8):: fetstl,fftstl,fststl,fetst,fftst,fstst
     real(8):: fetrnl,fftrnl,fstrnl,fetrn,fftrn,fstrn
     real(8):: tfl,tcl,tfg,tcg,tf0,tc0,tw0,twl,twg,tsmp0
     real(8):: tergl,tfrcl,tstrsl,tmp
 !!$    real(8):: fac_e, fac_f, fac_s
     type(mdsys):: smpl
+    real(8),parameter:: tiny = 1d-8
     logical,save:: l1st = .true.
     logical,parameter:: lgrad = .false.
     logical,parameter:: lgrad_done = .false.
@@ -361,8 +363,9 @@ contains
           ediff= (epot+esub -eref)/natm /eerr
         endif
         if( trim(ctype_loss).eq.'huber' ) then
-          if( abs(ediff).gt.1.d0 ) then
-            ediff = 2d0*abs(ediff) -1d0
+          if( abs(ediff).gt.esdvtrn ) then
+            ediff = 2d0*esdvtrn*(abs(ediff) &
+                 -0.5d0*esdvtrn)
           else
             ediff = ediff *ediff
           endif
@@ -381,15 +384,15 @@ contains
         fsub(1:3,1:natm) = smpl%fsub(1:3,1:natm)
         do ia=1,natm
 !!$          if( .not. smpl%lfrc_eval(ia) ) cycle
+          isp = int(smpl%tag(ia))
+          fsdvtrn = fsdvtrnp(isp)
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
           absfref = sqrt(fref(1,ia)**2 +fref(2,ia)**2 +fref(3,ia)**2)
           if( cfrc_scale(1:3).eq.'abs' ) then
             ferri = 1d0 /f_scale
           else if( cfrc_scale(1:3).eq.'rel' ) then
-            ferri = 1d0/ max(absfref,f_scale)
-          else if( cfrc_scale(1:3).eq.'exp' ) then
-            ferri = min(exp(-absfref/f_scale), 1d0)
+            ferri = 1d0/ max(absfref, f_scale)
           else  ! default: one
             ferri = 1d0
           endif
@@ -397,8 +400,9 @@ contains
             fdiff(ixyz,ia)= (frcs(ixyz,ia)+fsub(ixyz,ia) &
                  -fref(ixyz,ia))
             if( trim(ctype_loss).eq.'huber' ) then
-              if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
-                fdiff(ixyz,ia) = 2d0*abs(fdiff(ixyz,ia)) -1d0
+              if( abs(fdiff(ixyz,ia)).gt.fsdvtrn ) then
+                fdiff(ixyz,ia) = 2d0*fsdvtrn*(abs(fdiff(ixyz,ia)) &
+                     -0.5d0*fsdvtrn)
               else
                 fdiff(ixyz,ia)= fdiff(ixyz,ia)*fdiff(ixyz,ia)
               endif
@@ -429,8 +433,6 @@ contains
           serri = 1d0/ s_scale
         else if( cstrs_scale(1:3).eq.'rel' ) then
           serri = 1d0/ max(abssref,s_scale)
-        else if( cstrs_scale(1:3).eq.'exp' ) then
-          serri = min(exp(-abssref/s_scale), 1d0)
         else  ! default: one
           serri = 1d0
         endif
@@ -444,8 +446,9 @@ contains
         enddo
         if( trim(ctype_loss).eq.'huber' ) then
           do k=1,6
-            if( abs(pdiff(k)).gt.1d0 ) then
-              pdiff(k) = 2d0*abs(pdiff(k)) -1d0
+            if( abs(pdiff(k)).gt.sdvtrn ) then
+              pdiff(k) = 2d0*sdvtrn*(abs(pdiff(k)) &
+                   -0.5d0*sdvtrn)
             else
               pdiff(k)= pdiff(k)*pdiff(k)
             endif
@@ -545,8 +548,9 @@ contains
          maxna,maxnf,lematch,lfmatch,lsmatch,erefsub,crefstrct, &
          rcut,myidrefsub,isidrefsub,iprint, &
          ctype_loss,cfrc_scale,cstrs_scale,lgdw,dmem,terg,tfrc,tstrs, &
-         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn,cpot,cpotlow, &
-         vranges,ismask, repul_radii
+         wgte,wgtf,wgts,netrn,nftrn,nstrn,evtrn,fvtrn,svtrn, &
+         esdvtrn,fsdvtrnp,sdvtrn, &
+         cpot,cpotlow,vranges,ismask, repul_radii
     use parallel
 !!$    use minimize
     use UF3,only: get_mem_uf3, get_mem_uf3l, get_mem_uf3d, &
@@ -556,18 +560,19 @@ contains
     real(8),intent(in):: x(ndim)
     real(8),intent(out):: gtrn(ndim)
 
-    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i,jfcal,nfcal
+    integer:: ismpl,natm,k,ia,ixyz,jxyz,iv,iff,i,jfcal,nfcal,isp
     real(8):: tcl,tgl,tcg,tgg,tc0,tg0,tw0,twl,twg,tsmp0, &
          epot,esub,strs(3,3), &
          sref(3,3),ssub(3,3)
     real(8):: ediff,eerr,eref,swgt,ferr,ferri,serr,serri,tmp,gdw
-    real(8):: absfref,abssref
+    real(8):: absfref,abssref,fsdvtrn
     real(8):: tergl, tfrcl, tstrsl, ttmp
     type(mdsys):: smpl
     logical,save:: l1st = .true.
     logical,parameter:: lgrad = .true.
     logical:: lgrad_done = .false.
     logical,parameter:: lfdsgnmat = .false.
+    real(8),parameter:: small = 1d-3
     character(len=128):: csmplname
     real(8),allocatable,save:: gpena(:)
 
@@ -700,14 +705,14 @@ contains
         eerr = 1d0
         if( len(trim(crefstrct)).gt.5 ) then
           ediff= (epot-epotsub*natm+esub -(eref-erefsub*natm))/natm /eerr
-          if( trim(ctype_loss).eq.'LS' ) then
-            tmp = 2d0 *ediff
-          else  ! Huber
-            if( abs(ediff).gt.1d0 ) then
-              tmp = 2d0 *sign(1d0,ediff)
+          if( trim(ctype_loss).eq.'huber' ) then
+            if( abs(ediff).gt.esdvtrn ) then
+              tmp = 2d0 *sign(esdvtrn,ediff)
             else
               tmp = 2d0 *ediff
             endif
+          else  ! LS as default
+            tmp = 2d0 *ediff
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
                +tmp/natm/eerr *swgt *fac_etrn &
@@ -715,14 +720,14 @@ contains
 !!$               *(smpl%gwe(1:ndim) -gwesub(1:ndim))
         else
           ediff= (epot+esub -eref)/natm /eerr
-          if( trim(ctype_loss).eq.'LS' ) then
-            tmp = 2d0 *ediff
-          else  ! Huber
-            if( abs(ediff).gt.1d0 ) then
-              tmp = 2d0 *sign(1d0,ediff)
+          if( trim(ctype_loss).eq.'huber' ) then
+            if( abs(ediff).gt.esdvtrn ) then
+              tmp = 2d0 *sign(esdvtrn,ediff)
             else
               tmp = 2d0 *ediff
             endif
+          else  ! LS as default
+            tmp = 2d0 *ediff
           endif
           gtrnl(1:ndim) = gtrnl(1:ndim) &
                +tmp*gwe(1:ndim)/natm/eerr *swgt *fac_etrn
@@ -739,6 +744,8 @@ contains
         jfcal = 0
         do ia=1,natm
           if( .not. smpl%lfrc_eval(ia) ) cycle
+          isp = int(smpl%tag(ia))
+          fsdvtrn = fsdvtrnp(isp)
           jfcal = jfcal +1
           gdw = 1d0
           if( lgdw ) gdw = smpl%gdw(ia)
@@ -747,22 +754,20 @@ contains
             ferri = 1d0 /f_scale
           else if( cfrc_scale(1:3).eq.'rel' ) then
             ferri = 1d0/ max(absfref,f_scale)
-          else if( cfrc_scale(1:3).eq.'exp' ) then
-            ferri = min(exp(-absfref/f_scale), 1d0)
           else  ! default: one
             ferri = 1d0
           endif
           do ixyz=1,3
             fdiff(ixyz,ia)= (frcs(ixyz,ia) + fsub(ixyz,ia) &
                  -fref(ixyz,ia))
-            if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *fdiff(ixyz,ia)
-            else  ! Huber
-              if( abs(fdiff(ixyz,ia)).gt.1d0 ) then
-                tmp = 2d0 *sign(1d0,fdiff(ixyz,ia))
+            if( trim(ctype_loss).eq.'huber' ) then
+              if( abs(fdiff(ixyz,ia)).gt.fsdvtrn ) then
+                tmp = 2d0 *sign(fsdvtrn,fdiff(ixyz,ia))
               else
                 tmp = 2d0 *fdiff(ixyz,ia)
               endif
+            else  ! LS as default
+              tmp = 2d0 *fdiff(ixyz,ia)
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp &
                  *gwf(ixyz,1:ndim,jfcal) *swgt *gdw *fac_ftrn &
@@ -783,8 +788,6 @@ contains
           serri = 1d0/ s_scale
         else if( cstrs_scale(1:3).eq.'rel' ) then
           serri = 1d0/ max(abssref,s_scale)
-        else if( cstrs_scale(1:3).eq.'exp' ) then
-          serri = min(exp(-abssref/s_scale), 1d0)
         else ! default: one
           serri = 1d0
         endif
@@ -796,14 +799,14 @@ contains
             enddo
           enddo
           do k=1,6
-            if( trim(ctype_loss).eq.'LS' ) then
-              tmp = 2d0 *pdiff(k)
-            else  ! Huber
-              if( abs(pdiff(k)).gt.1d0 ) then
-                tmp = 2d0 *sign(1d0,pdiff(k))
+            if( trim(ctype_loss).eq.'huber' ) then
+              if( abs(pdiff(k)).gt.sdvtrn ) then
+                tmp = 2d0 *sign(sdvtrn,pdiff(k))
               else
                 tmp = 2d0 *pdiff(k)
               endif
+            else  ! LS as default
+              tmp = 2d0 *pdiff(k)
             endif
             gtrnl(1:ndim)= gtrnl(1:ndim) +tmp *gws(k,1:ndim) &
                  *swgt *fac_strn *serri

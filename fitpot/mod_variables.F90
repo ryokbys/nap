@@ -63,12 +63,13 @@ module variables
   real(8):: vinitrs  = 12345d0
 !.....Characteristic force scale used for limit or decay length
   real(8):: f_scale = 1d0
+  
 !.....Characteristic stress scale used for limit or decay length
   real(8):: s_scale = 1d0
 !.....Loss function type: LS (least-square), Huber
   character(len=128):: ctype_loss = 'LS'
 !.....Scaling type of force|stress in loss function:
-!.....  one (default) | abs | rel | exp
+!.....  one (default) | abs | sgm
   character(len=128):: cfrc_scale = 'one' !
   character(len=128):: cstrs_scale = 'one' !
 !.....Gaussian density weight
@@ -177,7 +178,8 @@ module variables
   real(8),allocatable:: vbest(:)
 
   integer:: netrn,netst,nftrn,nftst,nstrn,nstst
-  real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst
+  real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst, &
+       fsdvtrnp(nspmax),fsdvtstp(nspmax), esdvtrn, sdvtrn
   real(8):: etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm
 
   real(8):: time0,tcomm,tfunc,tgrad,twait
