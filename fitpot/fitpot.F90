@@ -1663,7 +1663,7 @@ subroutine get_data_stats()
   real(8):: f2sumltrnp(nspmax),f2sumltstp(nspmax),f2sumtrnp(nspmax), &
        f2sumtstp(nspmax),f2mtrnp(nspmax),f2mtstp(nspmax),&
        f2mtrn,f2mtst,fvtrnp(nspmax),fvtstp(nspmax)
-  integer:: nftrnlp(nspmax),nftrnp(nspmax),nftstlp(nspmax),nftstp(nspmax)
+  integer:: nftrnlp(nspmax),nftstlp(nspmax)
   real(8):: ssumltrn,ssumltst,ssumtrn,ssumtst,smtrn,smtst
   real(8):: s2sumltrn,s2sumltst,s2sumtrn,s2sumtst,s2mtrn,s2mtst
 
@@ -1704,10 +1704,6 @@ subroutine get_data_stats()
     emtst = 0d0
     e2mtst= 0d0
   endif
-  if( iprint.gt.1 .and. myid.eq.0 ) then
-    print *,'emtrn,emtrn^2,e2mtrn,nsmpl_trn =',emtrn,emtrn**2,e2mtrn,nsmpl_trn
-    print *,'emtst,emtst^2,e2mtst,nsmpl_tst =',emtst,emtst**2,e2mtst,nsmpl_tst
-  endif
   evtrn = (e2mtrn -emtrn**2)
   esdvtrn = sqrt(evtrn)
   evtst = (e2mtst -emtst**2)
@@ -1722,6 +1718,12 @@ subroutine get_data_stats()
   call mpi_bcast(etstdnm,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(netrn,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(netst,1,mpi_integer,0,mpi_world,ierr)
+  if( iprint.gt.1 .and. myid.eq.0 ) then
+    print '(3x,a,4es14.4,i7)','train:em,em^2,e2m,ev,nsmpl =', &
+         emtrn,emtrn**2,e2mtrn,evtrn,nsmpl_trn
+    print '(3x,a,4es14.4,i7)','test :em,em^2,e2m,ev,nsmpl =', &
+         emtst,emtst**2,e2mtst,evtst,nsmpl_tst
+  endif
 
 !.....Force
   fsumltrnp(:) = 0d0
@@ -1789,27 +1791,35 @@ subroutine get_data_stats()
   fsdvtstp(:) = 0d0
   nftrn = 0
   nftst = 0
+  fmtrn = 0d0
+  f2mtrn= 0d0
+  fmtst = 0d0
+  f2mtst= 0d0
   do isp=1,nspmax
-    if( nftrnp(isp).ne.0 ) then
+    if( nftrnp(isp) > 0 ) then
       fmtrnp(isp) = fsumtrnp(isp)/nftrnp(isp)
       f2mtrnp(isp)= f2sumtrnp(isp)/nftrnp(isp)
     endif
-    if( nftstp(isp).ne.0 ) then
+    if( nftstp(isp) > 0 ) then
       fmtstp(isp) = fsumtstp(isp)/nftstp(isp)
       f2mtstp(isp)= f2sumtstp(isp)/nftstp(isp)
     endif
     nftrn = nftrn + nftrnp(isp)
     nftst = nftst + nftstp(isp)
-    fmtrn = fmtrn + fmtrnp(isp)
-    f2mtrn= f2mtrn+ f2mtrnp(isp)
-    fmtst = fmtst + fmtstp(isp)
-    f2mtst= f2mtst+ f2mtstp(isp)
+    fmtrn = fmtrn + fsumtrnp(isp)
+    f2mtrn= f2mtrn+ f2sumtrnp(isp)
+    fmtst = fmtst + fsumtstp(isp)
+    f2mtst= f2mtst+ f2sumtstp(isp)
     fsdvtrnp(isp) = sqrt(f2mtrnp(isp) - fmtrnp(isp)**2)
     fsdvtstp(isp) = sqrt(f2mtstp(isp) - fmtstp(isp)**2)
   enddo
-  if( iprint.gt.1 .and. myid.eq.0 ) then
-    print *,'fmtrn,fmtrn^2,f2mtrn,ntrn =',fmtrn,fmtrn**2,f2mtrn,nftrn
-    print *,'fmtst,fmtst^2,f2mtst,ntst =',fmtst,fmtst**2,f2mtst,nftst
+  if( nftrn > 0 ) then
+    fmtrn = fmtrn / nftrn
+    f2mtrn= f2mtrn / nftrn
+  endif
+  if( nftst > 0 ) then
+    fmtst = fmtst / nftst
+    f2mtst= f2mtst / nftst
   endif
   fvtrn = (f2mtrn -fmtrn**2)
   fvtst = (f2mtst -fmtst**2)
@@ -1823,6 +1833,12 @@ subroutine get_data_stats()
   call mpi_bcast(ftstdnm,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nftrn,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nftst,1,mpi_integer,0,mpi_world,ierr)
+  if( iprint.gt.1 .and. myid.eq.0 ) then
+    print '(3x,a,4es14.4,i7)','train:fm,fm^2,f2m,fv,nf =', &
+         fmtrn,fmtrn**2,f2mtrn,fvtrn,nftrn
+    print '(3x,a,4es14.4,i7)','test :fm,fm^2,f2m,fv,nf =', &
+         fmtst,fmtst**2,f2mtst,fvtst,nftst
+  endif
 
 !.....Stress
   ssumltrn = 0d0
@@ -1878,10 +1894,6 @@ subroutine get_data_stats()
     smtst = 0d0
     s2mtst= 0d0
   endif
-  if( iprint.gt.1 .and. myid.eq.0 ) then
-    print *,'smtrn,smtrn^2,s2mtrn,ntrn =',smtrn,smtrn**2,s2mtrn,nstrn
-    print *,'smtst,smtst^2,s2mtst,ntst =',smtst,smtst**2,s2mtst,nstst
-  endif
   svtrn = (s2mtrn -smtrn**2)
   sdvtrn= sqrt(svtrn)
   svtst = (s2mtst -smtst**2)
@@ -1894,6 +1906,13 @@ subroutine get_data_stats()
   call mpi_bcast(ststdnm,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(nstrn,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(nstst,1,mpi_integer,0,mpi_world,ierr)
+  if( iprint.gt.1 .and. myid.eq.0 ) then
+    print '(3x,a,4es14.4,i7)','train:sm,sm^2,s2m,sv,ns =', &
+         smtrn,smtrn**2,s2mtrn,svtrn,nstrn
+    print '(3x,a,4es14.4,i7)','test :sm,sm^2,s2m,sv,ns =', &
+         smtst,smtst**2,s2mtst,svtst,nstst
+  endif
+  
   if( myid.eq.0 .and. iprint.ge.1 ) then
     print '(/a)',' Number of data (total,train,test), standard deviations (train, test):'
     print '(a,3i10,2es12.3)', '   Energy: ',netrn+netst,netrn,netst,&

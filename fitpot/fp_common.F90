@@ -31,14 +31,14 @@ contains
     use variables,only: lematch,lfmatch,lsmatch,wgte,wgtf,wgts, &
          evtrn,fvtrn,svtrn,netrn,nftrn,nstrn, &
          evtst,fvtst,svtst,netst,nftst,nstst, &
-         nspmax,rcut,iprint,nff,cffs
+         nspmax,rcut,iprint,nff,cffs,nftrnp,fsdvtrnp,fsdvtstp
     use parallel,only: myid
     use pmdvars, only: naux,nstp,nx,ny,nz,dt,rbuf,rc1nn,lvc
     use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
     use element,only: init_element
     use force,only: num_forces, force_list, loverlay
 
-    integer:: nterms,i
+    integer:: nterms,i,isp
     logical:: update_force_list
 
     fac_etrn = wgte
@@ -59,6 +59,11 @@ contains
       write(6,'(a,2es14.3)') '   Energy: ', fac_etrn, fac_etst
       write(6,'(a,2es14.3)') '   Force:  ', fac_ftrn, fac_ftst
       write(6,'(a,2es14.3)') '   Stress: ', fac_strn, fac_stst
+      write(6,'(/a)') ' Species-wise force standard deviations:'
+      do isp=1,nspmax
+        if( nftrnp(isp) .eq. 0 ) cycle
+        write(6,'(a,i1,a,2es14.3)') '   ',isp,': ', fsdvtrnp(isp), fsdvtstp(isp)
+      enddo
     endif
 
 !.....Create MPI COMM for pmd only for the 1st time

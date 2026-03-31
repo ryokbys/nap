@@ -177,7 +177,8 @@ module variables
   real(8):: fbest
   real(8),allocatable:: vbest(:)
 
-  integer:: netrn,netst,nftrn,nftst,nstrn,nstst
+  integer:: netrn,netst,nftrn,nftst,nstrn,nstst, &
+       nftrnp(nspmax),nftstp(nspmax)
   real(8):: evtrn,evtst,fvtrn,fvtst,svtrn,svtst, &
        fsdvtrnp(nspmax),fsdvtstp(nspmax), esdvtrn, sdvtrn
   real(8):: etrndnm,etstdnm,ftrndnm,ftstdnm,strndnm,ststdnm
