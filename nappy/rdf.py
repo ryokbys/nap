@@ -674,9 +674,8 @@ def gen_plot_rdf(datafname: str,
             sj = specorder[jsid-1]
             n += 1
             num_pair_dict[n] = (si,sj)
-    datestr = datetime.now().strftime('%y%m%d')
     if gpfname is None:
-        gpfname = f'plot_rdf_{datestr}.gp'
+        gpfname = f'plot_rdf.gp'
     with open(gpfname, 'w') as f:
         f.write("set xl 'Distance (Ang.)'\n")
         f.write("set yl 'RDF'\n")
