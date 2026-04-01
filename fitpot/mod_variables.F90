@@ -278,7 +278,7 @@ module variables
 
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
-  character(len=128):: clinmin= 'backtrack'
+  character(len=128):: clinmin= 'armijo'
   character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
   real(8):: pwgt = 1d-15
 
@@ -310,6 +310,10 @@ module variables
   real(8):: armijo_xi      = 1.0d-4
   real(8):: armijo_tau     = 0.5d0
   integer:: armijo_maxiter = 15
+!.....Wolf parameters
+  real(8):: wolf_c1     = 1d-4
+  real(8):: wolf_c2     = 0.9d0
+  real(8):: wolf_alp_max = 100d0
 
 !.....CG
   integer:: icgbtype = 1 ! 1:FR, 2:PRP, 3:HS, 4:DY

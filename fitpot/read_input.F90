@@ -270,6 +270,15 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'armijo_maxiter' ) then
     call read_i1(ionum,armijo_maxiter)
     return
+  elseif( trim(cname).eq.'wolf_c1' ) then
+    call read_r1(ionum,wolf_c1)
+    return
+  elseif( trim(cname).eq.'wolf_c2' ) then
+    call read_r1(ionum,wolf_c2)
+    return
+  elseif( trim(cname).eq.'wolf_alp_max' ) then
+    call read_r1(ionum,wolf_alp_max)
+    return
   elseif( trim(cname).eq.'niter_linmin' ) then
     call read_i1(ionum,niter_linmin)
     return

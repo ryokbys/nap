@@ -2049,6 +2049,10 @@ subroutine sync_input()
   call mpi_bcast(armijo_xi,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_tau,1,mpi_real8,0,mpi_world,ierr)
   call mpi_bcast(armijo_maxiter,1,mpi_integer,0,mpi_world,ierr)
+!.....Wolf
+  call mpi_bcast(wolf_c1,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(wolf_c2,1,mpi_real8,0,mpi_world,ierr)
+  call mpi_bcast(wolf_alp_max,1,mpi_real8,0,mpi_world,ierr)
 !.....gFS
   call mpi_bcast(ninnergfs,1,mpi_integer,0,mpi_world,ierr)
   call mpi_bcast(cread_fsmask,128,mpi_character,0,mpi_world,ierr)

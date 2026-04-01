@@ -3,7 +3,8 @@ module minimize
        nsgdbsize,nsgdbsnode,ismask,csgdupdate,sgd_rate_ini,sgd_rate_fin, &
        sgd_eps,adam_b1,adam_b2,ninnergfs,cread_fsmask,cfs_xrefresh, &
        maxfsrefresh,niter_linmin,fac_dec,fac_inc,armijo_xi,armijo_tau, &
-       armijo_maxiter,icgbtype,m_lbfgs,fupper_lim
+       armijo_maxiter,icgbtype,m_lbfgs,fupper_lim, &
+       wolf_c1,wolf_c2,wolf_alp_max
   use fp_common,only: wrap_ranges, func=>func_w_pmd, grad=>grad_w_pmd
   implicit none 
   save
@@ -837,14 +838,11 @@ contains
         call golden_section(ndim,x,u,ftrn,ftst,pval, &
              xtol,gtol,ftol,alpha,iprint,iflag,myid)
       else if( trim(clinmin).eq.'armijo' ) then
-!.....To enhance the convergence in Armijo search,
-!.....use the history of previous alpha by multiplying 2
-!.....avoiding constant decrease, but alpha should not be greater than 1.
-!!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
-!!$        alpha = max(alpha,xtol)*2d0
-!!$        alpha = alpha *fac_inc
         alpha = 1d0
         call armijo_search(ndim,x,xranges,u,ftrn,ftst,pval, &
+             g,alpha,iprint,iflag,myid,niter)
+      else if( trim(clinmin).eq.'wolf' ) then
+        call wolf_search(ndim,x,xranges,u,ftrn,ftst,pval, &
              g,alpha,iprint,iflag,myid,niter)
       else ! backtrack (default)
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
@@ -911,10 +909,10 @@ contains
         return
       endif
 
-      
+
       if( limited_mem ) then
 !.....L-BFGS algorithm, see wikipedia page for detail
-        
+
 !.....Newest data is at s(:,m_lbfgs), oldest data is at s(:,1)
         do i=2,m_lbfgs
           si(:,i-1) = si(:,i)
@@ -947,7 +945,7 @@ contains
           q(:) = q(:) +(ai(i)-bi(i))*si(:,i)
         enddo
         u(:) = -q(:)
-        
+
       else  ! BFGS
         s(:)= alpha *u(:)
         y(:)= g(:) -gp(:)
@@ -960,7 +958,8 @@ contains
             return
           else
             if(myid.eq.0) then
-              print *,'>>> Initialize gg'
+              print *,'>>> Initialize gg, because of any of the following values is small:'
+              print '(3x,a,5es12.2)','|y|,|dx|,|g|,|df|=',ynorm,dxnorm,gnorm,abs(ftrn-fp)
             endif
           endif
           gg(1:ndim,1:ndim)= 0d0
@@ -973,28 +972,30 @@ contains
 
 !.....update matrix gg in BFGS
         sy= dot_product(s,y)
-        syi= 1d0/sy
-        do i=1,ndim
-          tmp1= 0d0
-          tmp2= 0d0
-          do j=1,ndim
-            tmp1= tmp1 +gg(j,i)*y(j)
-          enddo
-          ggy(i)= tmp1 *syi
-        enddo
-        b= 1d0
-        do i=1,ndim
-          b=b +y(i)*ggy(i)
-        enddo
-        b= b*syi
-!.....without temporary matrix aa
-        do j=1,ndim
+        if( sy > 0d0 ) then  ! if sy <= 0d0, not to update gg
+          syi= 1d0/sy
           do i=1,ndim
-            gg(i,j)=gg(i,j) +s(j)*s(i)*b &
-                 -(s(i)*ggy(j) +ggy(i)*s(j))
+            tmp1= 0d0
+            tmp2= 0d0
+            do j=1,ndim
+              tmp1= tmp1 +gg(j,i)*y(j)
+            enddo
+            ggy(i)= tmp1 *syi
           enddo
-        enddo
-        ngg_init = 0
+          b= 1d0
+          do i=1,ndim
+            b=b +y(i)*ggy(i)
+          enddo
+          b= b*syi
+!.....without temporary matrix aa
+          do j=1,ndim
+            do i=1,ndim
+              gg(i,j)=gg(i,j) +s(j)*s(i)*b &
+                   -(s(i)*ggy(j) +ggy(i)*s(j))
+            enddo
+          enddo
+          ngg_init = 0
+        endif
       endif
 
     enddo  ! iter
@@ -1297,6 +1298,162 @@ contains
 
   end subroutine golden_section
 !=======================================================================
+  subroutine wolf_search(ndim,x0,xranges,d,ftrn,ftst,pval, &
+       g,alpha,iprint,iflag,myid,niter)
+!  
+!  1D search using strong Wolf condition.
+!
+    implicit none
+    integer,intent(in):: ndim,iprint,myid
+    integer,intent(inout):: iflag,niter
+    real(8),intent(in):: x0(ndim),d(ndim),xranges(2,ndim)
+    real(8),intent(inout):: ftrn,alpha,ftst,pval,g(ndim)
+
+    real(8),parameter:: tiny = 1d-10
+    integer:: iter
+    real(8):: alpi,phi0,f0,fi,fp,pvalp,alpp,phii
+    real(8):: ftrni, ftsti
+    real(8):: alo,ahi,flo,fhi
+    real(8),allocatable,save,dimension(:):: xi,gi
+    logical,save:: l1st = .true.
+
+    if( l1st ) then
+      if( myid.eq.0 .and. iprint.gt.0 ) then
+        write(6,'(a)') ' Strong wolf parameters:'
+        write(6,'(a,es12.3)') '   c1     = ', wolf_c1
+        write(6,'(a,es12.3)') '   c2     = ', wolf_c2
+        write(6,'(a,i8)')     '   niter  = ', niter_linmin
+        write(6,'(a,es12.3)') '   alpha_max = ', wolf_alp_max
+      endif
+      l1st = .false.
+    endif
+
+    if( .not. allocated(xi) ) allocate(xi(ndim),gi(ndim))
+!.....Initial phi0 = g^T * d
+    phi0 = dot_product(g,d)
+    if( phi0 >= 0.0d0 ) then
+      iflag= iflag + 100
+      alpha = 0d0
+      if( myid.eq.0 .and. iprint.gt.0 ) print *,'WARNING: g*d > 0.0'
+      return
+    endif
+    alpp = 0d0
+    alpi = 1d0
+
+    f0= ftrn
+    fp= f0
+    do iter=1,niter_linmin
+      xi(:)= x0(:) +alpi * d(:)
+      call wrap_ranges(ndim,xi,xranges)
+      call func(ndim,xi,ftrni,ftsti,pval)
+      call grad(ndim,xi,gi)
+!.....Armijo condition check
+      if( (ftrni > f0 + wolf_c1 * alpi * phi0) .or. &
+           (iter > 1 .and. ftrni >= fp)) then
+        alo = alpp; ahi = alpi; flo = fp; fhi = ftrni
+        call wolf_zoom(ndim, x0, xranges, d, f0, phi0, &
+             alo, ahi, flo, fhi, alpha, ftrni, ftsti, gi)
+        ftrn= ftrni
+        ftst= ftsti
+        niter = iter
+        g(:) = gi(:)
+        return
+      endif
+
+!.....Strong curvature check
+      phii = dot_product(gi,d)
+      if( abs(phii) <= -wolf_c2 * phi0 ) then  ! satisfied
+        alpha = alpi
+        ftrn = ftrni
+        ftst = ftsti
+        niter = iter
+        g(:) = gi(:)
+        return
+      endif
+
+!.....Gradient is positive (overshoot the minimum)
+      if( phii >= 0d0 ) then
+        alo = alpi; ahi = alpp; flo = ftrni; fhi = fp
+        call wolf_zoom(ndim, x0, xranges, d, f0, phi0, &
+             alo, ahi, flo, fhi, alpha, ftrni, ftsti, gi)
+        ftrn= ftrni
+        ftst= ftsti
+        niter = iter
+        g(:) = gi(:)
+        return
+      endif
+      
+      alpp = alpi
+      fp = ftrni
+      alpi = min(2d0*alpi, wolf_alp_max)
+    enddo
+
+    iflag= iflag +100
+    niter= iter
+    if( myid.eq.0 .and. iprint.gt.0 ) then
+      print *,'WARNING: iter.gt.NITER_LINMIN in wolf_search.'
+    endif
+    return
+    
+  end subroutine wolf_search
+!=======================================================================
+  subroutine wolf_zoom(ndim, x0, xranges, d, f0, phi0, a_lo, a_hi, &
+       f_lo, f_hi, a_star, ftrn, ftst, g_fin)
+    integer,intent(in):: ndim
+    real(8),intent(in):: x0(ndim), xranges(ndim), d(ndim), f0, phi0
+    real(8),intent(inout):: a_lo, a_hi, f_lo, f_hi, ftst, ftrn
+    real(8),intent(inout):: a_star, g_fin(ndim)
+
+    real(8):: ftrnj,ftrnp, ftstj, gj(ndim), phij, xj(ndim),pvalj
+    integer:: j
+
+    ftrnp = f_lo
+    do j=1,10
+! 二次内挿による a_star の決定
+! phi(a) = f_0 + p_p0*a + coeff*a^2 のモデル
+      a_star = -(phi0 * a_lo**2) / (2d0 * (f_lo - f0 - phi0*a_lo))
+
+! 内挿が失敗、または区間の外に出た場合は二分法
+      if(a_star <= min(a_lo, a_hi) .or. a_star >= max(a_lo, a_hi) .or. &
+           a_star*0d0 .ne. 0d0 ) then
+        a_star = 0.5d0 * (a_lo + a_hi)
+      end if
+      
+      xj(:) = x0(:) + a_star * d(:)
+      call wrap_ranges(ndim,xj,xranges)
+      call func(ndim, xj, ftrnj, ftstj, pvalj)
+      call grad(ndim, xj, gj)
+
+      if( (ftrnj > f0 + wolf_c1 * phi0) .or. &
+           (ftrnj >= f_lo) ) then
+        a_hi = a_star
+        f_hi = ftrnj
+      else
+        phij = dot_product(gj, d)
+!.....strong curvature condition
+        if( abs(phij) <= -wolf_c2 * phi0 ) then
+          g_fin(:) = gj(:)
+          ftst = ftstj
+          ftrn = ftrnj
+          return
+        endif
+
+!.....update range
+        if( phij * (a_hi - a_lo) >= 0d0 ) then
+          a_hi = a_lo
+          f_hi = f_lo
+        endif
+        a_lo = a_star
+        f_lo = ftrnj
+        
+      endif
+    enddo
+    g_fin(:) = gj(:)
+    ftst = ftstj
+    ftrn = ftrnj
+    return
+  end subroutine wolf_zoom
+!=======================================================================
   subroutine armijo_search(ndim,x0,xranges,d,ftrn,ftst,pval, &
        g,alpha,iprint,iflag,myid,niter)
 !  
@@ -1311,7 +1468,7 @@ contains
     real(8),parameter:: tiny = 1d-10
     integer:: iter
     real(8):: alpi,xigd,f0,fi,fp,pvalp,alpp,ftsti
-    real(8),allocatable,save,dimension(:):: x1(:),gpena(:)
+    real(8),allocatable,save,dimension(:):: x1(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1324,7 +1481,7 @@ contains
       l1st = .false.
     endif
 
-    if( .not. allocated(x1) ) allocate(x1(ndim),gpena(ndim))
+    if( .not. allocated(x1) ) allocate(x1(ndim))
     xigd= armijo_xi * dot_product(g,d)
     if( xigd.gt.0d0 ) then
       iflag= iflag + 100
