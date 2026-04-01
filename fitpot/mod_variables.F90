@@ -278,7 +278,7 @@ module variables
 
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
-  character(len=128):: clinmin= 'armijo'
+  character(len=128):: clinmin= 'wolf'
   character(len=128):: cfsmode= 'grad'  ! [grad,grad0corr,df0corr]
   real(8):: pwgt = 1d-15
 

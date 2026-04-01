@@ -69,8 +69,6 @@ contains
         endif
         iflag= iflag +1
         lconverged = .true.
-!!$        x0(1:ndim)= x(1:ndim)
-!!$        maxiter = iter
         return
       endif
     else if( gnorm.lt.gtol ) then
@@ -85,8 +83,6 @@ contains
         endif
         iflag= iflag +2
         lconverged = .true.
-!!$        x0(1:ndim)= x(1:ndim)
-!!$        maxiter = iter
         return
       endif
     else if( fdiff.lt.ftol) then
@@ -101,8 +97,6 @@ contains
         endif
         iflag= iflag +3
         lconverged = .true.
-!!$        x0(1:ndim)= x(1:ndim)
-!!$        maxiter = iter
         return
       endif
     else
@@ -946,7 +940,8 @@ contains
         enddo
         u(:) = -q(:)
 
-      else  ! BFGS
+!.....BFGS hereafter
+      else
         s(:)= alpha *u(:)
         y(:)= g(:) -gp(:)
         ynorm= dot_product(y,y)
