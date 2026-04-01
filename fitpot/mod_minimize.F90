@@ -147,8 +147,8 @@ contains
     call wrap_ranges(ndim,x,xranges)
     call func(ndim,x,ftrn,ftst,pval)
     call grad(ndim,x,g)
-    gnorm= sqrt(sprod(ndim,g,g))
-    vnorm= sqrt(sprod(ndim,x,x))
+    gnorm= sqrt(dot_product(g,g))
+    vnorm= sqrt(dot_product(x,x))
     d(1:ndim)= -g(1:ndim)
     call write_status(6,myid,iprint,cpena,iter,niter, &
          ftrn,ftst,pval,vnorm,gnorm,dxnorm,ftrn)
@@ -184,7 +184,7 @@ contains
           call backtrack(ndim,x,xranges,d,ftrn,ftst,pval,alpha,iprint &
                ,iflag,myid,niter)
         else
-          alpha = sprod(ndim,s,s)/sprod(ndim,s,y)
+          alpha = dot_product(s,s)/dot_product(s,y)
           alpha = max(min(alpha,1d0),xtol)
         endif
       else if( trim(clinmin).eq.'armijo' ) then
@@ -218,16 +218,16 @@ contains
       s(1:ndim) = alpha*d(1:ndim)
       dx(:) = x(:) -xp(:)
       xp(:) = x(:)
-      dxnorm = sqrt(sprod(ndim,dx,dx))
+      dxnorm = sqrt(dot_product(dx,dx))
       call wrap_ranges(ndim,x,xranges)
       gp(:) = g(:)
       call grad(ndim,x,g)
       y(:) = g(:) -gp(:)
-      gnorm= sqrt(sprod(ndim,g,g))
+      gnorm= sqrt(dot_product(g,g))
       d(1:ndim)= -g(1:ndim)
 !!$      g(1:ndim)= -g(1:ndim)/gnorm
 !!$      gnorm= gnorm/ndim
-      vnorm= sqrt(sprod(ndim,x,x))
+      vnorm= sqrt(dot_product(x,x))
       call write_status(6,myid,iprint,cpena,iter,niter, &
            ftrn,ftst,pval,vnorm,gnorm,dxnorm,fp)
       if( ftst < fbest ) then
@@ -338,8 +338,8 @@ contains
     xbest(:) = x0(:)
     ibest = 0
     call grad(ndim,x0,g)
-    gnorm= sqrt(sprod(ndim,g,g))
-    xnorm= sqrt(sprod(ndim,x,x))
+    gnorm= sqrt(dot_product(g,g))
+    xnorm= sqrt(dot_product(x,x))
     dxnorm = 0d0
 
     iter= 0
@@ -382,7 +382,7 @@ contains
         call wrap_ranges(ndim,x,xranges)
         call func(ndim,x,ftrn,ftst,pval)
         call grad(ndim,x,g)
-        gnorm= sqrt(sprod(ndim,g,g))
+        gnorm= sqrt(dot_product(g,g))
 !!$        print *,'myid,innerstp,gnorm=',myid,innerstp,gnorm
 
 !.....Compute step size of x
@@ -421,9 +421,9 @@ contains
 
       call wrap_ranges(ndim,x,xranges)
       dx(:) = x(:) -xp(:)
-      dxnorm = sqrt(sprod(ndim,dx,dx))
-      xnorm= sqrt(sprod(ndim,x,x))
-      gnorm= sqrt(sprod(ndim,g,g))
+      dxnorm = sqrt(dot_product(dx,dx))
+      xnorm= sqrt(dot_product(x,x))
+      gnorm= sqrt(dot_product(g,g))
 !!$      print *,'myid,iter,gnorm=',myid,iter,gnorm
 
 !.....Evaluate statistics at every niter_eval.
@@ -435,7 +435,7 @@ contains
         call wrap_ranges(ndim,x,xranges)
         call func(ndim,x,ftmp,ftst,pval)
 !!$        call grad(ndim,x,gtmp)  ! grad call for all the samples maybe time consuming
-!!$        gnorm= sqrt(sprod(ndim,gtmp,gtmp))
+!!$        gnorm= sqrt(dot_product(gtmp,gtmp))
         if( iter.ne.maxiter ) call write_stats(iter)  ! Write (ENERGY:, FORCE:, STRESS: ...)
         call write_vars(ndim,xbest,xranges,'best') 
       endif
@@ -581,9 +581,9 @@ contains
     xbest(:) = x0(:)
     ibest = 0
     call grad(ndim,x,g)
-    gnorm= sprod(ndim,g,g)
+    gnorm= dot_product(g,g)
     sgnorm= sqrt(gnorm)
-    vnorm= sqrt(sprod(ndim,x,x))
+    vnorm= sqrt(dot_product(x,x))
     call write_status(6,myid,iprint,cpena,iter,niter, &
          ftrn,ftst,pval,vnorm,sgnorm,dxnorm,ftrn)
     u(1:ndim)= -g(1:ndim)
@@ -593,7 +593,7 @@ contains
       fp= ftrn
       xp(1:ndim)= x(1:ndim)
 !!$!.....normalize u-vector only for line search
-!!$      unorm = sqrt(sprod(ndim,u,u))
+!!$      unorm = sqrt(dot_product(u,u))
 !!$      uu(1:ndim) = u(1:ndim)/unorm
 !.....line minimization
       if( trim(clinmin).eq.'quadratic' ) then
@@ -662,33 +662,33 @@ contains
       gp(1:ndim)= g(1:ndim)
       call grad(ndim,x,g)
 !!$      if( trim(cpena).eq.'ridge' ) g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-      gnorm= sprod(ndim,g,g)
+      gnorm= dot_product(g,g)
       sgnorm= sqrt(gnorm)
       if( icgbtype.eq.2 ) then
 !.....Polak-Ribiere-Polyak (PRP)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
-        beta= sprod(ndim,g,y)/gnormp
+        beta= dot_product(g,y)/gnormp
       else if( icgbtype.eq.3 ) then
 !.....Hestenes-Stiefel (HS)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
-        beta= sprod(ndim,g,y)/sprod(ndim,u,y)
+        beta= dot_product(g,y)/dot_product(u,y)
       else if( icgbtype.eq.4 ) then
 !.....Dai-Yuan (DY)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
-        beta= gnorm/sprod(ndim,u,y)
+        beta= gnorm/dot_product(u,y)
       else if( icgbtype.eq.5 ) then
 !.....Dai-Liao (DL)
         s(1:ndim)= x(1:ndim) -xp(1:ndim)
         y(1:ndim)= g(1:ndim) -gp(1:ndim)
-        beta= (sprod(ndim,g,y) -t_DL*sprod(ndim,g,s))&
-             /sprod(ndim,u,y)
+        beta= (dot_product(g,y) -t_DL*dot_product(g,s))&
+             /dot_product(u,y)
       else ! including icgbtype == 1
 !.....Fletcher-Reeves (FR)
         beta= gnorm/gnormp
       endif
       u(1:ndim)= -g(1:ndim) +beta*u(1:ndim)
-      vnorm= sqrt(sprod(ndim,x,x))
-      dxnorm= sqrt(sprod(ndim,dx,dx))
+      vnorm= sqrt(dot_product(x,x))
+      dxnorm= sqrt(dot_product(dx,dx))
       call write_status(6,myid,iprint,cpena,iter,niter, &
            ftrn,ftst,pval,vnorm,sgnorm,dxnorm,fp)
       if( ftst < fbest ) then
@@ -794,12 +794,12 @@ contains
     call wrap_ranges(ndim,x0,xranges)
     call func(ndim,x0,ftrn,ftst,pval)
     call grad(ndim,x0,g)
-    gnorm= sqrt(sprod(ndim,g,g))
+    gnorm= sqrt(dot_product(g,g))
     x(1:ndim)= x0(1:ndim)
     fbest = ftst
     ibest = 0
     xbest(:) = x0(:)
-    vnorm= sqrt(sprod(ndim,x,x))
+    vnorm= sqrt(dot_product(x,x))
     dxnorm = 0d0
 
     iter= 0
@@ -842,7 +842,8 @@ contains
 !.....avoiding constant decrease, but alpha should not be greater than 1.
 !!$        alpha = min(max(alpha,xtol*2d0)*2d0, 1d0)
 !!$        alpha = max(alpha,xtol)*2d0
-        alpha = alpha *fac_inc
+!!$        alpha = alpha *fac_inc
+        alpha = 1d0
         call armijo_search(ndim,x,xranges,u,ftrn,ftst,pval, &
              g,alpha,iprint,iflag,myid,niter)
       else ! backtrack (default)
@@ -887,9 +888,9 @@ contains
       dx(1:ndim)= x(1:ndim) -x0(1:ndim)
       x0(1:ndim)= x(1:ndim)
       call grad(ndim,x,g)
-      gnorm= sqrt(sprod(ndim,g,g))
-      vnorm= sqrt(sprod(ndim,x,x))
-      dxnorm= sqrt(sprod(ndim,dx,dx))
+      gnorm= sqrt(dot_product(g,g))
+      vnorm= sqrt(dot_product(x,x))
+      dxnorm= sqrt(dot_product(dx,dx))
       call write_status(6,myid,iprint,cpena,iter,niter, &
            ftrn,ftst,pval,vnorm,gnorm,dxnorm,fp)
       if( ftst < fbest ) then
@@ -926,9 +927,9 @@ contains
         rho(m_lbfgs) = 0d0
         yy = 0d0
         sy = 0d0
-        rho(m_lbfgs) = 1d0/sprod(ndim,yi(1,m_lbfgs),si(1,m_lbfgs))
-        sy = sprod(ndim,si(1,m_lbfgs-1),yi(1,m_lbfgs-1))
-        yy = sprod(ndim,yi(1,m_lbfgs-1),yi(1,m_lbfgs-1))
+        rho(m_lbfgs) = 1d0/dot_product(yi(:,m_lbfgs),si(:,m_lbfgs))
+        sy = dot_product(si(:,m_lbfgs-1),yi(:,m_lbfgs-1))
+        yy = dot_product(yi(:,m_lbfgs-1),yi(:,m_lbfgs-1))
         if( iter.eq.1 ) then
           u(:) = -g(:)
           cycle
@@ -936,13 +937,13 @@ contains
 !.....L-BFGS update
         q(:) = g(:)
         do i= m_lbfgs-1,1,-1
-          ai(i) = rho(i) *sprod(ndim,si(1,i),q)
+          ai(i) = rho(i) *dot_product(si(:,i),q)
           q(:) = q(:) -ai(i)*yi(:,i)
         enddo
 !.....H_k^0
         q(:) = sy/yy *q(:)
         do i= 1,m_lbfgs-1
-          bi(i) = rho(i) *sprod(ndim,yi(1,i),q)
+          bi(i) = rho(i) *dot_product(yi(:,i),q)
           q(:) = q(:) +(ai(i)-bi(i))*si(:,i)
         enddo
         u(:) = -q(:)
@@ -950,7 +951,7 @@ contains
       else  ! BFGS
         s(:)= alpha *u(:)
         y(:)= g(:) -gp(:)
-        ynorm= sprod(ndim,y,y)
+        ynorm= dot_product(y,y)
         if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
              .or. abs(ftrn-fp).lt.ftol ) then
           if( ngg_init > 3 ) then
@@ -971,7 +972,7 @@ contains
         endif
 
 !.....update matrix gg in BFGS
-        sy= sprod(ndim,s,y)
+        sy= dot_product(s,y)
         syi= 1d0/sy
         do i=1,ndim
           tmp1= 0d0
@@ -1307,11 +1308,10 @@ contains
     real(8),intent(in):: x0(ndim),g(ndim),d(ndim),xranges(2,ndim)
     real(8),intent(inout):: ftrn,alpha,ftst,pval
 
-!!$  real(8),external:: sprod
-    real(8),parameter:: xtiny  = 1d-14
+    real(8),parameter:: tiny = 1d-10
     integer:: iter
-    real(8):: alphai,xigd,f0,fi,fp,pvalp,alphap,ftsti
-    real(8),allocatable,dimension(:):: x1(:),gpena(:)
+    real(8):: alpi,xigd,f0,fi,fp,pvalp,alpp,ftsti
+    real(8),allocatable,save,dimension(:):: x1(:),gpena(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1324,49 +1324,45 @@ contains
       l1st = .false.
     endif
 
-    if( .not. allocated(x1)) allocate(x1(ndim),gpena(ndim))
-    xigd= sprod(ndim,g,d)*armijo_xi
+    if( .not. allocated(x1) ) allocate(x1(ndim),gpena(ndim))
+    xigd= armijo_xi * dot_product(g,d)
     if( xigd.gt.0d0 ) then
       iflag= iflag + 100
       if( myid.eq.0 .and. iprint.gt.0 ) print *,'WARNING: g*d > 0.0'
       return
     endif
-    alphai= alpha
+    alpi= alpha
 
     f0= ftrn
     fp= f0
     do iter=1,niter_linmin
-      x1(1:ndim)= x0(1:ndim)
-      x1(1:ndim)= x1(1:ndim) +alphai*d(1:ndim)
+      x1(:)= x0(:) +alpi*d(:)
       call wrap_ranges(ndim,x1,xranges)
       call func(ndim,x1,fi,ftsti,pval)
       if( myid.eq.0 .and. iprint.gt.2 ) write(6,'(a,i5,5es12.4)') &
-           ' armijo: iter,fi,fi-f0,fi-fp,xigd*alphai,alphai=',&
-           iter,fi,fi-fp,xigd*alphai,alphai
-      if( fi-fp.le.xigd*alphai ) then
+           ' armijo: iter,fi,fi-f0,fi-fp,xigd*alpi,alpi=',&
+           iter,fi,fi-fp,xigd*alpi,alpi
+      if( fi < f0 + xigd*alpi ) then  ! Armijo condition satisfied
         ftrn= fi
-        alpha= alphai
+        alpha= alpi
         ftst= ftsti
         niter = iter
         return
       endif
-      fp= fi
-      pvalp= pval
-      alphap= alphai
-      alphai= alphai*armijo_tau
+      alpi= alpi * armijo_tau  ! shrink step size
+      if( alpi < tiny ) then  ! avoid convergence failure
+        ftrn= fi
+        alpha= alpi
+        ftst= ftsti
+        niter = iter
+        return
+      endif
     enddo
 
     iflag= iflag +100
     niter= iter
     if( myid.eq.0 .and. iprint.gt.0 ) then
       print *,'WARNING: iter.gt.NITER_LINMIN in armijo_search.'
-!!$      write(6,'(a,es13.5)') '   alphai   = ',alphai
-!!$      write(6,'(a,es13.5)') '   xigd    = ',xigd
-!!$      write(6,'(a,es13.5)') '   norm(g) = ',sqrt(sprod(ndim,g,g))
-!!$      if( trim(cpena).eq.'lasso' .or. trim(cpena).eq.'glasso' .or. &
-!!$           trim(cpena).eq.'ridge' ) then
-!!$        write(6,'(a,es13.5)') '   pval    = ',pval
-!!$      endif
     endif
     return
 
@@ -1397,6 +1393,7 @@ contains
            print *,'backtrack, alpha=',alpha
     endif
     if( .not.allocated(x1) ) allocate(x1(ndim),gpena(ndim))
+    
     f0 = ftrn
     fp = f0
     alphai = alpha
@@ -1551,7 +1548,7 @@ contains
         enddo
       endif
       g(1:ndim)= g(1:ndim) +gpena(1:ndim)
-      gnorm= sqrt(sprod(ndim,g,g))
+      gnorm= sqrt(dot_product(g,g))
       if( myid.eq.0 ) then
 !!$        if( iprint.eq.1 .and. mod(iter,ndim).eq.1 ) then
         if( iprint.eq.1 ) then
@@ -1757,7 +1754,7 @@ contains
 !.....Restore mask
         mskgfs(1:ngl)= msktmp(1:ngl)
       endif
-      gnorm= sqrt(sprod(ndim,g,g))
+      gnorm= sqrt(dot_product(g,g))
 
       if( nmsks.eq.0 ) then
         if( myid.eq.0 ) then
@@ -1893,7 +1890,7 @@ contains
         if( mskgfs(ig).ne.0 ) g(i)= 0d0
       enddo
 
-      gnorm= sqrt(sprod(ndim,g,g))
+      gnorm= sqrt(dot_product(g,g))
       nftol= 0
       iflag= 0
       nfailinmin = 0
@@ -2006,7 +2003,7 @@ contains
           endif
         enddo
 
-        gnorm= sqrt(sprod(ndim,g,g))
+        gnorm= sqrt(dot_product(g,g))
         if( myid.eq.0 ) then
           if( iprint.gt.1 ) then
             write(6,'(a,i8,2es13.5)') ' itergfs,f,gnorm=',itergfs,f,gnorm
@@ -2112,7 +2109,7 @@ contains
         nvar = inc
 !!$        s(1:ndim)= alpha *u(1:ndim)
 !!$        y(1:ndim)= g(1:ndim) -gp(1:ndim)
-        ynorm= sprod(ndim,y,y)
+        ynorm= dot_product(y,y)
         if( ynorm.lt.1d-14 ) then
           if( myid.eq.0 .and. iprint.gt.1 ) then
             print *,'>>> Initialize gg because y*y < 1d-14'
@@ -2125,8 +2122,7 @@ contains
         endif
 
 !.....update matrix gg
-!!$        sy= sprod(ndim,s,y)
-        sy= sprod(nvar,s,y)
+        sy= dot_product(s,y)
         syi= 1d0/sy
 !!$        do i=1,ndim
         do i=1,nvar
@@ -2259,7 +2255,7 @@ contains
     real(8),parameter:: gmax= 1.0d0
     real(8):: gnorm
     
-    gnorm= sqrt(sprod(ndim,g,g))
+    gnorm= sqrt(dot_product(g,g))
 
     if( gnorm.gt.gmax ) then
       g(1:ndim)= g(1:ndim) *gmax /gnorm
