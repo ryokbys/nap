@@ -10,7 +10,7 @@ module version
 
   public:: write_revision, write_authors, write_runtime
   
-  character(len=128),parameter:: crevision = 'rev260208'
+  character(len=128),parameter:: crevision = 'rev260402'
   character(len=128),parameter:: cgithash = GIT_HASH
   character(len=128),parameter:: cauthors(1) = &
        (/ 'Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>' /)

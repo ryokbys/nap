@@ -945,25 +945,25 @@ contains
         s(:)= alpha *u(:)
         y(:)= g(:) -gp(:)
         ynorm= dot_product(y,y)
-        if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
-             .or. abs(ftrn-fp).lt.ftol ) then
-          if( ngg_init > 3 ) then
-            x0(1:ndim) = x(1:ndim)
-            if( myid.eq.0 ) print *,'>>> BFGS seems to be stacked, since gg initialized 3 times...'
-            return
-          else
-            if(myid.eq.0) then
-              print *,'>>> Initialize gg, because of any of the following values is small:'
-              print '(3x,a,5es12.2)','|y|,|dx|,|g|,|df|=',ynorm,dxnorm,gnorm,abs(ftrn-fp)
-            endif
-          endif
-          gg(1:ndim,1:ndim)= 0d0
-          do i=1,ndim
-            gg(i,i)= 1d0
-          enddo
-          ngg_init = ngg_init +1
-          cycle
-        endif
+!!$        if( ynorm.lt.1d-14 .or. dxnorm.lt.xtol .or. gnorm.lt.gtol &
+!!$             .or. abs(ftrn-fp).lt.ftol ) then
+!!$          if( ngg_init > 3 ) then
+!!$            x0(1:ndim) = x(1:ndim)
+!!$            if( myid.eq.0 ) print *,'>>> BFGS seems to be stacked, since gg initialized 3 times...'
+!!$            return
+!!$          else
+!!$            if(myid.eq.0) then
+!!$              print *,'>>> Initialize gg, because any of the following values is too small:'
+!!$              print '(3x,a,5es12.2)','|y|,|dx|,|g|,|df|=',ynorm,dxnorm,gnorm,abs(ftrn-fp)
+!!$            endif
+!!$          endif
+!!$          gg(1:ndim,1:ndim)= 0d0
+!!$          do i=1,ndim
+!!$            gg(i,i)= 1d0
+!!$          enddo
+!!$          ngg_init = ngg_init +1
+!!$          cycle
+!!$        endif
 
 !.....update matrix gg in BFGS
         sy= dot_product(s,y)

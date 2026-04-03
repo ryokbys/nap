@@ -20,7 +20,7 @@ module variables
   real(8):: epsf= 1d-4
   real(8):: xtol= 1d-4
   real(8):: gtol= 1d-5
-  real(8):: ftol= 1d-6
+  real(8):: ftol= 1d-5
 !.....This specorder is the one for whole fitpot process not for each sample.
   character(len=3),dimension(nspmax):: specorder = &
        (/'x','x','x','x','x','x','x','x','x'/)
@@ -274,7 +274,7 @@ module variables
 
 !------- MINIMIZATION PARAMETERS ---------------------------
 !.....number of convergence criteria achieved
-  integer:: numtol = 1
+  integer:: numtol = 2
 
 !.....penalty: lasso or ridge or smooth
   character(len=128):: cpena= 'none'
@@ -408,3 +408,7 @@ contains
   end function csp2isp
 !=======================================================================
 end module variables
+!-----------------------------------------------------------------------
+! Local Variables:
+! compile-command: "make fitpot"
+! End:
