@@ -5040,10 +5040,10 @@ contains
     return
   end subroutine penalty_grad_min3b_uf3l
 !=======================================================================
-  subroutine penalty_curv2b_uf3l(ndimp,params_in,pwgt2b, &
+  subroutine penalty_curv2b_uf3(ndimp,params_in,pwgt2b, &
        eps2b,sl2b,sr2b,penalty)
 !
-!  Accesor routine to set uf3l parameters from outside.
+!  Accesor routine to set uf3 parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
 !
 !  Penalty about the curve/curvature of 2-body.
@@ -5147,12 +5147,12 @@ contains
     enddo
 
     return
-  end subroutine penalty_curv2b_uf3l
+  end subroutine penalty_curv2b_uf3
 !=======================================================================
-  subroutine penalty_grad_curv2b_uf3l(ndimp,params_in,pwgt2b, &
+  subroutine penalty_grad_curv2b_uf3(ndimp,params_in,pwgt2b, &
        eps2b,sl2b,sr2b,grad)
 !
-!  Accesor routine to set uf3l parameters from outside.
+!  Accesor routine to set uf3 parameters from outside.
 !  It is supposed to be called from fitpot in a seriral process.
 !
 !  Penalty about the curve/curvature of 2-body.
@@ -5293,7 +5293,7 @@ contains
 !!$    print '(a,es12.2)',' grad(130)=',grad(130)
 
     return
-  end subroutine penalty_grad_curv2b_uf3l
+  end subroutine penalty_grad_curv2b_uf3
 !=======================================================================
   subroutine calc_short_lossfunc(np,radii,drepul,floss)
 !

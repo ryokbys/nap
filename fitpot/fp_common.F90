@@ -1092,7 +1092,7 @@ contains
          iprint, npenal, cpenals
     use UF3,only: penalty_uf3, penalty_curv_uf3l, &
          penalty_min3b_uf3l, &
-         penalty_ridge1b, penalty_curv2b_uf3l
+         penalty_ridge1b, penalty_curv2b_uf3
     use conditions,only: lconds, calc_fpenal_conds
     use parallel
     integer,intent(in):: ndim
@@ -1136,8 +1136,8 @@ contains
 !.....Penalty on curv2b
     idx = index_penalty('curv2b')
     if( idx > 0 ) then
-      if( trim(cpotlow).eq.'uf3l' ) then
-        call penalty_curv2b_uf3l(ndim,x,pwgt_curv2b, &
+      if( trim(cpotlow).eq.'uf3' ) then
+        call penalty_curv2b_uf3(ndim,x,pwgt_curv2b, &
              eps2b,sl2b,sr2b,pvals(idx))
         fp = fp +pvals(idx)
       endif
@@ -1178,7 +1178,7 @@ contains
          npenal
     use UF3,only: penalty_grad_uf3,penalty_grad_curv_uf3l, &
          penalty_grad_min3b_uf3l, &
-         penalty_grad_ridge1b, penalty_grad_curv2b_uf3l
+         penalty_grad_ridge1b, penalty_grad_curv2b_uf3
     use conditions,only: lconds, calc_gpenal_conds
     integer,intent(in):: ndim
     real(8),intent(in):: x(ndim)
@@ -1220,8 +1220,8 @@ contains
 !.....Penalty on curv2b
     idx = index_penalty('curv2b')
     if( idx > 0 ) then
-      if( index(cpotlow,'uf3l').ne.0 ) then
-        call penalty_grad_curv2b_uf3l(ndim,x,pwgt_curv2b, &
+      if( index(cpotlow,'uf3').ne.0 ) then
+        call penalty_grad_curv2b_uf3(ndim,x,pwgt_curv2b, &
              eps2b,sl2b,sr2b,gptmp)
       endif
       gp(:) = gp(:) +gptmp(:)
