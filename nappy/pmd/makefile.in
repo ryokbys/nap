@@ -10,6 +10,14 @@ ompopts=  --f90flags="-fopenmp" -lgomp
 compopts= --f77exec=@FC@ --f90exec=@FC@ --quiet
 # compopts= --f90exec=@FC@ --quiet --fcompiler=gnu95
 
+FC := @FC@
+FFLAGS := $(shell @FC@ --showme:compile)
+LDFLAGS := $(shell @FC@ --showme:link)
+
+export FC
+export FFLAGS
+export LDFLAGS
+
 pmd_wrapper: ${obj}
 #	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd   # use mpif90 directly w/o openmp
 	f2py  ${compopts} -m $@ -I${pmddir} -c $^ -L${pmddir} -lpmd ${ompopts}  # add ompopts if pmd was compiled with -fopenmp
