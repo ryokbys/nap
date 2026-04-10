@@ -24,7 +24,7 @@ __author__ = "RYO KOBAYASHI"
 __version__ = "240903"
 
 READ_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
-                'cube','CHGCAR','pdb','extxyz')
+                'cube','CHGCAR','pdb','extxyz','xyz')
 WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz',
                  'pdb', 'cube')
 
@@ -58,7 +58,7 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
         import ase.io
         ase.io.write(filename=fname,images=nsys.to_ase_atoms(),
                      format='proteindatabank')
-    elif format in ('extxyz',):
+    elif format in ('extxyz','xyz'):
         with open(fname,'a') as f:
             write_extxyz(f,nsys)
     else:
@@ -96,7 +96,7 @@ def read(fname="pmdini",format=None, specorder=[], index=None):
         nsys = read_lammps_data(fname,specorder=specorder)
     elif format == 'cube':
         nsys = read_cube(fname,specorder=specorder)
-    elif format in 'extxyz':
+    elif format in ('extxyz','xyz'):
         nsys = read_extxyz(fname,specorder=specorder)
     else:
         print(' Since the file format is unknown, try to read the file using ASE.')
