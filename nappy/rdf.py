@@ -41,6 +41,7 @@ Options:
               [default: None]
   --fortran   Try using fortran function for computing RDF.
   --progress  Show progress. [default: False]
+  -v,--verbose  Verbose ON. [default: False]
 """
 
 import os
@@ -206,7 +207,7 @@ def read_rdf(fname):
 
 
 def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
-        nnmax=100,fortran=False,mask=None):
+        nnmax=100,fortran=False,mask=None,verbose=False):
     """
     Compute RDF of the givin system.
     Number of bins is determined from DR, RMAX0, and RMIN as, int((RMAX0-RMIN)/DR)+1.
@@ -226,7 +227,8 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
     nsys = copy.deepcopy(nsys0)
     n1,n2,n3= nsys.get_expansion_num(3.0*rmax)
     if not (n1==1 and n2==1 and n3==1):
-        print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
+        if verbose:
+            print(' Extend system by {0:d}x{1:d}x{2:d}'.format(n1,n2,n3))
         nsys.repeat(n1,n2,n3)
 
     natm = len(nsys)
@@ -330,7 +332,7 @@ def rdf(nsys0,nspcs,dr,nr,rmax0,pairwise=False,rmin=0.0,
 
 def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
                 pairwise=False,nnmax=100,fortran=False,
-                format=None,nskip=0, show_progress=False):
+                format=None,nskip=0, show_progress=False, verbose=False):
     nspcs = len(specorder)
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
@@ -351,7 +353,8 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
                 if show_progress:
                     print(f'   {inc}/{len(nsys):}',end='\r',flush=True)
                 rd,gr= rdf(nsysi,nspcs,dr,nr,rmax,rmin=rmin,
-                           pairwise=pairwise,nnmax=nnmax,fortran=fortran)
+                           pairwise=pairwise,nnmax=nnmax,fortran=fortran,
+                           verbose=verbose)
                 if rd.shape[-1] != nr:
                     raise ValueError('The shape of radius data is wrong.')
                 agr += gr
@@ -362,7 +365,8 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
             if show_progress:
                 print(f'   {inc}/{len(infiles):}',end='\r',flush=True)
             rd,gr= rdf(nsys,nspcs,dr,nr,rmax,rmin=rmin,
-                       pairwise=pairwise,nnmax=nnmax,fortran=fortran)
+                       pairwise=pairwise,nnmax=nnmax,fortran=fortran,
+                       verbose=verbose)
             if rd.shape[-1] != nr:
                 raise ValueError('The shape of radius data is wrong.')
             agr += gr
@@ -723,6 +727,7 @@ def main():
     plot = args['--plot']
     nskip = int(args['--skip'])
     progress = args['--progress']
+    verbose = args['--verbose']
     SQ = args['--SQ']
     if SQ:
         qmax = float(args['--qmax'])
@@ -772,7 +777,7 @@ def main():
                           rmin=rmin, rmax=rmax, nskip=nskip,
                           pairwise=pairwise, nnmax=nnmax,
                           fortran=fortran,format=fmt,
-                          show_progress=progress)
+                          show_progress=progress,verbose=verbose)
 
     if not sigma == 0:
         # print(' Gaussian smearing...')
