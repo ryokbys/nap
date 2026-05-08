@@ -3,19 +3,21 @@ module zload
 !  Module for loading on plane perpendicular to z-axis
 !                     Last-modified: <2021-11-24 16:08:36 Ryo KOBAYASHI>
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use vector,only: norm,cross
   implicit none
   save
 !.....initial z top and bottom positions
-  real(8):: ztop0, zbot0, zlen0, dlen0, dzl, dl
+  real(rp):: ztop0, zbot0, zlen0, dlen0, dzl, dl
   integer:: nztop, nzbot
 !.....variables that change during z-loading simulation
-  real(8):: zlen, ztop, zbot
-  real(8):: dlen
+  real(rp):: zlen, ztop, zbot
+  real(rp):: dlen
 !.....unit vector of shear direction (ux,uy)
-  real(8):: uvx, uvy
+  real(rp):: uvx, uvy
 !.....deviation along a1,a2 vectors in case of shear
-  real(8):: d1,d2
+  real(rp):: d1,d2
   
 contains
   subroutine set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,nstp &
@@ -27,12 +29,11 @@ contains
 !
     use util,only: replaceTag
     implicit none
-    include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
-    real(8),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width
-    real(8),intent(inout):: tag(natm),fmv(3,0:9)
+    real(rp),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width
+    real(rp),intent(inout):: tag(natm),fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
-    real(8):: ztopl,zbotl,dzlfin
+    real(rp):: ztopl,zbotl,dzlfin
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       print *,''
@@ -51,9 +52,9 @@ contains
     enddo
     ztop0= 0d0
     zbot0= 0d0
-    call mpi_allreduce(ztopl,ztop0,1,mpi_real8,mpi_max &
+    call mpi_allreduce(ztopl,ztop0,1,mpi_real_rp,mpi_max &
          ,mpi_md_world,ierr)
-    call mpi_allreduce(zbotl,zbot0,1,mpi_real8,mpi_min &
+    call mpi_allreduce(zbotl,zbot0,1,mpi_real_rp,mpi_min &
          ,mpi_md_world,ierr)
     zlen0 = ztop0 -zbot0
     dzlfin = zlen0 *strfin
@@ -98,10 +99,9 @@ contains
 !  And the z-motions of those atoms are controled.
 !     
     implicit none
-    include 'mpif.h'
     integer,intent(in):: natm,nstp,myid_md,mpi_md_world
-    real(8),intent(in):: strfin,sorg(3)
-    real(8),intent(inout):: ra(3,natm),strnow,tag(natm)
+    real(rp),intent(in):: strfin,sorg(3)
+    real(rp),intent(inout):: ra(3,natm),strnow,tag(natm)
 
     integer:: i,l,ierr,ifmv
 
@@ -128,15 +128,14 @@ contains
 !
     use util,only: replaceTag
     implicit none
-    include 'mpif.h'
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
-    real(8),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width &
+    real(rp),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width &
          ,zshear_angle
-    real(8),intent(inout):: tag(natm),fmv(3,0:9)
+    real(rp),intent(inout):: tag(natm),fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
-    real(8):: ztopl,zbotl,dlfin,zskin,angle
-    real(8):: x1,y1,x2,y2,amati(2,2),det
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp):: ztopl,zbotl,dlfin,zskin,angle
+    real(rp):: x1,y1,x2,y2,amati(2,2),det
+    real(rp),parameter:: pi = 3.14159265358979d0
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       print *,''
@@ -161,9 +160,9 @@ contains
     enddo
     ztop0= 0d0
     zbot0= 0d0
-    call mpi_allreduce(ztopl,ztop0,1,mpi_real8,mpi_max &
+    call mpi_allreduce(ztopl,ztop0,1,mpi_real_rp,mpi_max &
          ,mpi_md_world,ierr)
-    call mpi_allreduce(zbotl,zbot0,1,mpi_real8,mpi_min &
+    call mpi_allreduce(zbotl,zbot0,1,mpi_real_rp,mpi_min &
          ,mpi_md_world,ierr)
     zlen0 = (ztop0 -zbot0)*norm(h(1:3,3))
     dlfin = zlen0 *strfin
@@ -223,10 +222,9 @@ contains
 !  And the xy-motions of those atoms are controled.
 !     
     implicit none
-    include 'mpif.h'
     integer,intent(in):: natm,nstp,myid_md,mpi_md_world
-    real(8),intent(in):: strfin,sorg(3)
-    real(8),intent(inout):: ra(3,natm),strnow,tag(natm)
+    real(rp),intent(in):: strfin,sorg(3)
+    real(rp),intent(inout):: ra(3,natm),strnow,tag(natm)
 
     integer:: i,l,ierr,ifmv
 
@@ -254,15 +252,14 @@ contains
 !  Assumes that the z-axis (3) is normal to xy-plane.
 !
     implicit none
-    include 'mpif.h'
     include './params_unit.h'
     integer,intent(in):: natm,myid,mpi_md_world,iprint
-    real(8),intent(in):: ra(3,natm),aa(3,natm),tag(natm),h(3,3) &
+    real(rp),intent(in):: ra(3,natm),aa(3,natm),tag(natm),h(3,3) &
          ,sorg(3)
-    real(8),intent(out):: ftop,fbot
+    real(rp),intent(out):: ftop,fbot
     character(len=*),intent(in):: czload_type
     integer:: i,is,ifmv,ierr,ixyz
-    real(8):: ftopl,fbotl,xyarea,a(3),b(3),axb(3),fx,fy
+    real(rp):: ftopl,fbotl,xyarea,a(3),b(3),axb(3),fx,fy
 
     ftopl= 0d0
     fbotl= 0d0
@@ -300,9 +297,9 @@ contains
 
     ftop= 0d0
     fbot= 0d0
-    call mpi_allreduce(ftopl,ftop,1,mpi_real8 &
+    call mpi_allreduce(ftopl,ftop,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(fbotl,fbot,1,mpi_real8 &
+    call mpi_allreduce(fbotl,fbot,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
 
 !.....Divide forces on top/bottom by xy-area to get stress
@@ -321,11 +318,11 @@ contains
 !
     implicit none
     integer,intent(in):: natm,nstp,istp,myid
-    real(8),intent(in):: strfin,dt
-    real(8),intent(inout):: strnow,h(1:3,1:3,0:1)
+    real(rp),intent(in):: strfin,dt
+    real(rp),intent(inout):: strnow,h(1:3,1:3,0:1)
 
     logical,save:: l1st= .true.
-    real(8),save:: zl0,dzlfin,dzl,zl,zv0(3)
+    real(rp),save:: zl0,dzlfin,dzl,zl,zv0(3)
 
 !.....at first call, determine velocity of top and bottom layers
     if( l1st ) then

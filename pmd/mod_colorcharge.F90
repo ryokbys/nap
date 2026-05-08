@@ -2,6 +2,8 @@ module clrchg
 !
 !  Module for color charge NEMD
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   implicit none
@@ -16,10 +18,10 @@ module clrchg
   character(len=3):: cspc_clrchg = 'non'
   integer:: ispc_clrchg
   character(len=20):: clr_set = 'random'
-  real(8):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
-  real(8):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
-  real(8):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
-  real(8):: clrregion(3,2)  ! regional condition
+  real(rp):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
+  real(rp):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
+  real(rp):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
+  real(rp):: clrregion(3,2)  ! regional condition
   data clrregion(1:3,1) / -1d0, -1d0, -1d0 / ! sufficiently smaller than 0
   data clrregion(1:3,2) /  2d0,  2d0,  2d0 / ! sufficiently greater than 1
   
@@ -34,10 +36,10 @@ contains
     use force,only: luse_charge
     integer,intent(in):: myid,iprint,ntot
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: tagtot(ntot)
-    real(8),intent(inout):: clrtot(ntot)
+    real(rp),intent(in):: tagtot(ntot)
+    real(rp),intent(inout):: clrtot(ntot)
 
-!!$    real(8),external:: urnd
+!!$    real(rp),external:: urnd
 
     if( trim(cspc_clrchg).eq.'non' ) then
       stop 'ERROR: spcs_clrchg must be specified.'
@@ -69,7 +71,7 @@ contains
 !  Read clr of atoms from file.
 !
     integer,intent(in):: ntot,myid
-    real(8),intent(inout):: clrtot(ntot)
+    real(rp),intent(inout):: clrtot(ntot)
     integer:: n,i,j
 
     if( myid.eq.0 ) then
@@ -92,8 +94,8 @@ contains
 !  Set all the clr one
 !
     integer,intent(in):: ntot,myid,iprint
-    real(8),intent(in):: tagtot(ntot)
-    real(8),intent(inout):: clrtot(ntot)
+    real(rp),intent(in):: tagtot(ntot)
+    real(rp),intent(inout):: clrtot(ntot)
 
     integer:: i,is
     
@@ -114,8 +116,8 @@ contains
 !  Set clr as round(chg)
 !
     integer,intent(in):: natm,myid,iprint
-    real(8),intent(in):: tag(natm),chg(natm)
-    real(8),intent(inout):: clr(natm)
+    real(rp),intent(in):: tag(natm),chg(natm)
+    real(rp),intent(inout):: clr(natm)
 
     integer:: i,is
 
@@ -131,11 +133,11 @@ contains
 !  Set clr of each atom randomly.
 !
     integer,intent(in):: ntot,myid,iprint
-    real(8),intent(in):: tagtot(ntot)
-    real(8),intent(inout):: clrtot(ntot)
+    real(rp),intent(in):: tagtot(ntot)
+    real(rp),intent(inout):: clrtot(ntot)
 
     integer:: i,is,nclr,np,nm
-    real(8):: r
+    real(rp):: r
     
     if( myid.eq.0 ) then
 !.....Count num of ions which color charges are to be set.
@@ -187,12 +189,12 @@ contains
     use pmdvars,only: naux,iaux_chg,iaux_clr,ra,sorg
     integer,intent(in):: namax,natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: tag(namax),hi(3,3)
-    real(8),intent(inout):: aa(3,namax),aux(naux,namax)
+    real(rp),intent(in):: tag(namax),hi(3,3)
+    real(rp),intent(inout):: aa(3,namax),aux(naux,namax)
     logical,save:: l1st = .true.
 
     integer:: i,is
-    real(8):: ri(3)
+    real(rp):: ri(3)
 
     if( l1st ) then
       if( myid.eq.0 ) then
@@ -261,10 +263,10 @@ contains
 !  Accumurate velocities with mutiplying color charge.
 !
     integer,intent(in):: namax,natm,istp,nouterg
-    real(8),intent(in):: hmat(3,3),va(3,namax),clr(namax),dt
+    real(rp),intent(in):: hmat(3,3),va(3,namax),clr(namax),dt
 
     integer:: i
-    real(8):: vi(3)
+    real(rp):: vi(3)
 
     do i=1,natm
       vi(1:3) = hmat(1:3,1)*va(1,i) +hmat(1:3,2)*va(2,i) &
@@ -282,13 +284,12 @@ contains
 !  Remove translational momentum of all the atoms except specified species.
 !
     use pmdvars,only: nrmtrans
-    include 'mpif.h'
     integer,intent(in):: natm,mpi_world,myid,iprint
-    real(8),intent(in):: tag(natm),am(nspmax)
-    real(8),intent(inout):: va(3,natm)
+    real(rp),intent(in):: tag(natm),am(nspmax)
+    real(rp),intent(inout):: va(3,natm)
     
     integer:: i,is,ierr
-    real(8):: sump(3),tmps(3),tmp,amtot,ami
+    real(rp):: sump(3),tmps(3),tmp,amtot,ami
 
 !.....If nrmtrans < 0, not to remove translation,
 !.....because the user must set that intentionally.
@@ -304,9 +305,9 @@ contains
       amtot= amtot +ami
     enddo
     tmps(:)= sump(:)
-    call mpi_allreduce(tmps,sump,3,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmps,sump,3,mpi_real_rp,mpi_sum,mpi_world,ierr)
     tmp= amtot
-    call mpi_allreduce(tmp,amtot,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( amtot.lt.1d-1 ) then
       print *,'Error: amtot.le.0.1 !, myid=',myid
       stop

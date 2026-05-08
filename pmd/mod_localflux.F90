@@ -2,11 +2,11 @@ module localflux
 !
 !  Module for evaluation of local flux using the color-charge NEMD.
 !
+  use mod_precision
   use pmdvars,only: nspmax
   use pmdmpi,only: nid2xyz
   use memory,only: accum_mem
   implicit none
-  include 'mpif.h'
   include "./const.h"
   save
 
@@ -18,8 +18,8 @@ module localflux
   logical:: initialized = .false.
   integer:: noutlflux = 1000
   integer:: nskipout
-  real(8),allocatable:: fluxg(:,:)  ! Global flux
-  real(8),allocatable:: fluxl(:,:),fluxt(:,:)  ! Local flux
+  real(rp),allocatable:: fluxg(:,:)  ! Global flux
+  real(rp),allocatable:: fluxl(:,:),fluxt(:,:)  ! Local flux
   integer:: nlx = 1  ! Num of divisions in a node for local regions
   integer:: nly = 1  ! where flux is evaluated within.
   integer:: nlz = 1
@@ -27,7 +27,7 @@ module localflux
   integer:: ng,ngx,ngy,ngz  ! Global num of divisions
   integer,allocatable:: idxl2g(:,:)  ! Conversion of index from local to global
   integer,allocatable:: nargn(:)  ! Num of atoms in local regions
-  real(8):: dlx,dly,dlz,dlxi,dlyi,dlzi,evflux(3)
+  real(rp):: dlx,dly,dlz,dlxi,dlyi,dlzi,evflux(3)
 
 contains
 !=======================================================================
@@ -37,12 +37,12 @@ contains
 !
     use clrchg,only: clrfield
     integer,intent(in):: myid,mpi_world,nx,ny,nz,iprint,maxstp
-    real(8),intent(in):: h(3,3)
+    real(rp),intent(in):: h(3,3)
     logical,intent(in):: lclrchg
     
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
     integer:: idxlfg,ilfgx,ilfgy,ilfgz,mem
-    real(8):: anxi,anyi,anzi,fext,alx,aly,alz
+    real(rp):: anxi,anyi,anzi,fext,alx,aly,alz
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -165,10 +165,10 @@ contains
 !  local flux.
 !
     integer,intent(in):: namax,natm,istp,myid,mpi_world,nxyz
-    real(8),intent(in):: hmat(3,3),ra(3,namax),va(3,namax),clr(namax),dt
+    real(rp),intent(in):: hmat(3,3),ra(3,namax),va(3,namax),clr(namax),dt
 
     integer:: i,ilx,ily,ilz,idxl,idxg,ixyz
-    real(8):: vi(3),flux
+    real(rp):: vi(3),flux
     integer,parameter:: nmpi = 2
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -204,7 +204,7 @@ contains
         do ixyz=1,nxyz-1
           itag = ixyz*nmpi -nmpi
           fluxl(:,:) = 0d0
-          call mpi_recv(fluxl,3*nl,mpi_real8,ixyz,itag+1,mpi_world &
+          call mpi_recv(fluxl,3*nl,mpi_real_rp,ixyz,itag+1,mpi_world &
                ,istat,ierr)
           do idxl=1,nl
             idxg = idxl2g(idxl,ixyz)
@@ -222,7 +222,7 @@ contains
         
       else  ! myid.ne.0
         itag = myid*nmpi -nmpi
-        call mpi_send(fluxl,3*nl,mpi_real8,0,itag+1,mpi_world,ierr)
+        call mpi_send(fluxl,3*nl,mpi_real_rp,0,itag+1,mpi_world,ierr)
       endif
 !.....Refresh fluxl
       fluxl(:,:) = 0d0

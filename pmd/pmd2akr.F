@@ -7,13 +7,14 @@ c     $$$$: akira frame number
 c USAGE:
 c   $ ./pmd2akr #####
 c-----------------------------------------------------------------------
+      use mod_precision
       use variables
       implicit none
       integer,parameter:: npmax= 2100000
 c.....Num of auxiliary data for coloring atoms in Akira
       integer,parameter:: nauxdat = 5
       integer:: ipmd,n,inode,itmp,i,nnodes,nkvs,ia,ib,l,itag(npmax)
-      real(8):: tmp,dat(18,npmax)
+      real(rp):: tmp,dat(18,npmax)
       character:: fin*13,fout*7
       integer,external:: itot_tag
       integer nargc
@@ -94,8 +95,9 @@ c-------output combined mts-file
       end program pmd2akr
 c=======================================================================
       function is_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: is_tag
       
       is_tag= int(tag)
@@ -103,8 +105,9 @@ c=======================================================================
       end function is_tag
 c=======================================================================
       function ifmv_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: ifmv_tag
       
       ifmv_tag= int((tag -int(tag))*10)
@@ -113,10 +116,11 @@ c=======================================================================
       end function ifmv_tag
 c=======================================================================
       function itot_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: itot_tag
-      real(8):: tmp
+      real(rp):: tmp
       integer,external:: is_tag,ifmv_tag
 
       tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1

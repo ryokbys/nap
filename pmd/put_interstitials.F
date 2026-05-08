@@ -6,19 +6,20 @@ c-----------------------------------------------------------------------
 c Usage:
 c   $ ./intrstl num-of-interstitials pmd00000 outfile
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
       integer,parameter:: namax= 100000
       integer,parameter:: nnmax= 20
-      real(8),parameter:: rcut = 3.0d0
+      real(rp),parameter:: rcut = 3.0d0
       character,parameter:: ciofmt*6 = 'ascii '
       integer,parameter:: is_int= 2
 
       integer:: nargc,natm,ntet,ntetmax
-      real(8):: tag(namax),ra(3,namax),va(3,namax),eki(3,3,namax)
+      real(rp):: tag(namax),ra(3,namax),va(3,namax),eki(3,3,namax)
      &     ,epi(namax),strs(3,3,namax),sorg(3),dt,hunit,h(3,3,0:1)
      &     ,hi(3,3),tagi,ri(3)
       integer:: lspr(0:nnmax,namax)
-      real(8),allocatable:: ptet(:,:),vtet(:)
+      real(rp),allocatable:: ptet(:,:),vtet(:)
 
       integer:: i,nint,num
       character(len=128):: ciname,coname,cnum
@@ -98,20 +99,21 @@ c.....choose 'num-of-interstitial' sites to be occupied
 c=======================================================================
       subroutine make_tetrahedra(natm,nnmax,lspr,ra,h
      &     ,ntetmax,ntet,ptet,vtet)
+      use mod_precision
       implicit none
       integer,intent(in):: natm,nnmax,lspr(0:nnmax,natm),ntetmax
-      real(8),intent(in):: ra(3,natm),h(3,3)
+      real(rp),intent(in):: ra(3,natm),h(3,3)
       integer,intent(out):: ntet
-      real(8),intent(out):: ptet(3,ntetmax) ! position
-      real(8),intent(out):: vtet(ntetmax)   ! volume
+      real(rp),intent(out):: ptet(3,ntetmax) ! position
+      real(rp),intent(out):: vtet(ntetmax)   ! volume
 
       integer:: i,j,k,l,jj,kk,ll,itet
       integer,allocatable:: iqrtt(:,:) ! quartet of indices
-      real(8):: a(3),b(3),c(3),ha(3),hb(3),hc(3),hbc(3)
+      real(rp):: a(3),b(3),c(3),ha(3),hb(3),hc(3),hbc(3)
      &     ,ri(3),rj(3),rk(3),rl(3)
 
       logical,external:: lexists
-      real(8),external:: dot
+      real(rp),external:: dot
 
       allocate(iqrtt(4,ntetmax))
 
@@ -176,6 +178,7 @@ c=======================================================================
 c
 c Check whether atom-i exists in j-neighbor
 c
+      use mod_precision
       implicit none
       integer,intent(in):: i,j,nnmax,natm,lspr(0:nnmax,natm)
 
@@ -194,18 +197,20 @@ c.....return false (there is no i in j-neighbor)
       end function lexists
 c=======================================================================
       function dot(v1,v2)
+      use mod_precision
       implicit none
-      real(8),intent(in):: v1(3),v2(3)
-      real(8):: dot
+      real(rp),intent(in):: v1(3),v2(3)
+      real(rp):: dot
 
       dot= v1(1)*v2(1) +v1(2)*v2(2) +v1(3)*v2(3)
       return
       end function dot
 c=======================================================================
       subroutine cross(v1,v2,ans)
+      use mod_precision
       implicit none
-      real(8),intent(in):: v1(3),v2(3)
-      real(8),intent(out):: ans(3)
+      real(rp),intent(in):: v1(3),v2(3)
+      real(rp),intent(out):: ans(3)
 
       ans(1)= v1(2)*v2(3) -v1(3)*v2(2)
       ans(2)= v1(3)*v2(1) -v1(1)*v2(3)
@@ -214,12 +219,13 @@ c=======================================================================
       end subroutine cross
 c=======================================================================
       subroutine invert(h,hi)
+      use mod_precision
       implicit none
-      real(8),intent(in):: h(3,3)
-      real(8),intent(out):: hi(3,3)
+      real(rp),intent(in):: h(3,3)
+      real(rp),intent(out):: hi(3,3)
 
       integer:: i,j,im,ip,jm,jp
-      real(8):: sgm(3,3),hit(3,3),vol
+      real(rp):: sgm(3,3),hit(3,3),vol
 
 c-----cofactor matrix, SGM
       do j=1,3

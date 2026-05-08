@@ -2,11 +2,12 @@ module impulse
 !
 !  Module for evaluation of probability density.
 !
+  use pmdmpi
+  use mod_precision
   use memory,only: accum_mem
   use pmdvars,only: nspmax
   use util,only: itotOf
   implicit none
-  include "mpif.h"
   include "./const.h"
   save
 
@@ -18,19 +19,19 @@ module impulse
   logical:: l_macro_impls = .false.  ! For checking macro ON/OFF
   integer:: itot_impls = 0  ! Atom index that must be given in in.pmd
   integer:: ia_impls  ! Atom index in local ordering
-  real(8):: orig_impls(3)  ! Original position of itot atom
-  real(8):: disp, displ  ! Displacement
-  real(8):: tau_impls(3)  ! Hopping direction
-  real(8):: ftau(nspmax), ftaul(nspmax)  ! sum_j F_{ji}(t).tau
-  real(8):: ptau, ptaul  ! p_i(t).tau
+  real(rp):: orig_impls(3)  ! Original position of itot atom
+  real(rp):: disp, displ  ! Displacement
+  real(rp):: tau_impls(3)  ! Hopping direction
+  real(rp):: ftau(nspmax), ftaul(nspmax)  ! sum_j F_{ji}(t).tau
+  real(rp):: ptau, ptaul  ! p_i(t).tau
 
 contains
 !=======================================================================
   subroutine init_impulse(myid,ntot,rtot)
     use pmdvars,only: specorder,nsp
     integer,intent(in):: myid,ntot
-    real(8),intent(in):: rtot(3,ntot)
-    real(8):: dtau
+    real(rp),intent(in):: rtot(3,ntot)
+    real(rp):: dtau
     integer:: is
 
     if( .not. l_macro_impls ) then
@@ -77,14 +78,14 @@ contains
 
     call mpi_bcast(l_impls, 1, mpi_logical, 0, mpi_world, ierr)
     call mpi_bcast(itot_impls, 1, mpi_integer, 0, mpi_world, ierr)
-    call mpi_bcast(tau_impls, 3, mpi_real8, 0, mpi_world, ierr)
-    call mpi_bcast(orig_impls, 3, mpi_real8, 0, mpi_world, ierr)
+    call mpi_bcast(tau_impls, 3, mpi_real_rp, 0, mpi_world, ierr)
+    call mpi_bcast(orig_impls, 3, mpi_real_rp, 0, mpi_world, ierr)
     
   end subroutine bcast_impulse
 !=======================================================================
   subroutine set_ia_impls(natm,tag,mpi_world)
     integer,intent(in):: natm, mpi_world
-    real(8),intent(in):: tag(natm)
+    real(rp),intent(in):: tag(natm)
 
     integer:: ia,ial, ierr
 
@@ -104,10 +105,10 @@ contains
   subroutine comp_ptau(natm,tag,ra,va,h,sorg)
     use pmdvars,only: am,fa2v,nsp
     integer,intent(in):: natm
-    real(8),intent(in):: tag(natm),ra(3,natm),va(3,natm),h(3,3),sorg(3)
+    real(rp),intent(in):: tag(natm),ra(3,natm),va(3,natm),h(3,3),sorg(3)
 
     integer:: is, ixyz
-    real(8):: di(3)
+    real(rp):: di(3)
 
     if( ia_impls > 0 ) then  ! only the node contains itot_impls does this
       is = int(tag(ia_impls))
@@ -138,7 +139,7 @@ contains
 !
     use pmdvars,only: fa2v,am,dt,nsp
     integer,intent(in):: istp, myid, mpi_world, iprint
-    real(8),intent(in):: simtime
+    real(rp),intent(in):: simtime
     integer:: ierr, is
 
 !.....Scale forces
@@ -149,13 +150,13 @@ contains
     
 !.....Gather information from child nodes
     disp= 0d0
-    call mpi_reduce(displ,disp,1,mpi_real8,mpi_sum, &
+    call mpi_reduce(displ,disp,1,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
     ptau= 0d0
-    call mpi_reduce(ptaul,ptau,1,mpi_real8,mpi_sum, &
+    call mpi_reduce(ptaul,ptau,1,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
     ftau(:) = 0d0
-    call mpi_reduce(ftaul,ftau,nsp,mpi_real8,mpi_sum, &
+    call mpi_reduce(ftaul,ftau,nsp,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
 
 !.....Write to the file only at node-0

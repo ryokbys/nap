@@ -8,13 +8,14 @@ module ttm
 ! In the current implementation, it is assumed that the number of 
 ! parallel nodes are the common dividors of number of TTM meshes.
 !
+  use pmdmpi
+  use mod_precision
   use memory,only: accum_mem
   use vector,only: dot
   use random,only: box_muller
   use util,only: itotOf
   implicit none
   save
-  include 'mpif.h'
   include "./params_unit.h"
   include "./const.h"
   
@@ -34,57 +35,57 @@ module ttm
   integer,parameter:: iots3d = 34
   integer,parameter:: iots1d = 35
 
-!!$  real(8),parameter:: pi = 3.14159265358979d0
+!!$  real(rp),parameter:: pi = 3.14159265358979d0
 
 !.....TTM mesh divisions
   integer:: nx,ny,nz,nxyz
 !.....Mesh size in reduced unit [0:1)
-  real(8):: dx,dy,dz,area,darea,dr2
+  real(rp):: dx,dy,dz,area,darea,dr2
 !.....ODE solver; 1) Euler, 2) RK4 (4th order Runge-Kutta), 3) RK2
   character(len=20):: csolver = 'RK4'
 !.....Time step in fs == dt in MD by default
-  real(8):: dt_inner = -1.0
+  real(rp):: dt_inner = -1.0
 !.....Number of inner loop in TTM
   integer:: nstp_inner = 1
 !.....Volume and area per mesh cell Ang^3 == dx*dy*dz
-  real(8):: vcell
+  real(rp):: vcell
 !.....Threshold kinetic energy in energy unit (or should be threshold velocity?)
-  real(8):: ekth = 8.0d0
+  real(rp):: ekth = 8.0d0
 !.....Te of right edge, if negative, use free boundary
-  real(8):: Te_right = -1d0
+  real(rp):: Te_right = -1d0
 !.....Minimum Te, which limits the electron system goes too low energy
-  real(8):: Te_min = -100d0
+  real(rp):: Te_min = -100d0
 !.....Maximums in the system
-  real(8):: Te_max = -1d0
-  real(8):: alpha_max = -1d0
-  real(8):: kappa_max, cete_min
+  real(rp):: Te_max = -1d0
+  real(rp):: alpha_max = -1d0
+  real(rp):: kappa_max, cete_min
 
 !.....Ce dependence on Te: none(0), polynomial(1), tanh(2), linear(3)
   character(len=128):: Ce_Tdep = 'none'
   integer:: iCe_Tdep = 0
-  real(8):: rho_e0 = 0.005d0
-  real(8):: rho_e_ratio = 1.0  ! electron desity as a ratio to atom density
-  real(8),allocatable:: rho_e(:)
-  real(8):: d_e = 20d0
-  real(8):: c_0 = 1e-4
+  real(rp):: rho_e0 = 0.005d0
+  real(rp):: rho_e_ratio = 1.0  ! electron desity as a ratio to atom density
+  real(rp),allocatable:: rho_e(:)
+  real(rp):: d_e = 20d0
+  real(rp):: c_0 = 1e-4
 !.....Coefficients for polynomial Ce(Te) [eV/(K.electron)]
 !.....See Jay et al., IEEE Trans. Nucl. Sci. 64 (2017)
-  real(8):: a_0 = 0d0
-  real(8):: a_1 = 0d0
-  real(8):: a_2 = 0d0
-  real(8):: a_3 = 0d0
-  real(8):: a_4 = 0d0
-  real(8):: A_exp = 0d0
+  real(rp):: a_0 = 0d0
+  real(rp):: a_1 = 0d0
+  real(rp):: a_2 = 0d0
+  real(rp):: a_3 = 0d0
+  real(rp):: a_4 = 0d0
+  real(rp):: A_exp = 0d0
 !.....Coefficients for linear, (Ce(Te) = gmm_ce * Te ), in eV/(Ang^3*K^2)
-  real(8):: gmm_ce = 6.648d-9
+  real(rp):: gmm_ce = 6.648d-9
 !.....Minimum Ce value for computational stability, in eV/K
-  real(8):: ce_min = 1d-6
+  real(rp):: ce_min = 1d-6
 !.....Minimum atomic temperature for calculating kappa, in K
-  real(8):: ta_min = 10.0
+  real(rp):: ta_min = 10.0
 
 !.....Initial Te distribution: exp, homo, or read (from cTe_init)
   character(len=128):: cTe_init = 'homo'
-  real(8):: Te_init = 300d0
+  real(rp):: Te_init = 300d0
 !.....T-dependence of pulse shape: stepwise(1, default) or gaussian(2)
   character(len=128):: ctype_pulse = 'stepwise'
   integer:: itype_pulse = 1
@@ -93,19 +94,19 @@ module ttm
   character(len=128):: ctype_kappa = 'DCrho'
   integer:: itype_kappa = 1
 !.....Prefactor in case of kappa_type = B2, in eV/(fs*Ang*K)
-  real(8):: kappa0 = 6.2422d-7
+  real(rp):: kappa0 = 6.2422d-7
 
 !.....Absobed laser fluence in eV/Ang^2 unit
-  real(8):: fluence = 0d0
-  real(8):: I_0
+  real(rp):: fluence = 0d0
+  real(rp):: I_0
 !.....Start time of laser injection
-  real(8):: t0_laser = 0d0
+  real(rp):: t0_laser = 0d0
 !.....Pulse duration in fs
-  real(8):: tau_pulse = 100d0
+  real(rp):: tau_pulse = 100d0
 !.....Pulse sigma in case of Gaussian
-  real(8):: sgm_pulse
+  real(rp):: sgm_pulse
 !.....Surface skin length in Ang
-  real(8):: lskin = 100d0
+  real(rp):: lskin = 100d0
 !.....Surface position (positive integer)
   integer:: lsurf = -1  ! left surface
   integer:: rsurf = -1  ! right surface
@@ -114,13 +115,13 @@ module ttm
   integer:: nstp_surfmove = 10
 !.....Threshold density: default = 0.025 Ang^{-3} (1/2 of ideal Si diamond density)
 !     ex) 8 /5.427^3 = 0.05
-  real(8):: dthresh = 0.025d0
+  real(rp):: dthresh = 0.025d0
 
 !.....Temperature distribution
-  real(8),allocatable:: te(:,:,:),te0(:,:,:),tep(:,:,:)
-  real(8),allocatable:: ta(:),tap(:),tex(:)
+  real(rp),allocatable:: te(:,:,:),te0(:,:,:),tep(:,:,:)
+  real(rp),allocatable:: ta(:),tap(:),tex(:)
   integer,allocatable:: nac(:),dof(:),dofp(:)
-  real(8),allocatable:: eksum(:),ekpsum(:),vac(:,:),ekti(:)
+  real(rp),allocatable:: eksum(:),ekpsum(:),vac(:,:),ekti(:)
 !.....Atom to cell correspondance
   integer,allocatable:: a2c(:)
 
@@ -129,37 +130,37 @@ module ttm
   integer:: itype_coupling = 1
 !.....e-ph coupling constant, g, in case of constant gp in eV/(fs*A^3*K)
 !.....Parameter for Ni from Zhigilei et al., J.Phys.Chem. C 113 (2009)
-  real(8):: e_ph_const = 2.247e-9
+  real(rp):: e_ph_const = 2.247e-9
 !.....Friction coefficient, gamma, in 1/fs (inverse of relaxation time)
-  real(8):: gamma_p = 0.001
-  real(8):: gamma_s = 0.1
-  real(8),allocatable:: gmmp(:), gmms(:)
+  real(rp):: gamma_p = 0.001
+  real(rp):: gamma_s = 0.1
+  real(rp),allocatable:: gmmp(:), gmms(:)
 !.....Sigma of random force in Langevin thermostat
-  real(8),allocatable:: sgm(:)
+  real(rp),allocatable:: sgm(:)
 !.....gp, gs
-  real(8),allocatable:: gp(:),gs(:)
+  real(rp),allocatable:: gp(:),gs(:)
 
-  real(8),allocatable:: aai(:,:)
+  real(rp),allocatable:: aai(:,:)
 
-  real(8):: etot_e
+  real(rp):: etot_e
 !.....For energy difference
-  real(8):: ein_e, ein_a, eout_e, eout_a
-  real(8),allocatable:: dein(:),deout(:)
+  real(rp):: ein_e, ein_a, eout_e, eout_a
+  real(rp),allocatable:: dein(:),deout(:)
 
 !.....1D continume TTM and boundary condition parameters
   logical:: lcouple_3d1d = .true.
   integer:: nd1d = 1000  ! Num of nodes for 1D TTM
-  real(8):: dx1d = 10d0  ! dx (Ang) of 1D TTM
-  real(8):: cl1d = 2.585d-4 ! specific heat of lattice system (eV/K/atom), 3k_B for Dulong-Petit
+  real(rp):: dx1d = 10d0  ! dx (Ang) of 1D TTM
+  real(rp):: cl1d = 2.585d-4 ! specific heat of lattice system (eV/K/atom), 3k_B for Dulong-Petit
   integer:: ibc1d,ibc3d
-  real(8),allocatable:: te1d(:),te1d0(:),tep1d(:),tl1d(:),tl1d0(:),tlp1d(:), &
+  real(rp),allocatable:: te1d(:),te1d0(:),tep1d(:),tl1d(:),tl1d0(:),tlp1d(:), &
        gp1d(:),gmmp1d(:)
-  real(8):: rho_latt  = 0.05d0 ! number density of atoms in lattice system (1/Ang^3) [default: 0.05]
-  real(8):: d_latt = 8.8d0    ! (A^2/fs)
+  real(rp):: rho_latt  = 0.05d0 ! number density of atoms in lattice system (1/Ang^3) [default: 0.05]
+  real(rp):: d_latt = 8.8d0    ! (A^2/fs)
 !.....Non-reflecting boundary condition
-  real(8):: dnr = 10d0   ! NRBC region length [default: 10 Ang]
-  real(8):: xrmd
-  real(8):: sspeed_latt = 8433d-5  ! speed of sound [default: 8433d-5 Ang/fs] for Si
+  real(rp):: dnr = 10d0   ! NRBC region length [default: 10 Ang]
+  real(rp):: xrmd
+  real(rp):: sspeed_latt = 8433d-5  ! speed of sound [default: 8433d-5 Ang/fs] for Si
 
 !.....DEBUGGING
 !.....Cut interaction bewteen atom and electron systems
@@ -173,12 +174,12 @@ contains
 !  Read parameters for TTM from in.ttm and initialize
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint
-    real(8),intent(in):: dtmd,h(3,3),ra(3,natm),sorg(3)
+    real(rp),intent(in):: dtmd,h(3,3),ra(3,natm),sorg(3)
     logical,intent(in):: lvardt 
     character(len=3),intent(in):: boundary
 
     integer:: ierr,ix,iy,iz,mem
-    real(8):: t,t0,t1,t2,dtmax,tmp
+    real(rp):: t,t0,t1,t2,dtmax,tmp
     character(len=128):: c1st
 
     t0 = mpi_wtime()
@@ -380,9 +381,9 @@ contains
       endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
-      call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(te1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(tl1d,nd1d+1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(te1d,nd1d+1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(tl1d,nd1d+1,mpi_real_rp,0,mpi_world,ierr)
     endif
 
     call assign_atom2cell(namax,natm,ra,sorg,boundary)
@@ -449,10 +450,10 @@ contains
   end subroutine init_ttm
 !=======================================================================
   subroutine set_inner_dt(dtmd,myid,iprint)
-    real(8),intent(in):: dtmd
+    real(rp),intent(in):: dtmd
     integer,intent(in):: myid,iprint
 
-    real(8):: tmp
+    real(rp):: tmp
 
 !.....If alpha_max > 0, the upper limit of dt_inner can be determined.
     if( alpha_max.gt.0d0 ) then
@@ -644,49 +645,49 @@ contains
     call mpi_bcast(ny,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nz,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(nstp_inner,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(dt_inner,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gamma_p,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gamma_s,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(ekth,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_e0,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_e_ratio,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_latt,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(d_e,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(d_latt,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dt_inner,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(gamma_p,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(gamma_s,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(ekth,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rho_e0,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rho_e_ratio,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rho_latt,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(d_e,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(d_latt,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(ctype_kappa,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(kappa0,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(t0_laser,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(kappa0,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(t0_laser,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(ctype_pulse,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(tau_pulse,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(tau_pulse,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(ctype_coupling,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(e_ph_const,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(e_ph_const,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(cTe_init,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(Te_right,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(Te_init,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(Te_right,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(Te_init,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(ce_Tdep,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(c_0,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(a_0,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(a_1,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(a_2,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(a_3,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(a_4,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(A_exp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gmm_ce,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(ce_min,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(ta_min,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(c_0,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(a_0,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(a_1,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(a_2,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(a_3,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(a_4,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(A_exp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(gmm_ce,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(ce_min,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(ta_min,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(surfmove,1,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(fluence,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(Te_min,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(fluence,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(Te_min,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
     call mpi_bcast(rsurf,1,mpi_integer,0,mpi_world,ierr)  ! deprecated
-    call mpi_bcast(lskin,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(lskin,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(lcut_interact,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(csolver,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(lcouple_3d1d,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(nd1d,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(dx1d,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dnr,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sspeed_latt,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dx1d,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dnr,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(sspeed_latt,1,mpi_real_rp,0,mpi_world,ierr)
     return
   end subroutine sync_params
 !=======================================================================
@@ -695,11 +696,11 @@ contains
 !  Assign atoms to TTM mesh cell
 !
     integer,intent(in):: namax,natm
-    real(8),intent(in):: ra(3,namax),sorg(3)
+    real(rp),intent(in):: ra(3,namax),sorg(3)
     character(len=3),intent(in):: boundary
 
     integer:: i,ix,iy,iz,ic,l
-    real(8):: xi(3),udx,udy,udz,t0
+    real(rp):: xi(3),udx,udy,udz,t0
 
     if( size(a2c).ne.namax ) then
       deallocate(a2c,aai,ekti)
@@ -771,13 +772,13 @@ contains
 !
     use util,only: ifmvOf
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,istp,iprint
-    real(8),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
+    real(rp),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
          ,fekin(nspmax)
 
     integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof,mem
-    real(8):: ek,t0,vat(3),vatr(3)
+    real(rp):: ek,t0,vat(3),vatr(3)
     integer,allocatable,save:: dofl(:),dofpl(:)
-    real(8),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
+    real(rp),allocatable,save:: eksuml(:),ekpsuml(:),vacl(:,:)
 !!$    integer,external:: ifmvOf
 
 !!$    if( myid.eq.0 .and. iprint.ge.ipl_info ) print *,'calc_Ta...'
@@ -798,12 +799,12 @@ contains
       vacl(1:3,ic) = vacl(1:3,ic) +va(1:3,i)
     enddo
     vac(:,:) = 0d0
-    call mpi_reduce(vacl,vac,3*nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(vacl,vac,3*nxyz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
     do ic=1,nxyz
       if( nac(ic).eq.0 ) cycle
       vac(1:3,ic) = vac(1:3,ic) /nac(ic)
     enddo
-    call mpi_bcast(vac,3*nxyz,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(vac,3*nxyz,mpi_real_rp,0,mpi_world,ierr)
 
 !.....Compute Ekin per atom using thermal part of velocities
     do i=1,natm
@@ -837,8 +838,8 @@ contains
     ekpsum(1:nxyz) = 0d0
     call mpi_reduce(dofl,dof,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(dofpl,dofp,nxyz,mpi_integer,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(eksuml,eksum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
-    call mpi_reduce(ekpsuml,ekpsum,nxyz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(eksuml,eksum,nxyz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(ekpsuml,ekpsum,nxyz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
 !.....Compute Ta and Tap only at node-0
     if( myid.eq.0 ) then
       if( trim(ctype_coupling).eq.'constant_gmmp' ) then
@@ -899,7 +900,7 @@ contains
 !  Wrapper routine for updating 3D-TTM and 1D-TTM systems.
 !
     integer,intent(in):: myid,mpi_world,iprint,natm
-    real(8),intent(in):: tnow,dtmd,ra(3,natm),h(3,3),sorg(3)
+    real(rp),intent(in):: tnow,dtmd,ra(3,natm),h(3,3),sorg(3)
 
     call update_2tm3d(tnow,dtmd,myid,mpi_world,iprint)
     call update_2tm1d(tnow,myid,mpi_world,iprint)
@@ -913,15 +914,15 @@ contains
 !  and some ODE solvers are (to be) implemented.
 !
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: tnow,dtmd
+    real(rp),intent(in):: tnow,dtmd
 
     integer:: ic,ix,iy,iz,ierr,istp,ix0,ix1
-    real(8):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor&
+    real(rp):: t0,ce,dce,xi,pterm,sterm,kappa,dkappa,pulsefactor&
          ,dtemp,tmp,de,eitmp,eotmp,eptmp
-    real(8):: de_surf, dte_surf
-    real(8),save:: ein_pulse,dte_sum
+    real(rp):: de_surf, dte_surf
+    real(rp),save:: ein_pulse,dte_sum
     logical,save:: l1st = .true.
-    real(8),allocatable,save:: dtep(:,:,:)
+    real(rp),allocatable,save:: dtep(:,:,:)
 
     t0 = mpi_wtime()
 
@@ -1062,7 +1063,7 @@ contains
     endif
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce communication cost.
-    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real_rp,0,mpi_world,ierr)
 
     return
   end subroutine update_2tm3d
@@ -1072,12 +1073,12 @@ contains
 !  Create f(t,y) for ODE dy/dt = f(t,y), where y=te(iz,iy,ix) here.
 !  The ODE is now diffusion Eq. with two-temperature model.
 !
-    real(8),intent(in):: tnow
+    real(rp),intent(in):: tnow
     integer,intent(in):: iprint
-    real(8),intent(out):: dtep(0:nz+1,0:ny+1,0:nx+1),eitmp,eotmp,eptmp
+    real(rp),intent(out):: dtep(0:nz+1,0:ny+1,0:nx+1),eitmp,eotmp,eptmp
 
     integer:: ic,ix,iy,iz
-    real(8):: ce,dce,kappa,dkappa,pterm,sterm,dtemp,de,tmp&
+    real(rp):: ce,dce,kappa,dkappa,pterm,sterm,dtemp,de,tmp&
          ,pulsefactor,xi,denom,teic
     
     dtep(:,:,:) = 0d0
@@ -1177,8 +1178,8 @@ contains
 !
     integer,intent(in):: ix,iy,iz
 
-    real(8):: cete
-    real(8):: t
+    real(rp):: cete
+    real(rp):: t
 
     cete = 0d0
     if( iCe_Tdep.eq.0 ) then  ! none
@@ -1202,8 +1203,8 @@ contains
 !
     integer,intent(in):: ix,iy,iz
 
-    real(8):: dcete
-    real(8):: t,texp,x
+    real(rp):: dcete
+    real(rp):: t,texp,x
 
     dcete = 0d0
     if( iCe_Tdep.eq.1 ) then  ! polynomial
@@ -1226,7 +1227,7 @@ contains
     integer,intent(in):: ix,iy,iz
 
     integer:: ixp,ixm,iyp,iym,izp,izm
-    real(8):: dte2
+    real(rp):: dte2
     ixp = ix +1
     ixm = ix -1
     iyp = iy +1
@@ -1248,7 +1249,7 @@ contains
     integer,intent(in):: ix,iy,iz
 
     integer:: ixp,ixm,iyp,iym,izp,izm
-    real(8):: d2te
+    real(rp):: d2te
     ixp = ix +1
     ixm = ix -1
     iyp = iy +1
@@ -1273,15 +1274,15 @@ contains
     use util,only: itotOf, ifmvOf
     include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
-    real(8),intent(in):: aa(3,namax),tag(namax),am(nspmax), &
+    real(rp),intent(in):: aa(3,namax),tag(namax),am(nspmax), &
          fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
-    real(8),intent(inout):: va(3,namax),ediff(nspmax)
+    real(rp),intent(inout):: va(3,namax),ediff(nspmax)
 
     integer:: ic,i,l,ifmv,ix,iy,iz,naccp,ierr,isp
-    real(8):: sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3),&
+    real(rp):: sgmi,ami,ek,gmmi,vl(3),vi(3),aai(3),t0,vt(3),&
          aain(3),aaout(3),vin(3),vout(3),v0(3),etai,afi,bfi
-    real(8):: dv(3),dv0(3),dvin(3),dvout(3)
-    real(8):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
+    real(rp):: dv(3),dv0(3),dvin(3),dvout(3)
+    real(rp):: ediffl(nspmax),deinl(nspmax),deoutl(nspmax)
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1379,11 +1380,11 @@ contains
     dein(1:nspmax) = 0d0
     deout(1:nspmax) = 0d0
     call mpi_reduce(ediffl,ediff,nspmax &
-         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+         ,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(deinl,dein,nspmax &
-         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+         ,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
     call mpi_reduce(deoutl,deout,nspmax &
-         ,mpi_real8,mpi_sum,0,mpi_world,ierr)
+         ,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
     do isp=1,nspmax
       ein_a = ein_a +dein(isp)
       eout_a = eout_a +deout(isp)
@@ -1399,12 +1400,12 @@ contains
 !  See Shugaev, et al., PRB96 (2017) for details.
 !
     integer,intent(in):: natm,myid,mpi_world,iprint,nspmax
-    real(8),intent(in):: ra(3,natm),h(3,3),sorg(3),tag(natm) &
+    real(rp),intent(in):: ra(3,natm),h(3,3),sorg(3),tag(natm) &
          ,dtmd,am(nspmax),fa2v(nspmax)
-    real(8),intent(inout):: va(3,natm)
+    real(rp),intent(inout):: va(3,natm)
 
     integer:: i,nabcl,nabc,ierr,isp,ic
-    real(8):: xdnr,area,xi,hxi,areatom,vx,ami,zimp,sgmi,axi
+    real(rp):: xdnr,area,xi,hxi,areatom,vx,ami,zimp,sgmi,axi
     
     xdnr = dnr/h(1,1)
     area = h(2,2)*h(3,3)
@@ -1457,7 +1458,7 @@ contains
 !  Wrapper function for output 3D-TTM and 1D-TTM systems.
 !
     integer,intent(in):: istp,myid,iprint
-    real(8),intent(in):: tnow
+    real(rp),intent(in):: tnow
     
     call output_ttm3d(istp,tnow,myid,iprint)
     call output_ttm1d(istp,tnow,myid,iprint)
@@ -1468,10 +1469,10 @@ contains
 !  Output Te data in 3D TTM-MD (ttm3d) region.
 !
     integer,intent(in):: istp,myid,iprint
-    real(8),intent(in):: tnow
+    real(rp),intent(in):: tnow
 
     integer:: ix,iy,iz,ic,n
-    real(8):: ave,eetot
+    real(rp):: ave,eetot
     character(len=128):: cnum
 
     if( myid.eq.0 ) then
@@ -1549,11 +1550,11 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
 
     integer:: ix,iy,iz,icl,ivac_right,ierr,lsurf_new,lsurf_true,imatt_right
-    real(8):: tmp
+    real(rp):: tmp
     logical:: lupdate
     logical,allocatable,save:: lexists(:)
-    real(8),allocatable,save:: densx(:)
-    real(8),save:: volyz
+    real(rp),allocatable,save:: densx(:)
+    real(rp),save:: volyz
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1621,7 +1622,7 @@ contains
 10  continue
 !.....Broadcast Te distribution to all the nodes.
 !.....There could be smarter way to reduce networking cost.
-    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(te,(nz+2)*(ny+2)*(nx+2),mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(lsurf,1,mpi_integer,0,mpi_world,ierr)
 
     if( lsurf.ge.ibc3d ) then
@@ -1643,7 +1644,7 @@ contains
 !  Output in/out of energy at electronic and atomic systems
 !
     integer,intent(in):: istp, myid, iprint
-    real(8),intent(in):: simtime
+    real(rp),intent(in):: simtime
     logical:: lopen
 
     if( myid.eq.0 ) then
@@ -1676,18 +1677,18 @@ contains
     use pmdmpi,only: nid2xyz
     integer,intent(in):: namax,naux
     integer,intent(inout):: natm
-    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
-    real(8),intent(inout):: aux(naux,namax)
-    real(8),intent(in):: h(3,3),simtime,sorg(3)
+    real(rp),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+    real(rp),intent(inout):: aux(naux,namax)
+    real(rp),intent(in):: h(3,3),simtime,sorg(3)
     
     integer:: ix,iy,iz,inc,nabl,n,ia,ja,inc2,ierr,itot,iyz,n0,iaux
-    real(8):: r(3),rt(3),v(3)
+    real(rp):: r(3),rt(3),v(3)
     logical:: lremove 
     integer,save:: ntmp = 1000
     integer,parameter:: nmpi = 4
     logical,save:: l1st = .true.
     integer,allocatable,save:: list(:)
-    real(8),allocatable,save:: tagabl(:),rabl(:,:),vabl(:,:)
+    real(rp),allocatable,save:: tagabl(:),rabl(:,:),vabl(:,:)
     integer:: istat(mpi_status_size),itag
 
 !!$    integer,external:: itotOf
@@ -1748,17 +1749,17 @@ contains
         do iyz = 1,ny*nz-1
           itag = iyz*nmpi -nmpi
           call mpi_recv(n,1,mpi_integer,iyz,itag,mpi_md_world,istat,ierr)
-          call mpi_recv(tagabl(n0),n,mpi_real8,iyz,itag+1,mpi_md_world,istat,ierr)
-          call mpi_recv(rabl(1,n0),3*n,mpi_real8,iyz,itag+2,mpi_md_world,istat,ierr)
-          call mpi_recv(vabl(1,n0),3*n,mpi_real8,iyz,itag+3,mpi_md_world,istat,ierr)
+          call mpi_recv(tagabl(n0),n,mpi_real_rp,iyz,itag+1,mpi_md_world,istat,ierr)
+          call mpi_recv(rabl(1,n0),3*n,mpi_real_rp,iyz,itag+2,mpi_md_world,istat,ierr)
+          call mpi_recv(vabl(1,n0),3*n,mpi_real_rp,iyz,itag+3,mpi_md_world,istat,ierr)
           n0 = n0 + n
         enddo
       else  ! myid_md.ne.0
         itag = myid_md*nmpi -nmpi
         call mpi_send(inc,1,mpi_integer,0,itag,mpi_md_world,ierr)
-        call mpi_send(tagabl,inc,mpi_real8,0,itag+1,mpi_md_world,ierr)
-        call mpi_send(rabl,3*inc,mpi_real8,0,itag+2,mpi_md_world,ierr)
-        call mpi_send(vabl,3*inc,mpi_real8,0,itag+3,mpi_md_world,ierr)
+        call mpi_send(tagabl,inc,mpi_real_rp,0,itag+1,mpi_md_world,ierr)
+        call mpi_send(rabl,3*inc,mpi_real_rp,0,itag+2,mpi_md_world,ierr)
+        call mpi_send(vabl,3*inc,mpi_real_rp,0,itag+3,mpi_md_world,ierr)
       endif
 !.....Write out only at node-0
       if( myid_md.eq.0 ) then
@@ -1798,7 +1799,7 @@ contains
 !  Get electronic temperatures of atoms from electronic temperatures on sites.
 !
     integer,intent(in):: namax,natm
-    real(8),intent(out):: tei(namax)
+    real(rp),intent(out):: tei(namax)
 
     integer:: ic,ia,ix,iy,iz
 
@@ -1816,10 +1817,10 @@ contains
 !  Solve 1D continume TTM attached to right-most end of TTM-MD region.
 !
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: tnow
+    real(rp),intent(in):: tnow
     
     integer:: istp,ix0,ix1
-    real(8),allocatable,save:: dtep1d(:),dtlp1d(:)
+    real(rp),allocatable,save:: dtep1d(:),dtlp1d(:)
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -1897,14 +1898,14 @@ contains
 !   [1] Zhigilei, et al., J. Phys. Chem. C 113, 11892–11906 (2009)
 !
     integer,intent(in):: iprint
-    real(8),intent(in):: tnow
-    real(8),intent(out):: dtep(nd1d),dtlp(nd1d)
+    real(rp),intent(in):: tnow
+    real(rp),intent(out):: dtep(nd1d),dtlp(nd1d)
 
     integer:: ix
-    real(8):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
-    real(8):: denom,xlsurf,vc1d,kl1d,I0_1D
-!!$    real(8),parameter:: kappa_latt = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
-!!$    real(8),parameter:: kappa_latt = 1.137d-4  ! kappa for Si lattice in eV/(fs.Ang.K)
+    real(rp):: ce,dce,kappa,dkappa,pterm,dtemp,tmp,xi,de,pulsefactor
+    real(rp):: denom,xlsurf,vc1d,kl1d,I0_1D
+!!$    real(rp),parameter:: kappa_latt = 8.125d-7  ! kappa for Si lattice in eV/(fs.Ang.K)
+!!$    real(rp),parameter:: kappa_latt = 1.137d-4  ! kappa for Si lattice in eV/(fs.Ang.K)
     
     dtep(:) = 0d0
     dtlp(:) = 0d0
@@ -1979,8 +1980,8 @@ contains
 !  Ce(Te) at ix
 !
     integer,intent(in):: ix
-    real(8):: cete1d
-    real(8):: t
+    real(rp):: cete1d
+    real(rp):: t
 
     cete1d = 0d0
     if( iCe_Tdep.eq.0 ) then  ! none
@@ -2004,8 +2005,8 @@ contains
 !
     integer,intent(in):: ix
 
-    real(8):: dcete1d
-    real(8):: t,texp,x
+    real(rp):: dcete1d
+    real(rp):: t,texp,x
     
     dcete1d = 0d0
     if( iCe_Tdep.eq.1 ) then  ! polynomial
@@ -2029,8 +2030,8 @@ contains
 !            = [(T(ix+1)^2 -2*T(ix+1)*T(ix-1) -T(ix-1)^2)/(2dx)^2]
 !
     integer,intent(in):: ix
-    real(8):: dte21d
-    real(8):: t,tp,tm
+    real(rp):: dte21d
+    real(rp):: t,tp,tm
 
     t = tep1d(ix)
     tp= tep1d(ix+1)
@@ -2044,8 +2045,8 @@ contains
 !  (d^2/dx^2)Te
 !
     integer,intent(in):: ix
-    real(8):: d2te1d
-    real(8):: t,tp,tm
+    real(rp):: d2te1d
+    real(rp):: t,tp,tm
 
     t = tep1d(ix)
     tp= tep1d(ix+1)
@@ -2059,8 +2060,8 @@ contains
 !  (d^2/dx^2)Tl
 !
     integer,intent(in):: ix
-    real(8):: d2tl1d
-    real(8):: t,tp,tm
+    real(rp):: d2tl1d
+    real(rp):: t,tp,tm
 
     t = tlp1d(ix)
     tp= tlp1d(ix+1)
@@ -2074,7 +2075,7 @@ contains
 !  Output temperatures (Te and Tl) in 1D TTM region.
 !
     integer,intent(in):: istp,myid,iprint
-    real(8),intent(in):: tnow
+    real(rp),intent(in):: tnow
 
     integer:: ix
     character(len=128):: cnum
@@ -2103,7 +2104,7 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
 
     integer:: ix,iy,iz,mx,mxp,jx,ic,icp,ierr
-    real(8):: tebc3d,tebcp3d,tabc3d,tabcp3d,x3d,x3dp,x1d,x1dp,tet3d,tat3d
+    real(rp):: tebc3d,tebcp3d,tabc3d,tabcp3d,x3d,x3dp,x1d,x1dp,tet3d,tat3d
 
     if( myid.ne.0 ) goto 10
 
@@ -2185,8 +2186,8 @@ contains
     enddo
 
 10  continue
-    call mpi_bcast(ta,nxyz,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(ta,nxyz,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(te,(nx+2)*(ny+2)*(nz+2),mpi_real_rp,0,mpi_world,ierr)
     return
   end subroutine couple_3d1d
 !=======================================================================
@@ -2196,17 +2197,17 @@ contains
 !  See RK's note "1D-TTM for heat conducting medium" for details.
 !
     integer,intent(in):: natm,myid,mpi_world,iprint
-    real(8),intent(in):: ra(3,natm),h(3,3),sorg(3)
+    real(rp),intent(in):: ra(3,natm),h(3,3),sorg(3)
 
     integer:: i,ierr
-    real(8):: xrl,xdnr,x1d,x3d
+    real(rp):: xrl,xdnr,x1d,x3d
 
 !.....Get right-most x-pos of atoms, xr
     xrl = 0d0
     do i=1,natm
       xrl = max(ra(1,i)+sorg(1),xrl)
     enddo
-    call mpi_allreduce(xrl,xrmd,1,mpi_real8,mpi_max,mpi_world,ierr)
+    call mpi_allreduce(xrl,xrmd,1,mpi_real_rp,mpi_max,mpi_world,ierr)
 
 !.....Get x-index of boundary cell in 3D-TTM system (ibc3d) from (xr - dnr), 
 !.....where dnr is the length of non-reflecting boundary region

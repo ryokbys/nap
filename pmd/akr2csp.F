@@ -5,21 +5,22 @@ c   - assuming akr file to be redirect to this program as STDIN
 c   - output akr format to STDOUT
 c   - change cutoff radius, rc, to apply this to your system
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 20
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
-cc      real(8),parameter:: rc    = 3.36d0
-c      real(8),parameter:: rc    = 3.5d0
+cc      real(rp),parameter:: rc    = 3.36d0
+c      real(rp),parameter:: rc    = 3.5d0
 c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
-      real(8),parameter:: abcc = 2.8533d0
-      real(8),parameter:: rc   = 0.5d0*(1d0+0.866025d0)*abcc
+      real(rp),parameter:: abcc = 2.8533d0
+      real(rp),parameter:: rc   = 0.5d0*(1d0+0.866025d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa
-      real(8):: tmp,h(3,3),xi(3),rij(3),r,hunit
+      real(rp):: tmp,h(3,3),xi(3),rij(3),r,hunit
       integer,allocatable:: lsa(:),lspr(:,:)
-      real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
+      real(rp),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:),cspi(:)
       integer nargc
       integer,external:: iargc
@@ -85,14 +86,15 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: natm,n1,n2,n3,nlist
-      real(8),intent(inout):: ra(3,natm)
+      real(rp),intent(inout):: ra(3,natm)
       integer,intent(out):: llist(nlist)
       integer:: i,j,n,nr1,nr2,nr3
-      real(8):: a1,a2,a3
+      real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(8),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1d0-1d-8
 
       llist(1:nlist)=0
 
@@ -122,14 +124,15 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make Verlet list from linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: nlls,lls(nlls),nx,ny,nz,natm,nnmax
-      real(8),intent(in):: h(3,3),ra(3,natm),rc
+      real(rp),intent(in):: h(3,3),ra(3,natm),rc
       integer,intent(out):: lspr(0:nnmax,natm)
       integer:: i,j,k,l,m,n,ir,jr,kx,ky,kz,irx,iry,irz,jrx,jry,jrz,ii
-      real(8):: dx,dy,dz,r
+      real(rp):: dx,dy,dz,r
 
-      real(8),allocatable:: da(:)
+      real(rp),allocatable:: da(:)
 
       allocate(da(nnmax))
 
@@ -226,15 +229,16 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  Reduce natm0 to natm based on the Centro-Symmetry Parameter.
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
       integer,intent(in):: natm0,nnmax,nauxdat,lspr(0:nnmax,natm0)
-      real(8),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0),h(3,3)
+      real(rp),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0),h(3,3)
       integer,intent(out):: natm
-      real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
+      real(rp),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
      &     ,cspi(natm0)
 
       integer:: i,j,k,l,m,kmin
-      real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),val,vmin,vjk
+      real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),val,vmin,vjk
 
       natm= 0
       do i=1,natm0

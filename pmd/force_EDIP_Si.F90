@@ -1,4 +1,6 @@
 module EDIP_Si
+  use pmdmpi
+  use mod_precision
 contains
   subroutine force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -10,30 +12,29 @@ contains
 !    - 2010.03.31 by R.K.
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_EDIP_Si.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,is,js,ks,ierr,jj,kk,ll
-    real(8):: epotl,epotl2,epotl3,epott
-    real(8):: rij,rij2,riji,rim,rimi,v2,t1,t2,t3,dft,aexp,gg &
+    real(rp):: epotl,epotl2,epotl3,epott
+    real(rp):: rij,rij2,riji,rim,rimi,v2,t1,t2,t3,dft,aexp,gg &
          ,eda2,eda,edb,edc,edg,eds
-    real(8):: v3,qz,dqz,tz,dtz,grij,dgrij,grik,dgrik,rik,rik2,riki,h1 &
+    real(rp):: v3,qz,dqz,tz,dtz,grij,dgrij,grik,dgrik,rik,rik2,riki,h1 &
          ,h2,cs,hijk
-    real(8),save,allocatable,dimension(:):: z,pz,xi,xj,xij,dxi,dxj,at &
+    real(rp),save,allocatable,dimension(:):: z,pz,xi,xj,xij,dxi,dxj,at &
          ,xx,dixij,djxij,dixik,dkxik,xk &
          ,xik,dcsi,dcsj,dcsk,dit1,dlt1
-    real(8),save,allocatable:: dz(:,:,:)
-    real(8),save,allocatable:: aa2(:,:),aa3(:,:)
-    real(8),save,allocatable:: teda(:,:),tedb(:,:),tedc(:,:) &
+    real(rp),save,allocatable:: dz(:,:,:)
+    real(rp),save,allocatable:: aa2(:,:),aa3(:,:)
+    real(rp),save,allocatable:: teda(:,:),tedb(:,:),tedc(:,:) &
          ,tedg(:,:),teds(:,:)
 !-----1st call
     logical,save:: l1st=.true.
@@ -288,7 +289,7 @@ contains
 !-----gather epot
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,mpi_real_rp &
            ,MPI_SUM,mpi_world,ierr)
       epot= epot +epott
     else
@@ -300,8 +301,8 @@ contains
   function f_r(a,c,r,alpha)
 !-----Weighting function of EDIP
     implicit none
-    real(8),intent(in):: a,c,r,alpha
-    real(8):: f_r,x
+    real(rp),intent(in):: a,c,r,alpha
+    real(rp):: f_r,x
 
     f_r= 0d0
     if(r.lt.c) then
@@ -316,8 +317,8 @@ contains
   function df_r(a,c,r,alpha)
 !-----Derivative: df(r)/dr
     implicit none 
-    real(8),intent(in):: a,c,r,alpha
-    real(8):: df_r,x,t1,t2,t3
+    real(rp),intent(in):: a,c,r,alpha
+    real(rp):: df_r,x,t1,t2,t3
 
     df_r= 0d0
     if(c.le.r .and. r.lt.a) then

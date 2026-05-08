@@ -4,6 +4,7 @@ module util
 !-----------------------------------------------------------------------
 !  Utility functions/subroutines used in nap.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   save
 
@@ -46,7 +47,7 @@ contains
 !    use,intrinsic:: ieee_arithmetic
     character(len=*),intent(in):: str
     logical:: is_numeric
-    real(8):: x
+    real(rp):: x
     integer:: e
 
     read(str,*,iostat=e) x
@@ -58,7 +59,7 @@ contains
 !=======================================================================
   function ispOf(tag)
     implicit none
-    real(8),intent(in):: tag
+    real(rp),intent(in):: tag
     integer:: ispOf
     ispOf= int(tag)
     return
@@ -66,7 +67,7 @@ contains
 !=======================================================================
   function ifmvOf(tag)
     implicit none
-    real(8),intent(in):: tag
+    real(rp),intent(in):: tag
     integer:: ifmvOf
     ifmvOf= int(mod(tag*10,10d0))
     return
@@ -74,7 +75,7 @@ contains
 !=======================================================================
   function ithOf(tag,ith)
     implicit none
-    real(8),intent(in):: tag
+    real(rp),intent(in):: tag
     integer,intent(in):: ith
     integer:: ithOf
     ithOf= int(mod(tag*10d0**ith,10d0))
@@ -92,9 +93,9 @@ contains
 !  and the other digits are reserved for species, ifmv, and igroups.
 !
     implicit none
-    real(8),intent(in):: tag
+    real(rp),intent(in):: tag
     integer:: itotOf
-    real(8):: tmp
+    real(rp):: tmp
 
 !!$    tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
 !!$    itotOf= nint(tmp*1d+14)
@@ -113,7 +114,7 @@ contains
 !  And, 1st-4th groups correspond to 2nd-5th digits, respectively.
 !  Thus, the max number of groups in this implementation is 4.
 !
-    real(8),intent(in):: tag
+    real(rp),intent(in):: tag
     integer,intent(in):: gid
     integer:: igvarOf
 
@@ -170,7 +171,7 @@ contains
     implicit none
     character(len=*),intent(in):: ctx
     integer,intent(in):: ival
-    real(8),intent(inout):: tag
+    real(rp),intent(inout):: tag
 
     integer:: ifmv
 
@@ -192,7 +193,7 @@ contains
 !
 !  Replace the current group variable of the given GID with the given IGVAR.
 !
-    real(8),intent(inout):: tagi
+    real(rp),intent(inout):: tagi
     integer,intent(in):: gid,igvar
     integer:: igvar0
     
@@ -204,11 +205,11 @@ contains
   subroutine cell_info(h)
     use vector,only: dot
     implicit none
-    real(8),intent(in):: h(3,3)
+    real(rp),intent(in):: h(3,3)
 
     integer:: i,j,jm,jp,im,ip
-    real(8):: a,b,c,alpha,beta,gamma,sgm(3,3),vol
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp):: a,b,c,alpha,beta,gamma,sgm(3,3),vol
+    real(rp),parameter:: pi = 3.14159265358979d0
 
     write(6,*) ''
     write(6,'(a)') " Lattice vectors:"
@@ -239,7 +240,7 @@ contains
   subroutine spcs_info(ntot,tagtot)
     use pmdvars,only: nspmax,specorder
     integer,intent(in):: ntot
-    real(8),intent(in):: tagtot(ntot)
+    real(rp),intent(in):: tagtot(ntot)
     integer:: nsps(nspmax),ia,is
 
     nsps(:) = 0
@@ -256,11 +257,11 @@ contains
   end subroutine spcs_info
 !=======================================================================
   function get_vol(h) result(vol)
-    real(8),intent(in):: h(3,3)
+    real(rp),intent(in):: h(3,3)
 
     integer:: i,j,jm,jp,im,ip
-    real(8):: sgm(3,3)
-    real(8):: vol
+    real(rp):: sgm(3,3)
+    real(rp):: vol
 
 !.....cofactor matrix, SGM
     do j=1,3
@@ -338,7 +339,7 @@ contains
     include 'mpif.h'
     include './const.h'
     integer,intent(in):: ntot
-    real(8),intent(in):: tagtot(ntot)
+    real(rp),intent(in):: tagtot(ntot)
 
     integer:: ia,ierr,igrp
 !!$    integer,external:: ifmvOf
@@ -453,12 +454,12 @@ contains
 !
 !  Resize 1D double array.
 !
-    real(8),allocatable:: darr(:)
+    real(rp),allocatable:: darr(:)
     integer,intent(in):: new_size(:)
 
     if( allocated(darr) ) then
       block
-        real(8),allocatable:: tmp(:)
+        real(rp),allocatable:: tmp(:)
         allocate(tmp(new_size(1)))
         tmp(1:size(darr)) = darr(1:size(darr))
         tmp(size(darr)+1:) = 0d0
@@ -472,12 +473,12 @@ contains
 !
 !  Resize 2D double array.
 !
-    real(8),allocatable:: darr(:,:)
+    real(rp),allocatable:: darr(:,:)
     integer,intent(in):: new_size(:)
 
     if( allocated(darr) ) then
       block
-        real(8),allocatable:: tmp(:,:)
+        real(rp),allocatable:: tmp(:,:)
         allocate(tmp(new_size(1),new_size(2)))
         tmp(:,1:size(darr,2)) = darr(:,1:size(darr,2))
         tmp(:,size(darr,2)+1:) = 0d0
@@ -491,12 +492,12 @@ contains
 !
 !  Resize 3D double array.
 !
-    real(8),allocatable:: darr(:,:,:)
+    real(rp),allocatable:: darr(:,:,:)
     integer,intent(in):: new_size(:)
 
     if( allocated(darr) ) then
       block
-        real(8),allocatable:: tmp(:,:,:)
+        real(rp),allocatable:: tmp(:,:,:)
         allocate(tmp(new_size(1),new_size(2),new_size(3)))
         tmp(:,:,1:size(darr,3)) = darr(:,:,1:size(darr,3))
         tmp(:,:,size(darr,3)+1:) = 0d0
@@ -534,8 +535,8 @@ contains
 !
 !  logistic sigmoid function (1 / (1 + exp(-x)))
 !
-    real(8),intent(in):: x
-    real(8):: expit
+    real(rp),intent(in):: x
+    real(rp):: expit
 
     if( x.ge.0d0 ) then
       expit = 1d0 / (1d0 + exp(-x))
@@ -549,8 +550,8 @@ contains
 !
 !  derivative of the logistic sigmoid function (1 / (1 + exp(-x)))
 !
-    real(8),intent(in):: x
-    real(8):: dexpit
+    real(rp),intent(in):: x
+    real(rp):: dexpit
 
     if( x.ge.0d0 ) then
       dexpit = exp(-x) / (1d0 + exp(-x))**2
@@ -564,8 +565,8 @@ contains
 !
 !  precise computation of log(1+x) when x ~= 0.
 !
-    real(8),intent(in):: x
-    real(8):: log1p
+    real(rp),intent(in):: x
+    real(rp):: log1p
 
     if( abs(x) .le. 1d-8 ) then
       log1p = x - 0.5d0*x*x
@@ -580,11 +581,11 @@ contains
 !  Numerical derivative of 1D function f(x).
 !
     integer,intent(in):: n
-    real(8),intent(in):: xs(n),fs(n)
-    real(8),intent(out):: dfs(n)
+    real(rp),intent(in):: xs(n),fs(n)
+    real(rp),intent(out):: dfs(n)
 
     integer:: i
-    real(8):: dx,dx2
+    real(rp):: dx,dx2
 
 !.....Assuming equi-partition
     dx = xs(2) -xs(1)

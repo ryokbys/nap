@@ -13,8 +13,9 @@ c  << Output files >>
 c    pot???: pot files
 c
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
-      include "mpif.h"
 c-----max. num. of atoms
       integer,parameter:: namax = 1000000
 c-----max. num. of species
@@ -26,32 +27,32 @@ c-----max. num. of neighbors
 c-----max. num. of buffer data
       integer,parameter:: maxbuf= 100000
 c-----criteria or threshold for potential energy per atom
-      real(8),parameter:: epic  = -6.8d10
+      real(rp),parameter:: epic  = -6.8d10
 
       integer:: i,j,k,l,m,n,ia,ib
       integer:: nstp,nouterg,noutpmd,iout_count,istp,nerg,ifpmd,npmd
       integer:: natm,nb,ntot,nis,itmp,ipmd
-      real(8):: dt
-      real(8):: tcpu,tcpu1,tcpu2,tcom
-      real(8):: tmp,dmp,treq,ttol,epot,ekin,epot0
+      real(rp):: dt
+      real(rp):: tcpu,tcpu1,tcpu2,tcom
+      real(rp):: tmp,dmp,treq,ttol,epot,ekin,epot0
 c-----parallel-related variables
       integer:: nx,ny,nz,nxyz
       integer:: nn(6),myparity(3),lsrc(6),lsb(0:nbmax,6)
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr,idis
-      real(8):: sv(3,6),anxi,anyi,anzi,sorg(3)
+      real(rp):: sv(3,6),anxi,anyi,anzi,sorg(3)
 c-----simulation box
-      real(8):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
+      real(rp):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
 c-----positions, velocities, and accelerations
       integer:: itype(namax)
-      real(8):: ra(3,namax),va(3,namax),op(2,namax)
+      real(rp):: ra(3,namax),va(3,namax),op(2,namax)
 c-----buffer data
       integer:: ibuf(maxbuf)
-      real(8):: rbuf(8,maxbuf)
+      real(rp):: rbuf(8,maxbuf)
 c-----pot data
       integer:: npot,npottot
       integer:: ipot(namax),lspot(namax)
       integer,allocatable:: lpot(:),nrecvs(:),idisps(:)
-      real(8):: xpot(8,namax)
+      real(rp):: xpot(8,namax)
 c-----species, index of FMV
       integer:: lspr(0:nnmax,namax)
 c-----output file names
@@ -176,8 +177,8 @@ c-------gather
           nrecvs(i)= nrecvs(i) *8
         enddo
         if(myid_md.eq.0)write(6,'(a)') " 2nd gatherv..."
-        call mpi_gatherv(rbuf,8*npot,MPI_DOUBLE_PRECISION
-     &       ,xpot,nrecvs,idisps,MPI_DOUBLE_PRECISION
+        call mpi_gatherv(rbuf,8*npot,mpi_real_rp
+     &       ,xpot,nrecvs,idisps,mpi_real_rp
      &       ,0,mpi_md_world,ierr)
 
 c-------output as pot file
@@ -200,13 +201,15 @@ c-------output as pot file
       end program pmd2pot
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
+      use pmdmpi
+      use mod_precision
       implicit none
       include "params_unit.h"
       include "params_eam_al.h"
 c      include "params_lj_ar.h"
       integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
+      real(rp),intent(in):: dt
+      real(rp),intent(out):: am(nismax),acon(nismax),fack(nismax)
 
       integer:: i
 
@@ -231,11 +234,13 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  Preparation for network related properties
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
       integer,intent(in):: myx,myy,myz,nx,ny,nz
-      real(8),intent(in):: anxi,anyi,anzi
+      real(rp),intent(in):: anxi,anyi,anzi
       integer,intent(out):: nn(6),myparity(3)
-      real(8),intent(out):: sv(3,6)
+      real(rp),intent(out):: sv(3,6)
       integer:: iv(3,6),ku,k1x,k1y,k1z
 
       iv(1:3,1)= (/ -1, 0, 0 /)

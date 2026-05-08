@@ -19,6 +19,12 @@ AC_PATH_PROG([PYTHON],[python])
 
 # Checks for library functions.
 
+AC_ARG_ENABLE([single],
+  [AS_HELP_STRING([--enable-single], [Use single precision floating point])],
+  [if test "x$enableval" = "xyes"; then
+    CPPFLAGS="$CPPFLAGS -D__SINGLE__"
+  fi])
+
 AC_CONFIG_FILES([pmd/makefile mkconf/makefile fitpot/run_pmd.sh
                  fitpot/run_smd.sh qmcl/makefile neb/makefile
                  fitpot/makefile nappy/pmd/makefile])

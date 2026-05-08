@@ -5,13 +5,14 @@ c-----------------------------------------------------------------------
 c  USAGE:
 c    $ ./cna2disl < cna000 > disl000
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
-      real(8),parameter:: bohr = 0.5291772d-10
-      real(8),parameter:: rcz  = 2.8553d-10 /bohr
+      real(rp),parameter:: bohr = 0.5291772d-10
+      real(rp),parameter:: rcz  = 2.8553d-10 /bohr
 
       integer:: i,iz,natm,naux,nz,nc
-      real(8):: h(3,3),dz,xav,yav,xref,yref,xi,yi,zi
-      real(8),allocatable:: ra(:,:),aux(:,:)
+      real(rp):: h(3,3),dz,xav,yav,xref,yref,xi,yi,zi
+      real(rp),allocatable:: ra(:,:),aux(:,:)
       integer,allocatable:: itype(:),lshd(:),lscl(:)
 
 c-----read cna file from STDIN

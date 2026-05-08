@@ -6,12 +6,13 @@ subroutine heapsort(n,nmax,tag,ndim,arr)
 !      by ascending order
 !    - assuming tag includes only total id information
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n,nmax,ndim
-  real(8),intent(inout):: tag(nmax),arr(ndim,nmax)
+  real(rp),intent(inout):: tag(nmax),arr(ndim,nmax)
 
   integer:: i,ir,j,l,irra
-  real(8):: rtag,rarr(ndim)
+  real(rp):: rtag,rarr(ndim)
 
 !-----check size
   if( n.lt.2 ) return
@@ -71,13 +72,14 @@ subroutine heapsort_itag(n,nmax,itag,ndim,arr)
 !      by ascending order
 !    - assuming tag includes only total id information
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n,nmax,ndim
   integer,intent(inout):: itag(nmax)
-  real(8),intent(inout):: arr(ndim,nmax)
+  real(rp),intent(inout):: arr(ndim,nmax)
 
   integer:: i,ir,j,l,irra,jtag
-  real(8):: rarr(ndim)
+  real(rp):: rarr(ndim)
 
 !-----check size
   if( n.lt.2 ) return
@@ -136,13 +138,14 @@ subroutine arg_heapsort_iarr(n,nmax,iarr,idxarr)
 !    - sort indices according to integer array IARR
 !      by ascending order
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n,nmax
   integer,intent(inout):: iarr(nmax)
   integer,intent(out):: idxarr(nmax)
 
   integer:: i,ir,j,l,irra,jarr,jdx
-!!$  real(8):: rarr(ndim)
+!!$  real(rp):: rarr(ndim)
 
 !-----check size
   if( n.lt.2 ) return
@@ -205,14 +208,15 @@ subroutine arg_heapsort_arr(n,nmax,arr,idxarr)
 !    - sort indices according to REAL8 array ARR
 !      by ascending order
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n,nmax
-  real(8),intent(inout):: arr(nmax)
+  real(rp),intent(inout):: arr(nmax)
   integer,intent(out):: idxarr(nmax)
 
   integer:: i,ir,j,l,irra,jdx
-  real(8):: tmp
-!!$  real(8):: rarr(ndim)
+  real(rp):: tmp
+!!$  real(rp):: rarr(ndim)
 
 !-----check size
   if( n.lt.2 ) return
@@ -276,13 +280,14 @@ subroutine heapsort_i(n,nmax,tag,iarr)
 !      by ascending order
 !    - assuming tag includes only total id information
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n,nmax
   integer,intent(inout):: iarr(nmax)
-  real(8),intent(inout):: tag(nmax)
+  real(rp),intent(inout):: tag(nmax)
 
   integer:: i,ir,j,l,irra,irarr
-  real(8):: rtag
+  real(rp):: rtag
 
 !-----check size
   if( n.lt.2 ) return
@@ -346,7 +351,7 @@ recursive subroutine qsort_iarr(nmax,il,ir,iarr,ndim,arr)
   implicit none
   integer,intent(in):: nmax,ndim,il,ir
   integer,intent(inout):: iarr(nmax)
-  real(8),intent(inout):: arr(ndim,nmax)
+  real(rp),intent(inout):: arr(ndim,nmax)
 
   integer:: ip,ipiv,i,j
 
@@ -404,11 +409,11 @@ recursive subroutine arg_qsort_arr(nmax,il,ir,arr,idxarr)
 !
   implicit none
   integer,intent(in):: nmax,il,ir
-  real(8),intent(inout):: arr(nmax)
+  real(rp),intent(inout):: arr(nmax)
   integer,intent(out):: idxarr(nmax)
 
   integer:: ip,i,j
-  real(8):: aip
+  real(rp):: aip
 
   do i=1,nmax
     idxarr(i) = i
@@ -431,13 +436,14 @@ recursive subroutine arg_qsort_arr(nmax,il,ir,arr,idxarr)
 end subroutine arg_qsort_arr
 !=======================================================================
 subroutine swap_iarr(nmax,i,j,iarr,ndim,arr)
+  use mod_precision
   implicit none 
   integer,intent(in):: nmax,i,j,ndim
   integer,intent(inout):: iarr(nmax)
-  real(8),intent(inout):: arr(ndim,nmax)
+  real(rp),intent(inout):: arr(ndim,nmax)
 
   integer:: itmp
-  real(8):: tmp(ndim)
+  real(rp):: tmp(ndim)
 
   itmp = iarr(i)
   iarr(i) = iarr(j)
@@ -450,6 +456,7 @@ subroutine swap_iarr(nmax,i,j,iarr,ndim,arr)
 end subroutine swap_iarr
 !=======================================================================
 subroutine swap_iarridx(nmax,i,j,iarr,idx)
+  use mod_precision
   implicit none 
   integer,intent(in):: nmax,i,j
   integer,intent(inout):: iarr(nmax),idx(nmax)
@@ -468,13 +475,14 @@ subroutine swap_iarridx(nmax,i,j,iarr,idx)
 end subroutine swap_iarridx
 !=======================================================================
 subroutine swap_arridx(nmax,i,j,arr,idx)
+  use mod_precision
   implicit none 
   integer,intent(in):: nmax,i,j
-  real(8),intent(inout):: arr(nmax)
+  real(rp),intent(inout):: arr(nmax)
   integer,intent(inout):: idx(nmax)
 
   integer:: itmp
-  real(8):: tmp
+  real(rp):: tmp
 
   tmp = arr(i)
   arr(i) = arr(j)

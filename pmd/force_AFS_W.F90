@@ -1,4 +1,6 @@
 module AFS_W
+  use pmdmpi
+  use mod_precision
 contains
   subroutine force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -15,23 +17,22 @@ contains
 !    - Philo. Mag. A, vol.50(1), 1984, pp.45--55
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_AFS_W.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,v2,dv2,dphi,dphj,tmp
+    real(rp):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
+    real(rp):: x,y,z,xi(3),epotl,v2,dv2,dphi,dphj,tmp
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: sqrho(:)
+    real(rp),allocatable,save:: sqrho(:)
 
     if( l1st ) then
       allocate(sqrho(namax))
@@ -145,7 +146,7 @@ contains
 !-----gather epot
     epot= 0d0
     if( myid_md.ge.0 ) then
-      call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epot,1,mpi_real_rp &
            ,MPI_SUM,mpi_md_world,ierr)
     else
       epot= epotl
@@ -161,9 +162,9 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_AFS_W.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: v2_IWHe,x
+    real(rp):: v2_IWHe,x
 
     v2_IWHe= 0d0
 
@@ -187,9 +188,9 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_AFS_W.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: dv2_IWHe,ri,x,exar
+    real(rp):: dv2_IWHe,ri,x,exar
 
     dv2_IWHe= 0d0
 
@@ -214,9 +215,9 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_AFS_W.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: phi_IWHe
+    real(rp):: phi_IWHe
 
     phi_IWHe= 0d0
 
@@ -232,9 +233,9 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_AFS_W.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: dphi_IWHe
+    real(rp):: dphi_IWHe
 
     dphi_IWHe= 0d0
 

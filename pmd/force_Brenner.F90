@@ -1,4 +1,6 @@
 module Brenner
+  use pmdmpi
+  use mod_precision
   use vector,only: dot
   
 contains
@@ -12,28 +14,27 @@ contains
 !       see, D.W.Brenner, PRB 42 (1990) pp.9458-9471
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "./params_Brenner.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,tag(namax),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
 !-----locals
     integer:: i,j,jj,k,kk,ierr,is
-    real(8):: rij,riji,rik,riki,rjk,rjki,rexp,aexp,dvrdr,cs,gc,tk,t1, &
+    real(rp):: rij,riji,rik,riki,rjk,rjki,rexp,aexp,dvrdr,cs,gc,tk,t1, &
          va,dgc,frik,dfrik,frjk,dfrjk,bij,bji,b,dvadr,frij,dfrij, &
          gfi,gfj,tmp,x,y,z,epotl,epott
-    real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
 !-----1st call
     logical,save:: l1st=.true.
-    real(8),allocatable,dimension(:,:),save:: aa1,aa2
+    real(rp),allocatable,dimension(:,:),save:: aa1,aa2
 
 !-----only at 1st call
     if( l1st ) then
@@ -287,7 +288,7 @@ contains
     aa(1:3,1:natm)= aa(1:3,1:natm) -aa1(1:3,1:natm) -aa2(1:3,1:natm)
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 
@@ -306,31 +307,30 @@ contains
 !   - Note: this mixed potential would return wrong C-C bond length
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "./params_Brenner.h"
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nismax&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,tag(namax),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
 !-----max num of neighbors for Brenner potential
     integer,parameter:: nnmaxb = 20
 !-----locals
     integer:: i,j,jj,k,kk,ierr,is
-    real(8):: rij,riji,rik,riki,rjk,rjki,rexp,aexp,dvrdr,cs,gc,tk,t1, &
+    real(rp):: rij,riji,rik,riki,rjk,rjki,rexp,aexp,dvrdr,cs,gc,tk,t1, &
          va,dgc,frik,dfrik,frjk,dfrjk,bij,bji,b,dvadr,frij,dfrij, &
          gfi,gfj,tmp,x,y,z,epotl
-    real(8):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xji(3),xik(3),xjk(3),dixij(3) &
          ,djxij(3),dixji(3),djxji(3),fi(3),fj(3),dixik(3),djxjk(3) &
          ,dkxik(3),dkxjk(3),dics(3),djcs(3),dkcs(3),at(3)
     
     logical,save:: l1st=.true.
-    real(8),allocatable,dimension(:,:),save:: aa1,aa2
+    real(rp),allocatable,dimension(:,:),save:: aa1,aa2
     integer,allocatable,save:: lsprb(:,:)
 
 !-----only at 1st call
@@ -608,16 +608,16 @@ contains
 
 !-----gather epot
     epot= 0d0
-    call mpi_allreduce(epotl,epot,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epot,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
 
   end subroutine force_Brenner_vdW
 !=======================================================================
   function f_r(r,r1,r2)
     implicit none
-    real(8),intent(in):: r,r1,r2
-    real(8):: f_r
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp),intent(in):: r,r1,r2
+    real(rp):: f_r
+    real(rp),parameter:: pi = 3.14159265358979d0
 
     f_r= 0d0
     if(r.lt.r1) then
@@ -631,9 +631,9 @@ contains
   function df_r(r,r1,r2)
 !-----Derivative: df(r)/dr
     implicit none 
-    real(8),intent(in):: r,r1,r2
-    real(8):: df_r
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp),intent(in):: r,r1,r2
+    real(rp):: df_r
+    real(rp),parameter:: pi = 3.14159265358979d0
 
     df_r= 0d0
     if(r1.le.r .and. r.lt.r2) then
@@ -650,8 +650,8 @@ contains
     implicit none
     include "./params_unit.h"
     include "./params_Brenner.h"
-    real(8),intent(in):: r,ri
-    real(8):: vvdw
+    real(rp),intent(in):: r,ri
+    real(rp):: vvdw
 
     vvdw= 0d0
     if(r.lt.r1vdw) then
@@ -674,8 +674,8 @@ contains
     implicit none
     include "./params_unit.h"
     include "./params_Brenner.h"
-    real(8),intent(in):: r,ri
-    real(8):: dvvdw
+    real(rp),intent(in):: r,ri
+    real(rp):: dvvdw
 
     dvvdw= 0d0
     if(r.ge.r1vdw .and. r.lt.r2vdw) then

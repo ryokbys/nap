@@ -6,6 +6,8 @@ module linreg
 !    - 2014.06.11 by R.K. 1st implementation
 !    - 2015.02.03 by R.K. extended to multiple species
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use vector,only: dot
   implicit none
   save
@@ -19,11 +21,11 @@ module linreg
   logical:: lprmset_linreg = .false.
 
 !.....parameters
-  real(8),allocatable:: coeff(:)
+  real(rp),allocatable:: coeff(:)
 !.....constants
   integer:: nelem,nexp,nsp
   integer,allocatable:: itype(:),icmb(:,:)
-  real(8),allocatable:: cnst(:,:),exps(:)
+  real(rp),allocatable:: cnst(:,:),exps(:)
 !.....function types and num of constatns for types
   integer,parameter:: max_ncnst= 3
   integer,parameter:: ncnst_type(1:10)= &
@@ -58,22 +60,21 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rc
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt
-    real(8):: rcin,b_na,at(3),epotl,wgt,aexp,bnai,apot,epott
-    real(8),save,allocatable:: fat(:,:),dbna(:,:,:)
+    real(rp):: rcin,b_na,at(3),epotl,wgt,aexp,bnai,apot,epott
+    real(rp),save,allocatable:: fat(:,:),dbna(:,:,:)
 !.....1st call
     logical,save:: l1st=.true.
 
@@ -160,7 +161,7 @@ contains
          ,nn,mpi_world,aa,3)
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_double_precision &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_world,ierr)
     if( iprint.gt.2 ) print *,'linreg epot = ',epott
     epot= epot +epott
@@ -174,25 +175,24 @@ contains
     use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays &
          ,pre_desci
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
     logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl,ia,ielem &
          ,iwgt,isf,ja,jj
-    real(8):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
-    real(8):: xi(3),xj(3),xji(3),sji,rji(3),dji
-    real(8),save,allocatable:: aal(:,:),strsl(:,:,:)
-    real(8),save:: rcin2 
+    real(rp):: b_na,at(3),epotl,wgt,aexp,bnai,apot,epott,tmp
+    real(rp):: xi(3),xj(3),xji(3),sji,rji(3),dji
+    real(rp),save,allocatable:: aal(:,:),strsl(:,:,:)
+    real(rp),save:: rcin2 
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
@@ -277,7 +277,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     if( myid.eq.0 .and. iprint.gt.2 ) print *,'epot linreg = ',epott
     
@@ -286,9 +286,9 @@ contains
 !=======================================================================
   function fc(r,rc)
     implicit none
-    real(8),intent(in):: r,rc
-    real(8):: fc
-    real(8),parameter:: pi= 3.14159265358979d0
+    real(rp),intent(in):: r,rc
+    real(rp):: fc
+    real(rp),parameter:: pi= 3.14159265358979d0
 
     fc= 0.5d0 *(cos(r/rc*pi)+1d0)
     return
@@ -296,9 +296,9 @@ contains
 !=======================================================================
   function dfc(r,rc)
     implicit none
-    real(8),intent(in):: r,rc
-    real(8):: dfc
-    real(8),parameter:: pi= 3.14159265358979d0
+    real(rp),intent(in):: r,rc
+    real(rp):: dfc
+    real(rp),parameter:: pi= 3.14159265358979d0
 
     dfc= -pi/2/rc *sin(r/rc*pi)
     return
@@ -312,11 +312,11 @@ contains
     implicit none
     integer,intent(in):: ia,natm,namax,nnmax,lspr(0:nnmax,natm) &
          ,ielem
-    real(8),intent(in):: ra(3,namax),h(3,3),tag(namax),rc,aexp
-    real(8),intent(out):: bnai,dbna(3,nelem,namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),tag(namax),rc,aexp
+    real(rp),intent(out):: bnai,dbna(3,nelem,namax)
 
     integer:: ja,jj,ka,kk,is,js,ks
-    real(8):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),r,dirij(3),djrij(3),tmp &
          ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik,dkrik(3),dirik(3) &
          ,f3,dfcj,dfck,tmp2,cs,acnst,dcosi(3),dcosj(3),dcosk(3)
 
@@ -478,9 +478,9 @@ contains
 !
     implicit none
     integer,intent(in):: ielem,is,js
-    real(8),intent(in):: rij
-    real(8):: func2
-    real(8):: a(max_ncnst),r2i,r4i
+    real(rp),intent(in):: rij
+    real(rp):: func2
+    real(rp):: a(max_ncnst),r2i,r4i
 
     func2= 0d0
     if( itype(ielem).eq.1 ) then ! Gaussian-type
@@ -528,8 +528,8 @@ contains
   function dfunc2(rij,ielem,is,js)
     implicit none
     integer,intent(in):: ielem,is,js
-    real(8),intent(in):: rij
-    real(8):: dfunc2,tmp,a(max_ncnst),ri,r2i,r4i
+    real(rp),intent(in):: rij
+    real(rp):: dfunc2,tmp,a(max_ncnst),ri,r2i,r4i
     integer:: ia2
 
     dfunc2= 0d0
@@ -584,8 +584,8 @@ contains
   function func3(rij,rj,rik,rk,ielem,is,js,ks)
     implicit none
     integer,intent(in):: ielem,is,js,ks
-    real(8),intent(in):: rij(3),rj,rik(3),rk
-    real(8):: func3,cs,a(max_ncnst)
+    real(rp),intent(in):: rij(3),rj,rik(3),rk
+    real(rp):: func3,cs,a(max_ncnst)
 
     func3= 0d0
     if( itype(ielem).eq.3 ) then ! angular
@@ -598,10 +598,9 @@ contains
 !=======================================================================
   subroutine read_params(myid,mpi_world,rcin)
     implicit none
-    include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world
-    real(8),intent(out):: rcin
+    real(rp),intent(out):: rcin
     integer:: itmp,ierr,i,j
     logical:: lexist
 
@@ -660,7 +659,6 @@ contains
   subroutine read_params_linreg(myid,mpi_world,iprint)
     use descriptor,only: nsf
     implicit none
-    include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
     integer:: itmp,ierr,i,j
@@ -695,7 +693,7 @@ contains
       enddo
       close(50)
     endif
-    call mpi_bcast(coeff,nsf,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(coeff,nsf,mpi_real_rp,0,mpi_world,ierr)
     
 
     return
@@ -718,7 +716,7 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
 
     if( .not. allocated(coeff) ) then
       allocate(coeff(ndimp))
@@ -741,13 +739,13 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
          ,iprm0
-    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),rcin
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),rcin
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,ia,ja,jj,isf,ne,nf,jra
 !!$    integer,external:: itotOf
-    real(8):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
+    real(rp):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     

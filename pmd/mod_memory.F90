@@ -4,6 +4,7 @@ module memory
 !-----------------------------------------------------------------------
 ! Module for memory measurement.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   save
 
@@ -79,7 +80,7 @@ contains
     character(len=3):: clen
     integer:: mem_tot
     character(len=4):: cunit
-    real(8):: rmem
+    real(rp):: rmem
 
     mem_tot = get_mem_total()
 
@@ -116,7 +117,7 @@ contains
 !  Original unit is Byte, and returns the memory in Byte, kB, MB, or GB.
 !
     integer,intent(in):: inmem
-    real(8),intent(out):: outmem
+    real(rp),intent(out):: outmem
     character(len=4):: cout
 
     if( inmem.lt.1000 ) then

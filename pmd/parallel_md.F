@@ -18,32 +18,33 @@ c               in the MD run if required by "flag_out_pmd" in in.pmd.
 c   out.stress: Stress component normal to z-upper surface of nanorod,
 c               and z-strain of the nanorod.
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       use variables
       implicit none
-      include "mpif.h"
       include "./params_unit.h"
 
 #ifdef __DISL__
 c.....Epot threshold for disl core extraction [Hartree]
-      real(8),parameter:: epith = -0.1410d0
+      real(rp),parameter:: epith = -0.1410d0
 #endif
 
 
       integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nisl,i_conv
       integer:: ihour,imin,isec
-      real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
+      real(rp):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),epotp
       integer,external:: ispOf,ifmvOf,itotOf
-      real(8),external:: box_muller,sprod
+      real(rp),external:: box_muller,sprod
       logical:: lconverged = .false.
       logical:: lstrs = .false.
 c-----output file names
       character:: cnode*5,cnum*4
 c.....FIRE variables
-      real(8):: alp_fire,fnorm,vnorm,fdotv
+      real(rp):: alp_fire,fnorm,vnorm,fdotv
       integer:: num_fire
 
 c.....For tensile test of Al nanorod
-      real(8):: strnow,ftop,fbot
+      real(rp):: strnow,ftop,fbot
 
 c-----initialize the MPI environment
       call mpi_init(ierr)
@@ -581,7 +582,7 @@ c-------output energies
           ediff(1:9)= ediff(1:9) /nouterg
           ediff0(1:9)= 0d0
           call mpi_reduce(ediff,ediff0,9
-     &         ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+     &         ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
           
           if(myid_md.eq.0) then
 c.....write energies
@@ -735,6 +736,8 @@ c.....write energy and forces only for fitpot (2nd digit of iprint==1)
       end program parallel_md
 c=======================================================================
       subroutine write_initial_setting()
+      use pmdmpi
+      use mod_precision
       use variables
       implicit none 
       integer:: i
@@ -809,9 +812,10 @@ c.....velocity multiplying factor
       end subroutine write_initial_setting
 c=======================================================================
       subroutine bcast_params()
+      use pmdmpi
+      use mod_precision
       use variables
       implicit none
-      include 'mpif.h'
 
 c-----Broadcast input parameters to all nodes
       call mpi_bcast(nx,1,MPI_INTEGER,0,mpi_md_world,ierr)
@@ -819,33 +823,33 @@ c-----Broadcast input parameters to all nodes
       call mpi_bcast(nz,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(nstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(minstp,1,MPI_INTEGER,0,mpi_md_world,ierr)
-      call mpi_bcast(dt,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rc,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(rbuf,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(dmp,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(eps_conv,1,MPI_DOUBLE_PRECISION,0,
+      call mpi_bcast(dt,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(rc,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(rbuf,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(dmp,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(eps_conv,1,mpi_real_rp,0,
      &     mpi_md_world,ierr)
       call mpi_bcast(n_conv,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(tinit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(tfin,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(tinit,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(tfin,1,mpi_real_rp,0,mpi_md_world,ierr)
       call mpi_bcast(ctctl,20,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ttgt,9,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
-      call mpi_bcast(trlx,1,MPI_DOUBLE_PRECISION,0,mpi_md_world,ierr)
+      call mpi_bcast(ttgt,9,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(trlx,1,mpi_real_rp,0,mpi_md_world,ierr)
       call mpi_bcast(nerg,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifpmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(npmd,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(ifsort,1,mpi_integer,0,mpi_md_world,ierr)
       call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpi_md_world,ierr)
       call mpi_bcast(iprint,1,mpi_integer,0,mpi_md_world,ierr)
-      call mpi_bcast(fmv,30,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(shrst,1,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(fmv,30,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(shrst,1,mpi_real_rp,0,mpi_md_world,ierr)
       call mpi_bcast(cpctl,20,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(ptgt,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(srlx,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(stgt,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(ptgt,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(srlx,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(stgt,9,mpi_real_rp,0,mpi_md_world,ierr)
       call mpi_bcast(czload_type,5,mpi_character,0,mpi_md_world,ierr)
-      call mpi_bcast(strfin,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(am,nismax,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(strfin,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(am,nismax,mpi_real_rp,0,mpi_md_world,ierr)
       call mpi_bcast(ciofmt,6,mpi_character,0,mpi_md_world,ierr)
       call mpi_bcast(cforce,20,mpi_character,0,mpi_md_world,ierr)
 c.....NEMD
@@ -860,6 +864,8 @@ c.....NEMD
       end subroutine bcast_params
 c=======================================================================
       subroutine error_mpi_stop(cerrmsg)
+      use pmdmpi
+      use mod_precision
       use variables
       implicit none
       character(len=*):: cerrmsg
@@ -877,14 +883,16 @@ c=======================================================================
       end subroutine error_mpi_stop
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
+      use pmdmpi
+      use mod_precision
       implicit none
       include "params_unit.h"
       integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: acon(nismax),fack(nismax),am(nismax)
+      real(rp),intent(in):: dt
+      real(rp),intent(out):: acon(nismax),fack(nismax),am(nismax)
 
       integer:: i
-      real(8):: tmp
+      real(rp):: tmp
 
       am(1:nismax)= am(1:nismax)
 
@@ -912,12 +920,14 @@ c    H:   MD-box matrix
 c    HI:  inverse MD-box matrix
 c    SGM: cofactor matrix
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
-      real(8),intent(in):: h(3,3,0:1)
-      real(8),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1)
+      real(rp),intent(in):: h(3,3,0:1)
+      real(rp),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1)
      &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1)
 
-      real(8):: hit(3,3)
+      real(rp):: hit(3,3)
       integer:: i,j,k,im,ip,jm,jp
 
 c-----cofactor matrix, SGM
@@ -987,11 +997,13 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  Preparation for network related properties
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
       integer,intent(in):: myx,myy,myz,nx,ny,nz
-      real(8),intent(in):: anxi,anyi,anzi
+      real(rp),intent(in):: anxi,anyi,anzi
       integer,intent(out):: nn(6),myparity(3)
-      real(8),intent(out):: sv(3,6)
+      real(rp),intent(out):: sv(3,6)
       integer:: iv(3,6),ku,k1x,k1y,k1z
 
       iv(1:3,1)= (/ -1, 0, 0 /)
@@ -1040,7 +1052,7 @@ c
 c Set default fmv values which might be override
 c
       implicit none
-      real(8),intent(out):: fmv(3,0:9)
+      real(rp),intent(out):: fmv(3,0:9)
 
 c-----set fmv(1:3,ifmv) to be multiplied to the velocities
       fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
@@ -1059,14 +1071,13 @@ c=======================================================================
       subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki,ekl
      &     ,vmax,mpi_md_world)
       implicit none 
-      include "mpif.h"
       integer,intent(in):: namax,natm,mpi_md_world,nismax
-      real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
+      real(rp),intent(in):: va(3,namax),h(3,3),fack(nismax)
      &     ,tag(namax)
-      real(8),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
+      real(rp),intent(out):: ekin,eki(3,3,namax),vmax,ekl(9)
 c-----locals
       integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
-      real(8):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
+      real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
 
       ekinl=0d0
       eki(1:3,1:3,1:natm)= 0d0
@@ -1098,13 +1109,13 @@ c.....Find max speed
       enddo
 
       ekin= 0d0
-      call mpi_allreduce(ekinl,ekin,1,MPI_DOUBLE_PRECISION
+      call mpi_allreduce(ekinl,ekin,1,mpi_real_rp
      &     ,MPI_SUM,mpi_md_world,ierr)
       ekl(1:9)= 0d0
-      call mpi_allreduce(ekll,ekl,9,mpi_double_precision
+      call mpi_allreduce(ekll,ekl,9,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
       vmax= 0d0
-      call mpi_allreduce(vmaxl,vmax,1,mpi_double_precision
+      call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp
      &     ,mpi_max,mpi_md_world,ierr)
       vmax=sqrt(vmax)
 
@@ -1113,11 +1124,10 @@ c=======================================================================
       subroutine calc_temp_dist()
       use variables
       implicit none
-      include 'mpif.h'
       include './params_unit.h'
       integer:: i,ix,itmp
-      real(8):: dx,xi,tmp
-      real(8),allocatable,save:: tdl(:)
+      real(rp):: dx,xi,tmp
+      real(rp),allocatable,save:: tdl(:)
       integer,allocatable,save:: ndl(:)
       logical,save:: l1st=.true.
       
@@ -1145,7 +1155,7 @@ c.....before writing to file, accumurate data of other nodes
         call mpi_reduce(nadst,ndl,ntdst
      &       ,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
         call mpi_reduce(tdst,tdl,ntdst
-     &       ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+     &       ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
         do i=1,ntdst
           if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
           if( myid_md.eq.0 ) then
@@ -1163,9 +1173,8 @@ c=======================================================================
       subroutine get_num_dof()
       use variables
       implicit none
-      include 'mpif.h'
       integer:: i,l,k,ndofl(9)
-      real(8),parameter:: deps= 1d-12
+      real(rp),parameter:: deps= 1d-12
 
       ndofl(1:9)= 0d0
       do i=1,natm
@@ -1187,9 +1196,8 @@ c=======================================================================
       subroutine check_size_and_parallel()
       use variables
       implicit none
-      include 'mpif.h'
 
-      real(8):: vala,valb,valc,rca,rcb,rcc
+      real(rp):: vala,valb,valc,rca,rcb,rcc
       
 c-----calculate the cut-off lengths
       vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
@@ -1226,19 +1234,18 @@ c-----------------------------------------------------------------------
 c     Exchanges boundary-atom data among neighbor nodes: tag and ra
 c-----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
      &     ,myid,myparity(3),mpi_md_world
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      real(rp),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+      real(rp),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,kul,kuh,ku,ierr
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3)
+      real(rp):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3)
       logical,external:: bbd
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
       if( l1st ) then
@@ -1367,20 +1374,19 @@ c
 c Note: parallelized to smaller than rcut should not happen.
 c-----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
      &     ,myid,myparity(3),mpi_md_world
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),lsex(nbmax,6)
      &     ,lsrc(6),nex(3)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      real(rp),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+      real(rp),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,kul,kuh,ku,ierr,iex
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2,xi(3),rcv(3),asgm
+      real(rp):: tcom1,tcom2,xi(3),rcv(3),asgm
       logical,external:: bbd
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
       logical:: lshort(3)
 
@@ -1552,18 +1558,17 @@ c  This doesnt search using position, just send & recv data of atoms
 c    which were listed by 'bacopy'.
 c-----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
      &     ,myid_md,myparity(3),mpi_md_world
       integer,intent(inout):: lsb(0:nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      real(rp),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+      real(rp),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,ku,ierr
       integer:: inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp):: tcom1,tcom2
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
       if( l1st ) then
@@ -1620,18 +1625,17 @@ c  This doesnt search using position, just send & recv data of atoms
 c    which were listed by 'bacopy'.
 c-----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6),natm,nb
      &     ,myid_md,myparity(3),mpi_md_world,nex(3)
       integer,intent(inout):: lsb(0:nbmax,6),lsex(nbmax,6),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
-      real(8),intent(inout):: tag(namax),ra(3,namax),tcom
+      real(rp),intent(in):: sv(3,6),sgm(3,3),vol,anxi,anyi,anzi,rc
+      real(rp),intent(inout):: tag(namax),ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,ku,ierr,iex
       integer:: inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2 !,rcv(3),asgm
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp):: tcom1,tcom2 !,rcv(3),asgm
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
       if( l1st ) then
@@ -1709,19 +1713,18 @@ c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 c    MVQUE(i,ku) is the adress, in IS, of atom i
 c----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax
       integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
-      real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
+      real(rp),intent(in):: anxi,anyi,anzi,sv(3,6)
       integer,intent(inout):: natm
-      real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
+      real(rp),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is
       integer:: mvque(0:nbmax,6),newim
-      real(8):: tcom1,tcom2,xi(3)
+      real(rp):: tcom1,tcom2,xi(3)
       logical,external:: bmv
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
       if( l1st ) then
@@ -1829,20 +1832,19 @@ c    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 c    MVQUE(i,ku) is the adress, in IS, of atom i
 c----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax
       integer,intent(in):: myid_md,mpi_md_world,myparity(3),nn(6)
-      real(8),intent(in):: anxi,anyi,anzi,sv(3,6)
+      real(rp),intent(in):: anxi,anyi,anzi,sv(3,6)
       integer,intent(inout):: natm
-      real(8),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
+      real(rp),intent(inout):: tcom,ra(3,namax),va(3,namax),tag(namax)
      &     ,strs(9,namax)
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is
       integer:: mvque(0:nbmax,6),newim
-      real(8):: tcom1,tcom2,xi(3)
+      real(rp):: tcom1,tcom2,xi(3)
       logical,external:: bmv
-      real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
       logical,save:: l1st=.true.
 
       if( l1st ) then
@@ -1948,7 +1950,7 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  BBD = .true. if the coordinates are in the boundary to neighbor ku
 c-----------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit real(rp)(a-h,o-z)
       logical:: bbd
       
       if (ku.eq.1) then
@@ -1973,7 +1975,7 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  BMV = .true. if the coordinates should belong to neighbor ku
 c------------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit real(rp)(a-h,o-z)
       logical bmv
 
       if (ku.eq.1) then
@@ -2001,15 +2003,14 @@ c  Calc. acceralation of h-matrix used in isobaric MD
 c  using given stress tensor stgt.
 c
       implicit none
-      include "mpif.h"
       integer,intent(in):: natm,mpi_md_world
-      real(8),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm),ptgt
+      real(rp),intent(in):: stgt(3,3),eki(3,3,natm),strs(3,3,natm),ptgt
      &     ,sgm(3,3),dt,vol,avol,srlx,stbeta
-      real(8),intent(out):: ah(3,3),ptnsr(3,3)
+      real(rp),intent(out):: ah(3,3),ptnsr(3,3)
       character(len=*):: cpctl
       
       integer:: i,ixyz,jxyz,kxyz,ierr
-      real(8):: pt(3,3),prss,fac
+      real(rp):: pt(3,3),prss,fac
 
       pt(1:3,1:3)= 0d0
       do i=1,natm
@@ -2024,7 +2025,7 @@ c     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)*avol
       enddo
 
       ptnsr(1:3,1:3)= 0d0
-      call mpi_allreduce(pt,ptnsr,9,mpi_double_precision,mpi_sum
+      call mpi_allreduce(pt,ptnsr,9,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       ptnsr(1:3,1:3)=ptnsr(1:3,1:3) /vol
 
@@ -2054,17 +2055,16 @@ c=======================================================================
       subroutine write_force(ionum,cpostfix,natm,h,tag,aa,acon,nismax
      &     ,epot,myid_md,mpi_md_world,nxyz,ntot,tagtot,atot,ptnsr)
       implicit none
-      include 'mpif.h'
       integer,intent(in):: natm,nismax,ionum,nxyz
      &     ,ntot,myid_md,mpi_md_world
       character(len=*),intent(in):: cpostfix
-      real(8),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
+      real(rp),intent(in):: h(3,3),acon(nismax),aa(3,natm),tag(natm)
      &     ,epot,ptnsr(3,3)
-      real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
+      real(rp),intent(inout):: tagtot(ntot),atot(3,ntot)
 
       integer:: i,is,n0,ixyz,itag,natmt,ierr
       integer:: istat(mpi_status_size)
-      real(8):: at(3)
+      real(rp):: at(3)
       integer,parameter:: nmpi = 2
 
 c.....Gather acceralations
@@ -2079,9 +2079,9 @@ c  parallelization.
           itag = ixyz*nmpi -nmpi
           call mpi_recv(natmt,1,mpi_integer,ixyz,itag
      &         ,mpi_md_world,istat,ierr)
-          call mpi_recv(tagtot(n0),natmt,mpi_double_precision
+          call mpi_recv(tagtot(n0),natmt,mpi_real_rp
      &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
-          call mpi_recv(atot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(atot(1,n0),3*natmt,mpi_real_rp
      &         ,ixyz,itag+2,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
@@ -2089,9 +2089,9 @@ c  parallelization.
         itag = myid_md*nmpi -nmpi
         call mpi_send(natm,1,mpi_integer,0,itag
      &       ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_double_precision,0,itag+1
+        call mpi_send(tag,natm,mpi_real_rp,0,itag+1
      &       ,mpi_md_world,ierr)
-        call mpi_send(aa,3*natm,mpi_double_precision,0,itag+2
+        call mpi_send(aa,3*natm,mpi_real_rp,0,itag+2
      &       ,mpi_md_world,ierr)
       endif
 
@@ -2126,12 +2126,11 @@ c=======================================================================
       subroutine setv()
       use variables
       implicit none
-      include 'mpif.h'
       include 'params_unit.h'
       integer:: i,l,is
-      real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
-      real(8),parameter:: pi = 3.14159265358979d0
-      real(8),external:: box_muller
+      real(rp):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
+      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),external:: box_muller
 
       facv(1:nismax)=dsqrt(tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
      &     *m2ang /s2fs
@@ -2157,9 +2156,8 @@ c=======================================================================
       subroutine rm_trans_motion()
       use variables
       implicit none
-      include 'mpif.h'
       integer:: i,is
-      real(8):: sumpx,sumpy,sumpz,amss,amtot,tmp
+      real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp
 
 c-----set center of mass motion to zero
       sumpx=0d0
@@ -2175,16 +2173,16 @@ c-----set center of mass motion to zero
         amtot= amtot +amss
       enddo
       tmp= sumpx
-      call mpi_allreduce(tmp,sumpx,1,mpi_double_precision,mpi_sum
+      call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       tmp= sumpy
-      call mpi_allreduce(tmp,sumpy,1,mpi_double_precision,mpi_sum
+      call mpi_allreduce(tmp,sumpy,1,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       tmp= sumpz
-      call mpi_allreduce(tmp,sumpz,1,mpi_double_precision,mpi_sum
+      call mpi_allreduce(tmp,sumpz,1,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       tmp= amtot
-      call mpi_allreduce(tmp,amtot,1,mpi_double_precision,mpi_sum
+      call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       do i=1,natm
         va(1,i)=va(1,i)-sumpx/amtot
@@ -2223,13 +2221,12 @@ c=======================================================================
       subroutine vfire(num_fire,alp_fire)
       use variables
       implicit none
-      include 'mpif.h'
       integer,intent(inout):: num_fire
-      real(8),intent(inout):: alp_fire
+      real(rp),intent(inout):: alp_fire
 
       integer:: i,ixyz
-      real(8):: fdotv,vnorm,fnorm
-      real(8):: fdotvl,vnorml,fnorml
+      real(rp):: fdotv,vnorm,fnorm
+      real(rp):: fdotvl,vnorml,fnorml
 
       fdotvl = 0d0
       vnorml = 0d0
@@ -2244,11 +2241,11 @@ c=======================================================================
       vnorm = 0d0
       fnorm = 0d0
       fdotv = 0d0
-      call mpi_allreduce(vnorml,vnorm,1,mpi_double_precision
+      call mpi_allreduce(vnorml,vnorm,1,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(fnorml,fnorm,1,mpi_double_precision
+      call mpi_allreduce(fnorml,fnorm,1,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(fdotvl,fdotv,1,mpi_double_precision
+      call mpi_allreduce(fdotvl,fdotv,1,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
       vnorm = sqrt(vnorm)
       fnorm = sqrt(fnorm)
@@ -2277,8 +2274,8 @@ c=======================================================================
      &         ,dt,alp_fire,fdotv
         endif
       endif
-      call mpi_bcast(dt,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(alp_fire,1,mpi_double_precision,0,mpi_md_world
+      call mpi_bcast(dt,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(alp_fire,1,mpi_real_rp,0,mpi_md_world
      &     ,ierr)
       end subroutine vfire
 c=======================================================================
@@ -2290,13 +2287,12 @@ c  written as if it is called several times.
 c
       use variables
       implicit none
-      include 'mpif.h'
       integer:: istat(mpi_status_size)
 
       integer:: i,j,ixyz,n
       integer:: myxt,myyt,myzt,nmax,nmin
-      real(8):: sxogt,syogt,szogt
-      real(8):: t0
+      real(rp):: sxogt,syogt,szogt
+      real(rp):: t0
 
       t0 = mpi_wtime()
 
@@ -2366,8 +2362,8 @@ c.....allocate memory for local arrays of length namax
      &       ,lsex(nbmax,6))
       endif
 
-      call mpi_bcast(hunit,1,mpi_double_precision,0,mpi_md_world,ierr)
-      call mpi_bcast(h,9,mpi_double_precision,0,mpi_md_world,ierr)
+      call mpi_bcast(hunit,1,mpi_real_rp,0,mpi_md_world,ierr)
+      call mpi_bcast(h,9,mpi_real_rp,0,mpi_md_world,ierr)
 
       ixyz= 0
       if( myid_md.eq.0 ) then
@@ -2395,11 +2391,11 @@ c.....allocate memory for local arrays of length namax
           if( ixyz.ne.0 ) then
             call mpi_send(natm,1,mpi_integer,ixyz,ixyz
      &           ,mpi_md_world,ierr)
-            call mpi_send(tag,natm,mpi_double_precision,ixyz
+            call mpi_send(tag,natm,mpi_real_rp,ixyz
      &           ,3*(ixyz+1)-3,mpi_md_world,ierr)
-            call mpi_send(ra,3*natm,mpi_double_precision,ixyz
+            call mpi_send(ra,3*natm,mpi_real_rp,ixyz
      &           ,3*(ixyz+1)-2,mpi_md_world,ierr)
-            call mpi_send(va,3*natm,mpi_double_precision,ixyz
+            call mpi_send(va,3*natm,mpi_real_rp,ixyz
      &           ,3*(ixyz+1)-1,mpi_md_world,ierr)
           endif
         enddo
@@ -2408,11 +2404,11 @@ c        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
       else ! myid_md.ne.0
         call mpi_recv(natm,1,mpi_integer,0,myid_md
      &       ,mpi_md_world,istat,ierr)
-        call mpi_recv(tag,natm,mpi_double_precision,0
+        call mpi_recv(tag,natm,mpi_real_rp,0
      &       ,3*(myid_md+1)-3,mpi_md_world,istat,ierr)
-        call mpi_recv(ra,3*natm,mpi_double_precision,0
+        call mpi_recv(ra,3*natm,mpi_real_rp,0
      &       ,3*(myid_md+1)-2,mpi_md_world,istat,ierr)
-        call mpi_recv(va,3*natm,mpi_double_precision,0
+        call mpi_recv(va,3*natm,mpi_real_rp,0
      &       ,3*(myid_md+1)-1,mpi_md_world,istat,ierr)
       endif
       call mpi_barrier(mpi_md_world,ierr)
@@ -2426,11 +2422,10 @@ c  to create the total system for output.
 c
       use variables
       implicit none
-      include 'mpif.h'
       integer,parameter:: nmpi = 7
       integer:: n0,ixyz,natmt,i
       integer:: istat(mpi_status_size),itag
-      real(8):: t0
+      real(rp):: t0
 
       t0 = mpi_wtime()
 
@@ -2447,17 +2442,17 @@ c
           itag = ixyz*nmpi -nmpi
           call mpi_recv(natmt,1,mpi_integer,ixyz,itag
      &         ,mpi_md_world,istat,ierr)
-          call mpi_recv(tagtot(n0),natmt,mpi_double_precision
+          call mpi_recv(tagtot(n0),natmt,mpi_real_rp
      &         ,ixyz,itag+1,mpi_md_world,istat,ierr)
-          call mpi_recv(rtot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(rtot(1,n0),3*natmt,mpi_real_rp
      &         ,ixyz,itag+2,mpi_md_world,istat,ierr)
-          call mpi_recv(vtot(1,n0),3*natmt,mpi_double_precision
+          call mpi_recv(vtot(1,n0),3*natmt,mpi_real_rp
      &         ,ixyz,itag+3,mpi_md_world,istat,ierr)
-          call mpi_recv(epitot(n0),natmt,mpi_double_precision
+          call mpi_recv(epitot(n0),natmt,mpi_real_rp
      &         ,ixyz,itag+4,mpi_md_world,istat,ierr)
-          call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_double_precision
+          call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_real_rp
      &         ,ixyz,itag+5,mpi_md_world,istat,ierr)
-          call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_double_precision
+          call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_real_rp
      &         ,ixyz,itag+6,mpi_md_world,istat,ierr)
           n0 = n0 + natmt
         enddo
@@ -2467,23 +2462,23 @@ c        write(6,'(a,f10.3)') ' time space_comp = ',mpi_wtime() -t0
         itag = myid_md*nmpi -nmpi
         call mpi_send(natm,1,mpi_integer,0,itag
      &       ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_double_precision,0,itag+1
+        call mpi_send(tag,natm,mpi_real_rp,0,itag+1
      &       ,mpi_md_world,ierr)
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) + sorg(1:3)
         enddo
-        call mpi_send(ra,3*natm,mpi_double_precision,0,itag+2
+        call mpi_send(ra,3*natm,mpi_real_rp,0,itag+2
      &       ,mpi_md_world,ierr)
         do i=1,natm
           ra(1:3,i) = ra(1:3,i) - sorg(1:3)
         enddo
-        call mpi_send(va,3*natm,mpi_double_precision,0,itag+3
+        call mpi_send(va,3*natm,mpi_real_rp,0,itag+3
      &       ,mpi_md_world,ierr)
-        call mpi_send(epi,natm,mpi_double_precision,0,itag+4
+        call mpi_send(epi,natm,mpi_real_rp,0,itag+4
      &       ,mpi_md_world,ierr)
-        call mpi_send(eki,3*3*natm,mpi_double_precision,0,itag+5
+        call mpi_send(eki,3*3*natm,mpi_real_rp,0,itag+5
      &       ,mpi_md_world,ierr)
-        call mpi_send(strs,3*3*natm,mpi_double_precision,0,itag+6
+        call mpi_send(strs,3*3*natm,mpi_real_rp,0,itag+6
      &       ,mpi_md_world,ierr)
       endif
 
@@ -2495,11 +2490,11 @@ c  Sort by tag for output.
 c  
       implicit none
       integer,intent(in):: natm
-      real(8),intent(inout):: ra(3,natm),va(3,natm),eki(3,3,natm)
+      real(rp),intent(inout):: ra(3,natm),va(3,natm),eki(3,3,natm)
      &     ,epi(natm),strs(3,3,natm),tag(natm)
 
       integer,allocatable:: itag(:)
-      real(8),allocatable:: buf(:,:)
+      real(rp),allocatable:: buf(:,:)
       integer:: i
       integer,save:: nsave = 0
       integer,external:: itotOf

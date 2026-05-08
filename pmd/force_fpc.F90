@@ -13,6 +13,8 @@ module fpc
 !    strong/deep Coulomb attractive interaction at very short range,
 !    which is computed in LJ_repul.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use util,only: csp2isp
   implicit none
@@ -24,15 +26,15 @@ module fpc
 
 !.....Max number of species available in the potential
   integer:: nspcs
-  real(8):: fpc_aij(nspmax,nspmax),fpc_alpij(nspmax,nspmax)
-  real(8):: fpc_bij(nspmax,nspmax),fpc_betij(nspmax,nspmax)
+  real(rp):: fpc_aij(nspmax,nspmax),fpc_alpij(nspmax,nspmax)
+  real(rp):: fpc_bij(nspmax,nspmax),fpc_betij(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
 
   logical:: lprmset_fpc 
   
 !.....params
   integer:: nprms
-  real(8),allocatable:: params(:)
+  real(rp),allocatable:: params(:)
 
 contains
   subroutine force_fpc(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -40,30 +42,29 @@ contains
        ,mpi_md_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     character(len=3),intent(in):: specorder(nspmax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2 &
+    real(rp):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2 &
          ,drdi(3),drdj(3),x,y,z,epotl,epott,at(3),tmp,tmp2 &
          ,aij,alpij,bij,betij,vs2b &
          ,vrc,dvdrc,dvs2b
-    real(8):: vs2bc,dvs2bc
-    real(8),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: vs2bc,dvs2bc
+    real(rp),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+    real(rp),allocatable,save:: strsl(:,:,:)
     
 
-    real(8),save:: rcmax2
+    real(rp),save:: rcmax2
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)
@@ -163,7 +164,7 @@ contains
     endif
 
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.gt.2 ) print *,'epot fpc = ',epott
@@ -187,7 +188,7 @@ contains
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
     logical,intent(in):: interact_in(nspmax,nspmax)
 
@@ -249,13 +250,12 @@ contains
   subroutine read_params_fpc(myid_md,mpi_md_world,iprint,specorder)
     use util, only: num_data
     implicit none
-    include 'mpif.h'
     include './params_unit.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr,ni,nj
-    real(8):: aij,alpij,bij,betij
+    real(rp):: aij,alpij,bij,betij
     character(len=3):: csp,cspi,cspj
     character(len=128):: cline,fname
 
@@ -312,18 +312,18 @@ contains
     endif  ! myid_md.eq.0
 
     call mpi_bcast(fpc_aij,nspmax*nspmax,mpi_integer,0,mpi_md_world,ierr)
-    call mpi_bcast(fpc_alpij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(fpc_bij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(fpc_betij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(fpc_alpij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(fpc_bij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(fpc_betij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     
   end subroutine read_params_fpc
 !=======================================================================
   function vshort2b(dij,isp,jsp)
-    real(8),intent(in):: dij
+    real(rp),intent(in):: dij
     integer,intent(in):: isp,jsp
-    real(8):: vshort2b
-    real(8):: aij,alpij,bij,betij
+    real(rp):: vshort2b
+    real(rp):: aij,alpij,bij,betij
 
     aij = fpc_aij(isp,jsp)
     alpij = fpc_alpij(isp,jsp)
@@ -334,10 +334,10 @@ contains
   end function vshort2b
 !=======================================================================
   function dvshort2b(dij,isp,jsp)
-    real(8),intent(in):: dij
+    real(rp),intent(in):: dij
     integer,intent(in):: isp,jsp
-    real(8):: dvshort2b
-    real(8):: aij,alpij,bij,betij
+    real(rp):: dvshort2b
+    real(rp):: aij,alpij,bij,betij
 
     aij = fpc_aij(isp,jsp)
     alpij = fpc_alpij(isp,jsp)

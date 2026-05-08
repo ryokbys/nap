@@ -1,11 +1,12 @@
 module vector
+  use mod_precision
   implicit none
 
 contains
 !=======================================================================
   function abc2cart(h,abc) result(cart)
-    real(8),intent(in):: h(3,3),abc(3)
-    real(8):: cart(3)
+    real(rp),intent(in):: h(3,3),abc(3)
+    real(rp):: cart(3)
 
     cart(1:3) = h(1:3,1)*abc(1) &
          +h(1:3,2)*abc(2) &
@@ -14,8 +15,8 @@ contains
   end function abc2cart
 !=======================================================================
   function cart2abc(hi,cart) result(abc)
-    real(8),intent(in):: hi(3,3),cart(3)
-    real(8):: abc(3)
+    real(rp),intent(in):: hi(3,3),cart(3)
+    real(rp):: abc(3)
 
     abc(1:3) = hi(1:3,1)*cart(1) &
          +hi(1:3,2)*cart(2) &
@@ -24,16 +25,16 @@ contains
   end function cart2abc
 !=======================================================================
   function matxvec3(mat,vec) result(vecout)
-    real(8),intent(in):: mat(3,3),vec(3)
-    real(8):: vecout(3)
+    real(rp),intent(in):: mat(3,3),vec(3)
+    real(rp):: vecout(3)
 
     vecout(1:3) = mat(1:3,1)*vec(1) +mat(1:3,2)*vec(2) +mat(1:3,3)*vec(3)
     return
   end function matxvec3
 !=======================================================================
   function dot(a,b)
-    real(8):: a(:),b(:)
-    real(8):: dot
+    real(rp):: a(:),b(:)
+    real(rp):: dot
     integer:: i
     dot = 0.0
     do i=1,ubound(a,1)
@@ -43,8 +44,8 @@ contains
   end function dot
 !=======================================================================
   function cross(a,b) result(c)
-    real(8):: a(3),b(3)
-    real(8):: c(3)
+    real(rp):: a(3),b(3)
+    real(rp):: c(3)
 
     c(1) = a(2)*b(3) -b(2)*a(3)
     c(2) = a(3)*b(1) -b(3)*a(1)
@@ -53,8 +54,8 @@ contains
   end function cross
 !=======================================================================
   function norm(v)
-    real(8):: v(:)
-    real(8):: norm
+    real(rp):: v(:)
+    real(rp):: norm
     integer:: i
 
     norm = 0d0
@@ -66,8 +67,8 @@ contains
   end function norm
 !=======================================================================
   function norm2(r)
-    real(8):: r(:)
-    real(8):: norm2
+    real(rp):: r(:)
+    real(rp):: norm2
     integer:: i
 
     norm2 = 0d0
@@ -78,11 +79,11 @@ contains
   end function norm2
 !=======================================================================
   function matinv3(mat) result(mati)
-    real(8),intent(in):: mat(3,3)
-    real(8):: mati(3,3)
+    real(rp),intent(in):: mat(3,3)
+    real(rp):: mati(3,3)
 
     integer:: i,j,im,ip,jm,jp
-    real(8):: vol,sgm(3,3),matit(3,3)
+    real(rp):: vol,sgm(3,3),matit(3,3)
 
 !.....cofactor matrix, SGM
     do j=1,3

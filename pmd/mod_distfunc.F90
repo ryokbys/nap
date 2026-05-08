@@ -2,6 +2,7 @@ module distfunc
 !-----------------------------------------------------------------------
 ! Module for distribution functions such as RDF and ADF.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   include './const.h'
   private
@@ -9,7 +10,7 @@ module distfunc
 
   public:: calc_rdf, calc_adf
 
-  real(8),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979d0
   
 contains
 !=======================================================================
@@ -20,15 +21,15 @@ contains
 !
     implicit none
     integer,intent(in):: natm,nnmax,iprint,msp,nbins
-    real(8),intent(in):: rmax,rmin,tag(natm),h(3,3),ra(3,natm)
+    real(rp),intent(in):: rmax,rmin,tag(natm),h(3,3),ra(3,natm)
     integer,intent(in):: lspr(0:nnmax,natm)
     logical,intent(in):: l1st,lpairwise
-    real(8),intent(out):: dists(nbins)
-    real(8),intent(out):: rdfs(nbins,0:msp,0:msp)
+    real(rp),intent(out):: dists(nbins)
+    real(rp),intent(out):: rdfs(nbins,0:msp,0:msp)
 
     integer:: ia,is,ja,js,jj,ib,ni,nj
     integer:: natms(msp)
-    real(8):: dr,rc2,dij2,dij,rrdr,vol,tmp,r,xij(3),rij(3),xi(3)
+    real(rp):: dr,rc2,dij2,dij,rrdr,vol,tmp,r,xij(3),rij(3),xi(3)
 
     dr = (rmax-rmin)/nbins
     do ib=1,nbins
@@ -116,13 +117,13 @@ contains
 !
     implicit none
     integer,intent(in):: natm,nnmax,ntrpl,nang
-    real(8),intent(in):: rc,tag(natm),h(3,3),ra(3,natm),dang
+    real(rp),intent(in):: rc,tag(natm),h(3,3),ra(3,natm),dang
     integer,intent(in):: lspr(0:nnmax,natm),itriples(3,ntrpl)
-    real(8),intent(out):: angs(nang)
-    real(8),intent(out):: adfs(nang,ntrpl)
+    real(rp),intent(out):: angs(nang)
+    real(rp),intent(out):: adfs(nang,ntrpl)
 
     integer:: ia,is,ja,js,jj,kk,ka,ks,itrpl,ijktrpl,iang
-    real(8):: rc2,dij2,dik2,xi(3),xij(3),rij(3),xik(3),rik(3),dot,cs,rad,deg
+    real(rp):: rc2,dij2,dik2,xi(3),xij(3),rij(3),xik(3),rik(3),dot,cs,rad,deg
     logical:: iexist,ijkexist
 
     do ia=1,nang

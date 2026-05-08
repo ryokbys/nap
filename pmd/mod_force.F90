@@ -2,6 +2,8 @@ module force
 !-----------------------------------------------------------------------
 !                     Last-modified: <2025-03-31 11:57:12 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   implicit none
   private
@@ -29,8 +31,8 @@ module force
 !.....Overlay type: pot or force
   character(len=128):: ol_type = 'pot'
   character(len=128):: ol_force = 'ZBL'
-  real(8):: ol_ranges(2,nspmax)
-  real(8),allocatable:: ol_alphas(:,:),ol_dalphas(:,:)
+  real(rp):: ol_ranges(2,nspmax)
+  real(rp),allocatable:: ol_alphas(:,:),ol_dalphas(:,:)
 
 contains
 !=======================================================================
@@ -136,7 +138,6 @@ contains
 !   Broadcast variables related to mod_force.
 !
     integer,intent(in):: mpicomm
-    include 'mpif.h'
     integer:: ierr
 
     call mpi_bcast(num_forces,1,mpi_integer,0,mpicomm,ierr)
@@ -147,7 +148,7 @@ contains
     call mpi_bcast(loverlay,1,mpi_logical,0,mpicomm,ierr)
     call mpi_bcast(ol_type,128,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(ol_force,128,mpi_character,0,mpicomm,ierr)
-    call mpi_bcast(ol_ranges,2*nspmax,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(ol_ranges,2*nspmax,mpi_real_rp,0,mpicomm,ierr)
 
   end subroutine bcast_force
 !=======================================================================
@@ -156,7 +157,7 @@ contains
 !  Return rin(ir==1), rout(ir==2) for pair (isp,jsp).
 !
     integer:: ir,isp,jsp
-    real(8):: ol_pair
+    real(rp):: ol_pair
 
     ol_pair = (ol_ranges(ir,isp)+ol_ranges(ir,jsp)) /2
     return
@@ -176,12 +177,12 @@ contains
 !=======================================================================
   subroutine get_fol_dfol(r,isp,jsp,fol,dfol)
     include "params_unit.h"
-!!$    real(8),parameter:: pi = 3.14159265358979d0
-    real(8),intent(in):: r
+!!$    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),intent(in):: r
     integer,intent(in):: isp,jsp
-    real(8),intent(out):: fol,dfol
+    real(rp),intent(out):: fol,dfol
 
-    real(8):: ri,ro,x
+    real(rp):: ri,ro,x
 
     ri = ol_pair(1,isp,jsp)
     ro = ol_pair(2,isp,jsp)
@@ -208,11 +209,11 @@ contains
 !
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax)
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax)
     logical,intent(in):: l1st
 
     integer:: ia,ja,jj,is,js
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij2,dij,ri,ro,fol,dfol
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij2,dij,ri,ro,fol,dfol
 
 !.....Check rcut of lspr, which should be larger than 2*rout.
 

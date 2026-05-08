@@ -4,14 +4,15 @@ c Reduce atoms from akr file according to their potential energy values.
 c   - assuming akr file to be redirect to this program as STDIN
 c   - output akr format to STDOUT
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
 c.....Threshold potential energy
-      real(8),parameter:: pth = -0.1410d0
+      real(rp),parameter:: pth = -0.1410d0
 
       integer:: i,n,itmp,nauxdat,j,ia,ib,l,natm
-      real(8):: h(3,3),hunit
+      real(rp):: h(3,3),hunit
       integer,allocatable:: is(:)
-      real(8),allocatable:: ra(:,:),auxdat(:,:)
+      real(rp),allocatable:: ra(:,:),auxdat(:,:)
       integer nargc
       integer,external:: iargc
       character*128:: ciname,coname

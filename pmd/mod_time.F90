@@ -4,6 +4,7 @@ module time
 !-----------------------------------------------------------------------
 ! Module for time measurement.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   save
 
@@ -11,7 +12,7 @@ module time
   integer,parameter:: mtimes = 128
   integer:: ntimes = 0
   integer:: ncalls(mtimes)
-  real(8):: etimes(mtimes)
+  real(rp):: etimes(mtimes)
   character(len=32):: ctnames(mtimes)
 
 contains
@@ -64,7 +65,7 @@ contains
 !=======================================================================
   subroutine accum_time(cname,etime)
     character(len=*),intent(in):: cname
-    real(8),intent(in):: etime
+    real(rp),intent(in):: etime
     integer:: idtime
 
     idtime = get_time_id(cname)
@@ -82,7 +83,7 @@ contains
     integer:: i,maxlen,itot,nspace,ihour,imin,isec
     character(len=3):: clen,cspace
     character(len=128):: ctn
-    real(8):: time_tot
+    real(rp):: time_tot
 
 !.....Total time
     time_tot = -1d0
@@ -136,7 +137,7 @@ contains
 !
 !  Convert second to hours,minutes,seconds
 !
-    real(8),intent(in):: sec
+    real(rp),intent(in):: sec
     integer,intent(out):: h,m,s
     h = int(sec/3600)
     m = int((sec-h*3600)/60)

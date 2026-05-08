@@ -2,6 +2,7 @@ module pairlist
 !-----------------------------------------------------------------------
 ! Module for pair-list.
 !-----------------------------------------------------------------------
+  use mod_precision
   use memory, only: accum_mem
   implicit none
   include './const.h'
@@ -15,19 +16,19 @@ module pairlist
   
   integer,allocatable:: lscl(:),lshd(:)
 !$acc declare create(lscl,lshd)
-  real(8):: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
+  real(rp):: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi
   integer:: lcx,lcy,lcz,lcxyz,lcyz,lcx2,lcy2,lcz2,lcyz2,lcxyz2
-  real(8),allocatable:: tmparr(:)
+  real(rp),allocatable:: tmparr(:)
   integer:: ndmax
 
 !.....Cutoff list and
-  real(8),allocatable:: rclst(:)
+  real(rp),allocatable:: rclst(:)
   integer,allocatable:: idxlst_rc(:,:)
 
 !.....Arrays for Gonnet's algorithm
-  real(8),allocatable:: dlist(:)
+  real(rp),allocatable:: dlist(:)
   integer,allocatable:: ilist(:),ileft(:),ia2ic(:)
-  real(8):: dh(3,3),vecc(3,26)
+  real(rp):: dh(3,3),vecc(3,26)
   integer:: idcell(-1:1,-1:1,-1:1)
   
 contains
@@ -40,11 +41,11 @@ contains
     use pmdvars,only: namax,natm,nbmax,nb,ra,anxi,anyi,anzi,rc,rbuf, &
          h,hi
 !!$    integer,intent(in):: namax,natm,nbmax,nb
-!!$    real(8),intent(in):: anxi,anyi,anzi,rc,h(3,3),hi(3,3)
-!!$    real(8),intent(inout):: ra(3,namax)
+!!$    real(rp),intent(in):: anxi,anyi,anzi,rc,h(3,3),hi(3,3)
+!!$    real(rp),intent(inout):: ra(3,namax)
 
     integer:: i,mx,my,mz,m
-    real(8):: rcut
+    real(rp):: rcut
 
     rcut = rc +rbuf
 
@@ -129,8 +130,8 @@ contains
 !    and thus it should not be used...
 !
     integer,intent(in):: namax,natm,nb,naux
-    real(8),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
-    real(8),intent(inout):: aux(naux,namax)
+    real(rp),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+    real(rp),intent(inout):: aux(naux,namax)
 
 !.....Sort arrays
     call sort_by_lscl(namax,natm,nb,1,tag)
@@ -166,7 +167,7 @@ contains
 
     integer:: i,j,k,l,m,n,inc,nni,nnj,maxnnl,ierr,ierr_max,ierr_maxg
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,mmax
-    real(8):: xi(3),xij(3),rij(3),rij2
+    real(rp):: xi(3),xij(3),rij(3),rij2
     integer:: nnmax_prev
 
     call mk_lscl_para()
@@ -295,14 +296,14 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax)
-    real(8),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
-    real(8),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
+    real(rp),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
+    real(rp),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ii,jj,inc,nleft
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr,mmax
-    real(8):: xi(3),xj(3),xij(3),rij(3),rij2,vc(3)
-    real(8):: tmp
+    real(rp):: xi(3),xj(3),xij(3),rij(3),rij2,vc(3)
+    real(rp):: tmp
 
     if( .not. allocated(dlist) ) then
       allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
@@ -505,11 +506,11 @@ contains
 !  Sort dlist and ilist used in Gonnet's algorithm by Quicksort.
 !
     integer,intent(in):: ndim,il,ir
-    real(8),intent(inout):: dlist(ndim)
+    real(rp),intent(inout):: dlist(ndim)
     integer,intent(inout):: ilist(ndim)
 
     integer:: ip,i,j
-    real(8):: dip
+    real(rp):: dip
 
     if( ir-il.lt.1 ) return
     ip = int((il+ir)/2)
@@ -538,18 +539,19 @@ contains
 ! This routine is called from a python script nappy/pmd/pairlist.py,
 ! so be careful when modfiying the code.
 !
+    use mod_precision
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3),tag(namax)
+    real(rp),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3),tag(namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n
     integer:: mx,my,mz,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-    real(8):: xi(3),xij(3),rij(3),rij2,shft(3)
+    real(rp):: xi(3),xij(3),rij(3),rij2,shft(3)
 
 !!$    integer,allocatable,save:: lscl(:),lshd(:)
-!!$    real(8),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi,rc1nn2
+!!$    real(rp),save:: rc2,rcx,rcy,rcz,rcxi,rcyi,rczi,rc1nn2
 !!$    integer,save:: lcx,lcy,lcz,lcyz,lcxyz
 
     if( l1st ) then
@@ -676,15 +678,16 @@ contains
 !  is supposed to be small. Expand the system to take all the atoms 
 !  within given cutoff radius into account.
 !
+    use mod_precision
     implicit none
     integer,intent(in):: namax,natm,nnmax,nbmax,iprint
     integer,intent(out):: lspr(0:nnmax,natm),nb
-    real(8),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
-    real(8),intent(out):: ra(3,namax),tag(namax)
+    real(rp),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
+    real(rp),intent(out):: ra(3,namax),tag(namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
-    real(8):: tmp,xi(3),sij(3),xij(3),rij,vol,asgm,rij2
+    real(rp):: tmp,xi(3),sij(3),xij(3),rij,vol,asgm,rij2
 
     integer,save:: naex,nex(3)
 
@@ -785,6 +788,7 @@ contains
   end subroutine mk_lspr_brute
 !=======================================================================
   subroutine check_lscl(myid,iprint)
+    use mod_precision
     integer,intent(in):: myid,iprint
 
     integer:: mmax,mx,my,mz,i,inc,m
@@ -815,12 +819,13 @@ contains
   end subroutine check_lscl
 !=======================================================================
   subroutine check_lspr(namax,natm,nnmax,lspr,iprint,myid,mpi_world)
+    use mod_precision
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
     integer,intent(in):: myid,mpi_world
 
     integer:: i,mmax
-    real(8):: vratio
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp):: vratio
+    real(rp),parameter:: pi = 3.14159265358979d0
 
     mmax = 0
     do i=1,natm
@@ -839,12 +844,13 @@ contains
   end subroutine check_lspr
 !=======================================================================
   subroutine sort_by_lscl(namax,natm,nb,ndim,arr)
+  use mod_precision
 !
 ! To gather atom data more accessible in memory space,
 ! make atoms in a cell contiguous in 1D memory.
 !
     integer,intent(in):: namax,natm,nb,ndim
-    real(8),intent(inout):: arr(ndim,namax)
+    real(rp),intent(inout):: arr(ndim,namax)
 
     integer:: n,nmig,mz,my,mx,i,j,m
     logical:: lmig,lmigx,lmigy,lmigz
@@ -894,12 +900,13 @@ contains
   end subroutine sort_by_lscl
 !=======================================================================
   subroutine swap(ndim,i,j,dlist,ilist)
+    use mod_precision
     integer,intent(in):: ndim,i,j
-    real(8),intent(inout):: dlist(ndim)
+    real(rp),intent(inout):: dlist(ndim)
     integer,intent(inout):: ilist(ndim)
 
     integer:: itmp
-    real(8):: tmp
+    real(rp):: tmp
 
     tmp = dlist(i)
     dlist(i) = dlist(j)
@@ -912,16 +919,17 @@ contains
   end subroutine swap
 !=======================================================================
   subroutine sort_lspr(namax,natm,ra,nnmax,h,lspr)
+  use mod_precision
 !
 !  Sort indices in lspr in ascending order of distance.
 !
     integer,intent(in):: namax,natm,nnmax
-    real(8),intent(in):: ra(3,namax),h(3,3)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     integer,intent(inout):: lspr(0:nnmax,namax)
 
     integer:: i,j,jj,nn
-    real(8):: xi(3),xij(3),rij(3),dij2
-    real(8),allocatable,save:: dists(:)
+    real(rp):: xi(3),xij(3),rij(3),dij2
+    real(rp),allocatable,save:: dists(:)
     integer,allocatable,save:: idxarr(:),itmparr(:)
 
     if( .not. allocated(dists) ) then
@@ -961,6 +969,7 @@ contains
 !  And the nnmax is determined by 4*pi*rho*rcut**3 *alpha /3,
 !  where alpha is a mergin of the estimate, like 1.2.
 !
+    use mod_precision
     use pmdvars,only: vol,myid_md,mpi_md_world,nnmax,nxyz,rc,rbuf, &
          iprint,ratio_nnmax_update,ntot
     include "mpif.h"
@@ -969,8 +978,8 @@ contains
     integer:: ierr,ic,i,inc,nmaxl,nmax,nnmax_estimate,nnmax_prev, &
          ncell,ncelltot
     integer:: ix,iy,iz
-    real(8):: volc,rho
-    real(8),parameter:: pi = 3.14159265358979d0
+    real(rp):: volc,rho
+    real(rp),parameter:: pi = 3.14159265358979d0
 !!$    logical,save:: l1st = .true. 
 
     nmaxl = 0

@@ -1,4 +1,6 @@
 module extforce
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   implicit none
@@ -9,8 +11,8 @@ module extforce
   logical:: initialized = .false.
   character(len=3):: cspc_extfrc = 'all' ! [default: 'all']
   integer:: ispc_extfrc
-  real(8):: extfrc(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
-  real(8):: extaa(3) = (/ 0d0, 0d0, 0d0 /)
+  real(rp):: extfrc(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
+  real(rp):: extaa(3) = (/ 0d0, 0d0, 0d0 /)
   
 contains
 !=======================================================================
@@ -41,8 +43,8 @@ contains
 !
     integer,intent(in):: natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: tag(natm),hi(3,3)
-    real(8),intent(inout):: aa(3,natm)
+    real(rp),intent(in):: tag(natm),hi(3,3)
+    real(rp),intent(inout):: aa(3,natm)
 
     integer:: i,is
 
@@ -65,13 +67,12 @@ contains
 !
 !  Remove translational momentum of all the atoms except specified species.
 !
-    include 'mpif.h'
     integer,intent(in):: natm,mpi_world,myid,iprint
-    real(8),intent(in):: tag(natm),am(nspmax)
-    real(8),intent(inout):: va(3,natm)
+    real(rp),intent(in):: tag(natm),am(nspmax)
+    real(rp),intent(inout):: va(3,natm)
     
     integer:: i,is,ierr
-    real(8):: sump(3),tmps(3),tmp,amtot,ami
+    real(rp):: sump(3),tmps(3),tmp,amtot,ami
 
     sump(:)= 0d0
     amtot = 0d0
@@ -83,9 +84,9 @@ contains
       amtot= amtot +ami
     enddo
     tmps(:)= sump(:)
-    call mpi_allreduce(tmps,sump,3,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmps,sump,3,mpi_real_rp,mpi_sum,mpi_world,ierr)
     tmp= amtot
-    call mpi_allreduce(tmp,amtot,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( amtot.lt.1d-1 ) then
       print *,'Error: amtot.le.0.1 !, myid=',myid
       stop

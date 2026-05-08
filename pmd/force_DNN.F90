@@ -6,6 +6,8 @@ module DNN
 !  See RK's memo 2020-01-21 for formulation details.
 !  To separate the symmetry function calculations in descriptor.F90.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use memory,only: accum_mem
   implicit none
   include "./const.h"
@@ -22,11 +24,11 @@ module DNN
 !.....parameter file name
   character(128),parameter:: cpfname = 'in.params.DNN'
 
-  real(8),parameter:: pi= 3.14159265358979d0
+  real(rp),parameter:: pi= 3.14159265358979d0
 
   integer:: mem
-  real(8):: time
-  real(8):: tgrads(10)
+  real(rp):: time
+  real(rp):: tgrads(10)
   
 !.....logical flag for bias
   logical:: lbias = .true.
@@ -38,12 +40,12 @@ module DNN
 !.....Parameters
   integer:: nlayer, maxnnode, nwtot
   integer,allocatable:: nhl(:), mhl(:),iactf(:),nwgt(:)
-  real(8),allocatable:: hls(:,:),gls(:,:),wgts(:,:,:)
-  real(8),allocatable:: zls(:,:),sgm1(:,:),sgm2(:,:)
+  real(rp),allocatable:: hls(:,:),gls(:,:),wgts(:,:,:)
+  real(rp),allocatable:: zls(:,:),sgm1(:,:),sgm2(:,:)
 
 !.....parameters given from outside (fitpot)
   integer:: nprms
-  real(8),allocatable:: prms(:)
+  real(rp),allocatable:: prms(:)
   logical:: lprmset_DNN = .false.
   
 !.....Sigmoid function types:
@@ -51,7 +53,7 @@ module DNN
 !     2) 1/(1+exp(-x)) +asig*x
   integer:: itypesig = 2
 !.....Coefficient of additional term in sigmoid2
-  real(8):: asig = 0.01d0
+  real(rp):: asig = 0.01d0
 
 !.....Whether or not called from fitpot [default: .false.]
   logical:: lfitpot = .false.
@@ -65,24 +67,23 @@ contains
          pre_desci,lupdate_gsf,gsfi,dgsfi,igsfi,calc_desci,prepare_desci,nnl
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
 !.....local
     integer:: i,j,k,l,m,n,is,js,ierr,ia,ja,ml,ml0,ml1,ml2,jj,ixyz,jxyz
-    real(8):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i,time0
-    real(8):: xi(3),xj(3),xji(3),rji(3),rij(3),dji,dji2,sji
-    real(8),allocatable,save:: strsl(:,:,:),aal(:,:),gw(:)
-    real(8),save:: rcmax2
+    real(rp):: at(3),epotl,epott,hl1i,hl2i,tmp2,tmp1,tmp,zl1i,zl2i,time0
+    real(rp):: xi(3),xj(3),xji(3),rji(3),rij(3),dji,dji2,sji
+    real(rp),allocatable,save:: strsl(:,:,:),aal(:,:),gw(:)
+    real(rp),save:: rcmax2
     integer:: itot
     character(len=8):: cnum
 
@@ -232,7 +233,7 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
 
 !.....Gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( iprint.ge.ipl_info ) print *,'DNN epot = ',epott
     epot= epot +epott
 
@@ -253,18 +254,17 @@ contains
          gsfi,dgsfi,igsfi,calc_desci,pre_desci
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: iv,jv,ia,jj,il,ml1,ml0,ml2,ml,nni,n,mn0,mn1,l,memg,jja,ja
-    real(8):: tmp,ftmp(3),xi(3),xj(3),xij(3),rij(3)
-    real(8):: ttmp,ttmp2
-    real(8),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)&
+    real(rp):: tmp,ftmp(3),xi(3),xj(3),xij(3),rij(3)
+    real(rp):: ttmp,ttmp2
+    real(rp),allocatable,save:: fls(:,:,:,:),wfgw(:,:,:,:),wsgm1(:,:),gw(:)&
          ,gmm(:,:,:,:),fftmp(:,:)
     integer,allocatable,save:: ivstart(:)
 
@@ -548,7 +548,7 @@ contains
     integer,intent(in):: ia
 
     integer:: il,ml0,ml1,ml2,itype
-    real(8):: z,sgmz,y
+    real(rp):: z,sgmz,y
 
 !.....Initialize
     hls(:,:) = 0d0
@@ -597,10 +597,10 @@ contains
 !  Compute Prod_{k=1}^{l-n} W_{l-k+1}G_{l-k} ==> wxs
 !
     integer,intent(in):: l,n
-    real(8):: wxs(maxnnode,maxnnode)
+    real(rp):: wxs(maxnnode,maxnnode)
 
     integer:: i,k,ml,ml0,ml1
-    real(8):: ymat(0:maxnnode,maxnnode),tmp(maxnnode,maxnnode)
+    real(rp):: ymat(0:maxnnode,maxnnode),tmp(maxnnode,maxnnode)
 
     wxs(:,:) = 0d0
     do i=1,maxnnode
@@ -630,7 +630,7 @@ contains
 !  Set sigmoid function type and asig value from outside.
 !
     integer,intent(in):: itype
-    real(8),intent(in):: a
+    real(rp),intent(in):: a
 
     itypesig = itype
     asig = a
@@ -642,8 +642,8 @@ contains
 !  Activation function, which could be DIFFERENT from sigmoid.
 !
     integer,intent(in):: itype
-    real(8),intent(in):: x
-    real(8):: actf
+    real(rp),intent(in):: x
+    real(rp):: actf
 
     select case(itype)
     case(0)
@@ -662,9 +662,9 @@ contains
 !=======================================================================
   function dactf(itype,x,sx)
     integer,intent(in):: itype
-    real(8),intent(in):: x,sx
-    real(8):: dactf
-    real(8):: sxt
+    real(rp),intent(in):: x,sx
+    real(rp):: dactf
+    real(rp):: sxt
     
     select case(itype)
     case(0)
@@ -685,9 +685,9 @@ contains
 !=======================================================================
   function ddactf(itype,x,sx)
     integer,intent(in):: itype
-    real(8),intent(in):: x,sx
-    real(8):: ddactf
-    real(8):: sxt
+    real(rp),intent(in):: x,sx
+    real(rp):: ddactf
+    real(rp):: sxt
     
     select case(itype)
     case(0)
@@ -741,7 +741,6 @@ contains
     use descriptor,only: nsf
     use util, only: num_data
     implicit none
-    include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
 
@@ -779,7 +778,7 @@ contains
 
     call mpi_bcast(lbias,1,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(itypesig,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(asig,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(asig,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(nlayer,1,mpi_integer,0,mpi_world,ierr)
     if( .not. allocated(nhl)) allocate(nhl(0:nlayer+1),iactf(nlayer)&
          ,nwgt(nlayer))
@@ -831,7 +830,7 @@ contains
       enddo
     endif
     nc = (maxnnode+1)*maxnnode*(nlayer+1)
-    call mpi_bcast(wgts,nc,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(wgts,nc,mpi_real_rp,0,mpi_world,ierr)
 
     return
   end subroutine read_params_DNN
@@ -847,7 +846,7 @@ contains
     implicit none 
     integer,intent(in):: nprms_in
 !!$    integer,intent(in):: nprms_in,nl_in,nhl_in(0:nl_in)
-    real(8),intent(in):: prms_in(nprms_in)
+    real(rp),intent(in):: prms_in(nprms_in)
 
     integer:: i, il, inc, istart, ml0, ml1
 
@@ -981,7 +980,7 @@ contains
     integer,intent(in):: iprint
     integer,intent(out):: ierr
 
-    real(8):: ropt
+    real(rp):: ropt
     character(len=10):: c1,copt
     logical:: lopt
 !!$    integer,external:: num_data
@@ -1021,7 +1020,7 @@ contains
   end function mem_DNN
 !=======================================================================
   function time_DNN()
-    real(8):: time_DNN
+    real(rp):: time_DNN
 
     time_DNN = time
     return

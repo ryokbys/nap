@@ -7,18 +7,19 @@ subroutine ludc_inv( n,a,c )
 !  n:  dimension of the matrix A
 !  a:  the matrix A
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
 !-----arguments
   integer,intent(in):: n
-  real*8,intent(in):: a(n,n)
+  real(rp),intent(in):: a(n,n)
 !-----return 
-  real*8,intent(out):: c(n,n)
+  real(rp),intent(out):: c(n,n)
 !-----locals
   integer i,j,k,pivot
-  real*8 amax,tmp
-  real*8,allocatable:: d(:,:)
+  real(rp) amax,tmp
+  real(rp),allocatable:: d(:,:)
 !-----function
-!      real*8 vbtime
+!      real(rp) vbtime
 
 !      write(6,'(A)') "---ludc_inv"
 !      write(6,'(A,F12.3)') "TIME =",vbtime(4)
@@ -95,12 +96,13 @@ subroutine chckinv(n,a,ai)
 !-----------------------------------------------------------------------
 !     subroutine chckinv
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   integer,intent(in):: n
-  real*8,intent(in):: a(n,n),ai(n,n)
+  real(rp),intent(in):: a(n,n),ai(n,n)
   integer i,j,k
-  real*8 tmp
-  real*8,allocatable:: e(:,:),dum(:,:)
+  real(rp) tmp
+  real(rp),allocatable:: e(:,:),dum(:,:)
 
   write(6,'(A)') "---chckinv"
   allocate(e(n,n),dum(n,n))
@@ -141,14 +143,15 @@ subroutine choldc_inv(n,a,c)
 !   Inversion routine using Cholesky decomposition with cholsl,
 !   choldc, from Numerical Recipes in Fortran.
 !-----------------------------------------------------------------------
-  implicit real*8 (a-h,o-z)
-  real*8,intent(in):: a(n,n)
-  real*8,allocatable:: p(:),b(:),x(:),ar(:,:)
-!      real*8 p(n),b(n),x(n),ar(n,n)
+  use mod_precision
+  implicit real(rp) (a-h,o-z)
+  real(rp),intent(in):: a(n,n)
+  real(rp),allocatable:: p(:),b(:),x(:),ar(:,:)
+!      real(rp) p(n),b(n),x(n),ar(n,n)
 !     return
-  real*8,intent(out) :: c(n,n)
+  real(rp),intent(out) :: c(n,n)
 !     functions
-  real*8 vbtime
+  real(rp) vbtime
 
 !      write(6,'(A)') "---choldc_inv"
 
@@ -180,15 +183,16 @@ subroutine choldc_inv(n,a,c)
 end subroutine choldc_inv
 !=======================================================================
 subroutine choldc(a,n,p)
+  use mod_precision
 !-----------------------------------------------------------------------
 !  subroutine choldc: 
 !    From Numerical Recipes in Fortran.
 !    Lower triangle matrix is returned in a.
 !-----------------------------------------------------------------------
   integer n
-  real*8 a(n,n),p(n)
+  real(rp) a(n,n),p(n)
   integer i,j,k,l
-  real*8 sum
+  real(rp) sum
 
   do i=1,n
     do j=i,n
@@ -213,10 +217,11 @@ subroutine choldc(a,n,p)
 end subroutine choldc
 !=======================================================================
 subroutine cholsl(a,n,p,b,x)
+  use mod_precision
   integer n
-  real*8 a(n,n),b(n),p(n),x(n)
+  real(rp) a(n,n),b(n),p(n),x(n)
   integer i,k
-  real*8 sum
+  real(rp) sum
 
   do i=1,n
     sum=b(i)

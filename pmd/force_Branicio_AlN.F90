@@ -1,4 +1,6 @@
 module Branicio_AlN
+  use pmdmpi
+  use mod_precision
 contains
   subroutine force_Branicio_AlN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -10,29 +12,28 @@ contains
 !    - 2010.04.02 by R.K.
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_Branicio_AlN.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ks,ir
-    real(8):: f2rc,df2rc,ri,cst,cs
-    real(8):: epotl,epotl2,epotl3,t1,t2,tmp1,tmp2,vol,epott
-    real(8):: rij,riji,rik,riki,d,v2,dv2,expij,expik,v3,dt1j,dt1k,dt2
-    real(8):: xi(3),xj(3),xij(3),xik(3),at(3),xx(3),drij(3),drik(3) &
+    real(rp):: f2rc,df2rc,ri,cst,cs
+    real(rp):: epotl,epotl2,epotl3,t1,t2,tmp1,tmp2,vol,epott
+    real(rp):: rij,riji,rik,riki,d,v2,dv2,expij,expik,v3,dt1j,dt1k,dt2
+    real(rp):: xi(3),xj(3),xij(3),xik(3),at(3),xx(3),drij(3),drik(3) &
          ,dcsj(3),dcsk(3),dcsi(3)
 
 !-----saved values
-    real(8),save:: rmin,rmax,dr
+    real(rp),save:: rmin,rmax,dr
 !-----saved allocatable arrays
-    real(8),allocatable,save:: tblf2(:,:,:),tbldf2(:,:,:)
-    real(8),allocatable,save:: aa2(:,:),aa3(:,:)
+    real(rp),allocatable,save:: tblf2(:,:,:),tbldf2(:,:,:)
+    real(rp),allocatable,save:: aa2(:,:),aa3(:,:)
 !-----1st call
     logical,save:: l1st=.true.
 
@@ -186,7 +187,7 @@ contains
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
       epott = 0d0
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,mpi_real_rp &
            ,MPI_SUM,mpi_world,ierr)
       epot= epot +epott
     else
@@ -213,12 +214,12 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Branicio_AlN.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
 
-    real(8):: dij
+    real(rp):: dij
 !-----value
-    real(8):: f2_r
+    real(rp):: f2_r
 
     dij= 0.5d0 *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
     f2_r= &
@@ -243,10 +244,10 @@ contains
     implicit none 
     include "./params_unit.h"
     include "params_Branicio_AlN.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
 
-    real(8):: df2_r,dij
+    real(rp):: df2_r,dij
 
     dij= 0.5d0 *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
     df2_r= &

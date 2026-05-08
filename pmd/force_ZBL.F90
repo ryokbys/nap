@@ -11,6 +11,8 @@ module ZBL
 !       and Methods in Physics Research, B 267, 1061 (2009).
 !   [3] G. Bonny et al., JAP 121, 165107 (2017) for switching function.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use force,only: loverlay
@@ -27,25 +29,25 @@ module ZBL
   integer,parameter:: msp = nspmax
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(8),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
-  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
   logical:: interact(1:msp,1:msp) = .true.
-  real(8):: qnucl(msp)
-  real(8):: zbl_rc
-  real(8):: r_inner(1:msp) = -1d0
-  real(8):: r_outer(1:msp) = -1d0
+  real(rp):: qnucl(msp)
+  real(rp):: zbl_rc
+  real(rp):: r_inner(1:msp) = -1d0
+  real(rp):: r_outer(1:msp) = -1d0
 
 !.....ZBL parameters
-  real(8):: zbl_aa = 0.4683766d0
-  real(8):: zbl_gamma = 0.23d0
-  real(8):: zbl_alpha(1:4) = (/ &
+  real(rp):: zbl_aa = 0.4683766d0
+  real(rp):: zbl_gamma = 0.23d0
+  real(rp):: zbl_alpha(1:4) = (/ &
        0.18180d0, &
        0.50990d0, &
        0.28020d0, &
        0.02817d0 /)
-  real(8):: zbl_beta(1:4) = (/ &
+  real(rp):: zbl_beta(1:4) = (/ &
        3.20d0, &
        0.94230d0, &
        0.40290d0, &
@@ -79,15 +81,14 @@ contains
     use force, only: loverlay
     use util, only: num_data
     implicit none
-    include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
-    real(8):: qnucli,ri,ro
+    real(rp):: qnucli,ri,ro
     character(len=128):: cline,fname,cmode,ctmp
     character(len=5):: cspi,cspj
-    real(8),parameter:: qtiny = 1d-10
+    real(rp),parameter:: qtiny = 1d-10
 !!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
@@ -159,10 +160,10 @@ contains
       endif
     endif
 
-    call mpi_bcast(zbl_rc,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qnucl,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(r_inner,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(r_outer,msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(zbl_rc,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(qnucl,msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(r_inner,msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(r_outer,msp,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
     lprmset_zbl = .true.
     return
@@ -172,25 +173,24 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp
-    real(8),allocatable,save:: strsl(:,:,:)
-    real(8),external:: fcut1,dfcut1
+    real(rp):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp
+    real(rp),allocatable,save:: strsl(:,:,:)
+    real(rp),external:: fcut1,dfcut1
 
-    real(8),save:: zbl_rc2
+    real(rp),save:: zbl_rc2
 
     if( l1st ) then
       if( rc.lt.zbl_rc ) then
@@ -265,7 +265,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     if( iprint.ge.ipl_info ) print *,'epot ZBL = ',epott
     epot= epot +epott
@@ -284,25 +284,24 @@ contains
 !
     use force,only: ol_ranges,ol_alphas,ol_dalphas,ol_pair,ol_type
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp,tmp2i,tmp2j &
+    real(rp):: xij(3),rij,rij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,tmp,tmp2,dtmp,tmp2i,tmp2j &
          ,dtmpi,dtmpj,alpi,ri,ro,dij,dij2
-    real(8),allocatable,save:: strsl(:,:,:),epit(:),aal(:,:)
-    real(8),external:: fcut1,dfcut1
-    real(8),save:: zbl_rc2
+    real(rp),allocatable,save:: strsl(:,:,:),epit(:),aal(:,:)
+    real(rp),external:: fcut1,dfcut1
+    real(rp),save:: zbl_rc2
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl,epit,aal)
@@ -404,7 +403,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     if( iprint.ge.ipl_info ) print *,'epot ZBL_overlay = ',epott
     epot= epot +epott
 
@@ -416,9 +415,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: vij
-    real(8):: ri,ro,veqt
+    real(rp),intent(in):: rij
+    real(rp):: vij
+    real(rp):: ri,ro,veqt
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
@@ -438,9 +437,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dvij
-    real(8):: ri,ro,x
+    real(rp),intent(in):: rij
+    real(rp):: dvij
+    real(rp):: ri,ro,x
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
@@ -462,9 +461,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: vnucl
-    real(8):: rs,qi,qj
+    real(rp),intent(in):: rij
+    real(rp):: vnucl
+    real(rp):: rs,qi,qj
 
     qi = qnucl(is)
     qj = qnucl(js)
@@ -479,9 +478,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dvnucl
-    real(8):: rs,qi,qj
+    real(rp),intent(in):: rij
+    real(rp):: dvnucl
+    real(rp):: rs,qi,qj
 
     qi = qnucl(is)
     qj = qnucl(js)
@@ -492,8 +491,8 @@ contains
 !=======================================================================
   function xi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: xi
+    real(rp),intent(in):: x
+    real(rp):: xi
     integer:: i
 
     xi = 0d0
@@ -509,8 +508,8 @@ contains
 !=======================================================================
   function dxi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dxi
+    real(rp),intent(in):: x
+    real(rp):: dxi
     integer:: i
 
     dxi = 0d0
@@ -526,8 +525,8 @@ contains
 !=======================================================================
   function zeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: zeta
+    real(rp),intent(in):: x
+    real(rp):: zeta
 
     zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
     return
@@ -535,8 +534,8 @@ contains
 !=======================================================================
   function dzeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dzeta
+    real(rp),intent(in):: x
+    real(rp):: dzeta
 
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return
@@ -558,7 +557,7 @@ contains
 !  Accessor routine to set ZBL parameters from outside (fitpot).
 !  Curretnly this routine is supposed to be called only on serial run.
 !
-    real(8),intent(in):: rcin,qnuclin(nspmax),riin(nspmax),roin(nspmax)
+    real(rp),intent(in):: rcin,qnuclin(nspmax),riin(nspmax),roin(nspmax)
     logical,intent(in):: interactin(nspmax,nspmax)
 
     if( lprmset_zbl ) return
@@ -578,7 +577,7 @@ contains
 !  Accessor routine to set ZBL parameters from outside (fitpot).
 !  Curretnly this routine is supposed to be called only on serial run.
 !
-    real(8),intent(in):: qnuclin(nspmax)
+    real(rp),intent(in):: qnuclin(nspmax)
     logical,intent(in):: interactin(nspmax,nspmax)
 
     qnucl(:) = qnuclin(:)
@@ -591,10 +590,10 @@ contains
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     integer,intent(in):: is,js,npnts
-    real(8),intent(in):: rijs(npnts)
-    real(8),intent(out):: dvnucls(npnts)
+    real(rp),intent(in):: rijs(npnts)
+    real(rp),intent(out):: dvnucls(npnts)
     integer:: i
-    real(8):: qi,qj,rs,rij
+    real(rp):: qi,qj,rs,rij
 
     qi = qnucl(is)
     qj = qnucl(js)

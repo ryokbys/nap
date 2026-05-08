@@ -17,6 +17,7 @@ c  large number of atoms than the original cell.
 c-----------------------------------------------------------------------
 c  iolevel: [0] for no print-out to stdout
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
       include "./params_unit.h"
 
@@ -24,25 +25,25 @@ c.....arguments
       integer,intent(in):: namax,natm,nis,nismax,nstp,nerg,ifdmp
      &     ,npmd,nbmax,nnmax,iolevel,n_conv,minstp
       integer,intent(inout):: nb,ifpmd,ndof(9)
-      real(8),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,fmv(3,0:9)
+      real(rp),intent(in):: rbuf,dmp,h(3,3,0:1),hunit,fmv(3,0:9)
      &     ,tinit,tfin,eps_conv,trlx
-      real(8),intent(inout):: tag(namax),ra(3,namax),dt
+      real(rp),intent(inout):: tag(namax),ra(3,namax),dt
      &     ,va(3,namax),eki(3,3,namax),epi(namax),aa(3,namax)
      &     ,strs(3,3,namax),rc,tfac(9),ttgt(9),am(nismax)
-      real(8),intent(out):: ekin,epot,temp(9),vol
+      real(rp),intent(out):: ekin,epot,temp(9),vol
       character(len=*),intent(in):: cforce,ctctl
 c.....FIRE args
       integer,intent(in):: nmin_fire
-      real(8),intent(in):: finc_fire,fdec_fire,alp0_fire,falp_fire
+      real(rp),intent(in):: finc_fire,fdec_fire,alp0_fire,falp_fire
      &     ,dtmax_fire
 
 c.....local variables
       integer:: i,j,k,l,m,n
       integer:: ia,is,ioerg,nouterg,noutpmd,iocntpmd,istp,ifmv
-      real(8):: tmp,at(3)
+      real(rp):: tmp,at(3)
       character:: cnum*4
       integer,external:: itotOf
-      real(8):: acon(nismax),fack(nismax),tcom,epot0,epotp
+      real(rp):: acon(nismax),fack(nismax),tcom,epot0,epotp
      &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1),hi(3,3),ht(3,3,0:1),sgm(3,3)
      &     ,sv(3,6),sorg(3)
       integer:: nn(6),myparity(3),lsrc(6)
@@ -52,7 +53,7 @@ c.....local variables
       logical:: lconverged = .false.
       logical:: lstrs = .false.
 c.....FIRE variables
-      real(8):: alp_fire
+      real(rp):: alp_fire
       integer:: num_fire
 
       allocate(lspr(0:nnmax,natm),lsb(0:nbmax,6))
@@ -272,14 +273,15 @@ c      enddo
       end subroutine smd_core
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
+      use mod_precision
       implicit none
       include "params_unit.h"
       integer,intent(in):: nismax
-      real(8),intent(in):: dt,am(nismax)
-      real(8),intent(out):: acon(nismax),fack(nismax)
+      real(rp),intent(in):: dt,am(nismax)
+      real(rp),intent(out):: acon(nismax),fack(nismax)
 
       integer:: i
-      real(8):: tmp
+      real(rp):: tmp
 
 c      am(1:nismax)= am(1:nismax) !*ump/ume
 
@@ -308,12 +310,13 @@ c    H:   MD-box matrix
 c    HI:  inverse MD-box matrix
 c    SGM: cofactor matrix
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
-      real(8),intent(in):: h(3,3,0:1)
-      real(8),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1)
+      real(rp),intent(in):: h(3,3,0:1)
+      real(rp),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1)
      &     ,g(3,3,0:1),gi(3,3),gt(3,3,0:1)
 
-      real(8):: hit(3,3)
+      real(rp):: hit(3,3)
       integer:: i,j,k,im,ip,jm,jp
 
 c-----cofactor matrix, SGM
@@ -371,17 +374,18 @@ c.....Inverse of G
       end subroutine boxmat
 c=======================================================================
       subroutine setv(natm,tag,va,h,dt,tinit,nismax,am)
+      use mod_precision
       implicit none
       include 'params_unit.h'
 c.....arguments
       integer,intent(in):: natm,nismax
-      real(8),intent(in):: tag(natm),h(3,3,0:1),dt,tinit,am(nismax)
-      real(8),intent(out):: va(3,natm)
+      real(rp),intent(in):: tag(natm),h(3,3,0:1),dt,tinit,am(nismax)
+      real(rp),intent(out):: va(3,natm)
 c.....local variables
       integer:: i,l,is
-      real(8):: sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
-      real(8),parameter:: pi = 3.14159265358979d0
-      real(8),external:: box_muller
+      real(rp):: sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
+      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),external:: box_muller
 
       facv(1:nismax)=dsqrt(tinit*fkb*ev2j/(am(1:nismax)*amu2kg))
      &     *m2ang /s2fs
@@ -403,14 +407,15 @@ c-----velocities in Maxwell-Boltzmann distribution
       end subroutine setv
 c=======================================================================
       subroutine rm_trans_motion(natm,tag,va,nismax,am)
+      use mod_precision
       implicit none
 c.....arguments
       integer,intent(in):: natm,nismax
-      real(8),intent(in):: tag(natm),am(nismax)
-      real(8),intent(inout):: va(3,natm)
+      real(rp),intent(in):: tag(natm),am(nismax)
+      real(rp),intent(inout):: va(3,natm)
 c.....local variables
       integer:: i,is
-      real(8):: sumpx,sumpy,sumpz,amss,amtot,tmp
+      real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp
 
 c-----set center of mass motion to zero
       sumpx=0d0
@@ -436,14 +441,15 @@ c-----set center of mass motion to zero
       end subroutine rm_trans_motion
 c=======================================================================
       subroutine get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
+      use mod_precision
       implicit none 
       integer,intent(in):: namax,natm,nismax
-      real(8),intent(in):: va(3,namax),h(3,3),fack(nismax)
+      real(rp),intent(in):: va(3,namax),h(3,3),fack(nismax)
      &     ,tag(namax)
-      real(8),intent(out):: ekin,eki(3,3,namax)
+      real(rp),intent(out):: ekin,eki(3,3,namax)
 c.....locals
       integer:: i,ierr,is,ixyz,jxyz,imax
-      real(8):: x,y,z,v(3)
+      real(rp):: x,y,z,v(3)
 
       ekin=0d0
       eki(1:3,1:3,1:natm)= 0d0
@@ -467,12 +473,13 @@ c.....Tensor form eki
       end subroutine get_ekin
 c=======================================================================
       subroutine get_num_dof(natm,tag,fmv,ndof)
+      use mod_precision
       implicit none
       integer,intent(in):: natm
-      real(8),intent(in):: fmv(3,0:9),tag(natm)
+      real(rp),intent(in):: fmv(3,0:9),tag(natm)
       integer,intent(inout):: ndof(9)
       integer:: i,l,k
-      real(8),parameter:: deps= 1d-12
+      real(rp),parameter:: deps= 1d-12
 
       ndof(1:9)= 0d0
       do i=1,natm
@@ -489,15 +496,16 @@ c=======================================================================
 c=======================================================================
       subroutine vfire(natm,num_fire,nmin_fire,finc_fire,fdec_fire
      &     ,falp_fire,alp0_fire,alp_fire,aa,va,dt,dtmax_fire)
+      use mod_precision
       implicit none
       integer,intent(in):: natm,nmin_fire
       integer,intent(inout):: num_fire
-      real(8),intent(in):: finc_fire,fdec_fire,falp_fire,alp0_fire
+      real(rp),intent(in):: finc_fire,fdec_fire,falp_fire,alp0_fire
      &     ,aa(3,natm),dtmax_fire
-      real(8),intent(inout):: dt,alp_fire,va(3,natm)
+      real(rp),intent(inout):: dt,alp_fire,va(3,natm)
 
       integer:: i,ixyz
-      real(8):: fdotv,vnorm,fnorm
+      real(rp):: fdotv,vnorm,fnorm
 
       fdotv = 0d0
       vnorm = 0d0
@@ -535,12 +543,13 @@ c=======================================================================
       end subroutine vfire
 c=======================================================================
       subroutine pbc(natm,ra)
+      use mod_precision
       implicit none 
       integer,intent(in):: natm
-      real(8),intent(inout):: ra(3,natm)
+      real(rp),intent(inout):: ra(3,natm)
 
       integer:: i,ixyz
-      real(8),parameter:: tiny = 1d-10
+      real(rp),parameter:: tiny = 1d-10
 
       do i=1,natm
         do ixyz=1,3

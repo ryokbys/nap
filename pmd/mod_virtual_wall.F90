@@ -4,6 +4,8 @@ module virtual_wall
 !-----------------------------------------------------------------------
 ! Module for virtual wall in MD simulation
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nvwall, ivwall, spos_vwall, iside_vwall, iovwall, &
        frc_vwall, dt,h,hi,fa2v,sorg, myid_md
   use util,only: itotOf
@@ -18,7 +20,6 @@ module virtual_wall
 contains
 !=======================================================================
   subroutine bcast_vwall(mpicomm)
-    include 'mpif.h'
     integer,intent(in):: mpicomm
     integer:: ierr
 
@@ -28,7 +29,7 @@ contains
            frc_vwall(nvwall))
     endif
     call mpi_bcast(ivwall,nvwall,mpi_integer,0,mpicomm,ierr)
-    call mpi_bcast(spos_vwall,nvwall,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(spos_vwall,nvwall,mpi_real_rp,0,mpicomm,ierr)
     call mpi_bcast(iside_vwall,nvwall,mpi_integer,0,mpicomm,ierr)
 
   end subroutine bcast_vwall
@@ -43,11 +44,11 @@ contains
 !
     implicit none
     integer,intent(in):: natm
-    real(8),intent(in):: tag(natm)
-    real(8),intent(inout):: ra(3,natm),va(3,natm)
+    real(rp),intent(in):: tag(natm)
+    real(rp),intent(inout):: ra(3,natm),va(3,natm)
 
     integer:: ivw,i123,iside,is,ia
-    real(8):: spw,vt(3),rt
+    real(rp):: spw,vt(3),rt
 
     frc_vwall(:) = 0d0
     do ivw=1,nvwall
@@ -84,7 +85,7 @@ contains
     integer,intent(in):: istp
     
     integer:: num,ivw,i123,iside
-    real(8):: frci(3),frc
+    real(rp):: frci(3),frc
     logical:: lopen = .false.
     
     inquire(file=trim(cfrcname), number=num, opened=lopen)

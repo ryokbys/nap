@@ -5,14 +5,16 @@
 !=======================================================================
 module wall
 
+  use pmdmpi
+use mod_precision
+
 contains
   subroutine wall_reflect()
     use variables
     use wall
     implicit none
-    include "mpif.h"
     integer:: i,is
-    real(8):: zi
+    real(rp):: zi
 
     do i=1,natm
       is= int(tag(i))
@@ -43,9 +45,8 @@ contains
     use variables
     use wall
     implicit none
-    include "mpif.h"
     integer:: i,itmp,is
-    real(8):: zi,tmp,vtop,vbot,dvtop,dvbot
+    real(rp):: zi,tmp,vtop,vbot,dvtop,dvbot
     logical,save:: l1st=.true.
 
     if(l1st) then
@@ -61,10 +62,10 @@ contains
         bbot= min(bbot,zi)
       enddo
       tmp= btop
-      call mpi_allreduce(tmp,btop,1,mpi_double_precision,mpi_max &
+      call mpi_allreduce(tmp,btop,1,mpi_real_rp,mpi_max &
            ,mpi_md_world,ierr)
       tmp= bbot
-      call mpi_allreduce(tmp,bbot,1,mpi_double_precision,mpi_min &
+      call mpi_allreduce(tmp,bbot,1,mpi_real_rp,mpi_min &
            ,mpi_md_world,ierr)
 !.....area of wall
       area_wall= h(2,2,0)*h(1,1,0)
@@ -90,11 +91,11 @@ contains
     call mpi_reduce(itmp,nibot,1,mpi_integer,mpi_sum,0, &
          mpi_md_world,ierr)
     tmp= ptop
-    call mpi_reduce(tmp,ptop,1,mpi_double_precision,mpi_sum,0, &
+    call mpi_reduce(tmp,ptop,1,mpi_real_rp,mpi_sum,0, &
          mpi_md_world,ierr)
     ptop= ptop /nodes_md
     tmp= pbot
-    call mpi_reduce(tmp,pbot,1,mpi_double_precision,mpi_sum,0, &
+    call mpi_reduce(tmp,pbot,1,mpi_real_rp,mpi_sum,0, &
          mpi_md_world,ierr)
     pbot= pbot /nodes_md
 
@@ -121,10 +122,10 @@ contains
       endif
     endif
 
-!      call mpi_bcast(wtop,1,mpi_double_precision,0,mpi_md_world,ierr)
-!      call mpi_bcast(wbot,1,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(dwtop,1,mpi_double_precision,0,mpi_md_world,ierr)
-    call mpi_bcast(dwbot,1,mpi_double_precision,0,mpi_md_world,ierr)
+!      call mpi_bcast(wtop,1,mpi_real_rp,0,mpi_md_world,ierr)
+!      call mpi_bcast(wbot,1,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(dwtop,1,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(dwbot,1,mpi_real_rp,0,mpi_md_world,ierr)
 
   end subroutine update_wall
 end module wall

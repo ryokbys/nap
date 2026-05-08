@@ -1,4 +1,5 @@
 module element
+  use mod_precision
   implicit none
   save
 
@@ -6,8 +7,8 @@ module element
   
   type atom
     character(len=3):: symbol
-    real(8):: mass = 1.0d0
-    real(8):: val = 0d0  ! valence in e
+    real(rp):: mass = 1.0d0
+    real(rp):: val = 0d0  ! valence in e
   end type atom
   type(atom):: elmts(nelem)
 
@@ -157,7 +158,7 @@ contains
     integer,intent(in):: nspmax
     character(len=*),intent(in):: specorder(nspmax)
     integer,intent(out):: nums(nspmax)
-    real(8),intent(out):: vals(nspmax)
+    real(rp),intent(out):: vals(nspmax)
 
     integer:: is,iel
     character(len=3):: s 

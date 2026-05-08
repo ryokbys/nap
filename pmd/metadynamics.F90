@@ -4,16 +4,17 @@ module metadynamics
 !-----------------------------------------------------------------------
 !  Metadynamics module mainly for creating samples for fitpot.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
   save
-  include 'mpif.h'
 
   character(len=128),parameter:: cfparams = 'in.metaD'
   character(len=128),parameter:: cfoutput = 'out.metaD.potential'
   integer,parameter:: ioprms = 40
   integer,parameter:: iopot  = 41
 
-  real(8),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979d0
 
 !.....CV type:
 !       - species_pair: mainly for the purpose of sample collection for fitpot
@@ -21,24 +22,24 @@ module metadynamics
 !       - bonds_from_atoms: all the bonds connected to given atoms
   character(len=128):: cvtype = 'species_pair'
 
-  real(8):: resrcs
+  real(rp):: resrcs
   
   integer:: nhistory
   integer:: nskip
-  real(8):: gwidth = 0.2d0
-  real(8):: gheight = 0.001d0  ! in eV per Gaussian
-  real(8):: rc = 5.0
-  real(8):: rc2, dr
+  real(rp):: gwidth = 0.2d0
+  real(rp):: gheight = 0.001d0  ! in eV per Gaussian
+  real(rp):: rc = 5.0
+  real(rp):: rc2, dr
   integer:: ndiv = 1024
-  real(8),allocatable:: fpair(:,:,:)
+  real(rp),allocatable:: fpair(:,:,:)
 !.....Specific to bonds
   integer:: nbond = 0
-  real(8),allocatable:: fbonds1(:),fbonds2(:,:)
+  real(rp),allocatable:: fbonds1(:),fbonds2(:,:)
   integer,allocatable:: ibonds(:,:)
 !.....Specific to bonds_from_atoms
   integer:: natm4bnd
   integer,allocatable:: iatm4bnd(:)
-  real(8),allocatable:: dbonds(:,:,:)
+  real(rp),allocatable:: dbonds(:,:,:)
   
 contains
 !=======================================================================
@@ -204,9 +205,9 @@ contains
     integer:: ierr
 
     call mpi_bcast(cvtype,128,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(gwidth,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gheight,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rc,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(gwidth,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(gheight,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rc,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(nhistory,1,mpi_integer,0,mpi_world,ierr)
     if( trim(cvtype).eq.'bonds' ) then
       call mpi_bcast(nbond,1,mpi_integer,0,mpi_world,ierr)
@@ -223,7 +224,7 @@ contains
 !
     integer,intent(in):: istp,namax,natm,nnmax,lspr(0:nnmax,namax),nsp
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: ihist
 
@@ -246,10 +247,10 @@ contains
        ,myid,mpi_world,iprint)
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nsp
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: ia,ja,is,js,isp,jsp,jj,idiv
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,pref,r,fval,fc
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,pref,r,fval,fc
 
     do ia=1,natm
       is = int(tag(ia))
@@ -292,8 +293,8 @@ contains
 !
 !  Cutoff function working between rin and rout.
 !
-    real(8),intent(in):: r,rin,rout
-    real(8):: fcut
+    real(rp),intent(in):: r,rin,rout
+    real(rp):: fcut
 
     if( r.lt.rin ) then
       fcut = 1d0
@@ -310,10 +311,10 @@ contains
     use util,only: itotOf
     integer,intent(in):: namax,natm,nsp
     integer,intent(in):: myid,mpi_world,iprint,ihist
-    real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: ia,ja,iat,jat,i,itot,ib,idiv1,idiv2
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,rbonds(2),d1,d2,tmp
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,rbonds(2),d1,d2,tmp
 !!$    integer,external:: itotOf
 
     do ib=1,nbond
@@ -364,10 +365,10 @@ contains
     use util,only: itotOf
     integer,intent(in):: namax,natm,nsp,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint,ihist
-    real(8),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
 
     integer:: i,j,ia,ja,jat,iat
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij
 !!$    integer,external:: itotOf
 
     do i=1,natm4bnd
@@ -389,7 +390,7 @@ contains
   function ia_from_itot(itot,natm,tag)
     use util,only: itotOf
     integer,intent(in):: itot,natm
-    real(8),intent(in):: tag(natm)
+    real(rp),intent(in):: tag(natm)
     integer:: ia_from_itot
 !!$    integer,external:: itotOf
     integer:: ia
@@ -411,8 +412,8 @@ contains
 !
     integer,intent(in):: namax,natm,istp,myid,mpi_world,iprint,nnmax&
          ,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
-    real(8),intent(inout):: aa(3,namax),epot
+    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ihist
 
@@ -439,13 +440,13 @@ contains
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
-    real(8),intent(inout):: aa(3,namax),epot
+    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
          ,epotl,at(3)
-    real(8),save,allocatable:: aal(:,:)
+    real(rp),save,allocatable:: aal(:,:)
 
     if( .not. allocated(aal) ) then
       allocate(aal(3,namax))
@@ -497,7 +498,7 @@ contains
     enddo
     
 !!$!.....Gather epot
-!!$    call mpi_allreduce(epotl,epot,1,mpi_real8 &
+!!$    call mpi_allreduce(epotl,epot,1,mpi_real_rp &
 !!$         ,mpi_sum,mpi_world,ierr)
     
     return
@@ -507,9 +508,9 @@ contains
 !
 !  F value at r
 !
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: isp,jsp
-    real(8):: fpair_at
+    real(rp):: fpair_at
 
     integer:: ir
 
@@ -522,9 +523,9 @@ contains
 !
 !  dF value at r
 !
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: isp,jsp
-    real(8):: dfpair_at
+    real(rp):: dfpair_at
 
     integer:: ir
 
@@ -547,13 +548,13 @@ contains
     use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
-    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
-    real(8),intent(inout):: aa(3,namax),epot
+    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj,i,iat,jat,itot,ib
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
          ,epotl,at(3),rbonds(2)
-    real(8),save,allocatable:: aal(:,:),dbdr(:)
+    real(rp),save,allocatable:: aal(:,:),dbdr(:)
 !!$    integer,external:: itotOf
 
     if( .not.allocated(dbdr) ) allocate(dbdr(nbond))
@@ -646,8 +647,8 @@ contains
   end subroutine force_bonds
 !=======================================================================
   function fbonds1_at(r1)
-    real(8),intent(in):: r1
-    real(8):: fbonds1_at
+    real(rp),intent(in):: r1
+    real(rp):: fbonds1_at
 
     integer:: ir1
 
@@ -657,8 +658,8 @@ contains
   end function fbonds1_at
 !=======================================================================
   function fbonds2_at(r1,r2)
-    real(8),intent(in):: r1,r2
-    real(8):: fbonds2_at
+    real(rp),intent(in):: r1,r2
+    real(rp):: fbonds2_at
 
     integer:: ir1,ir2
 
@@ -669,8 +670,8 @@ contains
   end function fbonds2_at
 !=======================================================================
   function dfbonds1_at(r1)
-    real(8),intent(in):: r1
-    real(8):: dfbonds1_at
+    real(rp),intent(in):: r1
+    real(rp):: dfbonds1_at
 
     integer:: ir1
 
@@ -687,11 +688,11 @@ contains
   end function dfbonds1_at
 !=======================================================================
   subroutine dfbonds2_at(r1,r2,df1,df2)
-    real(8),intent(in):: r1,r2
-    real(8),intent(out):: df1,df2
+    real(rp),intent(in):: r1,r2
+    real(rp),intent(out):: df1,df2
 
     integer:: ir1,ir2,ir1p,ir1m,ir2p,ir2m
-    real(8):: dr1,dr2
+    real(rp):: dr1,dr2
 
     ir1 = int(r1/dr) +1
     ir2 = int(r2/dr) +1
@@ -729,14 +730,14 @@ contains
     use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
-    real(8),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
-    real(8),intent(inout):: aa(3,namax),epot
+    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj,i,iat,jat,itot,ib,j,jt,ih
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3) &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3) &
          ,epotl,at(3),texp,tmp
     logical:: l_jat_in_lspr 
-    real(8),save,allocatable:: aal(:,:)
+    real(rp),save,allocatable:: aal(:,:)
 !!$    integer,external:: itotOf
 
     if( .not. allocated(aal) ) then
@@ -816,7 +817,7 @@ contains
     integer,intent(in):: nsp,myid,iprint,istp
 
     integer:: idiv,isp,jsp,idiv1,idiv2
-    real(8):: r1,r2
+    real(rp):: r1,r2
 
     if( myid.eq.0 ) then
       open(iopot,file=trim(cfoutput),status='replace')

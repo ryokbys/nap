@@ -15,11 +15,12 @@ program rdf
 !   - out.rdf:       RDF data
 !   - out.sfac:      Structure factor S(q) data obtained from total RDF.
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
-  real(8),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979d0
   character(len=128),parameter:: cpmdini='pmdini'
   character(len=128),parameter:: cfinput='in.rdf'
   character(len=128),parameter:: cfoutrdf='out.rdf'
@@ -29,15 +30,15 @@ program rdf
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nbins
   integer:: nspc(nspmax)
   integer:: ntot
-  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
-  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
-  real(8),allocatable:: auxtot(:,:)
+  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(rp),allocatable:: auxtot(:,:)
   integer,allocatable:: lspr(:,:),ls1nn(:,:)
-  real(8),allocatable:: rdfs(:,:,:),denoms(:,:),sqs(:)
+  real(rp),allocatable:: rdfs(:,:,:),denoms(:,:),sqs(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax)
-  real(8):: rcut,hi(3,3),t0,tmp,vol,dr,r
+  real(rp):: rcut,hi(3,3),t0,tmp,vol,dr,r
   integer:: jb,jbm
-  real(8):: dq,q,qcut,tmp1,tmp2,rm,rho
+  real(rp):: dq,q,qcut,tmp1,tmp2,rm,rho
   character(len=3):: csi,csj
   character(len=20):: cnum
 
@@ -198,12 +199,13 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 !-----------------------------------------------------------------------
 !  If pairs is specified, output pairwise RDF in addition to total RDF.
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars,only: csp2isp,nspmax
   use util, only: num_data
   implicit none 
   integer,intent(in):: ionum
   character(len=*),intent(in):: cfname
-  real(8),intent(inout):: rcut,qcut
+  real(rp),intent(inout):: rcut,qcut
   integer,intent(inout):: nbins
   logical,intent(out):: lpair(nspmax,nspmax)
 
@@ -268,12 +270,13 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 end subroutine read_in_rdf
 !=======================================================================
 subroutine get_hi(h,hi,vol)
+  use mod_precision
   implicit none 
-  real(8),intent(in):: h(3,3)
-  real(8),intent(out):: hi(3,3),vol
+  real(rp),intent(in):: h(3,3)
+  real(rp),intent(out):: hi(3,3),vol
 
   integer:: i,j,im,ip,jm,jp
-  real(8):: sgm(3,3),hit(3,3)
+  real(rp):: sgm(3,3),hit(3,3)
 
 !-----cofactor matrix, SGM
   do j=1,3
@@ -305,13 +308,14 @@ subroutine comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
 !
 !  Compute RDF.
 !
+  use mod_precision
   implicit none
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),msp,nbins
-  real(8),intent(in):: tagtot(ntot),rtot(3,ntot),rcut,h(3,3)
-  real(8),intent(out):: rdfs(0:msp,0:msp,nbins)
+  real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),rcut,h(3,3)
+  real(rp),intent(out):: rdfs(0:msp,0:msp,nbins)
 
   integer:: ia,is,ja,js,jj,ib
-  real(8):: dr,rc2,xi(3),xj(3),xij(3),rij(3),dij2,dij
+  real(rp):: dr,rc2,xi(3),xj(3),xij(3),rij(3),dij2,dij
 
   dr = rcut/nbins
   rc2 = rcut*rcut

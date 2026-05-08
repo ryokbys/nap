@@ -1,4 +1,5 @@
       program modify_pmd_boxsize
+      use mod_precision
       use variables
       implicit none
       integer:: ia,ib,l,n,i,j
@@ -6,7 +7,7 @@
       integer,external:: iargc
       integer:: nargc
       character(len=128):: cin,cout,ctmp
-      real(8):: x,amat(3,3),d,tmat(3,3)
+      real(rp):: x,amat(3,3),d,tmat(3,3)
 
       nargc= iargc()
       if( nargc.ne.3 ) then

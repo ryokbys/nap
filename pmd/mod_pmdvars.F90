@@ -2,6 +2,7 @@ module pmdvars
 !-----------------------------------------------------------------------
 !                    Last modified: <2025-05-16 13:00:48 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
 !=======================================================================
 ! Parameters or constants
@@ -33,11 +34,11 @@ module pmdvars
 !-----------------------------------------------------------------------
 
 !!$!.....Data of total system
-!!$  real(8):: hunit,h(3,3,0:1)
+!!$  real(rp):: hunit,h(3,3,0:1)
 !!$  integer:: ntot0,ntot,naux
-!!$  real(8),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
+!!$  real(rp),allocatable:: rtot(:,:),vtot(:,:),stot(:,:,:),epitot(:) &
 !!$       ,ekitot(:,:,:),tagtot(:),atot(:,:)
-!!$  real(8),allocatable:: auxtot(:,:)
+!!$  real(rp),allocatable:: auxtot(:,:)
 
 
 !.....max. num. of atoms in a node
@@ -68,34 +69,34 @@ module pmdvars
   logical:: loutforce = .false.
   logical:: lcomb_pos = .true.
   integer:: ifsort= 1
-  real(8):: dt = 1d0
-  real(8):: vardt_len = 0.1d0  ! Length criterion for variable time-step
-  real(8):: rc = 5.0d0
-  real(8):: rc1nn = 2.5d0
-  real(8):: rbuf= 0d0
+  real(rp):: dt = 1d0
+  real(rp):: vardt_len = 0.1d0  ! Length criterion for variable time-step
+  real(rp):: rc = 5.0d0
+  real(rp):: rc1nn = 2.5d0
+  real(rp):: rbuf= 0d0
   integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
   character(len=20):: cmin= ''
-  real(8):: dmp  = 0.9d0
-  real(8):: eps_conv = 1d-4
+  real(rp):: dmp  = 0.9d0
+  real(rp):: eps_conv = 1d-4
   integer:: n_conv = 1
 !.....Thermostat
   character(len=20):: ctctl='none'
   integer:: iftctl= 0
-  real(8):: tinit= -1d0
-  real(8):: tfin = -1d0
-  real(8):: ttgt(maxntemps)
+  real(rp):: tinit= -1d0
+  real(rp):: tfin = -1d0
+  real(rp):: ttgt(maxntemps)
   data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
        300d0, 300d0, 300d0 /
-  real(8):: trlx = 100d0
-  real(8):: tlimit = 1.0d+5
+  real(rp):: trlx = 100d0
+  real(rp):: tlimit = 1.0d+5
 !.....Multiple temperatures
   logical:: lmultemps = .false.
   integer:: ntemps = 1
-  real(8):: tfac(maxntemps),temps(maxntemps),eks(maxntemps)
+  real(rp):: tfac(maxntemps),temps(maxntemps),eks(maxntemps)
 !.....Random seed
 !  If positve, use (RSEED+MYID) as the seed for each process
 !  If negative, use the same random seeds for all the parallel process
-  real(8):: rseed = 12345d0
+  real(rp):: rseed = 12345d0
 !.....Remove translational motion:
 !     N< 0: not to remove translation
 !     N==0: remove translation only at the beginning
@@ -105,9 +106,9 @@ module pmdvars
   logical:: ltdst= .false.
   integer:: ntdst= 1
 !.....shear stress
-  real(8):: shrst = 0.0d0
+  real(rp):: shrst = 0.0d0
 !.....factors on each moving direction
-  real(8):: fmv(3,0:9)
+  real(rp):: fmv(3,0:9)
   data fmv &
        / 0d0, 0d0, 0d0, & ! 0
        1d0, 1d0, 1d0, & ! 1
@@ -127,13 +128,13 @@ module pmdvars
 !.....  vv --- variable volume
 !.....  vc --- variable cell
   character(len=20):: cpctl='none'
-  real(8):: ptgt   = 0d0   ! target pressure [GPa]
-  real(8):: pini   = 0d0
-  real(8):: pfin   = 0d0
-  real(8):: srlx   = 100d0  ! relaxation time [fs]
-  real(8):: stbeta = 1d-2   ! 1/B where B is the bulk modulus [GPa]
-  real(8):: strfin = 0.0d0
-  real(8):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
+  real(rp):: ptgt   = 0d0   ! target pressure [GPa]
+  real(rp):: pini   = 0d0
+  real(rp):: pfin   = 0d0
+  real(rp):: srlx   = 100d0  ! relaxation time [fs]
+  real(rp):: stbeta = 1d-2   ! 1/B where B is the bulk modulus [GPa]
+  real(rp):: strfin = 0.0d0
+  real(rp):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
   logical:: lcellfix(1:3,1:3)= .false.
   logical:: lhydrostatic = .false.  ! enforce only hydrostatic pressure
 !.....charge optimize or variable charge
@@ -160,9 +161,9 @@ module pmdvars
   integer:: iaux_chg,iaux_q,iaux_vq,iaux_tei,iaux_clr,iaux_edesc
 
 !.....mass
-  real(8):: am(1:nspmax)= 12.0d0
+  real(rp):: am(1:nspmax)= 12.0d0
 !.....charges
-  real(8):: schg(1:nspmax)= 0d0
+  real(rp):: schg(1:nspmax)= 0d0
 !.....species name
   character(len=3):: specorder(nspmax) = 'x'
   logical:: has_specorder = .false.
@@ -173,12 +174,12 @@ module pmdvars
   character(len=3):: boundary = 'ppp'
 
 !.....nnmax update ratio
-  real(8):: ratio_nnmax_update = 1.1d0
+  real(rp):: ratio_nnmax_update = 1.1d0
 
 !.....Virtual wall
   integer:: nvwall = 0
   integer,allocatable:: ivwall(:), iside_vwall(:)
-  real(8),allocatable:: spos_vwall(:),frc_vwall(:)
+  real(rp),allocatable:: spos_vwall(:),frc_vwall(:)
 
 !-----------------------------------------------------------------------
 !  Global variables used in pmd
@@ -190,40 +191,40 @@ module pmdvars
   integer:: natm,nb,nsp,nalmax,ntot
   integer:: maxnn = 0
   integer:: maxnb = 0
-  real(8):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
-  real(8):: epot0,vmaxold,vmax,simtime
-  real(8):: tgmm,cgmm,cmass
-  real(8):: ediff(nspmax),ediff0(nspmax)
+  real(rp):: tcpu,tcpu0,tcpu1,tcpu2,tlspr
+  real(rp):: epot0,vmaxold,vmax,simtime
+  real(rp):: tgmm,cgmm,cmass
+  real(rp):: ediff(nspmax),ediff0(nspmax)
   integer:: ndof(nspmax)
-  real(8):: ttgt_lang
+  real(rp):: ttgt_lang
 !!$  integer,allocatable:: ndof(:)
   integer:: nxmlt
 !.....Search time and expiration time
-  real(8):: ts,te
+  real(rp):: ts,te
   integer:: istpe
 !.....simulation box
-  real(8):: h(3,3,0:1)
+  real(rp):: h(3,3,0:1)
 !$acc declare create(h)
-  real(8):: hi(3,3),vol,sgm(3,3),al(3),avol
-  real(8):: ht(3,3,0:1),hti(3,3),dh
+  real(rp):: hi(3,3),vol,sgm(3,3),al(3),avol
+  real(rp):: ht(3,3,0:1),hti(3,3),dh
 !.....positions, velocities, and accelerations
-  real(8),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
+  real(rp),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
 !$acc declare create(ra)
-!.....real*8 identifier which includes species, index of FMV, total id
-  real(8),allocatable:: tag(:)
+!.....real(rp) identifier which includes species, index of FMV, total id
+  real(rp),allocatable:: tag(:)
   integer,allocatable:: lspr(:,:)
 !$acc declare create(tag,lspr)
 !.....potential and kinetic energy per atoms
-  real(8),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
+  real(rp),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
 !$acc declare create(epi)
 !.....mass, prefactors
-  real(8),allocatable:: acon(:),fack(:)
+  real(rp),allocatable:: acon(:),fack(:)
 !.....Factors for ekin
-  real(8):: fekin(nspmax),fa2v(nspmax)
+  real(rp):: fekin(nspmax),fa2v(nspmax)
 !.....atomic strain
-!!$  real(8),allocatable:: stn(:,:,:)
+!!$  real(rp),allocatable:: stn(:,:,:)
 !.....Auxiliary data
-  real(8),allocatable:: aux(:,:)
+  real(rp),allocatable:: aux(:,:)
 
   logical:: lcell_updated = .true.
 
@@ -231,29 +232,29 @@ module pmdvars
   logical:: lrealloc = .true.
   
 !.....Shear stress
-  real(8):: shrfx
+  real(rp):: shrfx
 
 !.....Barostat
-  real(8):: phyd,ah(3,3),aht(3,3),g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
+  real(rp):: phyd,ah(3,3),aht(3,3),g(3,3,0:1),gt(3,3,0:1),gi(3,3),gg(3,3)
 
 !.....FIRE parameters
   integer:: nmin_fire = 5
-  real(8):: finc_fire = 1.1
-  real(8):: fdec_fire = 0.5
-  real(8):: alp0_fire = 0.1
-  real(8):: falp_fire = 0.99
-  real(8):: dtmax_fire = 10.0
+  real(rp):: finc_fire = 1.1
+  real(rp):: fdec_fire = 0.5
+  real(rp):: alp0_fire = 0.1
+  real(rp):: falp_fire = 0.99
+  real(rp):: dtmax_fire = 10.0
 ! factor to be multiplied to dt to get dtmax_fire
-  real(8):: dtmfctr_fire = 10.0
+  real(rp):: dtmfctr_fire = 10.0
 
 !.....temperature distribution along x
-  real(8),allocatable:: tdst(:)
+  real(rp),allocatable:: tdst(:)
   integer,allocatable:: nadst(:)
 
 !.....space decomposition
   integer,allocatable:: lsb(:,:),lsex(:,:)
   integer:: nn(6),myparity(3),lsrc(6),nex(3),myx,myy,myz
-  real(8):: sv(3,6),sorg(3),anxi,anyi,anzi
+  real(rp):: sv(3,6),sorg(3),anxi,anyi,anzi
 
 !.....Number of ifmv
   integer:: nfmv = 1
@@ -276,20 +277,20 @@ module pmdvars
 !.....zload type: zload or shear
   character(len=128):: czload_type= 'none'
 !.....top and bottom skin width in which atoms are fixed and/or controlled
-  real(8):: zskin_width = 5.0d0
+  real(rp):: zskin_width = 5.0d0
 !.....Shear angle from x in degree, shear direction is on xy-plane
-  real(8):: zshear_angle = 0d0
+  real(rp):: zshear_angle = 0d0
 
 !.....PKA for radiation damage
   integer:: iatom_pka = -1
-  real(8):: pka_energy = -1.d0 ! in eV
-  real(8):: pka_theta = 0.d0  ! in degree
-  real(8):: pka_phi = 0.d0    ! in degree
+  real(rp):: pka_energy = -1.d0 ! in eV
+  real(rp):: pka_theta = 0.d0  ! in degree
+  real(rp):: pka_phi = 0.d0    ! in degree
   
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1
-  real(8):: rc_struct = 2.5d0
+  real(rp):: rc_struct = 2.5d0
 
 contains
 !=======================================================================

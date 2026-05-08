@@ -15,8 +15,9 @@ c  << Output files >>
 c    cna???: cna files
 c
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
-      include "mpif.h"
 c-----max. num. of atoms
       integer,parameter:: namax = 1000000
 c-----max. num. of species
@@ -28,33 +29,33 @@ c-----max. num. of neighbors
 c-----max. num. of buffer data
       integer,parameter:: maxbuf= 100000
 c-----cutoff radius
-      real(8),parameter:: rc1   = 8.d-10  /0.5291772d-10
-      real(8),parameter:: rc    = 3.5d-10 /0.5291772d-10
+      real(rp),parameter:: rc1   = 8.d-10  /0.5291772d-10
+      real(rp),parameter:: rc    = 3.5d-10 /0.5291772d-10
 
       integer:: i,j,k,l,m,n,ia,ib
       integer:: nstp,nouterg,noutpmd,iout_count,istp,nerg,ifpmd,npmd
       integer:: natm,nb,ntot,nis,itmp,ipmd
-      real(8):: dt
-      real(8):: tcpu,tcpu1,tcpu2,tcom
-      real(8):: tmp,dmp,treq,ttol,epot,ekin,epot0
+      real(rp):: dt
+      real(rp):: tcpu,tcpu1,tcpu2,tcom
+      real(rp):: tmp,dmp,treq,ttol,epot,ekin,epot0
 c-----parallel-related variables
       integer:: nx,ny,nz,nxyz
       integer:: nn(6),myparity(3),lsrc(6),lsb(0:nbmax,6)
      &     ,myid_md,nodes_md,mpi_md_world,myx,myy,myz,ierr,idis
-      real(8):: sv(3,6),anxi,anyi,anzi,sorg(3)
+      real(rp):: sv(3,6),anxi,anyi,anzi,sorg(3)
 c-----simulation box
-      real(8):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
+      real(rp):: hunit,h(3,3,0:1),hi(3,3),volume,sgm(3,3)
 c-----positions, velocities, and accelerations
       integer:: itype(namax)
-      real(8):: ra(3,namax),va(3,namax),op(10,namax),tag(namax)
+      real(rp):: ra(3,namax),va(3,namax),op(10,namax),tag(namax)
 c-----buffer data
       integer:: ibuf(maxbuf)
-      real(8):: rbuf(12,maxbuf)
+      real(rp):: rbuf(12,maxbuf)
 c-----cna data
       integer:: ncna,ncnatot
       integer:: icna(namax),lscna(namax)
       integer,allocatable:: lcna(:),nrecvs(:),idisps(:)
-      real(8):: xcna(12,namax)
+      real(rp):: xcna(12,namax)
 c-----species, index of FMV
       integer:: lspr(0:nnmax,namax)
 c-----output file names
@@ -185,8 +186,8 @@ c     &       ,0,mpi_md_world,ierr)
         enddo
 c        if(myid_md.eq.0)write(6,'(a)') " 2nd gatherv..."
         if(myid_md.eq.0)write(6,'(a)') " gatherv..."
-        call mpi_gatherv(rbuf,12*ncna,MPI_DOUBLE_PRECISION
-     &       ,xcna,nrecvs,idisps,MPI_DOUBLE_PRECISION
+        call mpi_gatherv(rbuf,12*ncna,mpi_real_rp
+     &       ,xcna,nrecvs,idisps,mpi_real_rp
      &       ,0,mpi_md_world,ierr)
 
 c-------output as cna file
@@ -208,13 +209,15 @@ c-------output as cna file
       end program pmd2cna
 c=======================================================================
       subroutine setup(nismax,am,acon,fack,dt)
+      use pmdmpi
+      use mod_precision
       implicit none
       include "params_unit.h"
 c      include "params_eam_al.h"
 c      include "params_lj_ar.h"
       integer,intent(in):: nismax
-      real(8),intent(in):: dt
-      real(8),intent(out):: am(nismax),acon(nismax),fack(nismax)
+      real(rp),intent(in):: dt
+      real(rp),intent(out):: am(nismax),acon(nismax),fack(nismax)
 
       integer:: i
 
@@ -242,11 +245,13 @@ c    H:   MD-box matrix
 c    HI:  inverse MD-box matrix
 c    SGM: cofactor matrix
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
-      real(8),intent(in):: h(3,3,0:1)
-      real(8),intent(out):: volume,sgm(3,3),hi(3,3)
+      real(rp),intent(in):: h(3,3,0:1)
+      real(rp),intent(out):: volume,sgm(3,3),hi(3,3)
 
-      real(8):: hit(3,3)
+      real(rp):: hit(3,3)
       integer:: i,j,im,ip,jm,jp
 
 c-----cofactor matrix, SGM
@@ -283,9 +288,9 @@ c  Preparation for network related properties
 c-----------------------------------------------------------------------
       implicit none
       integer,intent(in):: myx,myy,myz,nx,ny,nz
-      real(8),intent(in):: anxi,anyi,anzi
+      real(rp),intent(in):: anxi,anyi,anzi
       integer,intent(out):: nn(6),myparity(3)
-      real(8),intent(out):: sv(3,6)
+      real(rp),intent(out):: sv(3,6)
       integer:: iv(3,6),ku,k1x,k1y,k1z
 
       iv(1:3,1)= (/ -1, 0, 0 /)
@@ -336,20 +341,19 @@ c-----------------------------------------------------------------------
 c     Exchanges boundary-atom data among neighbor nodes: is and ra
 c-----------------------------------------------------------------------
       implicit none
-      include 'mpif.h'
       integer,intent(in):: namax,nbmax,nn(6)
      &     ,myid_md,myparity(3),mpi_md_world
       integer,intent(inout):: natm,nb,lsb(0:nbmax,6),is(namax),lsrc(6)
-      real(8),intent(in):: sv(3,6),sgm(3,3),volume,anxi,anyi,anzi,rc
-      real(8),intent(inout):: ra(3,namax),tcom
+      real(rp),intent(in):: sv(3,6),sgm(3,3),volume,anxi,anyi,anzi,rc
+      real(rp),intent(inout):: ra(3,namax),tcom
 
 c      integer:: status(MPI_STATUS_SIZE)
       integer:: i,j,kd,kdd,kul,kuh,ku,ierr
       integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-      real(8):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3)
+      real(rp):: tcom1,tcom2,vala,valb,valc,rca,rcb,rcc,xi(3)
       logical,external:: bbd
       integer,allocatable:: ibuf(:),ibufr(:)
-      real(8),allocatable:: dbuf(:,:),dbufr(:,:)
+      real(rp),allocatable:: dbuf(:,:),dbufr(:,:)
 
       allocate(ibuf(nbmax),ibufr(nbmax),dbuf(3,nbmax),dbufr(3,nbmax))
 
@@ -479,7 +483,7 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  BBD = .true. if the coordinates are in the boundary to neighbor ku
 c-----------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit real(rp)(a-h,o-z)
       logical:: bbd
       
       if (ku.eq.1) then
@@ -504,7 +508,7 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c  BMV = .true. if the coordinates should belong to neighbor ku
 c------------------------------------------------------------------------
-      implicit real*8(a-h,o-z)
+      implicit real(rp)(a-h,o-z)
       logical bmv
 
       if (ku.eq.1) then
@@ -529,14 +533,14 @@ c=======================================================================
      &     ,anxi,anyi,anzi,lspr,myid_md)
       implicit none
       integer,intent(in):: namax,natm,nb,nnmax,is(namax),myid_md
-      real(8),intent(in):: ra(3,namax),rc,anxi,anyi,anzi
+      real(rp),intent(in):: ra(3,namax),rc,anxi,anyi,anzi
      &     ,hi(3,3),h(3,3,0:1)
       integer,intent(out):: lspr(0:nnmax,namax)
 
       integer:: i,j,k,l,m,n
       integer:: lcx,lcy,lcz,lcx2,lcy2,lcz2,lcyz2,lcxyz2,mx,my,mz
      &     ,kux,kuy,kuz,m1x,m1y,m1z,m1,ic,jc,ierr
-      real(8):: rcx,rcy,rcz,rcxi,rcyi,rczi,xi(3),xij(3),rij(3),rij2
+      real(rp):: rcx,rcy,rcz,rcxi,rcyi,rczi,xi(3),xij(3),rij(3),rij2
       integer,allocatable:: lscl(:),lshd(:)
 
 c-----reset pair list, LSPR
@@ -662,7 +666,6 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     Integer message passing.  
 c-----------------------------------------------------------------------
-      include 'mpif.h'
       integer,intent(in):: inode,parity,nsd,nrc,tag
       integer,intent(in):: ibufs(nsd)
       integer,intent(out):: ibufr(nrc)
@@ -695,23 +698,22 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c-----------------------------------------------------------------------
 c     Real*8 message passing.
 c-----------------------------------------------------------------------
-      include 'mpif.h'
       integer,intent(in):: inode,parity,nsd,nrc,tag
-      real(8),intent(in):: bufs(nsd)
-      real(8),intent(out):: bufr(nrc)
+      real(rp),intent(in):: bufs(nsd)
+      real(rp),intent(out):: bufr(nrc)
       integer:: status(MPI_STATUS_SIZE),ierr
 
 c-----Even: send & recv
       if (parity.eq.0) then
-        call MPI_SEND(bufs,nsd,MPI_DOUBLE_PRECISION,inode,tag,
+        call MPI_SEND(bufs,nsd,mpi_real_rp,inode,tag,
      &       mpi_md_world,ierr) 
-        call MPI_RECV(bufr,nrc,MPI_DOUBLE_PRECISION,MPI_ANY_SOURCE,tag,
+        call MPI_RECV(bufr,nrc,mpi_real_rp,MPI_ANY_SOURCE,tag,
      &       mpi_md_world,status,ierr) 
 c-----Odd: recv & send
       else if (parity.eq.1) then
-        call MPI_RECV(bufr,nrc,MPI_DOUBLE_PRECISION,MPI_ANY_SOURCE,tag,
+        call MPI_RECV(bufr,nrc,mpi_real_rp,MPI_ANY_SOURCE,tag,
      &       mpi_md_world,status,ierr) 
-        call MPI_SEND(bufs,nsd,MPI_DOUBLE_PRECISION,inode,tag,
+        call MPI_SEND(bufs,nsd,mpi_real_rp,inode,tag,
      &       mpi_md_world,ierr)
 c-----Exchange information with myself
       else
@@ -745,9 +747,9 @@ c Reduce natm0 to natm by using Common Neighbor Analysis
 c-----------------------------------------------------------------------
       implicit none
       integer,intent(in):: namax,natm0,nbndr,nnmax,lspr(0:nnmax,namax)
-      real(8),intent(in):: ra0(3,namax),va0(3,namax)
+      real(rp),intent(in):: ra0(3,namax),va0(3,namax)
       integer,intent(inout):: ncna,lscna(namax)
-      real(8),intent(inout):: tag(namax)
+      real(rp),intent(inout):: tag(namax)
 
       integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim
      &     ,ib1,ib2,iib1,iib2,n421,n422
@@ -895,7 +897,7 @@ c  Reduce num. of atoms by eliminating according to z-coordinate
 c-----------------------------------------------------------------------
       implicit none
       integer,intent(in):: namax,natm
-      real(8),intent(in):: ra(3,namax)
+      real(rp),intent(in):: ra(3,namax)
       integer,intent(inout):: ncna,lscna(namax)
 
       integer:: i,n

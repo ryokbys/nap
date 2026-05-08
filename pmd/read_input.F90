@@ -2,6 +2,7 @@ subroutine read_inpmd(ionum,cfname)
 !
 !  Read frexible input format
 !
+  use mod_precision
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cfname
@@ -35,6 +36,7 @@ subroutine read_inpmd(ionum,cfname)
 end subroutine read_inpmd
 !=======================================================================
 subroutine set_variable(ionum,cname)
+  use mod_precision
   use pmdvars
   use pmdmpi
   use util,only: csp2isp, to_lower
@@ -59,7 +61,7 @@ subroutine set_variable(ionum,cname)
   character(len=128):: ctmp,cval
   character(len=3):: csp
   integer:: ndata,nrow,is,itmp,ixyz
-  real(8):: tmp
+  real(rp):: tmp
 
   if( trim(cname).eq.'time_interval' ) then
     call read_r1(ionum,dt)
@@ -465,11 +467,12 @@ subroutine set_variable(ionum,cname)
 end subroutine set_variable
 !=======================================================================
 subroutine read_r1(ionum,rval)
+  use mod_precision
 !
 !  Read one read*8 parameter from the line
 !
   integer,intent(in):: ionum
-  real(8),intent(out):: rval
+  real(rp),intent(out):: rval
   character(len=128):: ctmp
 
   backspace(ionum)
@@ -479,11 +482,12 @@ subroutine read_r1(ionum,rval)
 end subroutine read_r1
 !=======================================================================
 subroutine read_rs(ionum,ndata,nrow,rval)
+  use mod_precision
 !
 !  Read several read*8 parameters
 !
   integer,intent(in):: ionum,ndata,nrow
-  real(8),intent(out):: rval(ndata,nrow)
+  real(rp),intent(out):: rval(ndata,nrow)
 
   do n=1,nrow
     read(ionum,*) (rval(i,n),i=1,ndata)
@@ -493,6 +497,7 @@ subroutine read_rs(ionum,ndata,nrow,rval)
 end subroutine read_rs
 !=======================================================================
 subroutine read_i1(ionum,ival)
+  use mod_precision
 !
 !  Read one integer parameter from the line
 !
@@ -507,6 +512,7 @@ subroutine read_i1(ionum,ival)
 end subroutine read_i1
 !=======================================================================
 subroutine read_is(ionum,ndata,nrow,ival)
+  use mod_precision
 !
 !  Read several integer parameters
 !
@@ -521,6 +527,7 @@ subroutine read_is(ionum,ndata,nrow,ival)
 end subroutine read_is
 !=======================================================================
 subroutine read_c1(ionum,cval)
+  use mod_precision
 !
 !  Read one word from the line
 !
@@ -535,6 +542,7 @@ subroutine read_c1(ionum,cval)
 end subroutine read_c1
 !=======================================================================
 subroutine read_l1(ionum,lval)
+  use mod_precision
 !
 !  Read logical variable
 !
@@ -549,6 +557,7 @@ subroutine read_l1(ionum,lval)
 end subroutine read_l1
 !=======================================================================
 subroutine read_ls(ionum,ndata,nrow,lval)
+  use mod_precision
 !
 !  Read several logical parameters
 !
@@ -568,6 +577,7 @@ subroutine read_force_field(ionum)
 !     There is no limit of number of force-fields to be specified.
 !
 !.....use pmdio
+  use mod_precision
   use force, only: num_forces, force_list
   use util, only: num_data
   implicit none
@@ -595,6 +605,7 @@ subroutine read_overlay(ionum)
 !
 !  Read overlay of a given pair
 !
+  use mod_precision
   use pmdvars, only: specorder, nspmax
   use force, only: ol_ranges, loverlay
   use util, only: num_data, csp2isp
@@ -605,7 +616,7 @@ subroutine read_overlay(ionum)
   character(len=128):: ctmp1
   integer:: isp,ndat
   character(len=3):: cspi
-  real(8):: rin, rout
+  real(rp):: rin, rout
 
   backspace(ionum)
   read(ionum,'(a)') ctmp
@@ -628,6 +639,7 @@ subroutine read_dumpaux(ionum)
 !
 !  Read dump_aux_order entry
 !
+  use mod_precision
   use pmdvars, only: cdumpaux,ldumpaux_changed
   use util, only: num_data
   implicit none 
@@ -652,6 +664,7 @@ subroutine read_stress_target(ionum)
 !
 !  Read stress_target which depends on the number of entries
 !
+  use mod_precision
   use pmdvars, only: lhydrostatic, stgt
   use util, only: num_data
   implicit none 
@@ -681,12 +694,13 @@ subroutine read_stress_target(ionum)
 end subroutine read_stress_target
 !=======================================================================
 subroutine read_vwall(ionum)
+  use mod_precision
   use pmdvars,only: nvwall,ivwall,spos_vwall,iside_vwall,frc_vwall
   use util,only: resize_iarr, resize_darr
   integer,intent(in):: ionum
 
   integer:: i123,iside
-  real(8):: wpos
+  real(rp):: wpos
   character(len=128) ctmp
   
   backspace(ionum)

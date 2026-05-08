@@ -1,4 +1,5 @@
       program read_pmd
+      use mod_precision
       use variables
       implicit none
       integer:: ia,ib,l,n,i,j
@@ -6,7 +7,7 @@
       integer,external:: iargc
       integer:: nargc
       character*128:: cargv
-      real*8:: x
+      real(rp):: x
 
       nargc= iargc()
       if( nargc.lt.1 ) stop ' [Error] nargc.lt.1 !'

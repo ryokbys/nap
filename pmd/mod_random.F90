@@ -1,18 +1,19 @@
 module random
+  use mod_precision
   implicit none
   save
-  real(8):: rseed  = 12345d0
-  real(8),parameter:: pi= 3.14159265358979d0
+  real(rp):: rseed  = 12345d0
+  real(rp),parameter:: pi= 3.14159265358979d0
 
 contains
 !=======================================================================
   subroutine set_seed(seed)
-    real(8),intent(in):: seed
+    real(rp),intent(in):: seed
     rseed = seed
   end subroutine set_seed
 !=======================================================================
   function get_seed()
-    real(8):: get_seed
+    real(rp):: get_seed
     get_seed = rseed
     return
   end function get_seed
@@ -21,8 +22,8 @@ contains
 !
 !  Uniform random number generator
 !      
-    real(8):: urnd
-    real(8),save:: d2p31m,d2p31
+    real(rp):: urnd
+    real(rp),save:: d2p31m,d2p31
     data d2p31m/2147483647d0/
     data d2p31 /2147483648d0/
 
@@ -38,8 +39,8 @@ contains
 !  Generate Gaussian distribution from two uniform random numbers.
 !  Only one of two dependent random numbers is returned.
 !
-    real(8):: polarbm
-    real(8):: x1,x2,w,y
+    real(rp):: polarbm
+    real(rp):: x1,x2,w,y
 
     w = 2d0
     do while( w.ge.1d0 )
@@ -57,8 +58,8 @@ contains
 !  Generate Gaussian distribution from two uniform random number.
 !  Only one of two dependent random numbers is returned.
 !
-    real(8):: box_muller
-    real(8):: r1,r2
+    real(rp):: box_muller
+    real(rp):: r1,r2
 
     r1= urnd()
     r2= urnd()

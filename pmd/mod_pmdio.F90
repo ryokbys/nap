@@ -2,6 +2,7 @@ module pmdio
 !-----------------------------------------------------------------------
 !                     Last modified: <2025-05-03 18:27:59 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use mod_precision
   use util, only: num_data
   implicit none
   save
@@ -14,7 +15,7 @@ contains
     integer:: ntot
 
     integer:: ia,ib,l,i
-    real(8):: hunit,h(3,3,0:1)
+    real(rp):: hunit,h(3,3,0:1)
     character(len=128):: ctmp
 
     open(ionum,file=trim(cfname),status='old')
@@ -39,7 +40,7 @@ contains
     integer:: ntot
 
     integer:: ia,ib,l,i,msp,naux
-    real(8):: h(3,3,0:1),hunit
+    real(rp):: h(3,3,0:1),hunit
     character:: ctmp*3
 
     open(ionum,file=trim(cfname),form='unformatted',status='old')
@@ -57,8 +58,8 @@ contains
        rtot,vtot)
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in):: cfname
-    real(8),intent(out):: hunit,h(3,3,0:1)
-    real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    real(rp),intent(out):: hunit,h(3,3,0:1)
+    real(rp),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,itmp,num
     character(len=128):: ctmp
@@ -120,13 +121,13 @@ contains
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
-    real(8),intent(in):: hunit,h(3,3,0:1)
-    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
-    real(8),intent(in):: epot,ekin,stnsr(3,3)
+    real(rp),intent(in):: hunit,h(3,3,0:1)
+    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
+    real(rp),intent(in):: epot,ekin,stnsr(3,3)
     logical,intent(in):: lforce
 
     integer:: ia,ib,l,i,msp,num
-    real(8):: atmp(3)
+    real(rp):: atmp(3)
     character(len=128):: cftmp
     logical:: lopen = .false.
     logical:: lclose = .false.
@@ -197,8 +198,8 @@ contains
     use pmdvars,only: specorder
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in):: cfname
-    real(8),intent(out):: hunit,h(3,3,0:1)
-    real(8),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    real(rp),intent(out):: hunit,h(3,3,0:1)
+    real(rp),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp,itmp
 
@@ -232,8 +233,8 @@ contains
     include './params_unit.h'
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in) :: cfname
-    real(8),intent(in):: hunit,h(3,3,0:1)
-    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    real(rp),intent(in):: hunit,h(3,3,0:1)
+    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp
 
@@ -267,23 +268,23 @@ contains
     include "mpif.h"
     integer,intent(in):: ionum,ntot,naux,istp
     character(len=*),intent(in) :: cfname
-    real(8),intent(in):: hunit,h(3,3,0:1)
-    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
+    real(rp),intent(in):: hunit,h(3,3,0:1)
+    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
          atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot), &
          epitot(ntot),auxtot(naux,ntot)
 
     integer:: i,j,k,l,is,idlmp
-    real(8):: xi(3),ri(3),xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
+    real(rp):: xi(3),ri(3),xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz, &
          xlo_bound,xhi_bound,ylo_bound,yhi_bound, &
          zlo_bound,zhi_bound,st(3,3)
 !!$    integer,external:: itotOf
-!!$    real(8),allocatable,save:: rlmp(:,:),vlmp(:,:)
+!!$    real(rp),allocatable,save:: rlmp(:,:),vlmp(:,:)
     integer,save:: ndlmp,ndim
-    real(8),allocatable,save:: dlmp(:,:)
+    real(rp),allocatable,save:: dlmp(:,:)
     character(len=3),save:: cndlmp
     character(len=3):: csp
     character(len=6):: caux
-    real(8),parameter:: tiny = 1d-14
+    real(rp),parameter:: tiny = 1d-14
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -403,13 +404,13 @@ contains
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
-    real(8),intent(in):: hunit,h(3,3,0:1)
-    real(8),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
+    real(rp),intent(in):: hunit,h(3,3,0:1)
+    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
          atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot),epitot(ntot)
-    real(8),intent(in):: epot,ekin,stnsr(3,3)
+    real(rp),intent(in):: epot,ekin,stnsr(3,3)
 
     integer:: ia,ja,ib,l,i,msp,num,is
-    real(8):: atmp(3),ri(3),vi(3),ai(3),epi,eki
+    real(rp):: atmp(3),ri(3),vi(3),ai(3),epi,eki
     character(len=3):: csp
     character(len=128):: cftmp,str
     character(len=256):: cpath
@@ -495,15 +496,15 @@ contains
     use vector,only: norm,dot,cross
     use pmdvars,only: boundary
     integer,intent(in):: ntot
-    real(8),intent(in):: h(3,3),rtot(3,ntot),vtot(3,ntot)
-    real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz &
+    real(rp),intent(in):: h(3,3),rtot(3,ntot),vtot(3,ntot)
+    real(rp),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz &
          ,rlmp(3,ntot),vlmp(3,ntot)
 
     integer:: i,lxy,lxz,lyz,ixyz
-    real(8):: a0(3),b0(3),c0(3),a1(3),a2(3),a3(3) &
+    real(rp):: a0(3),b0(3),c0(3),a1(3),a2(3),a3(3) &
          ,b1(3),b2(3),b3(3),rt(3),vt(3),amat(3,3),bmat(3,3) &
          ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
-    real(8):: a,b,c,alpha,beta,gamma
+    real(rp):: a,b,c,alpha,beta,gamma
 
     xlo = 0d0
     ylo = 0d0
@@ -596,12 +597,12 @@ contains
 !=======================================================================
   subroutine shift_pos_for_lammps(r,rn,lxy,lxz,lyz,x,y,z,yz,xz,xy)
     use pmdvars,only: boundary
-    real(8),intent(in):: r(3),x,y,z,yz,xz,xy
+    real(rp),intent(in):: r(3),x,y,z,yz,xz,xy
     integer,intent(in):: lxy,lxz,lyz
-    real(8),intent(out):: rn(3)
+    real(rp),intent(out):: rn(3)
 
     integer:: i
-    real(8):: xyp
+    real(rp):: xyp
 
     xyp = xy -lxy*x
     rn(1:3) = r(1:3)
@@ -616,8 +617,8 @@ contains
   end subroutine shift_pos_for_lammps
 !=======================================================================
   function pbc(x)
-    real(8),intent(in):: x
-    real(8):: pbc
+    real(rp),intent(in):: x
+    real(rp):: pbc
 
     if( x.lt.0d0 ) then
       pbc = x -int(x) +1d0
@@ -641,11 +642,11 @@ contains
 !     See, http://lammps.sandia.gov/doc/Section_howto.html, for detail.
 !
     use vector,only: norm,dot
-    real(8),intent(in):: hmat(3,3)
-    real(8),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
+    real(rp),intent(in):: hmat(3,3)
+    real(rp),intent(out):: xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz
 
-    real(8):: a0(3),b0(3),c0(3)
-    real(8):: a,b,c,alpha,beta,gamma
+    real(rp):: a0(3),b0(3),c0(3)
+    real(rp):: a,b,c,alpha,beta,gamma
 
     xlo = 0d0
     ylo = 0d0
@@ -686,7 +687,7 @@ contains
     character(len=*),intent(in):: cline
 
     integer:: iopt1,isp,num
-    real(8):: opt1, opt2
+    real(rp):: opt1, opt2
     character(len=10):: c1,copt
     logical:: lopt
 

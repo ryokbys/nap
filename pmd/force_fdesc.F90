@@ -5,10 +5,11 @@ module fdesc
 !  Potential in descriptor space.
 !  Originally for the purpose of restricting structure, at 2021-05-17, by R.K.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax, nsp
   use util,only: csp2isp
   implicit none
-  include 'mpif.h'
   include "./const.h"
   save
 
@@ -24,12 +25,12 @@ module fdesc
 
   integer:: ndim_desc = -1
   integer:: giddesc = -1
-  real(8):: scnst = 1.0d0
-  real(8):: gcoef = 0.1d0
-  real(8):: gsgm  = 1.0d0
-  real(8),allocatable:: desctgt(:), descov(:,:), descacc(:,:), &
+  real(rp):: scnst = 1.0d0
+  real(rp):: gcoef = 0.1d0
+  real(rp):: gsgm  = 1.0d0
+  real(rp),allocatable:: desctgt(:), descov(:,:), descacc(:,:), &
        descpca(:), descfrc(:,:),descstrs(:,:,:)
-  real(8):: edesc
+  real(rp):: edesc
 !  logical:: ldspc(nspmax)
 
 contains
@@ -41,7 +42,7 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz,nxyz
-    real(8):: anxi,anyi,anzi,fext
+    real(rp):: anxi,anyi,anzi,fext
     integer:: istat(mpi_status_size),itag,ierr
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -97,9 +98,9 @@ contains
     integer,intent(in):: myid,mpi_world,iprint
     
     integer:: nentry,isp,ierr,isf,jsf,idesc
-    real(8):: tmp
+    real(rp):: tmp
     character:: cline*128, c1st*128, csp*3, cmode*128
-    real(8),allocatable:: desctmp(:)
+    real(rp),allocatable:: desctmp(:)
 
     if( myid.eq.0 ) then ! only at master, node-0.
 !      ldspc(:) = .true.
@@ -158,7 +159,7 @@ contains
 !.....Broadcast some parameters
     call mpi_barrier(mpi_world,ierr)
     call mpi_bcast(ndim_desc,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(scnst,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(scnst,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(giddesc,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(edesc_type,1,mpi_integer,0,mpi_world,ierr)
 !    call mpi_bcast(ldspc,nspmax,mpi_logical,0,mpi_world,ierr)
@@ -167,9 +168,9 @@ contains
       allocate(desctgt(ndim_desc), descov(ndim_desc,ndim_desc), &
            descacc(ndim_desc,ndim_desc))
     endif
-    call mpi_bcast(desctgt,ndim_desc,mpi_real8,0,mpi_world,ierr)
-!!$    call mpi_bcast(descpca,ndim_desc,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(descov,ndim_desc**2,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(desctgt,ndim_desc,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(descpca,ndim_desc,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(descov,ndim_desc**2,mpi_real_rp,0,mpi_world,ierr)
 !.....Calculate descacc by inverting descov
     call ludc_inv(ndim_desc, descov, descacc)
 
@@ -189,14 +190,14 @@ contains
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          myid,mpi_world,iprint,nn(6),nex(3), &
          nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
-    real(8),intent(in):: rcin,tag(namax),h(3,3),hi(3,3),ra(3,namax)
-    real(8),intent(inout):: aa(3,namax),edesci(namax),epot,strs(3,3,namax)
+    real(rp),intent(in):: rcin,tag(namax),h(3,3),hi(3,3),ra(3,namax)
+    real(rp),intent(inout):: aa(3,namax),edesci(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
 
     integer:: ia,igv,isf,jsf,isp,jsp,jj,ja,i,k,ixyz,jxyz,ierr
-    real(8):: tmp,at(3),ave_aa,ave_dsp,dsq,dpca1,pca1,aexp, &
+    real(rp):: tmp,at(3),ave_aa,ave_dsp,dsq,dpca1,pca1,aexp, &
          xi(3),xj(3),xij(3),rij(3),dij,sij,esp
-    real(8):: dxmah(nsf)
+    real(rp):: dxmah(nsf)
 
     if( .not.allocated(descfrc) ) then
       allocate(descfrc(3,namax),descstrs(3,3,namax))
@@ -287,7 +288,7 @@ contains
     aa(1:3,1:natm) = aa(1:3,1:natm) +descfrc(1:3,1:natm)
 !.....Gather epot
     tmp = edesc
-    call mpi_allreduce(tmp,edesc,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmp,edesc,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     epot = epot + edesc
 !.....Send back stresses
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
@@ -305,7 +306,7 @@ contains
 !
     integer,intent(in):: namax,natm,nbmax,nb,myparity(3),nn(6),nex(3), &
          lsb(0:nbmax,6),lsrc(6),mpi_world
-    real(8),intent(inout):: strs(3,3,namax)
+    real(rp),intent(inout):: strs(3,3,namax)
     
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,descstrs,9)
@@ -318,15 +319,15 @@ contains
 !  Add desc epot to that of the system.
 !  It requires that force_fdesc is called beforehand.
 !
-    real(8),intent(inout):: epot
+    real(rp),intent(inout):: epot
     integer,intent(in):: mpi_world
 
     integer:: ierr
-    real(8):: tmp
+    real(rp):: tmp
     
 !.....Gather energy
     tmp = edesc
-    call mpi_allreduce(tmp,edesc,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(tmp,edesc,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     epot = epot +edesc
     return
   end subroutine add_fdesc_epot

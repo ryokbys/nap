@@ -1,20 +1,21 @@
 module rdcfrc
+  use pmdmpi
+  use mod_precision
   implicit none
   save
-  include 'mpif.h'
 
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: cfparams = 'in.rdcfrc'
   integer,parameter:: ioprms = 67
 
-  real(8),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979d0
 
 !.....Type of selection of atoms whose forces are to be reduced.
 !.....Available types: species, ID, neigh_XXXXX, cna
   character(len=128):: ctype_fmod = 'species' ! default
   
 !.....alpha: factor to be multiplied to forces
-  real(8):: alpha = 0.5d0
+  real(rp):: alpha = 0.5d0
 
 !.....Species whose forces are to be reduced.
   integer:: is_rdcfrc = -1 ! default
@@ -22,24 +23,24 @@ module rdcfrc
   integer:: nids = 0
 
 !.....Number of neighbors per atom
-  real(8),allocatable:: ann(:)
+  real(rp),allocatable:: ann(:)
 !.....Distance where neighbor counting starts to decrease
-  real(8):: rin = -1d0
+  real(rp):: rin = -1d0
 !.....Cutoff distance of neighbor counting
-  real(8):: rout = -1d0
-  real(8):: rout2
+  real(rp):: rout = -1d0
+  real(rp):: rout2
 !.....Forces of atoms having this num of neighbors are not modified
   integer:: nn_intact = 8
 !.....Threshold of difference in num of neighbors
-  real(8):: dth_nn = 0.5d0
+  real(rp):: dth_nn = 0.5d0
 !.....Boundary in num of neighbors
-  real(8):: nn_boundary = -1d0
+  real(rp):: nn_boundary = -1d0
 
 !.....For the calculation of histogram of num of neighbors
   logical:: lhist = .false.
   integer:: nbins = 200
-  real(8),allocatable:: hist_nn(:)
-  real(8):: dhist
+  real(rp),allocatable:: hist_nn(:)
+  real(rp):: dhist
   
 contains
 !=======================================================================
@@ -53,11 +54,11 @@ contains
 
     call mpi_bcast(ctype_fmod,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(is_rdcfrc,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(alpha,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rin,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rout,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dth_nn,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(nn_boundary,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(alpha,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rin,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rout,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dth_nn,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(nn_boundary,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(nn_intact,1,mpi_integer,mpi_world,ierr)
     call mpi_bcast(nids,1,mpi_integer,0,mpi_world,ierr)
     if( nids.gt.0 ) then
@@ -200,11 +201,11 @@ contains
     use structure,only: idcna
     use util,only: itotOf
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
-    real(8),intent(inout):: aa(3,namax)
+    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(rp),intent(inout):: aa(3,namax)
 
     integer:: ia,is,i,itot,icna
-    real(8):: beta
+    real(rp):: beta
 !!$    integer,external:: itotOf
 
     if( ctype_fmod(1:5).eq.'neigh' ) then
@@ -276,10 +277,10 @@ contains
 !=======================================================================
   subroutine count_nn(namax,natm,ra,h,nnmax,lspr)
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
 
     integer:: ia,jj,ja
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij2,dij
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij2,dij
 
     ann(1:natm) = 0d0
     do ia=1,natm
@@ -299,8 +300,8 @@ contains
   end subroutine count_nn
 !=======================================================================
   function fnn(rij)
-    real(8),intent(in):: rij
-    real(8):: fnn
+    real(rp),intent(in):: rij
+    real(rp):: fnn
 
     fnn = 0d0
     if( rij.le.rin ) then

@@ -4,6 +4,8 @@ module repel
 !-----------------------------------------------------------------------
 !  Parallel implementation of repulsion pontential
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp, is_numeric
   use memory,only: accum_mem
@@ -21,13 +23,13 @@ module repel
   logical:: interact(nspmax,nspmax)
 
   character(len=10):: ctype = 'exp'
-  real(8):: Aij(nspmax,nspmax), rhoij(nspmax,nspmax), &
+  real(rp):: Aij(nspmax,nspmax), rhoij(nspmax,nspmax), &
        sgmij(nspmax,nspmax), rcij(nspmax,nspmax)
 
 !.....Smooth cutoff
-  real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
+  real(rp):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
 
-  real(8),allocatable:: strsl(:,:,:)
+  real(rp),allocatable:: strsl(:,:,:)
 
   logical:: lprmset_repel = .false.
 
@@ -36,13 +38,12 @@ contains
 !
 !  Read pair parameters for repel potential from file
 !
-    include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
     integer:: i,j,isp,jsp,id,ierr
     character(len=128):: cline,fname
     character(len=3):: cspi,cspj
-    real(8):: Ai,rhoi,c6i,c8i,c10i,rci,sgmi
+    real(rp):: Ai,rhoi,c6i,c8i,c10i,rci,sgmi
 
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -107,10 +108,10 @@ contains
       enddo
     endif  ! myid_md.eq.0
 
-    call mpi_bcast(Aij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rhoij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(sgmij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rcij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(Aij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rhoij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(sgmij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rcij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
     if( iprint.ge.ipl_debug .and. myid_md.eq.0 ) then
@@ -153,24 +154,23 @@ contains
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc_global &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc_global &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott, &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott, &
          dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2, &
          dij2,vrc,dvdrc,expbrc,expbr,A,rho,rc,sgm
-    real(8),save:: rc2
-    real(8),external:: fcut1,dfcut1
+    real(rp),save:: rc2
+    real(rp),external:: fcut1,dfcut1
 
     if( l1st ) then
       if( allocated(strsl) ) then
@@ -287,7 +287,7 @@ contains
 
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot repel = ',epott

@@ -2,6 +2,8 @@ module descriptor
 !=======================================================================
 ! Descriptor module
 !=======================================================================
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use memory,only: accum_mem
@@ -30,17 +32,17 @@ module descriptor
   integer,parameter:: ionum = 51
   logical:: lprmset_desc = .false.
 
-!!$  real(8),parameter:: pi = 3.14159265358979d0
+!!$  real(rp),parameter:: pi = 3.14159265358979d0
 !!$  integer,parameter:: msp = 9  ! hard-coded max-num of species
 
   type desc
     integer:: itype
-    real(8):: rcut,rcut2
+    real(rp):: rcut,rcut2
     character(len=3):: cspi,cspj,cspk
     integer:: isp,jsp
     integer:: ksp = -1
     integer:: nprm
-    real(8),allocatable:: prms(:)
+    real(rp),allocatable:: prms(:)
   end type desc
   type(desc),allocatable:: descs(:)
 !.....List of isf's for each pair (ilsf2) and angle (ilsf3)
@@ -49,15 +51,15 @@ module descriptor
 !.....Memory used in byte
   integer:: mem
 !.....Time consumed
-  real(8):: time
+  real(rp):: time
 
   integer:: nsf,nsf2,nsf3,nsff
 !!$  integer,allocatable:: itype(:)
-!!$  real(8),allocatable:: cnst(:,:),rcs(:),rcs2(:)
+!!$  real(rp),allocatable:: cnst(:,:),rcs(:),rcs2(:)
 !.....symmetry function values and their derivatives
-  real(8),allocatable:: gsf(:,:),dgsf(:,:,:,:)
-  real(8),allocatable:: gsfi(:),dgsfi(:,:,:)
-  real(8),allocatable:: gscli(:) ! scaling factor to G's
+  real(rp),allocatable:: gsf(:,:),dgsf(:,:,:,:)
+  real(rp),allocatable:: gsfi(:),dgsfi(:,:,:)
+  real(rp),allocatable:: gscli(:) ! scaling factor to G's
 !.....symmetry function IDs for each pair
   integer(2),allocatable:: igsf(:,:,:),igsfi(:,:)
   logical:: lupdate_gsf = .true.
@@ -67,10 +69,10 @@ module descriptor
   integer,parameter:: max_ncnst = 2
   integer:: ncnst_type(200)
   integer:: ncomb_type(200)
-  real(8):: cnst(max_ncnst)
+  real(rp):: cnst(max_ncnst)
 
 !.....Maximum cutoff radius
-  real(8):: rcmax,rcmax2,rc3max
+  real(rp):: rcmax,rcmax2,rc3max
 
   integer:: nng,nag,nnt
   integer:: nal = 0
@@ -78,11 +80,11 @@ module descriptor
 
 !.....Chebyshev
   logical:: lcheby = .false.
-  real(8),allocatable:: ts_cheby(:),dts_cheby(:),wgtsp(:)
+  real(rp),allocatable:: ts_cheby(:),dts_cheby(:),wgtsp(:)
 
 !.....For group LASSO/FS in minimization
   integer:: ngl
-  real(8),allocatable:: glval(:)
+  real(rp),allocatable:: glval(:)
   integer,allocatable:: mskgfs(:),msktmp(:),iglid(:)
 
 !.....Whether or not called from fitpot [default: .false.]
@@ -121,7 +123,7 @@ contains
 !
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          iprint
-    real(8),intent(in):: rc
+    real(rp),intent(in):: rc
 
     integer:: i,ierr
     
@@ -150,16 +152,15 @@ contains
 !
 !  Make or update gsf arrays
 !
-    include "mpif.h"
     logical,intent(in):: l1st
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
     integer,intent(in):: myid,mpi_world
-    real(8),intent(in):: tag(namax)
+    real(rp),intent(in):: tag(namax)
 
     integer:: i,ierr
     integer:: ns_gsf(2),ns_dgsf(4)
     logical,save:: lrealloc = .false.
-    real(8):: time0
+    real(rp):: time0
 
     if( .not. lupdate_gsf ) return
 
@@ -291,11 +292,10 @@ contains
 
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st
-    include "mpif.h"
 
-    real(8):: time0
+    real(rp):: time0
 
     if( .not.lupdate_gsf ) return
     
@@ -320,7 +320,7 @@ contains
 !
     integer,intent(in):: ia,namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
 
     integer:: isf
 
@@ -364,9 +364,8 @@ contains
 !
 !  Preparation for desci calculation
 !
-    include "mpif.h"
     integer,intent(in):: myid,iprint
-    real(8),intent(in):: rc
+    real(rp),intent(in):: rc
 
     integer:: ierr
     
@@ -397,23 +396,22 @@ contains
 !  - If the overlay option is set, use inner and outer cutoff of ZBL potential.
 !
 !!$    implicit none
-    include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st 
 
     integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2 &
          ,ksf,itypp
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
          ri,ro,xs,z,dz,an,gijk,rcut,rcut2,rcutp,ttmp
     type(desc):: desci
-    real(8):: texpij,texpik,eta3,zang,twozeta
-!!$    real(8),save:: time2, time3
+    real(rp):: texpij,texpik,eta3,zang,twozeta
+!!$    real(rp),save:: time2, time3
 
     if( l1st ) then
 !!$      time2 = 0d0
@@ -757,19 +755,19 @@ contains
 !
     integer,intent(in):: ia,namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
 
     integer:: isf,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2 &
          ,ksf,itypp
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dij2,fcij,eta,rs,texp,driji(3), &
          dfcij,drijj(3),dgdr,xk(3),xik(3),rik(3),dik,fcik,dfcik, &
          driki(3),drikk(3),almbd,spijk,cs,t1,t2,dgdij,dgdik,dgcs, &
          dcsdj(3),dcsdk(3),dcsdi(3),tcos,tpoly,a1,a2,tmorse,dik2,tmp,dtmp, &
          xjk(3),rjk(3),djk,djk2,fcjk,dfcjk,drjkj(3),drjkk(3),dgdjk, &
          ri,ro,xs,z,dz,an,gijk,rcut,rcut2,rcutp,ttmp
     type(desc):: desci
-    real(8):: texpij,texpik,eta3,zang,twozeta
-!!$    real(8),save:: time2, time3
+    real(rp):: texpij,texpik,eta3,zang,twozeta
+!!$    real(rp),save:: time2, time3
 
     xi(1:3)= ra(1:3,ia)
     is= int(tag(ia))
@@ -1083,14 +1081,13 @@ contains
 !-----------------------------------------------------------------------    
 !  See Artrith et al., PRB96, 014112 (2017)
 !-----------------------------------------------------------------------
-    include "mpif.h"
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
     logical,intent(in):: l1st
 
     integer:: ia,ja,ka,jj,kk,is,js,ks,n,isf,ierr,isf0
-    real(8):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
+    real(rp):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
          ,rik(3),dik,dik2,driji(3),drijj(3),driki(3),drikk(3) &
          ,fcij,dfcij,fcik,dfcik,spijk,cs,dcsdj(3),dcsdk(3),dcsdi(3) &
          ,dgdcs,dgdij,dgdik,dgdr,wgt,rcut2,rcut3,rcut,wgts(nsf)
@@ -1228,10 +1225,10 @@ contains
 !-----------------------------------------------------------------------
     integer,intent(in):: ia,namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
 
     integer:: ja,ka,jj,kk,is,js,ks,n,isf,ierr,isf0
-    real(8):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
+    real(rp):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
          ,rik(3),dik,dik2,driji(3),drijj(3),driki(3),drikk(3) &
          ,fcij,dfcij,fcik,dfcik,spijk,cs,dcsdj(3),dcsdk(3),dcsdi(3) &
          ,dgdcs,dgdij,dgdik,dgdr,wgt,rcut2,rcut3,rcut,wgts(nsf)
@@ -1335,8 +1332,8 @@ contains
 !=======================================================================
   function fc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rin,rout
-    real(8):: fc1
+    real(rp),intent(in):: r,rin,rout
+    real(rp):: fc1
 
     if( r.le.rin ) then
       fc1= 1d0
@@ -1350,8 +1347,8 @@ contains
 !=======================================================================
   function dfc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rin,rout
-    real(8):: dfc1
+    real(rp),intent(in):: r,rin,rout
+    real(rp):: dfc1
 
     if( r.le.rin ) then
       dfc1= 0d0
@@ -1367,11 +1364,11 @@ contains
 !
 !  Calculate cutoff/switching function depending on r and r_outer
 !
-    real(8),intent(in):: r,rcut
+    real(rp),intent(in):: r,rcut
     integer,intent(in):: isp,jsp
-    real(8),intent(out):: fc,dfc
+    real(rp),intent(out):: fc,dfc
 
-    real(8):: rin,rout
+    real(rp):: rin,rout
     
     fc= fc1(r,0d0,rcut)
     dfc= dfc1(r,0d0,rcut)
@@ -1382,15 +1379,14 @@ contains
   subroutine read_params_desc(myid,mpi_world,iprint,specorder)
     use util, only: num_data
     implicit none
-    include 'mpif.h'
 
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-!!$    real(8),intent(in):: rcin
+!!$    real(rp),intent(in):: rcin
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp,isp,jsp,ksp,isf,ityp &
          ,ihl0,ihl1,ihl2,icmb(3),iap,jap,kap,ndat,is1,is2
-    real(8):: rcut2,rcut3,rcut,time0,wgt
+    real(rp):: rcut2,rcut3,rcut,time0,wgt
     logical:: lexist
     character(len=128):: ctmp,fname,cline,cmode
     character(len=3):: ccmb(3),csp
@@ -1572,7 +1568,7 @@ contains
     call mpi_bcast(ilsf2,size(ilsf2),mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(ilsf3,size(ilsf3),mpi_integer,0,mpi_world,ierr)
     if( lcheby ) then
-      call mpi_bcast(wgtsp,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(wgtsp,nspmax,mpi_real_rp,0,mpi_world,ierr)
     endif
 
 !.....Compute maximum rcut in all descriptors
@@ -1615,7 +1611,7 @@ contains
     integer,intent(out):: ierr
 
     integer:: iopt1,isp
-    real(8):: opt1, opt2
+    real(rp):: opt1, opt2
     character(len=10):: c1,copt
     logical:: lopt
 
@@ -1633,7 +1629,6 @@ contains
   end subroutine parse_option
 !=======================================================================
   subroutine bcast_descs(myid,mpi_world,iprint)
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
 
     integer:: i,ierr
@@ -1643,8 +1638,8 @@ contains
       call mpi_bcast(descs(i)%isp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%jsp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%ksp,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(descs(i)%rcut,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(descs(i)%rcut2,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(descs(i)%rcut,1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(descs(i)%rcut2,1,mpi_real_rp,0,mpi_world,ierr)
       call mpi_bcast(descs(i)%nprm,1,mpi_integer,0,mpi_world,ierr)
       if( .not. lcheby ) then
         if( myid.ne.0 ) then
@@ -1652,7 +1647,7 @@ contains
           allocate(descs(i)%prms(descs(i)%nprm))
         endif
         call mpi_barrier(mpi_world,ierr)
-        call mpi_bcast(descs(i)%prms,descs(i)%nprm,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(descs(i)%prms,descs(i)%nprm,mpi_real_rp,0,mpi_world,ierr)
       endif
     enddo
   end subroutine bcast_descs
@@ -1677,12 +1672,12 @@ contains
     integer,intent(in):: nsf_in,nsf2_in,nsf3_in,nsff_in, &
          ilsf2_in(0:nsf_in,nspmax,nspmax), ilsf3_in(0:nsf_in,nspmax,nspmax,nspmax)
     logical,intent(in):: lcheby_in
-    real(8),intent(in):: cnst_in(max_ncnst)
+    real(rp),intent(in):: cnst_in(max_ncnst)
     type(desc),intent(in):: descs_in(nsf_in)
-    real(8),intent(in),optional:: wgtsp_in(nspmax)
+    real(rp),intent(in),optional:: wgtsp_in(nspmax)
 
     integer:: i,nsp
-    real(8):: rcut
+    real(rp):: rcut
 
     if( lprmset_desc ) return
 
@@ -1747,12 +1742,12 @@ contains
     integer,intent(in):: nsf_in,nsf2_in,nsf3_in,nsff_in, &
          ilsf2_in(0:nsf_in,nspmax,nspmax), ilsf3_in(0:nsf_in,nspmax,nspmax,nspmax)
     logical,intent(in):: lcheby_in
-    real(8),intent(in):: cnst_in(max_ncnst)
+    real(rp),intent(in):: cnst_in(max_ncnst)
     type(desc),intent(in):: descs_in(nsf_in)
-    real(8),intent(in),optional:: wgtsp_in(nspmax)
+    real(rp),intent(in),optional:: wgtsp_in(nspmax)
 
     integer:: i,nsp
-    real(8):: rcut
+    real(rp):: rcut
     character(len=22):: cerr = 'ERROR@set_params_desc:'
 
     if( lcheby .and. .not. present(wgtsp_in) ) then
@@ -1815,10 +1810,10 @@ contains
     implicit none
     integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax)
+    real(rp),intent(in):: tag(namax)
 
     integer:: ia,jj,ja,jra,isf,ihl0
-    real(8),allocatable:: dgsfo(:,:,:,:)
+    real(rp),allocatable:: dgsfo(:,:,:,:)
     integer(2),allocatable:: igsfo(:,:,:)
 !!$    integer,external:: itotOf
 
@@ -1876,7 +1871,7 @@ contains
 !
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          myid,mpi_world,iprint
-    real(8),intent(in):: tag(namax),ra(3,namax),rcin,h(3,3)
+    real(rp),intent(in):: tag(namax),ra(3,namax),rcin,h(3,3)
 
     integer:: ia,is,isf
     character(len=12),save:: cnum
@@ -1915,8 +1910,8 @@ contains
 !  Access to descriptors from outside
 !
     integer,intent(in):: nsfo,nalo,nnlo
-    real(8),intent(out):: gsfo(nsfo,nalo)
-    real(8),intent(out),optional:: dgsfo(3,nsfo,0:nnlo,nalo)
+    real(rp),intent(out):: gsfo(nsfo,nalo)
+    real(rp),intent(out),optional:: dgsfo(3,nsfo,0:nnlo,nalo)
     integer(2),intent(out),optional:: igsfo(nsfo,0:nnlo,nalo)
 
     integer:: i
@@ -1939,7 +1934,7 @@ contains
 !  Set descriptors from outside (fitpot).
 !
     integer,intent(in):: nsfo,nalo,nnlo
-    real(8),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)
+    real(rp),intent(in):: gsfo(nsfo,nalo),dgsfo(3,nsfo,0:nnlo,nalo)
     integer(2),intent(in):: igsfo(nsfo,0:nnlo,nalo)
 
     integer:: isf
@@ -1970,7 +1965,7 @@ contains
 !  Set G scales from the outside (fitpot).
 !
     integer,intent(in):: nsfo
-    real(8),intent(in):: gsclo(nsfo)
+    real(rp),intent(in):: gsclo(nsfo)
 
     if( nsf.ne.nsfo ) stop 'ERROR: nsf.ne.nsfo, which should not happen.'
 
@@ -1987,7 +1982,7 @@ contains
     use pmdvars,only: namax,nbmax,natm,nb,lsb,nex,lsrc,myparity,nn &
          ,lspr
     integer,intent(in):: mpi_world
-    real(8),allocatable,intent(out):: dgsfa(:,:,:)
+    real(rp),allocatable,intent(out):: dgsfa(:,:,:)
 
     integer:: ia,jj,ja,isf
 
@@ -2023,9 +2018,9 @@ contains
 !  Derivative of Tn(x), dTn(x)/dx, is also computed.
 !  Returns ts and dts, which correspond to Tn(x) and dTn(x)
 !
-    real(8),intent(in):: x
+    real(rp),intent(in):: x
     integer,intent(in):: nmax
-    real(8),intent(out):: ts(0:nmax),dts(0:nmax)
+    real(rp),intent(out):: ts(0:nmax),dts(0:nmax)
 
     integer:: n
 
@@ -2048,7 +2043,7 @@ contains
   end function mem_descriptor
 !=======================================================================
   function time_descriptor()
-    real(8):: time_descriptor
+    real(rp):: time_descriptor
 
     time_descriptor = time
     return

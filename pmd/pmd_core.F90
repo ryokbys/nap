@@ -6,6 +6,7 @@
 subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
      ,ekitot,epitot,auxtot,epot,ekin,stnsr)
 !.....All the arguments are in pmdvars module
+  use mod_precision
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump, &
        write_extxyz
   use util,only: iauxof, calc_nfmv, cell_info
@@ -45,29 +46,28 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        l_impls, ftaul
 
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
   integer,intent(inout):: ntot0
-  real(8),intent(in):: hunit
-  real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
+  real(rp),intent(in):: hunit
+  real(rp),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
        hmat(3,3,0:1)
-  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
+  real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
-  real(8),intent(out):: epot,ekin,stnsr(3,3)
+  real(rp),intent(out):: epot,ekin,stnsr(3,3)
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,itemp,nave,nspl,i_conv,ierr
   integer:: ihour,imin,isec
   integer:: ifwrong  ! for sanity check
-  real(8):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
+  real(rp):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
   logical:: l1st
   logical:: lconverged = .false.
 !.....FIRE variables
-  real(8):: alp_fire,fnorm,vnorm,fdotv
+  real(rp):: alp_fire,fnorm,vnorm,fdotv
   integer:: num_fire
 !.....For tensile test of Al nanorod
-  real(8):: strnow,ftop,fbot
+  real(rp):: strnow,ftop,fbot
 !-----output file names
   character:: cnum*128, ctmp*128
   logical:: ltot_updated = .true.
@@ -856,7 +856,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         ediff(1:9)= ediff(1:9) /nouterg
         ediff0(1:9)= 0d0
         call mpi_reduce(ediff,ediff0,9 &
-             ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+             ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
       endif
 
       if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -1106,22 +1106,23 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use force
   use pairlist,only: mk_lspr_para
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
   integer,intent(in):: ntot0
-  real(8),intent(in):: hunit,hmat(3,3,0:1)
-  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
-  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
-  real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
+  real(rp),intent(in):: hunit,hmat(3,3,0:1)
+  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+  real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
+  real(rp),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: linit
 
   integer:: i,ierr,is,nspl,iprm0
-  real(8):: aai(3),epott
+  real(rp):: aai(3),epott
   logical:: l1st
   character(len=3):: csp
 
@@ -1209,6 +1210,8 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
 !
+  use pmdmpi
+  use mod_precision
   use util,only: iauxof
   use pmdvars
   use force
@@ -1219,23 +1222,22 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   use UF3,only: gradw_uf3, gradw_uf3l, gradw_uf3d
   use pairlist,only: mk_lspr_para
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
   integer,intent(in):: ntot0
-  real(8),intent(in):: hunit,hmat(3,3,0:1)
-  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
-  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
-  real(8),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
+  real(rp),intent(in):: hunit,hmat(3,3,0:1)
+  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+  real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
+  real(rp),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: lgrad, lgrad_done
   integer,intent(in):: ndimp,maxisp
   integer,intent(in):: nfcal
   logical,intent(in):: lfrc_eval(ntot0)
-  real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+  real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
   logical,intent(in):: lematch,lfmatch,lsmatch
 
   integer:: i,ierr,is,nspl,iprm0
-  real(8):: aai(3),epott,ttmp
+  real(rp):: aai(3),epott,ttmp
   logical:: l1st
   character(len=3):: csp
 
@@ -1376,6 +1378,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !  subroutine for minimization.
 !
 !.....All the arguments are in pmdvars module
+  use mod_precision
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump, &
        write_extxyz
   use util,only: iauxof, cell_info
@@ -1391,19 +1394,18 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use isostat,only: setup_cell_min
 
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
   integer,intent(inout):: ntot0
-  real(8),intent(in):: hunit
-  real(8),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
+  real(rp),intent(in):: hunit
+  real(rp),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
        hmat(3,3,0:1)
-  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
+  real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
-  real(8),intent(out):: epot,stnsr(3,3)
+  real(rp),intent(out):: epot,stnsr(3,3)
 
   integer:: ifmv,ierr,i_conv,i
-  real(8):: tmp,tave,prss,epotp,sth(3,3),ekin
+  real(rp):: tmp,tave,prss,epotp,sth(3,3),ekin
   logical:: l1st
   logical:: lconverged = .false.
   character:: cnum*128, ctmp*128
@@ -1666,8 +1668,10 @@ subroutine set_fmv(fmv)
 !
 ! Set default fmv values which might be override
 !
+  use pmdmpi
+  use mod_precision
   implicit none
-  real(8),intent(out):: fmv(3,0:9)
+  real(rp),intent(out):: fmv(3,0:9)
 
 !-----set fmv(1:3,ifmv) to be multiplied to the velocities
   fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
@@ -1687,12 +1691,13 @@ subroutine set_nsp(ntot,tagtot)
 !
 !  Set nsp from specorder.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nsp,nspmax,specorder,myid_md,mpi_md_world,iprint
   implicit none 
   integer,intent(in):: ntot
-  real(8),intent(in):: tagtot(ntot)
+  real(rp),intent(in):: tagtot(ntot)
   include './const.h'
-  include 'mpif.h'
 
   integer:: i,ierr
 
@@ -1718,6 +1723,8 @@ subroutine set_nsp(ntot,tagtot)
 end subroutine set_nsp
 !=======================================================================
 subroutine set_domain_vars()
+  use pmdmpi
+  use mod_precision
   use pmdvars
   implicit none
   
@@ -1738,11 +1745,13 @@ subroutine set_domain_vars()
 end subroutine set_domain_vars
 !=======================================================================
 subroutine setup(nspmax,am,fekin,fa2v)
+  use pmdmpi
+  use mod_precision
   implicit none
   include "params_unit.h"
   integer,intent(in):: nspmax
-  real(8),intent(in):: am(nspmax)
-  real(8),intent(out):: fekin(nspmax),fa2v(nspmax)
+  real(rp),intent(in):: am(nspmax)
+  real(rp),intent(out):: fekin(nspmax),fa2v(nspmax)
 
   integer:: is
 
@@ -1766,12 +1775,14 @@ subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 !    HI:  inverse MD-box matrix
 !    SGM: cofactor matrix
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
-  real(8),intent(in):: h(3,3,0:1)
-  real(8),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1) &
+  real(rp),intent(in):: h(3,3,0:1)
+  real(rp),intent(out):: vol,sgm(3,3),hi(3,3),ht(3,3,0:1) &
        ,g(3,3,0:1),gi(3,3),gt(3,3,0:1)
 
-  real(8):: hit(3,3)
+  real(rp):: hit(3,3)
   integer:: i,j,k,im,ip,jm,jp
 
 !-----cofactor matrix, SGM
@@ -1832,11 +1843,13 @@ subroutine ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 !-----------------------------------------------------------------------
 !  Preparation for network related properties
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: myx,myy,myz,nx,ny,nz
-  real(8),intent(in):: anxi,anyi,anzi
+  real(rp),intent(in):: anxi,anyi,anzi
   integer,intent(out):: nn(6),myparity(3)
-  real(8),intent(out):: sv(3,6)
+  real(rp),intent(out):: sv(3,6)
   integer:: iv(3,6),ku,k1x,k1y,k1z
 
   iv(1:3,1)= (/ -1, 0, 0 /)
@@ -1882,17 +1895,18 @@ end subroutine ntset
 !=======================================================================
 subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
      ,vmax,mpi_md_world)
+  use pmdmpi
+  use mod_precision
   use util,only: ithOf
   use time,only: accum_time
   implicit none 
-  include "mpif.h"
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
-  real(8),intent(in):: va(3,namax),h(3,3),fekin(nspmax) &
+  real(rp),intent(in):: va(3,namax),h(3,3),fekin(nspmax) &
        ,tag(namax)
-  real(8),intent(out):: ekin,eki(3,3,namax),vmax,eks(nspmax)
+  real(rp),intent(out):: ekin,eki(3,3,namax),vmax,eks(nspmax)
 !-----locals
   integer:: i,ierr,is,ixyz,jxyz,imax,igrp,itemp
-  real(8):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(nspmax),tmp
+  real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(nspmax),tmp
 
   ekinl=0d0
   eki(1:3,1:3,1:natm)= 0d0
@@ -1924,13 +1938,13 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
 
   tmp = mpi_wtime()  
   ekin= 0d0
-  call mpi_allreduce(ekinl,ekin,1,mpi_real8 &
+  call mpi_allreduce(ekinl,ekin,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   eks(:)= 0d0
-  call mpi_allreduce(eksl,eks,nspmax,mpi_real8 &
+  call mpi_allreduce(eksl,eks,nspmax,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   vmax= 0d0
-  call mpi_allreduce(vmaxl,vmax,1,mpi_real8 &
+  call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp &
        ,mpi_max,mpi_md_world,ierr)
   vmax=dsqrt(vmax)
   call accum_time('mpi_allreduce',mpi_wtime()-tmp)
@@ -1938,15 +1952,16 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
 end subroutine get_ekin
 !=======================================================================
 subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
+  use pmdmpi
+  use mod_precision
   use time,only: accum_time
   implicit none 
-  include "mpif.h"
   integer,intent(in):: namax,natm,mpi_md_world
-  real(8),intent(in):: va(3,namax),h(3,3)
-  real(8),intent(out):: vmax
+  real(rp),intent(in):: va(3,namax),h(3,3)
+  real(rp),intent(out):: vmax
 
   integer:: i,ierr
-  real(8):: vx,vy,vz,v(3),v2,vmaxl,tmp
+  real(rp):: vx,vy,vz,v(3),v2,vmaxl,tmp
 
   vmaxl = 0d0
   do i=1,natm
@@ -1960,7 +1975,7 @@ subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
   enddo
   tmp = mpi_wtime()
   vmax= 0d0
-  call mpi_allreduce(vmaxl,vmax,1,mpi_real8 &
+  call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp &
        ,mpi_max,mpi_md_world,ierr)
   vmax=dsqrt(vmax)
   call accum_time('mpi_allreduce',mpi_wtime()-tmp)
@@ -1969,18 +1984,19 @@ end subroutine get_vmax
 !=======================================================================
 subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
      ,istp,nouterg,myid_md,mpi_md_world,sorg)
+  use pmdmpi
+  use mod_precision
   implicit none
-  include 'mpif.h'
   include './params_unit.h'
   integer,intent(in):: iotdst,ntdst,natm,istp,nouterg,myid_md &
        ,mpi_md_world
-  real(8),intent(in):: ra(3,natm),eki(3,3,natm),sorg(3)
+  real(rp),intent(in):: ra(3,natm),eki(3,3,natm),sorg(3)
   integer,intent(out):: nadst(ntdst)
-  real(8),intent(out):: tdst(ntdst)
+  real(rp),intent(out):: tdst(ntdst)
 
   integer:: i,ix,ierr
-  real(8):: dx,xi
-  real(8),allocatable,save:: tdl(:)
+  real(rp):: dx,xi
+  real(rp),allocatable,save:: tdl(:)
   integer,allocatable,save:: ndl(:)
   logical,save:: l1st=.true.
 
@@ -2008,7 +2024,7 @@ subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
     call mpi_reduce(nadst,ndl,ntdst &
          ,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
     call mpi_reduce(tdst,tdl,ntdst &
-         ,mpi_double_precision,mpi_sum,0,mpi_md_world,ierr)
+         ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
     do i=1,ntdst
       if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
       if( myid_md.eq.0 ) then
@@ -2024,21 +2040,22 @@ subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
 end subroutine calc_temp_dist
 !=======================================================================
 subroutine get_num_dof()
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: natm,tag,fmv,nfmv,ndof, &
        myid_md,mpi_md_world,iprint
   use time,only: accum_time
   use util,only: ithOf
   implicit none
-  include 'mpif.h'
   include "./const.h"
 !!$  integer,intent(in):: natm,myid_md,mpi_md_world,iprint
 !!$!.....TODO: hard coding number 9 should be replaced...
-!!$  real(8),intent(in):: tag(natm),fmv(3,0:9)
+!!$  real(rp),intent(in):: tag(natm),fmv(3,0:9)
 !!$  integer,intent(out):: ndof(9)
 
   integer:: i,l,k,ndofl(9),ierr,igrp,ifmv
-  real(8):: tmp
-  real(8),parameter:: deps= 1d-12
+  real(rp):: tmp
+  real(rp),parameter:: deps= 1d-12
 
   igrp = 1  ! Group-#1 for multiple-temperature (same as fmv)
   ndofl(1:9)= 0
@@ -2064,13 +2081,14 @@ end subroutine get_num_dof
 !=======================================================================
 subroutine check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
      ,nx,ny,nz,myid_md)
+  use pmdmpi
+  use mod_precision
   implicit none
-  include 'mpif.h'
   integer,intent(in):: nx,ny,nz,myid_md
-  real(8),intent(in):: sgm(3,3),vol,rc,anxi,anyi,anzi
+  real(rp),intent(in):: sgm(3,3),vol,rc,anxi,anyi,anzi
 
   integer:: ierr
-  real(8):: vala,valb,valc,rca,rcb,rcc
+  real(rp):: vala,valb,valc,rca,rcb,rcc
 
 !-----calculate the cut-off lengths
   vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
@@ -2108,22 +2126,22 @@ subroutine bacopy(l1st)
 !  
 !  Note: parallelized to smaller than rcut should not happen.
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars
   use force
   use pmdmpi,only: nid2xyz
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
-  include 'mpif.h'
   include './const.h'
   logical,intent(in):: l1st
 
 !.....integer:: status(MPI_STATUS_SIZE)
   integer:: i,j,m,kd,kdd,kul,kuh,ku,ierr,iex,ix,iy,iz,itmp,istatus,iaux
   integer:: nav,maxna,maxb,inode,nsd,nrc,nbnew
-  real(8):: xi(3),rcv(3),asgm,tmp
+  real(rp):: xi(3),rcv(3),asgm,tmp
   logical,external:: bbd
-  real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical:: lshort(3)
 
   integer,save:: ndimbuf = 4
@@ -2363,16 +2381,16 @@ subroutine bacopy_fixed()
 !  Different number of data are copied depending on whether 
 !    using atomic charges or not.
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars
   use force
   use pmdmpi,only: nid2xyz
   use clrchg,only: lclrchg
   implicit none
-  include 'mpif.h'
 
   integer:: i,j,m,kd,kdd,ku,ierr,iex,ix,iy,iz,iaux
   integer:: inode,nsd,nrc,nbnew
-  real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
   integer,save:: ndimbuf = 4
 
@@ -2455,19 +2473,19 @@ subroutine bamove()
 !    MVQUE(0,ku) is the # of to-be-moved atoms to neighbor ku;
 !    MVQUE(i,ku) is the adress, in IS, of atom i
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars
   use force
   use pmdmpi,only: nid2xyz
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
-  include 'mpif.h'
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
   integer:: mvque(0:nbmax,6),newim,maxa,itmp,mvql,mvqg
-  real(8):: xi(3),tmp
+  real(rp):: xi(3),tmp
   logical,external:: bmv
-  real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
   integer,save:: ndimbuf = 7
 
@@ -2659,8 +2677,10 @@ function bbd(xv,yv,zv,rcav,rcbv,rccv,ku,anxi,anyi,anzi)
 !-----------------------------------------------------------------------
 !  BBD = .true. if the coordinates are in the boundary to neighbor ku
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
-  real(8),intent(in):: xv,yv,zv,rcav,rcbv,rccv,anxi,anyi,anzi
+  real(rp),intent(in):: xv,yv,zv,rcav,rcbv,rccv,anxi,anyi,anzi
   integer,intent(in):: ku
   logical:: bbd
   
@@ -2688,8 +2708,10 @@ function bmv(xv,yv,zv,ku,anxi,anyi,anzi)
 !-----------------------------------------------------------------------
 !  BMV = .true. if the coordinates should belong to neighbor ku
 !------------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
-  real(8),intent(in):: xv,yv,zv,anxi,anyi,anzi
+  real(rp),intent(in):: xv,yv,zv,anxi,anyi,anzi
   integer,intent(in):: ku
   
   logical:: bmv
@@ -2717,15 +2739,16 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 !      
 !  Take sum of atomic stresses to compute cell stress
 !
+  use pmdmpi
+  use mod_precision
   use time,only: accum_time
   implicit none
-  include "mpif.h"
   integer,intent(in):: natm,mpi_md_world
-  real(8),intent(in):: eki(3,3,natm),strs(3,3,natm),vol
-  real(8),intent(out):: stnsr(3,3)
+  real(rp),intent(in):: eki(3,3,natm),strs(3,3,natm),vol
+  real(rp),intent(out):: stnsr(3,3)
 
   integer:: i,ixyz,jxyz,ierr
-  real(8):: stp(3,3),stk(3,3),stl(3,3),stg(3,3),tmp
+  real(rp):: stp(3,3),stk(3,3),stl(3,3),stg(3,3),tmp
 
   stp(1:3,1:3)= 0d0
   stk(1:3,1:3)= 0d0
@@ -2742,7 +2765,7 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 !!$  stl(1:3,1:3) = stp(1:3,1:3)
   stg(1:3,1:3)= 0d0
   tmp = mpi_wtime()
-  call mpi_allreduce(stl,stg,9,mpi_real8,mpi_sum &
+  call mpi_allreduce(stl,stg,9,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',mpi_wtime()-tmp)
   stnsr(1:3,1:3) = stg(1:3,1:3)/vol
@@ -2750,16 +2773,17 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 end subroutine sa2stnsr
 !=======================================================================
 subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
+  use pmdmpi
+  use mod_precision
   use random,only: box_muller
   implicit none
-  include 'mpif.h'
   include 'params_unit.h'
   integer,intent(in):: natm,nspmax
-  real(8),intent(in):: tag(natm),am(nspmax),tinit,dt &
+  real(rp),intent(in):: tag(natm),am(nspmax),tinit,dt &
        ,h(3,3,0:1),hi(3,3)
-  real(8),intent(out):: va(3,natm)
+  real(rp),intent(out):: va(3,natm)
   integer:: i,l,is
-  real(8):: dseed,sumvx,sumvy,sumvz,tmp,facv(nspmax),vt(3)
+  real(rp):: dseed,sumvx,sumvy,sumvz,tmp,facv(nspmax),vt(3)
 
 !      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
 !     &     *m2ang /s2fs
@@ -2785,16 +2809,17 @@ end subroutine setv
 !=======================================================================
 subroutine rm_trans_motion(natm,tag,va,nspmax,am &
      ,mpi_md_world,myid_md,iprint)
+  use pmdmpi
+  use mod_precision
   use time,only: accum_time
   implicit none
-  include 'mpif.h'
   include "./const.h"
   integer,intent(in):: natm,nspmax,mpi_md_world,myid_md,iprint
-  real(8),intent(in):: tag(natm),am(nspmax)
-  real(8),intent(out):: va(3,natm)
+  real(rp),intent(in):: tag(natm),am(nspmax)
+  real(rp),intent(out):: va(3,natm)
 
   integer:: i,is,ierr
-  real(8):: sumpx,sumpy,sumpz,amss,amtot,tmp,ttmp
+  real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp,ttmp
 
 !-----set center of mass motion to zero
   sumpx=0d0
@@ -2811,16 +2836,16 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
   enddo
   ttmp = mpi_wtime()
   tmp= sumpx
-  call mpi_allreduce(tmp,sumpx,1,mpi_double_precision,mpi_sum &
+  call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   tmp= sumpy
-  call mpi_allreduce(tmp,sumpy,1,mpi_double_precision,mpi_sum &
+  call mpi_allreduce(tmp,sumpy,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   tmp= sumpz
-  call mpi_allreduce(tmp,sumpz,1,mpi_double_precision,mpi_sum &
+  call mpi_allreduce(tmp,sumpz,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   tmp= amtot
-  call mpi_allreduce(tmp,amtot,1,mpi_double_precision,mpi_sum &
+  call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',mpi_wtime()-ttmp)
   do i=1,natm
@@ -2839,20 +2864,21 @@ end subroutine rm_trans_motion
 subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
      ,finc_fire,fdec_fire,nmin_fire &
      ,natm,va,aa,myid_md,mpi_md_world,dt,iprint)
+  use pmdmpi
+  use mod_precision
   use time,only: accum_time
   implicit none
-  include 'mpif.h'
   include './const.h'
   integer,intent(in):: natm,myid_md,mpi_md_world,nmin_fire &
        ,iprint
-  real(8),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire &
+  real(rp),intent(in):: aa(3,natm),falp_fire,alp0_fire,dtmax_fire &
        ,finc_fire,fdec_fire
   integer,intent(inout):: num_fire
-  real(8),intent(inout):: alp_fire,va(3,natm),dt
+  real(rp),intent(inout):: alp_fire,va(3,natm),dt
 
   integer:: i,ixyz,ierr
-  real(8):: fdotv,vnorm,fnorm,tmp
-  real(8):: fdotvl,vnorml,fnorml
+  real(rp):: fdotv,vnorm,fnorm,tmp
+  real(rp):: fdotvl,vnorml,fnorml
 
   fdotvl = 0d0
   vnorml = 0d0
@@ -2868,11 +2894,11 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
   fnorm = 0d0
   fdotv = 0d0
   tmp = mpi_wtime()
-  call mpi_allreduce(vnorml,vnorm,1,mpi_real8 &
+  call mpi_allreduce(vnorml,vnorm,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
-  call mpi_allreduce(fnorml,fnorm,1,mpi_real8 &
+  call mpi_allreduce(fnorml,fnorm,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
-  call mpi_allreduce(fdotvl,fdotv,1,mpi_real8 &
+  call mpi_allreduce(fdotvl,fdotv,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',mpi_wtime()-tmp)
   vnorm = dsqrt(vnorm)
@@ -2906,8 +2932,8 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
     endif
   endif
 
-!      call mpi_bcast(dt,1,mpi_real8,0,mpi_md_world,ierr)
-!      call mpi_bcast(alp_fire,1,mpi_real8,0,mpi_md_world
+!      call mpi_bcast(dt,1,mpi_real_rp,0,mpi_md_world,ierr)
+!      call mpi_bcast(alp_fire,1,mpi_real_rp,0,mpi_md_world
 !     &     ,ierr)
 end subroutine vfire
 !=======================================================================
@@ -2915,21 +2941,22 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
 !
 !  Decompose the system and scatter atoms to every process.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use clrchg,only: lclrchg
   implicit none
-  include 'mpif.h'
   integer,intent(in):: ntot0
-  real(8),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
-  real(8),intent(in):: vtot(3,ntot0)
-  real(8),intent(in):: auxtot(naux,ntot0)
+  real(rp),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
+  real(rp),intent(in):: vtot(3,ntot0)
+  real(rp),intent(in):: auxtot(naux,ntot0)
   logical,intent(in):: l1st
 
   integer:: istat(mpi_status_size)
   integer:: i,j,ixyz,n,ierr,nacc,ir,newnamax,newnbmax
   integer:: myxt,myyt,myzt,nmin
-  real(8):: sxogt,syogt,szogt
-  real(8):: t0
+  real(rp):: sxogt,syogt,szogt
+  real(rp):: t0
 
   t0 = mpi_wtime()
 
@@ -3059,14 +3086,14 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
       if( ixyz.ne.0 ) then
         call mpi_send(natm,1,mpi_integer,ixyz,ixyz+1 &
              ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_real8,ixyz,ixyz+2 &
+        call mpi_send(tag,natm,mpi_real_rp,ixyz,ixyz+2 &
              ,mpi_md_world,ierr)
-        call mpi_send(ra,3*natm,mpi_real8,ixyz,ixyz+3 &
+        call mpi_send(ra,3*natm,mpi_real_rp,ixyz,ixyz+3 &
              ,mpi_md_world,ierr)
-        call mpi_send(va,3*natm,mpi_real8,ixyz,ixyz+4 &
+        call mpi_send(va,3*natm,mpi_real_rp,ixyz,ixyz+4 &
              ,mpi_md_world,ierr)
         if( naux.gt.0 ) then
-          call mpi_send(aux,natm*naux,mpi_real8,ixyz,ixyz+8 &
+          call mpi_send(aux,natm*naux,mpi_real_rp,ixyz,ixyz+8 &
                ,mpi_md_world,ierr)
         endif
       endif
@@ -3079,14 +3106,14 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   else ! myid_md.ne.0
     call mpi_recv(natm,1,mpi_integer,0,myid_md+1 &
          ,mpi_md_world,istat,ierr)
-    call mpi_recv(tag,natm,mpi_real8,0,myid_md+2 &
+    call mpi_recv(tag,natm,mpi_real_rp,0,myid_md+2 &
          ,mpi_md_world,istat,ierr)
-    call mpi_recv(ra,3*natm,mpi_real8,0,myid_md+3 &
+    call mpi_recv(ra,3*natm,mpi_real_rp,0,myid_md+3 &
          ,mpi_md_world,istat,ierr)
-    call mpi_recv(va,3*natm,mpi_real8,0,myid_md+4 &
+    call mpi_recv(va,3*natm,mpi_real_rp,0,myid_md+4 &
          ,mpi_md_world,istat,ierr)
     if( naux.gt.0 ) then
-      call mpi_recv(aux,natm*naux,mpi_real8,0,myid_md+8 &
+      call mpi_recv(aux,natm*naux,mpi_real_rp,0,myid_md+8 &
            ,mpi_md_world,istat,ierr)
     endif
   endif
@@ -3100,19 +3127,20 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
 !  Opposite to space_decomp, gather atoms from every process
 !  to create the total system for output.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use util,only: itotOf
   implicit none
-  include 'mpif.h'
   integer,intent(in):: ntot0
-  real(8),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
+  real(rp),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0),stot(3,3,ntot0)
-  real(8),intent(out):: auxtot(naux,ntot0)
+  real(rp),intent(out):: auxtot(naux,ntot0)
   integer,parameter:: nmpi = 10
   integer:: n0,ixyz,natmt,i,ierr,ntott
   integer:: istat(mpi_status_size),itag
-  real(8):: t0
-  real(8),allocatable,save:: ratmp(:,:),vatmp(:,:),aatmp(:,:)
+  real(rp):: t0
+  real(rp),allocatable,save:: ratmp(:,:),vatmp(:,:),aatmp(:,:)
 
   if( .not. allocated(ratmp) ) then
     allocate(ratmp(3,natm),vatmp(3,natm),aatmp(3,natm))
@@ -3145,22 +3173,22 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
            ,mpi_md_world,istat,ierr)
       if( natmt.eq.0 ) cycle
       ntott = ntott + natmt
-      call mpi_recv(tagtot(n0),natmt,mpi_real8 &
+      call mpi_recv(tagtot(n0),natmt,mpi_real_rp &
            ,ixyz,itag+1,mpi_md_world,istat,ierr)
-      call mpi_recv(rtot(1,n0),3*natmt,mpi_real8 &
+      call mpi_recv(rtot(1,n0),3*natmt,mpi_real_rp &
            ,ixyz,itag+2,mpi_md_world,istat,ierr)
-      call mpi_recv(vtot(1,n0),3*natmt,mpi_real8 &
+      call mpi_recv(vtot(1,n0),3*natmt,mpi_real_rp &
            ,ixyz,itag+3,mpi_md_world,istat,ierr)
-      call mpi_recv(epitot(n0),natmt,mpi_real8 &
+      call mpi_recv(epitot(n0),natmt,mpi_real_rp &
            ,ixyz,itag+4,mpi_md_world,istat,ierr)
-      call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_real8 &
+      call mpi_recv(ekitot(1,1,n0),3*3*natmt,mpi_real_rp &
            ,ixyz,itag+5,mpi_md_world,istat,ierr)
-      call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_real8 &
+      call mpi_recv(stot(1,1,n0),3*3*natmt,mpi_real_rp &
            ,ixyz,itag+6,mpi_md_world,istat,ierr)
-      call mpi_recv(atot(1,n0),3*natmt,mpi_real8 &
+      call mpi_recv(atot(1,n0),3*natmt,mpi_real_rp &
            ,ixyz,itag+7,mpi_md_world,istat,ierr)
       if( naux.gt.0 ) then
-        call mpi_recv(auxtot(1,n0),natmt*naux,mpi_real8 &
+        call mpi_recv(auxtot(1,n0),natmt*naux,mpi_real_rp &
              ,ixyz,itag+11,mpi_md_world,istat,ierr)
       endif
       n0 = n0 + natmt
@@ -3177,7 +3205,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
     call mpi_send(natm,1,mpi_integer,0,itag &
          ,mpi_md_world,ierr)
     if( natm.gt.0 ) then
-      call mpi_send(tag,natm,mpi_real8,0,itag+1 &
+      call mpi_send(tag,natm,mpi_real_rp,0,itag+1 &
            ,mpi_md_world,ierr)
 !.....Positions should be shifted, velocities and forces should be converted to scaled ones
       do i=1,natm
@@ -3185,20 +3213,20 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
         vatmp(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
         aatmp(1:3,i) = hi(1:3,1)*aa(1,i) +hi(1:3,2)*aa(2,i) +hi(1:3,3)*aa(3,i)
       enddo
-      call mpi_send(ratmp,3*natm,mpi_real8,0,itag+2 &
+      call mpi_send(ratmp,3*natm,mpi_real_rp,0,itag+2 &
            ,mpi_md_world,ierr)
-      call mpi_send(vatmp,3*natm,mpi_real8,0,itag+3 &
+      call mpi_send(vatmp,3*natm,mpi_real_rp,0,itag+3 &
            ,mpi_md_world,ierr)
-      call mpi_send(epi,natm,mpi_real8,0,itag+4 &
+      call mpi_send(epi,natm,mpi_real_rp,0,itag+4 &
            ,mpi_md_world,ierr)
-      call mpi_send(eki,3*3*natm,mpi_real8,0,itag+5 &
+      call mpi_send(eki,3*3*natm,mpi_real_rp,0,itag+5 &
            ,mpi_md_world,ierr)
-      call mpi_send(strs,3*3*natm,mpi_real8,0,itag+6 &
+      call mpi_send(strs,3*3*natm,mpi_real_rp,0,itag+6 &
            ,mpi_md_world,ierr)
-      call mpi_send(aatmp,3*natm,mpi_real8,0,itag+7 &
+      call mpi_send(aatmp,3*natm,mpi_real_rp,0,itag+7 &
            ,mpi_md_world,ierr)
       if( naux.gt.0 ) then
-        call mpi_send(aux,natm*naux,mpi_real8,0,itag+11 &
+        call mpi_send(aux,natm*naux,mpi_real_rp,0,itag+11 &
              ,mpi_md_world,ierr)
       endif
     endif
@@ -3215,23 +3243,24 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 !      1: quick sort
 !      2: heap sort
 !  
+  use pmdmpi
+  use mod_precision
   use util,only: itotOf
   use time,only: accum_time
 !!$  use force,only: luse_charge, luse_elec_temp
   implicit none
-  include "mpif.h"
   integer,intent(in):: natm,ifsort
-  real(8),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
+  real(rp),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
        ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm)
   integer,intent(in):: naux
-  real(8),intent(inout):: aux(naux,natm)
+  real(rp),intent(inout):: aux(naux,natm)
 
   integer,allocatable,save:: itag(:),idxarr(:)
-  real(8),allocatable,save:: buf(:,:)
+  real(rp),allocatable,save:: buf(:,:)
   integer:: i,j,k
   integer,save:: nsave = 0
   integer,save:: ndata
-  real(8):: tmp
+  real(rp):: tmp
 !!$  integer,external:: itotOf
 
 !!$  ndata = 33
@@ -3305,6 +3334,8 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 end subroutine sort_by_tag
 !=======================================================================
 subroutine error_mpi_stop(cerrmsg)
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: myid_md
   implicit none
   character(len=*):: cerrmsg
@@ -3325,14 +3356,16 @@ subroutine error_mpi_stop(cerrmsg)
 end subroutine error_mpi_stop
 !=======================================================================
 subroutine estimate_nbmax(nalmax,h,nx,ny,nz,vol,rcut,rbuf,nbmax,boundary)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: nalmax,nx,ny,nz
-  real(8),intent(in):: vol,rcut,rbuf,h(3,3)
+  real(rp),intent(in):: vol,rcut,rbuf,h(3,3)
   integer,intent(inout):: nbmax
   character(len=3),intent(in):: boundary
 
   integer:: nest
-  real(8):: alx,aly,alz,area,dens_2A3,densl,dens,rc,volex,dvol
+  real(rp):: alx,aly,alz,area,dens_2A3,densl,dens,rc,volex,dvol
 
   rc = rcut +rbuf
   alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx +2*rc
@@ -3363,6 +3396,8 @@ subroutine alloc_namax_related()
 !     
 !     Allocated arrays related to NAMAX.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use memory, only: accum_mem
   implicit none
@@ -3397,6 +3432,8 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 !     Reallocated namax-related arrays everywhen namax needed to be
 !     updated
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use memory, only: accum_mem
   use util, only: resize_darr, resize_darr2, resize_darr3
@@ -3404,7 +3441,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   integer,intent(in):: newnalmax,newnbmax
 
   integer:: ierr,newnamax,ndim,l,m,inc,mem
-  real(8),allocatable:: arr(:)
+  real(rp),allocatable:: arr(:)
   integer,allocatable:: iarr(:)
 
   if( .not. allocated(ra) ) then
@@ -3503,16 +3540,20 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 end subroutine realloc_namax_related
 !=======================================================================
 subroutine copy_arr(ndim,srcarr,destarr)
+  use pmdmpi
+  use mod_precision
   implicit none 
   integer,intent(in):: ndim
-  real(8),intent(in):: srcarr(ndim)
-  real(8),intent(out):: destarr(ndim)
+  real(rp),intent(in):: srcarr(ndim)
+  real(rp),intent(out):: destarr(ndim)
 
   destarr(:) = srcarr(:)
   return
 end subroutine copy_arr
 !=======================================================================
 subroutine copy_iarr(ndim,srcarr,destarr)
+  use pmdmpi
+  use mod_precision
   implicit none 
   integer,intent(in):: ndim
   integer,intent(in):: srcarr(ndim)
@@ -3524,12 +3565,13 @@ end subroutine copy_iarr
 !=======================================================================
 subroutine sanity_check(ekin,epot,stnsr,tave, &
      myid,mpi_world,ifwrong)
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: tlimit
   implicit none 
   integer,intent(in):: myid,mpi_world
-  real(8),intent(in):: ekin,epot,stnsr(3,3),tave
+  real(rp),intent(in):: ekin,epot,stnsr(3,3),tave
   integer,intent(out):: ifwrong
-  include "mpif.h"
 
   integer:: i,j,ierr
   character(len=128):: msg
@@ -3576,6 +3618,8 @@ subroutine sanity_check(ekin,epot,stnsr,tave, &
 end subroutine sanity_check
 !=======================================================================
 subroutine set_cauxarr()
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: cauxarr,naux, iaux_chg, iaux_q, iaux_vq, iaux_tei,&
        iaux_clr, ctctl, iaux_edesc
   use force,only: set_use_charge, set_use_elec_temp, use_force, &
@@ -3645,12 +3689,14 @@ subroutine get_shortest_distances(dshort)
 !  Compute shortest distances of each species pair which would be used
 !  in fitpot.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: natm,tag,ra,lspr,h,nspmax
   implicit none
-  real(8),intent(inout):: dshort(nspmax,nspmax)
+  real(rp),intent(inout):: dshort(nspmax,nspmax)
   
   integer:: ia,is,jj,ja,js
-  real(8):: xi(3),xj(3),xij(3),rij(3),dij2,dij
+  real(rp):: xi(3),xj(3),xij(3),rij(3),dij2,dij
 
   do ia=1,natm
     is = int(tag(ia))

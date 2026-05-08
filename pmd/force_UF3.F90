@@ -7,12 +7,13 @@ module UF3
 !    - 2025.04.00 by R.K., implemented UF3L
 !    - 2026.02.05 by R.K., start implementing UF3D
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp, num_data
   use memory,only: accum_mem
   use vector,only: dot
   implicit none
-  include "mpif.h"
   include './const.h'
   include "./params_unit.h"
   save
@@ -31,8 +32,8 @@ module UF3
 !!$  logical:: lprmset_uf3l = .false.
 !!$  logical:: lprmset_uf3d = .false.
 
-  real(8),parameter:: huge = 1d+100
-  real(8),parameter:: tiny = 1d-8
+  real(rp),parameter:: huge = 1d+100
+  real(rp),parameter:: tiny = 1d-8
 
 !.....uf2 parameters
   type prm2
@@ -43,9 +44,9 @@ module UF3
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
     integer:: nklead, nktrail
     integer:: nknot, ncoef
-    real(8):: rc,rc2
-    real(8),allocatable:: knots(:), coefs(:)
-    real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
+    real(rp):: rc,rc2
+    real(rp),allocatable:: knots(:), coefs(:)
+    real(rp),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm2
 
 !.....uf3 parameters
@@ -57,9 +58,9 @@ module UF3
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
     integer:: nklead, nktrail
     integer:: nknij, nknik, nknjk, ncfij, ncfik, ncfjk
-    real(8):: rcij, rcik, rcjk, rcij2, rcik2, rcjk2
-    real(8),allocatable:: knij(:), knik(:), knjk(:), coefs(:,:,:)
-    real(8),allocatable:: gwe(:,:,:), gwf(:,:,:,:,:), gws(:,:,:,:)
+    real(rp):: rcij, rcik, rcjk, rcij2, rcik2, rcjk2
+    real(rp),allocatable:: knij(:), knik(:), knjk(:), coefs(:,:,:)
+    real(rp),allocatable:: gwe(:,:,:), gwf(:,:,:,:,:), gws(:,:,:,:)
   end type prm3
 
 !.....uf3l 3B parameters
@@ -71,9 +72,9 @@ module UF3
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
     integer:: nklead, nktrail
     integer:: nknot, ncoef
-    real(8):: rcij, rcik, rcij2, rcik2, gmj, gmk
-    real(8),allocatable:: knots(:), coefs(:)
-    real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
+    real(rp):: rcij, rcik, rcij2, rcik2, gmj, gmk
+    real(rp),allocatable:: knots(:), coefs(:)
+    real(rp),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm3l
 
 !.....uf3d 3B parameters
@@ -85,14 +86,14 @@ module UF3
 !  cknot: nk (non-uniform knot spacing) or uk (uniform knot spacing)
     integer:: nklead, nktrail
     integer:: nknij, nknik, nkncs, ncfij, ncfik, ncfcs
-    real(8):: rcij, rcik, rcij2, rcik2
-    real(8),allocatable:: knij(:), knik(:), kncs(:), cfij(:), cfik(:), cfcs(:)
-    real(8),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
+    real(rp):: rcij, rcik, rcij2, rcik2
+    real(rp),allocatable:: knij(:), knik(:), kncs(:), cfij(:), cfik(:), cfcs(:)
+    real(rp),allocatable:: gwe(:), gwf(:,:,:), gws(:,:)
   end type prm3d
 
   integer:: n1b, n2b, n3b
   integer:: ncoef = 0
-  real(8):: erg1s(nspmax), gerg1s(nspmax)
+  real(rp):: erg1s(nspmax), gerg1s(nspmax)
   integer,allocatable:: prm1s(:)
   type(prm2),allocatable:: prm2s(:)
   type(prm3),allocatable:: prm3s(:)
@@ -100,22 +101,22 @@ module UF3
   type(prm3d),allocatable:: prm3ds(:)
   logical:: has_trios = .false.
   logical:: has_solo = .false.
-  real(8):: rcmax = 0.0d0
-  real(8):: rc3max = 0.0d0
-  real(8):: rc3max2 = 0.0d0
+  real(rp):: rcmax = 0.0d0
+  real(rp):: rc3max = 0.0d0
+  real(rp):: rc3max2 = 0.0d0
 !.....Common for angular softmax penalty
   integer,parameter:: npnts = 100
   integer:: nc2max = 0
   integer:: nc3max = 0
-  real(8),allocatable:: sumbexp(:,:), sumexp(:)
+  real(rp),allocatable:: sumbexp(:,:), sumexp(:)
   
-  real(8),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
+  real(rp),allocatable:: aal2(:,:),aal3(:,:),strsl(:,:,:)
   integer,allocatable:: ls3b(:)
 
 !.....Map of pairs (trios) to parameter set id
   integer:: interact2(nspmax,nspmax), interact3(nspmax,nspmax,nspmax)
 !!$!.....Cutoffs
-!!$  real(8):: rc2_3b(nspmax,nspmax)
+!!$  real(rp):: rc2_3b(nspmax,nspmax)
 
 !.....constants
   integer:: nelem,nexp,nsp
@@ -161,7 +162,7 @@ contains
 
     integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
-    real(8):: etmp
+    real(rp):: etmp
 !  nklead, nktrail: num of leading or trailing knots
     logical:: lexist
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
@@ -317,7 +318,7 @@ contains
 
     integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
-    real(8):: etmp
+    real(rp):: etmp
 !  nklead, nktrail: num of leading or trailing knots
     logical:: lexist
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
@@ -478,7 +479,7 @@ contains
 
     integer:: itmp,ierr,i,j,i1b,i2b,i3b,isp
     integer:: nklead, nktrail
-    real(8):: etmp
+    real(rp):: etmp
 !  nklead, nktrail: num of leading or trailing knots
     logical:: lexist
     character:: fname*128, cmode*4, cb*2, csi*2, csj*2, csk*2, &
@@ -804,13 +805,13 @@ contains
       call mpi_bcast(prm2s(i2b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%nknot,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real_rp,0,mpi_world,ierr)
       if( .not.allocated(prm2s(i2b)%knots) ) &
            allocate(prm2s(i2b)%knots(prm2s(i2b)%nknot))
       if( .not.allocated(prm2s(i2b)%coefs) ) &
            allocate(prm2s(i2b)%coefs(prm2s(i2b)%ncoef))
-      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real_rp,0,mpi_world,ierr)
     enddo
 
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
@@ -833,9 +834,9 @@ contains
         call mpi_bcast(prm3s(i3b)%ncfij,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3s(i3b)%ncfik,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3s(i3b)%ncfjk,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3s(i3b)%rcij,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3s(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3s(i3b)%rcjk,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcij,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcik,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3s(i3b)%rcjk,1,mpi_real_rp,0,mpi_world,ierr)
         if( .not.allocated(prm3s(i3b)%knij) ) &
              allocate(prm3s(i3b)%knij(prm3s(i3b)%nknij))
         if( .not.allocated(prm3s(i3b)%knik) ) &
@@ -846,14 +847,14 @@ contains
              allocate(prm3s(i3b)%coefs(prm3s(i3b)%ncfjk, &
              prm3s(i3b)%ncfik, prm3s(i3b)%ncfij))
         call mpi_bcast(prm3s(i3b)%knij,prm3s(i3b)%nknij, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3s(i3b)%knik,prm3s(i3b)%nknik, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3s(i3b)%knjk,prm3s(i3b)%nknjk, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3s(i3b)%coefs,&
              prm3s(i3b)%ncfjk*prm3s(i3b)%ncfik*prm3s(i3b)%ncfij,&
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
       enddo
     endif  ! has_trios
 
@@ -861,7 +862,7 @@ contains
     if( has_solo ) then
       if( .not. allocated(prm1s) ) allocate(prm1s(n1b))
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(erg1s,nspmax,mpi_real_rp,0,mpi_world,ierr)
     endif  ! has_solo
 
     call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
@@ -896,20 +897,20 @@ contains
       call mpi_bcast(prm2s(i2b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%nknot,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%rc2,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc2,1,mpi_real_rp,0,mpi_world,ierr)
       if( .not.allocated(prm2s(i2b)%knots) ) &
            allocate(prm2s(i2b)%knots(prm2s(i2b)%nknot))
       if( .not.allocated(prm2s(i2b)%coefs) ) &
            allocate(prm2s(i2b)%coefs(prm2s(i2b)%ncoef))
-      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real_rp,0,mpi_world,ierr)
     enddo
 
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
     if( has_trios ) then
-      call mpi_bcast(rc3max,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rc3max2,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rc3max,1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(rc3max2,1,mpi_real_rp,0,mpi_world,ierr)
       if( .not. allocated(prm3ls) ) allocate(prm3ls(n3b))
       do i3b=1,n3b
         call mpi_bcast(prm3ls(i3b)%cb,2,mpi_character,0,mpi_world,ierr)
@@ -924,20 +925,20 @@ contains
         call mpi_bcast(prm3ls(i3b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%nknot,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%rcij,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%rcij2,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%rcik2,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%gmj,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ls(i3b)%gmk,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%rcij,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%rcik,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%rcij2,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%rcik2,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%gmj,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ls(i3b)%gmk,1,mpi_real_rp,0,mpi_world,ierr)
         if( .not.allocated(prm3ls(i3b)%knots) ) &
              allocate(prm3ls(i3b)%knots(prm3ls(i3b)%nknot))
         if( .not.allocated(prm3ls(i3b)%coefs)) &
              allocate(prm3ls(i3b)%coefs(prm3ls(i3b)%ncoef))
         call mpi_bcast(prm3ls(i3b)%knots,prm3ls(i3b)%nknot, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ls(i3b)%coefs,prm3ls(i3b)%ncoef, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
       enddo
     endif  ! has_trios
 
@@ -945,7 +946,7 @@ contains
     if( has_solo ) then
       if( .not. allocated(prm1s) ) allocate(prm1s(n1b))
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(erg1s,nspmax,mpi_real_rp,0,mpi_world,ierr)
     endif  ! has_solo
 
     call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
@@ -980,20 +981,20 @@ contains
       call mpi_bcast(prm2s(i2b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%nknot,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(prm2s(i2b)%ncoef,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%rc2,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc,1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%rc2,1,mpi_real_rp,0,mpi_world,ierr)
       if( .not.allocated(prm2s(i2b)%knots) ) &
            allocate(prm2s(i2b)%knots(prm2s(i2b)%nknot))
       if( .not.allocated(prm2s(i2b)%coefs) ) &
            allocate(prm2s(i2b)%coefs(prm2s(i2b)%ncoef))
-      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%knots,prm2s(i2b)%nknot,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(prm2s(i2b)%coefs,prm2s(i2b)%ncoef,mpi_real_rp,0,mpi_world,ierr)
     enddo
 
     call mpi_bcast(has_trios, 1, mpi_logical, 0,mpi_world,ierr)
     if( has_trios ) then
-      call mpi_bcast(rc3max,1,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(rc3max2,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(rc3max,1,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(rc3max2,1,mpi_real_rp,0,mpi_world,ierr)
       if( .not. allocated(prm3ds) ) allocate(prm3ds(n3b))
       do i3b=1,n3b
         call mpi_bcast(prm3ds(i3b)%cb,2,mpi_character,0,mpi_world,ierr)
@@ -1006,10 +1007,10 @@ contains
         call mpi_bcast(prm3ds(i3b)%ksp,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nklead,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nktrail,1,mpi_integer,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%rcij,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%rcik,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%rcij2,1,mpi_real8,0,mpi_world,ierr)
-        call mpi_bcast(prm3ds(i3b)%rcik2,1,mpi_real8,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%rcij,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%rcik,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%rcij2,1,mpi_real_rp,0,mpi_world,ierr)
+        call mpi_bcast(prm3ds(i3b)%rcik2,1,mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nknij,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nknik,1,mpi_integer,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%nkncs,1,mpi_integer,0,mpi_world,ierr)
@@ -1025,17 +1026,17 @@ contains
              prm3ds(i3b)%cfik(prm3ds(i3b)%ncfik), &
              prm3ds(i3b)%cfcs(prm3ds(i3b)%ncfcs) )
         call mpi_bcast(prm3ds(i3b)%knij,prm3ds(i3b)%nknij, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%knik,prm3ds(i3b)%nknik, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%kncs,prm3ds(i3b)%nkncs, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%cfij,prm3ds(i3b)%ncfij, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%cfik,prm3ds(i3b)%ncfik, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
         call mpi_bcast(prm3ds(i3b)%cfcs,prm3ds(i3b)%ncfcs, &
-             mpi_real8,0,mpi_world,ierr)
+             mpi_real_rp,0,mpi_world,ierr)
       enddo
     endif  ! has_trios
 
@@ -1043,7 +1044,7 @@ contains
     if( has_solo ) then
       if( .not. allocated(prm1s) ) allocate(prm1s(n1b))
       call mpi_bcast(prm1s,n1b,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(erg1s,nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(erg1s,nspmax,mpi_real_rp,0,mpi_world,ierr)
     endif  ! has_solo
 
     call mpi_bcast(interact2, nspmax**2, mpi_integer, 0,mpi_world,ierr)
@@ -1065,10 +1066,10 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
@@ -1076,13 +1077,13 @@ contains
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
          nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lij,lik,ljk
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
          dbjk3(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1d0
 
     type(prm2):: p2
     type(prm3):: p3
@@ -1333,10 +1334,10 @@ contains
     epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+    call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
@@ -1360,10 +1361,10 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
@@ -1371,13 +1372,13 @@ contains
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,nij3,inc,nik3,njk3,&
          nik,njk,nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lij,lik,ljk
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
          dbjk3(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1d0
 
     type(prm2):: p2
     type(prm3):: p3
@@ -1623,10 +1624,10 @@ contains
     epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+    call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
@@ -1650,27 +1651,27 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st, lstrs
 
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
-    real(8):: rcij, rcik, rcij2, rcik2
-    real(8),save:: rcin2 = -1d0
+    real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
+    real(rp):: rcij, rcik, rcij2, rcik2
+    real(rp),save:: rcin2 = -1d0
 
 #ifdef CONTRIB
-    real(8):: epot_LiLa, epot_NbO, epot_X, epot_Xp, epot_Xm, epot_elem, &
+    real(rp):: epot_LiLa, epot_NbO, epot_X, epot_Xp, epot_Xm, epot_elem, &
          epot_Li, epot_La
 #endif
 
@@ -1977,10 +1978,10 @@ contains
     epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+    call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
@@ -2009,27 +2010,27 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6)
-    real(8),intent(inout):: rcin
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: rcin
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st, lstrs
 
 !.....local
     integer:: ia,ja,ka,jj,kk,l,is,nr2,n,inc,&
          nij,itot,jtot,ktot,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs,nij3,nik3,lik,nik
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b, &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0)
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik, &
          sumcb,sumcdb,sumcbij,sumcdbij,sumcbik,sumcdbik, &
          c3ij,c3ik
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
-    real(8):: rcij, rcik, rcij2, rcik2
-    real(8),save:: rcin2 = -1d0
+    real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
+    real(rp):: rcij, rcik, rcij2, rcik2
+    real(rp),save:: rcin2 = -1d0
 
     type(prm2):: p2
     type(prm3d):: p3
@@ -2292,10 +2293,10 @@ contains
     epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real8, &
+    call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
-    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real8, &
+    if( has_trios ) call mpi_allreduce(epotl3,epot3,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
     epot= epot +epot1 +epot2 +epot3
     if( myid == 0 .and. iprint > 2 ) &
@@ -2318,12 +2319,12 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
-    real(8),intent(inout):: rcin
+    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
     logical,intent(in):: lfrc_eval(natm)
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
@@ -2331,13 +2332,13 @@ contains
          nik,njk,nij,itot,jtot,ktot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lij,lik,ljk,ip,jra,kra,ij,ik,jk
     integer:: ifcal,jfcal,kfcal
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0),bjk3(-3:0), &
          dbjk3(-3:0),c2t,c3t,epotl1,epot1,ttmp,fac3b
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(8),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1d0
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -2730,12 +2731,12 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
-    real(8),intent(inout):: rcin
+    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
     logical,intent(in):: lfrc_eval(natm)
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
@@ -2743,17 +2744,17 @@ contains
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,lij,ncs
     integer:: ifcal,jfcal,kfcal,ip,iv,jra,kra
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
-    real(8):: dv3rijdgj,dv3rijdgk,dv3rijc, dv3rikdgj,dv3rikdgk,dv3rikc, &
+    real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
+    real(rp):: dv3rijdgj,dv3rijdgk,dv3rijc, dv3rikdgj,dv3rikdgk,dv3rikc, &
          dv3csndgj,dv3csndgk,dv3csnc, &
          dv3rijdcj,dv3rijdck,dv3rikdcj,dv3rikdck,dv3csndcj,dv3csndck
-    real(8):: rcij,rcik,rcij2,rcik2
-    real(8),save:: rcin2 = -1d0
+    real(rp):: rcij,rcik,rcij2,rcik2
+    real(rp),save:: rcin2 = -1d0
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -3212,12 +3213,12 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
-    real(8),intent(inout):: rcin
+    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
     logical,intent(in):: lfrc_eval(natm)
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch,lgrad_done
 
 !.....local
@@ -3225,19 +3226,19 @@ contains
          nij,itot,i1b,i2b,i3b,js,ks,jsp,ksp,ierr, &
          ixyz,jxyz,lcs,ncs,nc,lij,nij3,lik,nik,nik3,n0
     integer:: ifcal,jfcal,kfcal,ip,iv,jra,kra
-    real(8):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
+    real(rp):: epotl2,epotl3,epot2,epot3,tmp,tmp2,bij(-3:0),dbij(-3:0), &
          bcs(-3:0),dbcs(-3:0),c2t,c3t,epotl1,epot1,fac3b,tmp3, &
          bij3(-3:0),dbij3(-3:0),bik3(-3:0),dbik3(-3:0)
-    real(8):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
+    real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,drijj(3),drikk(3),&
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb, &
          c3ij,sumcbij,sumcdbij,c3ik,sumcbik,sumcdbik
-    real(8):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
-    real(8):: dv3rijdcij,dv3rijdcik,dv3rijdccs, &
+    real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
+    real(rp):: dv3rijdcij,dv3rijdcik,dv3rijdccs, &
          dv3rikdcij,dv3rikdcik,dv3rikdccs, &
          dv3csndcij,dv3csndcik,dv3csndccs
-    real(8):: rcij,rcik,rcij2,rcik2
-    real(8),save:: rcin2 = -1d0
+    real(rp):: rcij,rcik,rcij2,rcik2
+    real(rp),save:: rcin2 = -1d0
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -3782,15 +3783,15 @@ contains
 !    ddb: ddB array (2nd derivative of B) (optional)
 !
     integer,intent(in):: nmax
-    real(8),intent(in):: r,ts(nmax)
+    real(rp),intent(in):: r,ts(nmax)
     integer,intent(out):: nr
-    real(8),intent(out):: b(-3:0), db(-3:0)
-    real(8),intent(out),optional:: ddb(-3:0)
+    real(rp),intent(out):: b(-3:0), db(-3:0)
+    real(rp),intent(out),optional:: ddb(-3:0)
 !.....local variables
-    real(8):: btmp(-3:+2,0:3)  ! Temporal B(n,d) array with n in (-3,+2)
-    real(8):: dbtmp(-3:+1), ddbtmp(-3:0)
+    real(rp):: btmp(-3:+2,0:3)  ! Temporal B(n,d) array with n in (-3,+2)
+    real(rp):: dbtmp(-3:+1), ddbtmp(-3:0)
     integer:: id, n, l
-    real(8):: tn0,tn1,tn2,tn3,tn4,dt1,dt2,tmp1,tmp2
+    real(rp):: tn0,tn1,tn2,tn3,tn4,dt1,dt2,tmp1,tmp2
 
 !...index in the knot where ts(nr) <= r < ts(nr+1)
     nr = knot_index(r,nmax,ts)
@@ -3869,9 +3870,9 @@ contains
   end subroutine b_spl
 !=======================================================================
   function knot_index(r, nknot, knots) result(n)
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: nknot
-    real(8),intent(in):: knots(nknot)
+    real(rp),intent(in):: knots(nknot)
     integer:: n, i
 
 !.....TODO: use faster algorithm
@@ -3907,7 +3908,7 @@ contains
 !  when species of j and k are identical.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params(ndimp)
+    real(rp),intent(in):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
     type(prm2):: p2
@@ -3980,11 +3981,11 @@ contains
 !  and num of coefficients already read in read_params_uf3().
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params(ndimp)
+    real(rp),intent(in):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp, &
          nklead, nktrail
-    real(8):: rcij, rcik
+    real(rp):: rcij, rcik
     type(prm2):: p2
     type(prm3l):: p3
 
@@ -4062,11 +4063,11 @@ contains
 !  and num of coefficients already read in read_params_uf3d().
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params(ndimp)
+    real(rp),intent(in):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp, &
          nklead, nktrail
-    real(8):: rcij, rcik
+    real(rp):: rcij, rcik
     type(prm2):: p2
     type(prm3d):: p3
 
@@ -4140,7 +4141,7 @@ contains
 !  Make the 3-body parameters symmetric when species of j and k are identical.
 !
     integer,intent(in):: ndimp
-    real(8),intent(inout):: params(ndimp)
+    real(rp),intent(inout):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp
     type(prm2):: p2
@@ -4211,7 +4212,7 @@ contains
 !  Make the 3-body parameters symmetric when species of j and k are identical.
 !
     integer,intent(in):: ndimp
-    real(8),intent(inout):: params(ndimp)
+    real(rp),intent(inout):: params(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,itmp,nc
     type(prm2):: p2
@@ -4277,9 +4278,9 @@ contains
 !
     use util,only: expit,log1p,num_deriv
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt1b
-    real(8),intent(out):: penalty
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt1b
+    real(rp),intent(out):: penalty
 
     type(prm2):: p2
     integer:: inc,i1b
@@ -4305,9 +4306,9 @@ contains
 !
     use util,only: expit,dexpit,log1p,num_deriv
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt1b
-    real(8),intent(out):: grad(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt1b
+    real(rp),intent(out):: grad(ndimp)
 
     type(prm2):: p2
     integer:: inc,i1b
@@ -4331,15 +4332,15 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
          repul_radii(nspmax,nspmax)
-    real(8),intent(out):: penalty
+    real(rp),intent(out):: penalty
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp
     type(prm2):: p2
     type(prm3):: p3
-    real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
+    real(rp):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
     logical:: ledge
 
     inc = 0
@@ -4442,18 +4443,18 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
          repul_radii(nspmax,nspmax)
-    real(8),intent(out):: grad(ndimp)
+    real(rp),intent(out):: grad(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,ip, &
          nr2,isp,jsp
     type(prm2):: p2
     type(prm3):: p3
-    real(8):: tmp,dc1,dc2,rc
+    real(rp):: tmp,dc1,dc2,rc
     logical:: ledge
-    real(8),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
+    real(rp),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
     integer,save:: nc2max, ncfijmax, ncfikmax, ncfjkmax
     integer,save,allocatable:: ic2ip(:),ic3ip(:,:,:)
 
@@ -4623,16 +4624,16 @@ contains
 !  Penalty about curvature of B-spline.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,pwgt3b
-    real(8),intent(out):: penalty
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,pwgt3b
+    real(rp),intent(out):: penalty
 
-    real(8):: pwgt2bd,pwgt2bs,pwgt3bd,repul_radii(nspmax,nspmax)
+    real(rp):: pwgt2bd,pwgt2bs,pwgt3bd,repul_radii(nspmax,nspmax)
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
+    real(rp):: tmp,p2b,p2bd,p3b,p3bd,p2bs,dc1,dc2,rc
     logical:: ledge
 
     inc = 0
@@ -4731,18 +4732,18 @@ contains
 !  It is supposed to be called from fitpot in a seriral process.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,pwgt2bd,pwgt2bs,pwgt3b,pwgt3bd, &
          repul_radii(nspmax,nspmax)
-    real(8),intent(out):: grad(ndimp)
+    real(rp),intent(out):: grad(ndimp)
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,ip, &
          nr2,isp,jsp, nklead, nktrail
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,dc1,dc2,rc
+    real(rp):: tmp,dc1,dc2,rc
     logical:: ledge
-    real(8),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
+    real(rp),save,allocatable:: gp2b(:),gp2bd(:),gp2bs(:),gp3b(:),gp3bd(:)
     integer,save,allocatable:: ic2ip(:),ic3ip(:)
 
     if( .not.allocated(gp2b) ) then
@@ -4885,17 +4886,17 @@ contains
 !  so to make the min of angular term become 0.
 !  
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt,beta
-    real(8),intent(out):: penalty
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt,beta
+    real(rp),intent(out):: penalty
 
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail,ncs,lcs,ix,j
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,p3b,p3bi,x(npnts),fi,fs(npnts),fmin, &
+    real(rp):: tmp,p3b,p3bi,x(npnts),fi,fs(npnts),fmin, &
          bcs(-3:0),dbcs(-3:0),dx
-    real(8),allocatable,save:: bspl(:,:),expbf(:)
+    real(rp),allocatable,save:: bspl(:,:),expbf(:)
 
     if( .not.allocated(bspl) ) then
       nc3max = 0
@@ -4985,15 +4986,15 @@ contains
 !  so to make the min of angular term tends to 0.
 !  
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt,beta
-    real(8),intent(out):: grad(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt,beta
+    real(rp),intent(out):: grad(ndimp)
     
     integer:: i1b,i2b,i3b,ncoef,ic,icfij,icfik,icfjk,inc,k,nr2,isp,jsp, &
          nklead, nktrail,ncs,lcs,ix,j
     type(prm2):: p2
     type(prm3l):: p3
-    real(8):: tmp,p3b,x(npnts),fi, &
+    real(rp):: tmp,p3b,x(npnts),fi, &
          bcs(-3:0),dbcs(-3:0),dx
 
     inc = 0
@@ -5050,18 +5051,18 @@ contains
 !
     use util,only: expit,log1p,num_deriv
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,sl2b,sr2b
-    real(8),intent(out):: penalty
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,eps2b,sl2b,sr2b
+    real(rp),intent(out):: penalty
 
     type(prm2):: p2
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,lr,ic
-    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
+    real(rp):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
          fs(npnts),dfs(npnts),ddfs(npnts), &
          rmin,pl,pr,sgml,sgmr,cr,exp1,rdl,rdr
-    real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
+    real(rp):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
-    real(8),parameter:: sgmin = 1d-2
+    real(rp),parameter:: sgmin = 1d-2
 
     penalty = 0d0
     rdl = abs(sl2b *4.6d0)
@@ -5159,13 +5160,13 @@ contains
 !
     use util,only: expit,dexpit,log1p,num_deriv
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
-    real(8),intent(in):: pwgt2b,eps2b,sl2b,sr2b
-    real(8),intent(out):: grad(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: pwgt2b,eps2b,sl2b,sr2b
+    real(rp),intent(out):: grad(ndimp)
 
     type(prm2):: p2
     integer:: inc,i1b,i2b,ir,nr,nk,nc,j,l,ic,ibase
-    real(8):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
+    real(rp):: rc,r0,dr,rs(npnts),fi,dfi,ddfi,ws(npnts),expsum, &
          cr,tmp,p2b, exp1, rmin,pl,pr,sgmls(npnts),sgmrs(npnts), &
          rels(npnts),rers(npnts),drmdf(npnts), &
          fs(npnts),dfs(npnts),ddfs(npnts), &
@@ -5173,9 +5174,9 @@ contains
          dplddf,dprddf,dpldc(ndimp),dprdc(ndimp), &
          blj(ndimp,npnts),dblj(ndimp,npnts),ddblj(ndimp,npnts), &
          xl,xr,rdl,rdr
-    real(8):: br(-3:0),dbr(-3:0),ddbr(-3:0)
+    real(rp):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
-    real(8),parameter:: sgmin = 1d-2
+    real(rp),parameter:: sgmin = 1d-2
 
     grad(:) = 0d0
     rdl = abs(sl2b *4.6d0)
@@ -5300,11 +5301,11 @@ contains
 !  Compute loss function for short-distance repulsion correction.
 !
     integer,intent(in):: np
-    real(8),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
-    real(8),intent(out):: floss
+    real(rp),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
+    real(rp),intent(out):: floss
 
     integer:: i2b,isp,jsp,ir,lij,n,nr2
-    real(8):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
+    real(rp):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
     type(prm2):: p2
 
     floss = 0d0
@@ -5337,11 +5338,11 @@ contains
 !  Compute loss function gradient for short-distance repulsion correction.
 !
     integer,intent(in):: np,ndimp
-    real(8),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
-    real(8),intent(out):: gloss(ndimp)
+    real(rp),intent(in):: radii(nspmax,nspmax),drepul(np,nspmax,nspmax)
+    real(rp),intent(out):: gloss(ndimp)
 
     integer:: i2b,isp,jsp,ir,lij,n,i1b,inc,ic,ip,nr2
-    real(8):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
+    real(rp):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
     type(prm2):: p2
     integer,save:: nc2max
     integer,save,allocatable:: ic2ip(:)
@@ -5399,11 +5400,11 @@ contains
 !  Modify some coefficients to correct short-range repulsive potential.
 !
     integer,intent(in):: ndimp,nsp
-    real(8),intent(inout):: params(ndimp),radii(nspmax,nspmax)
+    real(rp),intent(inout):: params(ndimp),radii(nspmax,nspmax)
     logical,intent(in):: ldcover(ndimp)
 
     integer:: inc,i1b,i2b,isp,jsp,ic,nr2,ip,min_ic_data,l,n
-    real(8):: ri,tgt,bij(-3:0),dbij(-3:0),ddbij(-3:0),dr,rc, &
+    real(rp):: ri,tgt,bij(-3:0),dbij(-3:0),ddbij(-3:0),dr,rc, &
          val,dval,ddval,c
     type(prm2):: p2
     integer,save:: nc2max
@@ -5579,7 +5580,7 @@ contains
 !
 !  Compute and return memory usage in this module.
 !
-    real(8):: dmem
+    real(rp):: dmem
     integer:: i2b, i3b
     type(prm2):: p2
     type(prm3):: p3
@@ -5611,7 +5612,7 @@ contains
 !
 !  Compute and return memory usage in this module.
 !
-    real(8):: dmem
+    real(rp):: dmem
     integer:: i2b, i3b
     type(prm2):: p2
     type(prm3l):: p3
@@ -5642,7 +5643,7 @@ contains
 !
 !  Compute and return memory usage in this module.
 !
-    real(8):: dmem
+    real(rp):: dmem
     integer:: i2b, i3b
     type(prm2):: p2
     type(prm3d):: p3

@@ -1,5 +1,8 @@
 module RK_FeH
 
+  use pmdmpi
+use mod_precision
+
 contains
   subroutine force_RK_FeH(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -12,25 +15,24 @@ contains
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_RK_FeH.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,t1,t2,t3,vemb
+    real(rp):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,tmp,t1,t2,t3,vemb
 
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: rho(:)
-    real(8),save:: rs,rs_feh
+    real(rp),allocatable,save:: rho(:)
+    real(rp),save:: rs,rs_feh
 
     if( l1st ) then
       allocate(rho(namax))
@@ -203,7 +205,7 @@ contains
 
 !.....gather epot
     if( myid_md.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,mpi_real_rp &
            ,MPI_SUM,mpi_md_world,ierr)
       epot= epot +epott
     else
@@ -217,8 +219,8 @@ contains
 !  Screening function for r < r1
 !
     implicit none
-    real(8),intent(in):: x
-    real(8):: fphi
+    real(rp),intent(in):: x
+    real(rp):: fphi
 
     fphi= 0.1818d0*exp(-3.2d0*x) &
          +0.5099d0*exp(-0.9423d0*x) &
@@ -232,8 +234,8 @@ contains
 !  1st derivative of the screening function for r < r1
 !
     implicit none 
-    real(8),intent(in):: x
-    real(8):: dfphi
+    real(rp),intent(in):: x
+    real(rp):: dfphi
 
     dfphi= -0.58176d0*exp(-3.2d0*x) &
          -0.48047877d0*exp(-0.9423d0*x) &
@@ -246,10 +248,10 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r,rs
-    real(8):: fvphi
+    real(rp),intent(in):: r,rs
+    real(rp):: fvphi
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     fvphi=0d0
     if( r.le.r1 ) then
@@ -269,10 +271,10 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r,rs
-    real(8):: dfvphi
+    real(rp),intent(in):: r,rs
+    real(rp):: dfvphi
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     dfvphi= 0d0
     if( r.le.r1 ) then
@@ -298,10 +300,10 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: fpsi
+    real(rp),intent(in):: r
+    real(rp):: fpsi
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     fpsi=0d0
     do i=1,3
@@ -318,10 +320,10 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: dfpsi
+    real(rp),intent(in):: r
+    real(rp):: dfpsi
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     dfpsi=0d0
     do i=1,3
@@ -339,8 +341,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: rho
-    real(8):: femb
+    real(rp),intent(in):: rho
+    real(rp):: femb
 
     femb= (-dsqrt(rho) +a_emb*rho*rho)
     return
@@ -353,8 +355,8 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: rho
-    real(8):: dfemb
+    real(rp),intent(in):: rho
+    real(rp):: dfemb
 
     dfemb= (-0.5d0/dsqrt(rho)+2d0*a_emb*rho)
     return
@@ -364,9 +366,9 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: rho_feh
-    real(8),external:: hvsd
+    real(rp),intent(in):: r
+    real(rp):: rho_feh
+    real(rp),external:: hvsd
 
     integer:: i
 
@@ -382,10 +384,10 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: drho_feh
+    real(rp),intent(in):: r
+    real(rp):: drho_feh
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     drho_feh=0d0
     do i=1,6
@@ -400,9 +402,9 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: rho_hfe
-    real(8),external:: hvsd
+    real(rp),intent(in):: r
+    real(rp):: rho_hfe
+    real(rp),external:: hvsd
 
     integer:: i
 
@@ -418,10 +420,10 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: drho_hfe
+    real(rp),intent(in):: r
+    real(rp):: drho_hfe
     integer:: i
-    real(8),external:: hvsd
+    real(rp),external:: hvsd
 
     drho_hfe=0d0
     do i=1,5
@@ -436,8 +438,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: rho_hh
+    real(rp),intent(in):: r
+    real(rp):: rho_hh
     
     rho_hh=0d0
     if( r.ge.rc_phi_hh ) return
@@ -449,10 +451,10 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: drho_hh
+    real(rp),intent(in):: r
+    real(rp):: drho_hh
 
-    real(8):: e1,fc
+    real(rp):: e1,fc
 
     drho_hh=0d0
     if( r.ge.rc_phi_hh ) return
@@ -466,8 +468,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: fcut
+    real(rp),intent(in):: r
+    real(rp):: fcut
 
     fcut= exp(1d0/(r-rc_phi_hh))
     return
@@ -477,8 +479,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: dfcut
+    real(rp),intent(in):: r
+    real(rp):: dfcut
 
     dfcut= -1d0/(r-rc_phi_hh)**2 *fcut(r)
     return
@@ -488,8 +490,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: rho
-    real(8):: fh
+    real(rp),intent(in):: rho
+    real(rp):: fh
     integer:: i
 
     fh= 0d0
@@ -503,8 +505,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: rho
-    real(8):: dfh
+    real(rp),intent(in):: rho
+    real(rp):: dfh
     integer:: i
 
     dfh= 0d0
@@ -518,10 +520,10 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: fvphi_hh
+    real(rp),intent(in):: r
+    real(rp):: fvphi_hh
 
-    real(8):: rho,emol,adag,sr,x,ex,exm
+    real(rp):: rho,emol,adag,sr,x,ex,exm
 
     fvphi_hh= 0d0
 !.....correction term to avoid H-H clustering
@@ -555,11 +557,11 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: dfvphi_hh
+    real(rp),intent(in):: r
+    real(rp):: dfvphi_hh
 
-    real(8):: emol,rho,adag,sr,x,ex,exm,xk1,xk2
-    real(8):: dsr,demolr,dfhr,drhor
+    real(rp):: emol,rho,adag,sr,x,ex,exm,xk1,xk2
+    real(rp):: dsr,demolr,dfhr,drhor
 
     dfvphi_hh= 0d0
 
@@ -613,8 +615,8 @@ contains
     implicit none
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r
-    real(8):: s_hh
+    real(rp),intent(in):: r
+    real(rp):: s_hh
 
     s_hh= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
     return
@@ -624,11 +626,11 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r,rs
-    real(8):: fvphi_feh
+    real(rp),intent(in):: r,rs
+    real(rp):: fvphi_feh
     integer:: i
-    real(8):: rr,r4
-    real(8),external:: hvsd
+    real(rp):: rr,r4
+    real(rp),external:: hvsd
 
     fvphi_feh=0d0
     if( r.le.r1_feh ) then
@@ -654,11 +656,11 @@ contains
     implicit none 
     include './params_unit.h'
     include './params_RK_FeH.h'
-    real(8),intent(in):: r,rs
-    real(8):: dfvphi_feh
+    real(rp),intent(in):: r,rs
+    real(rp):: dfvphi_feh
     integer:: i
-    real(8):: r4,r3,rr
-    real(8),external:: hvsd
+    real(rp):: r4,r3,rr
+    real(rp),external:: hvsd
 
     dfvphi_feh= 0d0
     if( r.le.r1_feh ) then

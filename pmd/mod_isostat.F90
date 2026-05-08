@@ -19,6 +19,7 @@ module isostat
 !   1. Gronbech-Jensen and Farago, J Chem Phys 141, 194108 (2014)
 !   2. PhD thesis by David Quigley (2005)
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars,only: tinit,tfin,trlx,nstp,istp,tgmm,ttgt,dt,am,fa2v,tfac, &
        ndof,eks,temps,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
        pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm,lhydrostatic, &
@@ -32,7 +33,7 @@ module isostat
   save
 
 !.....Max strain rate (1%)
-  real(8):: sratemax = 0.01d0
+  real(rp):: sratemax = 0.01d0
   
   public:: setup_langevin, setup_cell_langevin, setup_cell_berendsen, &
        setup_cell_min, &
@@ -80,9 +81,9 @@ contains
 !!$         pini,pfin,cpctl,ifdmp
     implicit none
     integer,intent(in):: myid,iprint
-    real(8),parameter:: temp_min = 10d0
+    real(rp),parameter:: temp_min = 10d0
     integer:: is,ndoftot
-    real(8):: ttgtmax,temp,j2
+    real(rp):: ttgtmax,temp,j2
     
     ndoftot = 0
     ttgtmax = 0d0
@@ -198,11 +199,11 @@ contains
 !
     implicit none
     integer,intent(in):: natm
-    real(8),intent(in):: tag(natm),aa(3,natm)
-    real(8),intent(inout):: va(3,natm)
+    real(rp),intent(in):: tag(natm),aa(3,natm)
+    real(rp),intent(inout):: va(3,natm)
 
     integer:: i,is,itemp,l
-    real(8):: ami,tmp,eta,bfac,afac,aai(3)
+    real(rp):: ami,tmp,eta,bfac,afac,aai(3)
 
 !.....For G-JF algorithm
     eta = tgmm*dt/2
@@ -248,8 +249,8 @@ contains
 !
     implicit none 
     integer,intent(in):: natm
-    real(8),intent(in):: tag(natm)
-    real(8),intent(inout):: va(3,natm)
+    real(rp),intent(in):: tag(natm)
+    real(rp),intent(inout):: va(3,natm)
 
     integer:: i,is,itemp
     
@@ -284,13 +285,13 @@ contains
     implicit none
     include "mpif.h"
     integer,intent(in):: mpi_md_world
-    real(8),intent(in):: stnsr(3,3)
-    real(8),intent(out):: ah(3,3)
+    real(rp),intent(in):: stnsr(3,3)
+    real(rp),intent(out):: ah(3,3)
 
 
     integer:: i,ixyz,jxyz,ierr,l,jm,jp,im,ip
-    real(8):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
-    real(8):: detah,ahcof(3,3)
+    real(rp):: prss,fac,tmp,bxc(3),cxa(3),axb(3),sgmnrm
+    real(rp):: detah,ahcof(3,3)
 
 !.....now ah is scaling factor for h-mat
       ah(1:3,1:3)= 0d0
@@ -348,13 +349,13 @@ contains
 !  Update cell vector, h, by Berendsen barostat
 !
     implicit none 
-    real(8),intent(in):: ah(3,3)
+    real(rp),intent(in):: ah(3,3)
     logical,intent(in):: lcellfix(3,3)
-    real(8),intent(inout):: h(3,3,0:1)
+    real(rp),intent(inout):: h(3,3,0:1)
     logical,intent(inout):: lcell_updated
 
     integer:: i,j
-    real(8):: htmp(3,3)
+    real(rp):: htmp(3,3)
     
     htmp(1:3,1:3) = matmul(ah,h(1:3,1:3,0))
     do i=1,3
@@ -381,11 +382,11 @@ contains
     implicit none
     include "mpif.h"
     integer,intent(in):: mpi_md_world,ikick
-    real(8),intent(in):: stnsr(3,3)
-    real(8),intent(inout):: h(3,3,0:1)
+    real(rp),intent(in):: stnsr(3,3)
+    real(rp),intent(inout):: h(3,3,0:1)
 
     integer:: ixyz,jxyz,l
-    real(8):: tfac_lang,tmp,tmp2,eta,bfac,afac,prss, &
+    real(rp):: tfac_lang,tmp,tmp2,eta,bfac,afac,prss, &
          sdiff(3,3),sgmnrm,dh
 
 !.....For G-JF algorithm
@@ -428,11 +429,11 @@ contains
 !!$    use pmdvars,only: dt,cgmm,cmass
     implicit none
     logical,intent(in):: lcellfix(3,3)
-    real(8),intent(inout):: h(3,3,0:1)
+    real(rp),intent(inout):: h(3,3,0:1)
     logical,intent(inout):: lcell_updated
 
     integer:: ixyz,jxyz
-    real(8):: eta,bfac,ah(3,3),htmp(3,3),elemax,fac
+    real(rp):: eta,bfac,ah(3,3),htmp(3,3),elemax,fac
     
 !.....For G-JF algorithm
     eta = cgmm *dt/2

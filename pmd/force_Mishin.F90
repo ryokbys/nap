@@ -7,33 +7,34 @@ module Mishin
 !-----------------------------------------------------------------------
 !  See Mishin et al. PRB 59(5) (1999) 3393--3407.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
   save
 
-  real(8):: rc_eam,rcmax2
+  real(rp):: rc_eam,rcmax2
   integer,parameter:: neamd = 25
 
-  real(8):: rtbl(neamd)
-  real(8):: rhotbl(neamd)
-  real(8):: rhoprm(4,neamd-1)
-  real(8):: vprm(4,neamd-1)
-  real(8):: fprm(4,neamd-1)
+  real(rp):: rtbl(neamd)
+  real(rp):: rhotbl(neamd)
+  real(rp):: rhoprm(4,neamd-1)
+  real(rp):: vprm(4,neamd-1)
+  real(rp):: fprm(4,neamd-1)
   
 contains
   subroutine force_Mishin_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_Mishin_Al.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
     if( l1st ) then
@@ -66,16 +67,15 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_Mishin_Ni.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
     if( l1st ) then
@@ -108,24 +108,23 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_Mishin_Al.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
-    real(8):: xij(3),rij(3),dij,dij2,dfi,dfj,drhoij,drdxi(3),drdxj(3) &
+    real(rp):: xij(3),rij(3),dij,dij2,dfi,dfj,drhoij,drdxi(3),drdxj(3) &
          ,r,dphi,at(3),xi(3),xj(3),epotl,epott,tmp,sji
 !.....Saved variables
-    real(8),allocatable,save:: rho(:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp),allocatable,save:: rho(:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
       if( allocated(rho) ) deallocate(rho)
@@ -221,7 +220,7 @@ contains
 
 !-----gather epot
     if( myid_md.ge.0 ) then
-      call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+      call mpi_allreduce(epotl,epott,1,mpi_real_rp &
            ,MPI_SUM,mpi_md_world,ierr)
       epot= epot +epott
     else
@@ -235,11 +234,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: r
-    real(8):: calc_rho
+    real(rp),intent(in):: r
+    real(rp):: calc_rho
 
     integer:: i
-    real(8):: a(4),r0,rho0,drho0
+    real(rp):: a(4),r0,rho0,drho0
 
 !!$    call check_range(r,neamd,rtbl,'calc_rho')
     if( r.ge.rtbl(neamd) ) then
@@ -268,11 +267,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: r
-    real(8):: calc_drho
+    real(rp),intent(in):: r
+    real(rp):: calc_drho
 
     integer:: i
-    real(8):: a(4),r0
+    real(rp):: a(4),r0
 
     if( r.ge.rtbl(neamd) ) then
       calc_drho= 0d0
@@ -298,11 +297,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: r
-    real(8):: calc_v
+    real(rp),intent(in):: r
+    real(rp):: calc_v
 
     integer:: i
-    real(8):: a(4),r0,v0,dv0
+    real(rp):: a(4),r0,v0,dv0
 
     if( r.ge.rtbl(neamd) ) then
       calc_v= 0d0
@@ -330,11 +329,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: r
-    real(8):: calc_dv
+    real(rp),intent(in):: r
+    real(rp):: calc_dv
 
     integer:: i
-    real(8):: a(4),r0
+    real(rp):: a(4),r0
 
     if( r.ge.rtbl(neamd) ) then
       calc_dv= 0d0
@@ -360,11 +359,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: rho
-    real(8):: calc_f
+    real(rp),intent(in):: rho
+    real(rp):: calc_f
 
     integer:: i
-    real(8):: a(4),rho0,f0,df0
+    real(rp):: a(4),rho0,f0,df0
 
     if( rho.ge.rhotbl(neamd) ) then
       a(1:4) = fprm(1:4,neamd-1)
@@ -391,11 +390,11 @@ contains
     implicit none
     include './params_unit.h'
     include 'params_Mishin_Al.h'
-    real(8),intent(in):: rho
-    real(8):: calc_df
+    real(rp),intent(in):: rho
+    real(rp):: calc_df
 
     integer:: i
-    real(8):: a(4),rho0
+    real(rp):: a(4),rho0
 
     if( rho.ge.rhotbl(neamd) ) then
       a(1:4)= fprm(1:4,neamd-1)
@@ -418,7 +417,7 @@ contains
 !=======================================================================
   subroutine check_range(x,n,tbl,c)
     integer,intent(in):: n
-    real(8),intent(in):: x,tbl(n)
+    real(rp),intent(in):: x,tbl(n)
     character(len=*),intent(in):: c
 
     if( x.lt.tbl(1) ) then

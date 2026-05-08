@@ -10,32 +10,33 @@ c Usage:
 c   $ ./akr2ddm akr000
 c   - then, ddm000.ps will be created.
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
 cc.....Lattice constant for BCC W
-c      real(8),parameter:: abcc = 3.171d0
+c      real(rp),parameter:: abcc = 3.171d0
 c.....Lattice constant for BCC Fe
-      real(8),parameter:: abcc = 2.835d0
+      real(rp),parameter:: abcc = 2.835d0
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
-      real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
+      real(rp),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
-c      real(8),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
+c      real(rp),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
 c.....Scaling factor
-      real(8),parameter:: sfac = 4
+      real(rp),parameter:: sfac = 4
 c.....radius of a circle
-      real(8),parameter:: rcrc = 1.5d0
+      real(rp),parameter:: rcrc = 1.5d0
 c.....width,height of the paper
-      real(8),parameter:: alx  = 590d0
-      real(8),parameter:: aly  = 840d0
+      real(rp),parameter:: alx  = 590d0
+      real(rp),parameter:: aly  = 840d0
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm,nx,ny,nz,nlsa,ndisp,nvec,isrc,idst
-      real(8):: tmp,al(3),xi(3),rij(3),r,rlz,gray,x,y
+      real(rp):: tmp,al(3),xi(3),rij(3),r,rlz,gray,x,y
      &     ,x1,y1,x2,y2,vmax,scale,xmax,ymax,sx,sy,hunit
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:)
      &     ,lsza(:),lsdisp(:),ijdd(:,:)
-      real(8),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
+      real(rp),allocatable:: ra0(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:),ga(:),vdd(:)
 
       integer,external:: iargc
@@ -157,14 +158,15 @@ c=======================================================================
 c
 c  Get layer number (1,2, or 3) of each atom looking at z-coordiate.
 c
+      use mod_precision
       implicit none
       integer,intent(in):: natm
-      real(8),intent(in):: ra(3,natm),al(3),rlz
+      real(rp),intent(in):: ra(3,natm),al(3),rlz
       integer,intent(out):: lsza(natm)
-      real(8),intent(out):: ga(natm)
+      real(rp),intent(out):: ga(natm)
       
       integer:: i
-      real(8):: z10
+      real(rp):: z10
       
       do i=1,natm
         z10= ra(3,i)*al(3)
@@ -186,11 +188,12 @@ c
 c  Extract atoms to be displayed within the z-width [Z0:Z0+ZW] in RA
 c  and list atom-id in lsdisp.
 c
+      use mod_precision
       implicit none
       integer,intent(in):: natm
-      real(8),intent(in):: ra(3,natm),z0,zw
+      real(rp),intent(in):: ra(3,natm),z0,zw
       integer,intent(out):: ndisp,lsdisp(natm)
-      real(8),parameter:: eps= 1d-8
+      real(rp),parameter:: eps= 1d-8
 
       integer:: i
 
@@ -209,14 +212,15 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: natm,n1,n2,n3,nlist
-      real(8),intent(inout):: ra(3,natm)
+      real(rp),intent(inout):: ra(3,natm)
       integer,intent(out):: llist(nlist)
       integer:: i,j,n,nr1,nr2,nr3
-      real(8):: a1,a2,a3
+      real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(8),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1d0-1d-8
 
       llist(1:nlist)=0
 
@@ -246,14 +250,15 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make Verlet list from linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: nlls,lls(nlls),nx,ny,nz,natm,nnmax
-      real(8),intent(in):: al(3),ra(3,natm),rc
+      real(rp),intent(in):: al(3),ra(3,natm),rc
       integer,intent(out):: lspr(0:nnmax,natm)
       integer:: i,j,k,l,m,n,ir,jr,kx,ky,kz,irx,iry,irz,jrx,jry,jrz,ii
-      real(8):: dx,dy,dz,r
+      real(rp):: dx,dy,dz,r
 
-      real(8),allocatable:: da(:)
+      real(rp),allocatable:: da(:)
 
       allocate(da(nnmax))
 
@@ -347,14 +352,15 @@ c      stop
 c=======================================================================
       subroutine get_dd_vector(natm,ra,ra0,al,nvec,ijdd,vdd
      &     ,nnmax,lspr,bv)
+      use mod_precision
       implicit none
       integer,intent(in):: natm,nnmax,lspr(0:nnmax,natm)
-      real(8),intent(in):: ra(3,natm),ra0(3,natm),al(3),bv
+      real(rp),intent(in):: ra(3,natm),ra0(3,natm),al(3),bv
       integer,intent(out):: nvec,ijdd(2,8*natm)
-      real(8),intent(out):: vdd(8*natm)
+      real(rp),intent(out):: vdd(8*natm)
 
       integer:: i,j,l,itmp
-      real(8):: xi0(3),xi(3),ui(3),xj0(3),xj(3),uj(3),du(3)
+      real(rp):: xi0(3),xi(3),ui(3),xj0(3),xj(3),uj(3),du(3)
 
       nvec= 0
       do i=1,natm-1
@@ -398,6 +404,7 @@ c.....turn around the vector
       end subroutine get_dd_vector
 c=======================================================================
       subroutine init_ps(ionum)
+      use mod_precision
       implicit none
       integer,intent(in):: ionum
 
@@ -411,6 +418,7 @@ c      write(ionum,'(a)') '/cm { 28.3 mul } def'
       end subroutine init_ps
 c=======================================================================
       subroutine final_ps(ionum)
+      use mod_precision
       implicit none
       integer,intent(in):: ionum
 
@@ -420,9 +428,10 @@ c=======================================================================
       end subroutine final_ps
 c=======================================================================
       subroutine draw_circle(ionum,x,y,r,gray)
+      use mod_precision
       implicit none
       integer,intent(in):: ionum
-      real(8),intent(in):: x,y,r,gray
+      real(rp),intent(in):: x,y,r,gray
       write(ionum,'(3f8.2,a)') x,y,r,' 0  360  arc'
       write(ionum,'(a)') 'gsave'
       write(ionum,'(2x,f8.2,a)') gray,' setgray'
@@ -437,13 +446,14 @@ c
 c  draw triangle of an edge-length 'al', orientation (cs,sn), 
 c  center of mass position (x,y)
 c
+      use mod_precision
       implicit none
       integer,intent(in):: ionum
-      real(8),intent(in):: x,y,al,cs,sn
-      real(8),parameter:: pi = 3.14159265358979d0
-      real(8),parameter:: ang= pi*5d0/6
+      real(rp),intent(in):: x,y,al,cs,sn
+      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),parameter:: ang= pi*5d0/6
 
-      real(8):: ex,ey,ex1,ey1,ex2,ey2
+      real(rp):: ex,ey,ex1,ey1,ex2,ey2
 
       ex= cos(ang)
       ey= sin(ang)
@@ -465,16 +475,17 @@ c
       end subroutine draw_triangle
 c=======================================================================
       subroutine draw_arrow(ionum,x1,y1,x2,y2,scale,rcrc)
+      use mod_precision
       implicit none
       integer,intent(in):: ionum
-      real(8),intent(in):: x1,y1,x2,y2,scale,rcrc
+      real(rp),intent(in):: x1,y1,x2,y2,scale,rcrc
 
-      real(8):: rx,ry,r,cs,sn,rl,dr,x0,y0,dx,dy,x3,y3,ex,ey
+      real(rp):: rx,ry,r,cs,sn,rl,dr,x0,y0,dx,dy,x3,y3,ex,ey
      &     ,ex1,ey1,ex2,ey2
-      real(8),parameter:: pi = 3.14159265358979d0
-      real(8),parameter:: angv = pi -pi/6
+      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),parameter:: angv = pi -pi/6
 c.....arrow length, 3 points
-      real(8),parameter:: alen = 2d0
+      real(rp),parameter:: alen = 2d0
 
       rx= x2-x1
       ry= y2-y1

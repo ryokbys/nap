@@ -1,5 +1,8 @@
 module Ito3_WHe
 
+  use pmdmpi
+use mod_precision
+
 contains
   subroutine force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -14,25 +17,24 @@ contains
 !  See Ito's manuscript 2013-08-06
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rij2,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,v2,dv2,dphi,dphj,tmp
-    real(8),save:: rcmax2
+    real(rp):: xij(3),rij,rij2,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,v2,dv2,dphi,dphj,tmp
+    real(rp),save:: rcmax2
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: rho(:),sqrho(:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp),allocatable,save:: rho(:),sqrho(:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
       if( myid.eq.0 .and. iprint.gt.0 ) write(6,'(a)') ' use force_Ito3_Whe'
@@ -181,7 +183,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
 
@@ -194,19 +196,18 @@ contains
 !     Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     integer:: status(MPI_STATUS_SIZE)
 !-----in
     integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world
     integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
-    real(8),intent(in):: sv(3,6)
+    real(rp),intent(in):: sv(3,6)
 !-----out
-    real(8),intent(inout):: rho(natm+nb)
+    real(rp),intent(inout):: rho(natm+nb)
 
 !-----locals
     integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: dbuf(:),dbufr(:)
+    real(rp),allocatable,save:: dbuf(:),dbufr(:)
 
     if( l1st ) then
       allocate(dbuf(nbmax),dbufr(nbmax))
@@ -257,20 +258,19 @@ contains
 !  Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     integer:: status(MPI_STATUS_SIZE)
 !-----in
     integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world
     integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
-    real(8),intent(in):: sv(3,6)
+    real(rp),intent(in):: sv(3,6)
 !-----out
-    real(8),intent(inout):: strs(9,natm+nb)
+    real(rp),intent(inout):: strs(9,natm+nb)
 
 !-----locals
     integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr
 
     logical,save:: l1st=.true.
-    real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+    real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
 
     if( l1st ) then
       allocate(dbuf(9,nbmax),dbufr(9,nbmax))
@@ -322,10 +322,10 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: v2_IWHe,x,alpha,beta,gamma,rs,rl
-!    real(8),external:: fc
+    real(rp):: v2_IWHe,x,alpha,beta,gamma,rs,rl
+!    real(rp),external:: fc
 
     v2_IWHe= 0d0
     rl= p_rl(is,js)
@@ -355,10 +355,10 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: dv2_IWHe,ri,x,exar,paren,alpha,beta,gamma,dx,rs,rl
-!    real(8),external:: fc,dfc
+    real(rp):: dv2_IWHe,ri,x,exar,paren,alpha,beta,gamma,dx,rs,rl
+!    real(rp),external:: fc,dfc
 
     dv2_IWHe= 0d0
     rl= p_rl(is,js)
@@ -395,10 +395,10 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: phi_IWHe,x
-!    real(8),external:: fc
+    real(rp):: phi_IWHe,x
+!    real(rp),external:: fc
 
     phi_IWHe= 0d0
 
@@ -415,10 +415,10 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: is,js
-    real(8):: dphi_IWHe,rd,x,dx
-!    real(8),external:: fc,dfc
+    real(rp):: dphi_IWHe,rd,x,dx
+!    real(rp),external:: fc,dfc
 
     dphi_IWHe= 0d0
 
@@ -436,8 +436,8 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: x
-    real(8):: fc
+    real(rp),intent(in):: x
+    real(rp):: fc
 
     if( x.lt.0d0 ) then
       fc= 1d0
@@ -453,8 +453,8 @@ contains
     implicit none
     include "./params_unit.h"
     include "params_Ito3_WHe.h"
-    real(8),intent(in):: x
-    real(8):: dfc
+    real(rp),intent(in):: x
+    real(rp):: dfc
 
     if( x.lt.0d0 ) then
       dfc= 0d0

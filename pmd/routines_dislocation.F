@@ -1,14 +1,15 @@
       subroutine init_shear_stress(shrst,shrfx,natm,tag,ra,h,sorg,acon
      &     ,myid_md,mpi_md_world)
+      use pmdmpi
+      use mod_precision
       implicit none
-      include "mpif.h"
       integer,intent(in):: natm,myid_md,mpi_md_world
-      real(8),intent(in):: shrst,tag(natm),ra(3,natm)
+      real(rp),intent(in):: shrst,tag(natm),ra(3,natm)
      &     ,h(3,3,0:1),sorg(3),acon
-      real(8),intent(out):: shrfx
+      real(rp),intent(out):: shrfx
 
       integer:: n,m,nt,mt,i,ierr,l
-      real(8):: area
+      real(rp):: area
 
       n=0
       m=0
@@ -48,10 +49,12 @@ c.....Normalize shrfx by Lx, and multiply 0.5d0*dt**2/am(i)
       end subroutine init_shear_stress
 c=======================================================================
       subroutine add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
+      use pmdmpi
+      use mod_precision
       implicit none
       integer,intent(in):: natm
-      real(8),intent(in):: ra(3,natm),tag(natm),sorg(3),shrfx
-      real(8),intent(inout):: aa(3,natm)
+      real(rp),intent(in):: ra(3,natm),tag(natm),sorg(3),shrfx
+      real(rp),intent(inout):: aa(3,natm)
 
       integer:: i,l
       
@@ -75,18 +78,19 @@ c-----------------------------------------------------------------------
 c  Compute average stress around dislocation core using strs(3,3,natm).
 c  Results are written to the file #91, 'dat.strs'.
 c-----------------------------------------------------------------------
+      use pmdmpi
+      use mod_precision
       implicit none
-      include 'mpif.h'
       include "./params_unit.h"
       integer,intent(in):: namax,natm,myid_md,mpi_md_world,istp
-      real(8),intent(in):: ra(3,natm),h(3,3,0:1),rcore(3),strs(3,3,natm)
+      real(rp),intent(in):: ra(3,natm),h(3,3,0:1),rcore(3),strs(3,3,natm)
 
 c.....Cut off distance for average calculation
-      real(8),parameter:: rcutave= 20.0d0
-      real(8),parameter:: rcutave2= rcutave**2
+      real(rp),parameter:: rcutave= 20.0d0
+      real(rp),parameter:: rcutave2= rcutave**2
 
       integer:: ia,ierr,n1,nr1,n2,nr2
-      real(8):: al(3),strs1(2,2),strsr1(2,2),strs2(2,2),strsr2(2,2)
+      real(rp):: al(3),strs1(2,2),strsr1(2,2),strs2(2,2),strsr2(2,2)
      &     ,xic(2),ric2
 
 c.....Assuming orthogonal 2D system
@@ -116,9 +120,9 @@ c.....Store stress data of atoms inside the band along x
 c.....Gather stress data of the atoms to node-0
       call mpi_reduce(n1,nr1,1,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
       call mpi_reduce(n2,nr2,1,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
-      call mpi_reduce(strs1,strsr1,4,mpi_double_precision,mpi_sum,0
+      call mpi_reduce(strs1,strsr1,4,mpi_real_rp,mpi_sum,0
      &     ,mpi_md_world,ierr)
-      call mpi_reduce(strs2,strsr2,4,mpi_double_precision,mpi_sum,0
+      call mpi_reduce(strs2,strsr2,4,mpi_real_rp,mpi_sum,0
      &     ,mpi_md_world,ierr)
 
       if( myid_md .eq. 0 ) then
@@ -140,24 +144,25 @@ c
 c Find dislocation core by looking at number of nearest neighbours.
 c Note this can be applicable only to 2D triangle lattice.
 c
+      use pmdmpi
+      use mod_precision
       implicit none
-      include 'mpif.h'
       include './params_unit.h'
       include './params_LJ.h'
 c.....Arguments
       integer,intent(in):: namax,natm,nb,nnmax,myid_md,mpi_md_world
      &     ,nodes_md
-      real(8),intent(in):: sorg(3),ra(3,natm),tag(natm),epi(natm)
+      real(rp),intent(in):: sorg(3),ra(3,natm),tag(natm),epi(natm)
      &     ,h(3,3,0:1),hi(3,3),anxi,anyi,anzi
-      real(8),intent(inout):: rcore(3),rcpre
+      real(rp),intent(inout):: rcore(3),rcpre
       integer,intent(inout):: ndpbc
 c.....Constants
       integer,parameter:: ncmax = 100
-      real(8),parameter:: rcnn  = 1.5d0*sgmlj
+      real(rp),parameter:: rcnn  = 1.5d0*sgmlj
 c.....Variables
       integer:: i,j,k,l,m,n,nc,ierr
       integer,allocatable,save:: lnc(:),nrecvs(:),idisps(:),lsnn(:,:)
-      real(8),allocatable,save:: rci(:,:),rcis(:,:),add(:)
+      real(rp),allocatable,save:: rci(:,:),rcis(:,:),add(:)
       logical,save:: l1st=.true.
       
       if(l1st) then
@@ -232,8 +237,8 @@ c.....Count num of core atoms
       enddo
       idisps(0:nodes_md-1)= idisps(0:nodes_md-1)*3
       nrecvs(0:nodes_md-1)= nrecvs(0:nodes_md-1)*3
-      call mpi_gatherv(rci,3*nc,mpi_double_precision
-     &     ,rcis,nrecvs,idisps,mpi_double_precision
+      call mpi_gatherv(rci,3*nc,mpi_real_rp
+     &     ,rcis,nrecvs,idisps,mpi_real_rp
      &     ,0,mpi_md_world,ierr)
       if( myid_md.eq.0 ) then
 c.....Check pbc
@@ -264,14 +269,15 @@ c Find dislocation core by looking at a potential energy value.
 c Taking into account there are two disl cores (dissociated disl)
 c in the system.
 c
+      use pmdmpi
+      use mod_precision
       implicit none
-      include 'mpif.h'
       include './params_unit.h'
       include './params_EAM_Fe-H.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
 c.....Potential energy threshold
-      real(8),intent(in):: epith
-      real(8),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
+      real(rp),intent(in):: epith
+      real(rp),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
 
 c.....Max num of core atoms
       integer,parameter:: mnc= 10000
@@ -280,18 +286,18 @@ c.....Max num of core groups
 
       integer:: i,n,nc,ierr,ndx,ndy,ndz,ndxz,ndxy,mx,my,mz,m
      &     ,ig,ng,kx,ky,kz,m1x,m1y,m1z,m1,j
-      real(8):: al(3),dx,dy,dz,avx
+      real(rp):: al(3),dx,dy,dz,avx
       integer,allocatable:: lscl(:),lshd(:)
       character:: cfname*9
 
 c.....Cutoff radius
-      real(8),parameter:: rc   = 10.0d0
-      real(8),parameter:: rcz  = rc_vphi
+      real(rp),parameter:: rc   = 10.0d0
+      real(rp),parameter:: rcz  = rc_vphi
 c.....Num of disl cores to be assumed
       integer,parameter:: ncrs = 2
       logical,save:: l1st=.true.
       integer,allocatable,save:: lnc(:),idisps(:)
-      real(8),allocatable,save:: rci(:,:),rcis(:,:,:)
+      real(rp),allocatable,save:: rci(:,:),rcis(:,:,:)
       integer,allocatable,save:: ngc(:),igc(:,:)
 
       if( l1st ) then
@@ -322,9 +328,9 @@ c.....Gather lsdc from all nodes to node-0
       do i=1,nodes-1
         idisps(i)=idisps(i-1) +lnc(i-1)*3
       enddo
-      call mpi_gatherv(rci,3*nc,mpi_double_precision
+      call mpi_gatherv(rci,3*nc,mpi_real_rp
      &     ,rcis,lnc*3,idisps
-     &     ,mpi_double_precision,0,mpi_md_world,ierr)
+     &     ,mpi_real_rp,0,mpi_md_world,ierr)
 
       if( myid_md.eq.0 ) then
         nc=0
@@ -447,29 +453,30 @@ c  potential energy value of each atom.
 c  Assuming disl line to be z-direction and there are surfaces 
 c  at the top and bottom of y-direction.
 c
+      use pmdmpi
+      use mod_precision
       implicit none
-      include 'mpif.h'
       include './params_unit.h'
       include './params_EAM_Fe-H.h'
       integer,intent(in):: natm,myid_md,mpi_md_world,nodes,iocnt,ionum
 c.....Potential energy threshold
-      real(8),intent(in):: epith
-      real(8),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
+      real(rp),intent(in):: epith
+      real(rp),intent(in):: ra(3,natm),h(3,3,0:1),epi(natm),sorg(3)
 
 c.....Max num of core atoms
       integer,parameter:: mnc= 1000
 
       integer:: i,n,nc,mz,ierr
-      real(8):: avx,xref,xav
+      real(rp):: avx,xref,xav
       character:: cfname*9
 
 c.....Cutoff radius
-      real(8),parameter:: rcz  = rc_vphi
+      real(rp),parameter:: rcz  = rc_vphi
       logical,save:: l1st=.true.
       integer,save:: ndz
-      real(8),save:: dz
+      real(rp),save:: dz
       integer,allocatable,save:: lnc(:),idisps(:)
-      real(8),allocatable,save:: rci(:,:),rcis(:,:,:)
+      real(rp),allocatable,save:: rci(:,:),rcis(:,:,:)
 
       if( l1st ) then
         allocate(lnc(0:nodes-1),idisps(0:nodes-1)
@@ -500,9 +507,9 @@ c.....Gather lsdc from all nodes to node-0
       do i=1,nodes-1
         idisps(i)=idisps(i-1) +lnc(i-1)*3
       enddo
-      call mpi_gatherv(rci,3*nc,mpi_double_precision
+      call mpi_gatherv(rci,3*nc,mpi_real_rp
      &     ,rcis,lnc*3,idisps
-     &     ,mpi_double_precision,0,mpi_md_world,ierr)
+     &     ,mpi_real_rp,0,mpi_md_world,ierr)
 
       if( myid_md.eq.0 ) then
         nc= 0

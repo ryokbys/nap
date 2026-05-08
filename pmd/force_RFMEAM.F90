@@ -8,6 +8,8 @@ module RFMEAM
 !    [2] Timonova and Thijsse, MSMSE 19 (2011) 015003
 !    [3] Srinivasan et al., MSMSE 27 (2019) 065013
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use memory,only: accum_mem
   use util,only: csp2isp
@@ -24,14 +26,14 @@ module RFMEAM
   integer,parameter:: ioprms = 20
   integer,parameter:: lmax = 3
   integer,parameter:: mmax = 3
-  real(8),parameter:: tiny = 1d-14
+  real(rp),parameter:: tiny = 1d-14
   integer,parameter:: allspcs = 1000
   
   logical:: lprmset_RFMEAM = .false.
 
   
-  real(8):: rcmax,rc2max
-  real(8):: rcij(nspmax,nspmax),rsij(nspmax,nspmax), &
+  real(rp):: rcmax,rc2max
+  real(rp):: rcij(nspmax,nspmax),rsij(nspmax,nspmax), &
        rcij2(nspmax,nspmax),trcij2(nspmax,nspmax),trcij(nspmax,nspmax), &
        cmax(nspmax,nspmax,nspmax), cmin(nspmax,nspmax,nspmax), &
        epij(nspmax,nspmax), alpij(nspmax,nspmax), c2ij(nspmax,nspmax), &
@@ -39,7 +41,7 @@ module RFMEAM
        qj(0:lmax,nspmax), e0(nspmax), e1(nspmax), e2(nspmax), &
        ni(nspmax), ti(lmax,nspmax), rcfac2(nspmax,nspmax), &
        wij(0:lmax,nspmax,nspmax), sgm(nspmax)
-  real(8):: srij(mmax,nspmax,nspmax), bij(mmax,nspmax,nspmax)
+  real(rp):: srij(mmax,nspmax,nspmax), bij(mmax,nspmax,nspmax)
   integer:: itype2(nspmax,nspmax)
 
   logical:: interact(nspmax,nspmax), &
@@ -60,14 +62,13 @@ contains
 !     1) Timonova type
 !     2) Srinivasan type
 !-----------------------------------------------------------------------
-    include 'mpif.h'
     include './const.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(8):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rp,e0i,e1i,e2i,n, &
+    real(rp):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rp,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
          bmax,srmax,sgmi
     character(len=128):: cline,fname,c1
@@ -390,29 +391,29 @@ contains
       endif
     endif  ! myid_md == 0
 
-    call mpi_bcast(rcij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rsij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rpij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(alpij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(epij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(c2ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(c3ij,nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(wij,(lmax+1)*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(pj,(lmax+1)*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(qj,(lmax+1)*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ti,lmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ni,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(e0,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(e1,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(e2,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(sgm,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(cmax,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(cmin,nspmax**3,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rcij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rsij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rpij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(alpij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(epij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(c2ij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(c3ij,nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(wij,(lmax+1)*nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(pj,(lmax+1)*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(qj,(lmax+1)*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ti,lmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ni,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(e0,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(e1,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(e2,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(sgm,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(cmax,nspmax**3,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(cmin,nspmax**3,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax**2,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(interact3,nspmax**3,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(itype2,nspmax**2,mpi_integer,0,mpi_md_world,ierr)
-    call mpi_bcast(bij,mmax*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(srij,mmax*nspmax**2,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(bij,mmax*nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(srij,mmax*nspmax**2,mpi_real_rp,0,mpi_md_world,ierr)
 
     if( myid_md.eq.0 .and. iprint.gt.ipl_basic ) then
       write(6,'(a)') ' Finished reading '//trim(fname)
@@ -425,20 +426,19 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcg,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,rcg,tag(namax)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ks,ixyz,jxyz,jj,kk,nni
-    real(8):: xi(3),xij(3),rij(3),xj(3),dij2,dij,ep,alpha,c2,c3, &
+    real(rp):: xi(3),xij(3),rij(3),xj(3),dij2,dij,ep,alpha,c2,c3, &
          dp,eta,expeta,phi,rs,rc,zij,z2,fcij,dfcij,tmp,epotl, &
          driji(3),drijj(3),dphi,dtmp,phifc,eqjr,dfcdr, &
          rik(3),dik2,dik,fcik,cs,cs2,plcs(0:lmax),dplcs(0:lmax),sfcjk, &
@@ -446,8 +446,8 @@ contains
          pcs,pcsi,dcsdij(3),dcsdik(3),strho2,dgdy,dfdy,atmp(3), &
          cmaxkij,cmaxmax,truerc,epott,epot2l,epotml,epot2,epotm, &
          phi2,dphi2,sgmi
-    real(8),allocatable,save:: aal(:,:),strsl(:,:,:),epil(:)
-    real(8),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
+    real(rp),allocatable,save:: aal(:,:),strsl(:,:,:),epil(:)
+    real(rp),allocatable,save:: sij(:),dsij(:,:),sfc(:),fl(:,:), &
          dfl(:,:,:),dsfc(:,:,:),drhoi2(:,:,:),drhoi0(:,:),dstrho2(:,:), &
          dgam(:,:),drho(:,:),rijs(:,:),skij(:)
 
@@ -892,11 +892,11 @@ contains
 
 !.....Gather epot
     epotl = epot2l +epotml
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) then
-      call mpi_allreduce(epot2l,epot2,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(epotml,epotm,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(epot2l,epot2,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(epotml,epotm,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
       if( myid_md.eq.0 ) &
            write(6,'(a,3es15.7)') ' epot RFMEAM (2-body,embed,total) = ', &
            epot2,epotm,epott
@@ -918,15 +918,15 @@ contains
     implicit none
     integer,intent(in):: i,j,jj,is,js,namax,natm,nnmax
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: rijs(5,nnmax)
-    real(8),intent(in):: tag(namax)
-    real(8),intent(out):: sij,dsij(3,nnmax),skij(nnmax)
+    real(rp),intent(in):: rijs(5,nnmax)
+    real(rp),intent(in):: tag(namax)
+    real(rp),intent(out):: sij,dsij(3,nnmax),skij(nnmax)
 
     integer:: kk,k,ks
-    real(8):: dij4,cmaxkij,cminkij,dij,dij2,rij(3)
-    real(8):: xk(3),xik(3),rik(3),dik2,dik
-    real(8):: denom,numer,ckij,y,denom2
-    real(8):: dc,driki(3),drikk(3),pcs,pcsi,qcs,cs,sn, &
+    real(rp):: dij4,cmaxkij,cminkij,dij,dij2,rij(3)
+    real(rp):: xk(3),xik(3),rik(3),dik2,dik
+    real(rp):: denom,numer,ckij,y,denom2
+    real(rp):: dc,driki(3),drikk(3),pcs,pcsi,qcs,cs,sn, &
          ddij,ddik,dcsdij(3),dcsdik(3), &
          dcdij(3),dcdik(3),dbdy,tmp,dnumdcs,ddendcs,dcdcs, &
          dydc,sijperkij
@@ -1013,9 +1013,9 @@ contains
 !=======================================================================
   function fcut(is,js,rij)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: fcut
-    real(8):: zij,rs,rc,z2
+    real(rp),intent(in):: rij
+    real(rp):: fcut
+    real(rp):: zij,rs,rc,z2
     
     rs = rsij(is,js)
     rc = rcij(is,js)
@@ -1033,9 +1033,9 @@ contains
 !=======================================================================
   function dfcut(is,js,rij)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dfcut
-    real(8):: zij,rs,rc,z2
+    real(rp),intent(in):: rij
+    real(rp):: dfcut
+    real(rp):: zij,rs,rc,z2
     
     rs = rsij(is,js)
     rc = rcij(is,js)
@@ -1053,11 +1053,11 @@ contains
 !=======================================================================
   subroutine calc_phi2(is,js,rij,phi2,dphi2)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8),intent(out):: phi2,dphi2
+    real(rp),intent(in):: rij
+    real(rp),intent(out):: phi2,dphi2
 
     integer:: m
-    real(8):: x,x2
+    real(rp):: x,x2
 
     phi2 = 0d0
     dphi2 = 0d0

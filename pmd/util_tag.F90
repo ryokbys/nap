@@ -1,24 +1,27 @@
 function ispOf(tag)
+  use mod_precision
   implicit none
-  real(8),intent(in):: tag
+  real(rp),intent(in):: tag
   integer:: ispOf
   ispOf= int(tag)
   return
 end function ispOf
 !=======================================================================
 function ifmvOf(tag)
+  use mod_precision
   implicit none
-  real(8),intent(in):: tag
+  real(rp),intent(in):: tag
   integer:: ifmvOf
   ifmvOf= int(mod(tag*10,10d0))
   return
 end function ifmvOf
 !=======================================================================
 function itotOf(tag)
+  use mod_precision
   implicit none
-  real(8),intent(in):: tag
+  real(rp),intent(in):: tag
   integer:: itotOf
-  real(8):: tmp
+  real(rp):: tmp
 
   tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
   itotOf= nint(tmp*1d+14)
@@ -26,10 +29,11 @@ function itotOf(tag)
 end function itotOf
 !=======================================================================
 subroutine replaceTag(ctx,ival,tag)
+  use mod_precision
   implicit none
   character(len=*),intent(in):: ctx
   integer,intent(in):: ival
-  real(8),intent(inout):: tag
+  real(rp),intent(inout):: tag
 
   integer:: ifmv
 

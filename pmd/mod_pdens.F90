@@ -2,9 +2,10 @@ module pdens
 !
 !  Module for evaluation of probability density.
 !
+  use pmdmpi
+  use mod_precision
   use memory,only: accum_mem
   implicit none
-  include 'mpif.h'
   include "./const.h"
   save
 
@@ -18,14 +19,14 @@ module pdens
   logical:: initialized = .false.
   character(len=3):: cspc_pdens = 'non'
   integer:: ispc_pdens
-  real(8):: orig_pdens(3),hmat_pdens(3,3)
-  real(8):: sosub(3),shsub(3,3),shsubi(3,3)
-  real(8),allocatable:: pds(:,:,:)
+  real(rp):: orig_pdens(3),hmat_pdens(3,3)
+  real(rp):: sosub(3),shsub(3,3),shsubi(3,3)
+  real(rp),allocatable:: pds(:,:,:)
   integer:: npx = 1  ! Num of divisions of subsystem read as ndiv_pdens in read_input
   integer:: npy = 1
   integer:: npz = 1
   integer:: np
-  real(8):: dpx,dpy,dpz,vol,dpxi,dpyi,dpzi
+  real(rp):: dpx,dpy,dpz,vol,dpxi,dpyi,dpzi
   integer:: nacc
 
 contains
@@ -37,11 +38,11 @@ contains
     use util,only: csp2isp, get_vol
     use vector,only: matinv3,matxvec3
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: hmat(3,3)
+    real(rp),intent(in):: hmat(3,3)
 
     integer:: inc,ix,iy,iz,mx,my,mz,ixyz
     integer:: idxg,ipx,ipy,ipz
-    real(8):: hmati(3,3)
+    real(rp):: hmati(3,3)
     integer,allocatable:: idxl2gt(:)
     integer:: istat(mpi_status_size),itag,ierr
 
@@ -112,11 +113,11 @@ contains
 !
     use vector,only: matxvec3
     integer,intent(in):: namax,natm
-    real(8),intent(in):: ra(3,namax),tag(namax),sorg(3)
+    real(rp),intent(in):: ra(3,namax),tag(namax),sorg(3)
 
     integer:: i,ipx,ipy,ipz,idx,is
     integer,parameter:: nmpi = 2
-    real(8):: ri(3),sri(3)
+    real(rp):: ri(3),sri(3)
 
     do i=1,natm
       is = int(tag(i))
@@ -144,20 +145,20 @@ contains
     use util,only: get_vol
     include 'params_unit.h'
     integer,intent(in):: myid,mpi_world
-    real(8),intent(in):: hmat(3,3)
+    real(rp),intent(in):: hmat(3,3)
 
     integer,parameter:: nmpi = 1
     integer:: idx,ixyz,is,ia,ix,iy,iz,inc
     integer:: ierr
-    real(8):: vol,dr(3),fac
-    real(8),allocatable:: pdl(:,:,:)
+    real(rp):: vol,dr(3),fac
+    real(rp),allocatable:: pdl(:,:,:)
 
 !.....Reduce prob densities in each node to global prob density
     vol = get_vol(hmat)/np
     allocate(pdl(npz,npy,npx))
     call accum_mem('pdens',8*size(pdl))
     pdl(:,:,:) = 0d0
-    call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real8,mpi_sum,0,mpi_world,ierr)
+    call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
     if( myid.eq.0 ) then
       dr(1:3) = hmat_pdens(1,1:3)/npx +hmat_pdens(2,1:3)/npy +hmat_pdens(3,1:3)/npz

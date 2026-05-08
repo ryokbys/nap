@@ -4,6 +4,8 @@ module EAM
 !-----------------------------------------------------------------------
 !  Parallel implementation of the EAM pontential.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use util,only: csp2isp
   implicit none
@@ -12,7 +14,7 @@ module EAM
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.EAM'
 
-  real(8),external:: fcut1,dfcut1
+  real(rp),external:: fcut1,dfcut1
 
   integer,parameter:: ioprms = 20
   
@@ -20,17 +22,17 @@ module EAM
   integer:: nsp = 0
 
 !!$.....Default parameter set for Al
-!!$  real(8):: ea_a  = 0.763905d0
-!!$  real(8):: ea_b  = 0.075016d0
-!!$  real(8):: ea_c  = 0.159472d0
-!!$  real(8):: ea_re = 3.389513d-10 /ang
-!!$  real(8):: ea_al = 1.755162d+10 *ang
-!!$  real(8):: ea_bt = 2.003449d+10 *ang
-!!$  real(8):: ea_xi = 0.147699d0
-!!$  real(8):: am_al = 26.9815d0
+!!$  real(rp):: ea_a  = 0.763905d0
+!!$  real(rp):: ea_b  = 0.075016d0
+!!$  real(rp):: ea_c  = 0.159472d0
+!!$  real(rp):: ea_re = 3.389513d-10 /ang
+!!$  real(rp):: ea_al = 1.755162d+10 *ang
+!!$  real(rp):: ea_bt = 2.003449d+10 *ang
+!!$  real(rp):: ea_xi = 0.147699d0
+!!$  real(rp):: am_al = 26.9815d0
 
-  real(8),allocatable:: ea_a(:),ea_xi(:)
-  real(8),allocatable,dimension(:,:):: ea_b,ea_c,ea_re, &
+  real(rp),allocatable:: ea_a(:),ea_xi(:)
+  real(rp),allocatable,dimension(:,:):: ea_b,ea_c,ea_re, &
        ea_alp,ea_beta,ea_rcin,ea_rcout
   logical,allocatable:: pair_interact(:,:),ea_interact(:)
 
@@ -38,7 +40,7 @@ module EAM
 
 !.....Parameters from fitpot
   integer:: nprms
-  real(8),allocatable:: prms(:)
+  real(rp),allocatable:: prms(:)
 
 !.....Types of forms of potential terms
   character(len=128),allocatable:: type_rho(:,:),type_frho(:),type_phi(:,:)
@@ -65,13 +67,12 @@ contains
 !
 !  Read parameters from file
 !
-    include 'mpif.h'
     include './const.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
-    real(8):: a,b,c,re,alp,beta,xi,rc,rcin,rcout
+    real(rp):: a,b,c,re,alp,beta,xi,rc,rcin,rcout
     character(len=128):: cline,fname,c1,c2,c3
     character(len=3):: cspi,cspj
 
@@ -183,18 +184,18 @@ contains
       endif
     endif  ! myid_md == 0
 
-    call mpi_bcast(ea_a,nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_xi,nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_a,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_xi,nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(ea_interact,nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(type_frho,128*nspmax,mpi_character,0,mpi_md_world,ierr)
 
-    call mpi_bcast(ea_b,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_c,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_re,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_alp,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_beta,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_rcin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(ea_rcout,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_b,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_c,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_re,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_alp,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_beta,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_rcin,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(ea_rcout,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(pair_interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     call mpi_bcast(type_rho,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
     call mpi_bcast(type_phi,128*nspmax*nspmax,mpi_character,0,mpi_md_world,ierr)
@@ -234,23 +235,22 @@ contains
 !  See only EAM part of Streitz and Mintmire, PRB 50(16), 11996 (1994)
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij,rcin,rcout,rc2,dfi,dfj,drhoi,drhoj,drdxi(3),drdxj(3),r,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp,dtmp
-    real(8),allocatable,save:: rho(:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: xij(3),rij,rcin,rcout,rc2,dfi,dfj,drhoi,drhoj,drdxi(3),drdxj(3),r,at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,tmp,dtmp
+    real(rp),allocatable,save:: rho(:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
       if( allocated(rho) ) deallocate(rho)
@@ -398,7 +398,7 @@ contains
 !!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( myid_md.eq.0 .and. iprint.ge.ipl_info ) &
          write(6,'(a,es15.7)') ' epot EAM = ',epott
@@ -410,11 +410,11 @@ contains
 ! Calculate rho_ij from rij and rcij.
 ! The type of rho form is given by TYPE_RHO global variable.
 !
-    real(8),intent(in):: rij,rcin,rcout
+    real(rp),intent(in):: rij,rcin,rcout
     integer,intent(in):: is,js
     character(len=*),intent(in):: ctype
-    real(8):: rhoij
-    real(8),external:: fcut1
+    real(rp):: rhoij
+    real(rp),external:: fcut1
 
     rhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
@@ -426,10 +426,10 @@ contains
 !=======================================================================
   function drhoij(is,js,rij,rcin,rcout,ctype)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij,rcin,rcout
+    real(rp),intent(in):: rij,rcin,rcout
     character(len=*),intent(in):: ctype 
-    real(8):: drhoij
-    real(8):: r
+    real(rp):: drhoij
+    real(rp):: r
 
     drhoij = 0d0
     if( trim(ctype).eq.'exp1' ) then
@@ -446,10 +446,10 @@ contains
 ! The type of F[.] form is given by TYPE_FRHO global variable.
 !
     integer,intent(in):: is
-    real(8),intent(in):: rho
+    real(rp),intent(in):: rho
     character(len=*),intent(in):: ctype 
     
-    real(8):: frho
+    real(rp):: frho
 
     frho = 0d0
     if( trim(ctype).eq.'sqrt1' ) then
@@ -460,9 +460,9 @@ contains
 !=======================================================================
   function dfrho(is,rho,ctype)
     integer,intent(in):: is
-    real(8),intent(in):: rho
+    real(rp),intent(in):: rho
     character(len=*),intent(in):: ctype 
-    real(8):: dfrho
+    real(rp):: dfrho
 
     dfrho = 0d0
     if( trim(ctype).eq.'sqrt1') then
@@ -473,10 +473,10 @@ contains
 !=======================================================================
   function phi(is,js,rij,rcin,rcout,ctype)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij,rcin,rcout
+    real(rp),intent(in):: rij,rcin,rcout
     character(len=*),intent(in):: ctype 
-    real(8):: phi
-    real(8):: r
+    real(rp):: phi
+    real(rp):: r
 
     phi = 0d0
     if( trim(ctype).eq.'SM' ) then
@@ -492,10 +492,10 @@ contains
 !=======================================================================
   function dphi(is,js,rij,rcin,rcout,ctype)
     integer,intent(in):: is,js
-    real(8),intent(in):: rij,rcin,rcout
+    real(rp),intent(in):: rij,rcin,rcout
     character(len=*),intent(in):: ctype 
-    real(8):: dphi,tmp
-    real(8):: r
+    real(rp):: dphi,tmp
+    real(rp):: r
 
     dphi = 0d0
     if( trim(ctype).eq.'SM' ) then
@@ -516,8 +516,8 @@ contains
 !=======================================================================
   function veq(r)
     implicit none
-    real(8),intent(in):: r
-    real(8):: veq
+    real(rp),intent(in):: r
+    real(rp):: veq
 !.....TODO: code...
     veq = 0d0
     return
@@ -525,8 +525,8 @@ contains
 !=======================================================================
   function xi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: xi
+    real(rp),intent(in):: x
+    real(rp):: xi
 
     xi= 0.1818d0*exp(-3.2d0*x) &
          +0.5099d0*exp(-0.9423d0*x) &
@@ -537,8 +537,8 @@ contains
 !=======================================================================
   function dxi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dxi
+    real(rp),intent(in):: x
+    real(rp):: dxi
 
     dxi= -0.58176d0*exp(-3.2d0*x) &
          -0.48047877d0*exp(-0.9423d0*x) &
@@ -549,8 +549,8 @@ contains
 !=======================================================================
   function zeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: zeta
+    real(rp),intent(in):: x
+    real(rp):: zeta
 
     zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
     return
@@ -558,8 +558,8 @@ contains
 !=======================================================================
   function dzeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dzeta
+    real(rp),intent(in):: x
+    real(rp):: dzeta
 
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return

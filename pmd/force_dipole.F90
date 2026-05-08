@@ -4,6 +4,8 @@ module dipole
 !-----------------------------------------------------------------------
 !  Parallel implementation of dipole-dipole and quadrupole-dipole interactions.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use util,only: csp2isp
   implicit none
@@ -13,22 +15,22 @@ module dipole
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(8),parameter:: acc  = 14.3998554737d0
-  real(8):: acc2 = acc*acc
+  real(rp),parameter:: acc  = 14.3998554737d0
+  real(rp):: acc2 = acc*acc
 !.....permittivity of vacuum
-  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
 !.....Max number of species available in the potential
   integer:: nspcs
   integer:: dip_ni(nspmax)
-  real(8):: dip_ei(nspmax),dip_cij(nspmax,nspmax),dip_dij(nspmax,nspmax)
+  real(rp):: dip_ei(nspmax),dip_cij(nspmax,nspmax),dip_dij(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
 
   logical:: lprmset_dipole
   
 !.....params
   integer:: nprms
-  real(8),allocatable:: params(:)
+  real(rp),allocatable:: params(:)
 
 contains
   subroutine force_dipole(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -36,30 +38,29 @@ contains
        ,mpi_md_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     character(len=3),intent(in):: specorder(nspmax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2,dij6,dij8 &
+    real(rp):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2,dij6,dij8 &
          ,drdi(3),drdj(3),x,y,z,epotl,epott,at(3),tmp,tmp2 &
          ,c6ij,c8ij,dv6,dv8,v6,v8 &
          ,vrc,dvdrc
-    real(8):: vrc6,vrc8,dvdrc6,dvdrc8
-    real(8),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: vrc6,vrc8,dvdrc6,dvdrc8
+    real(rp),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+    real(rp),allocatable,save:: strsl(:,:,:)
     
 
-    real(8),save:: rcmax2
+    real(rp),save:: rcmax2
 
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)
@@ -157,7 +158,7 @@ contains
     endif
 
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.gt.2 ) print '(a,es15.7)',' epot dipole = ',epott
@@ -178,14 +179,13 @@ contains
   subroutine read_params_dipole(myid_md,mpi_md_world,iprint,specorder,amass)
     use util, only: num_data
     implicit none
-    include 'mpif.h'
     include './params_unit.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: amass(nspmax)
+    real(rp),intent(in):: amass(nspmax)
 
     integer:: isp,jsp,ierr,ni,nj
-    real(8):: ei,ej,ai,aj,cij,dij,aij,alpij,bij,betij
+    real(rp):: ei,ej,ai,aj,cij,dij,aij,alpij,bij,betij
     character(len=3):: csp,cspi,cspj
     character(len=128):: cline,fname
 
@@ -248,9 +248,9 @@ contains
     endif  ! myid_md.eq.0
 
     call mpi_bcast(dip_ni,nspmax*nspmax,mpi_integer,0,mpi_md_world,ierr)
-    call mpi_bcast(dip_ei,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(dip_cij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(dip_dij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(dip_ei,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(dip_cij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(dip_dij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     
   end subroutine read_params_dipole

@@ -2,12 +2,14 @@ module cspline
 !-----------------------------------------------------------------------
 !  Parallel implementation of cubic spline force field.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   implicit none
   save
 
-  real(8),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979d0
 
   character(len=128):: paramsdir = '.'
 !.....parameter file name
@@ -23,41 +25,40 @@ module cspline
     integer:: isp,jsp
     integer:: ksp = -1
     integer:: npnts = 0
-    real(8):: rcut
-    real(8),allocatable:: pnts(:),vals(:)
-    real(8),allocatable:: coefs(:,:)
-    real(8):: aux  ! auxiliary data
+    real(rp):: rcut
+    real(rp),allocatable:: pnts(:),vals(:)
+    real(rp),allocatable:: coefs(:,:)
+    real(rp):: aux  ! auxiliary data
   end type spline
   type(spline),allocatable:: spls(:)
 
-  real(8):: epot_cspln
+  real(rp):: epot_cspln
 contains
 !=======================================================================
   subroutine force_cspline(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
     integer:: ispln,jj,ia,ja,kk,ka,ierr,is,js,ks,ispl,jxyz
-    real(8):: epotl,xi(3),xj(3),xij(3),rij(3),drij(3) &
+    real(rp):: epotl,xi(3),xj(3),xij(3),rij(3),drij(3) &
          ,xk(3),xik(3),rik(3),rjk(3),drik(3),dcsdj(3),dcsdk(3),tmpj(3) &
          ,tmpk(3),csn,dfcij,dfcik,dgcs,dgdij,dgdik,dij,dij2,diji &
          ,dik,diki,dik2,epotl2,epotl3,fcij,fcik,gijk,phi,dphi,rc2,rct &
          ,rct2,tmp,eta3,texpij,texpik,texpjk,tmpjk(3),djk2,djk,fcjk,dfcjk &
          ,drjk(3),dgdjk,xjk(3),texp
-    real(8),save:: rcmax,rcmax2,rctmax,rctmax2
+    real(rp),save:: rcmax,rcmax2,rctmax,rctmax2
     character(len=128):: ctype
-    real(8),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
+    real(rp),save,allocatable:: aa2(:,:),aa3(:,:),strsl(:,:,:)
     logical,save:: l3b,l2b
     logical:: l3b_exist
     type(spline):: spl
@@ -360,20 +361,20 @@ contains
     endif
 
     epotl = epotl2 +epotl3
-    call mpi_allreduce(epotl,epot_cspln,1,mpi_real8,mpi_sum &
+    call mpi_allreduce(epotl,epot_cspln,1,mpi_real_rp,mpi_sum &
          ,mpi_md_world,ierr)
     epot = epot +epot_cspln
     return
   end subroutine force_cspline
 !=======================================================================
   subroutine eval_spline(r,npnts,pnts,vals,coefs,spl,dspl)
-    real(8),intent(in):: r
+    real(rp),intent(in):: r
     integer,intent(in):: npnts
-    real(8),intent(in):: pnts(npnts),vals(npnts),coefs(4,npnts-1)
-    real(8),intent(inout):: spl,dspl
+    real(rp),intent(in):: pnts(npnts),vals(npnts),coefs(4,npnts-1)
+    real(rp),intent(inout):: spl,dspl
 
     integer:: i
-    real(8):: a(4),r2,rt
+    real(rp):: a(4),r2,rt
 
     if( r.gt.pnts(npnts) ) then ! outside the right edge of the range
       a(:) = coefs(:,npnts-1)
@@ -400,13 +401,13 @@ contains
   end subroutine eval_spline
 !=======================================================================
   subroutine spl2d(rij,npnts,pnts,coefs,spl,dspl)
-    real(8),intent(in):: rij
+    real(rp),intent(in):: rij
     integer,intent(in):: npnts
-    real(8),intent(in):: pnts(npnts),coefs(4,npnts-1)
-    real(8),intent(inout):: spl,dspl
+    real(rp),intent(in):: pnts(npnts),coefs(4,npnts-1)
+    real(rp),intent(inout):: spl,dspl
 
     integer:: i,ip
-    real(8):: a(4),rij2
+    real(rp):: a(4),rij2
 
     do i=2,npnts
       if( rij.lt.pnts(i) ) exit
@@ -420,13 +421,13 @@ contains
   end subroutine spl2d
 !=======================================================================
   subroutine spl3d(csn,npnts,pnts,coefs,spl,dspl)
-    real(8),intent(in):: csn
+    real(rp),intent(in):: csn
     integer,intent(in):: npnts
-    real(8),intent(in):: pnts(npnts),coefs(4,npnts-1)
-    real(8),intent(inout):: spl,dspl
+    real(rp),intent(in):: pnts(npnts),coefs(4,npnts-1)
+    real(rp),intent(inout):: spl,dspl
 
     integer:: i,ip
-    real(8):: a(4),csn2
+    real(rp):: a(4),csn2
 
     do i=2,npnts
       if( csn.lt.pnts(i) ) exit
@@ -441,8 +442,8 @@ contains
 !=======================================================================
   function fc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rin,rout
-    real(8):: fc1
+    real(rp),intent(in):: r,rin,rout
+    real(rp):: fc1
 
     if( r.le.rin ) then
       fc1= 1d0
@@ -456,8 +457,8 @@ contains
 !=======================================================================
   function dfc1(r,rin,rout)
     implicit none
-    real(8),intent(in):: r,rin,rout
-    real(8):: dfc1
+    real(rp),intent(in):: r,rin,rout
+    real(rp):: dfc1
 
     if( r.le.rin ) then
       Dfc1= 0d0
@@ -486,12 +487,11 @@ contains
 !  Coefficients are computed from these values.
 !
     use util, only: num_data, is_numeric
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,ierr,isp,jsp,ksp,ndat,npnts,ispl
-    real(8):: rcut
+    real(rp):: rcut
     logical:: lexist
     character(len=128):: fname,ctmp,ctmp1,ctmp2,ctype
     character(len=3):: cspi,cspj,cspk
@@ -642,7 +642,7 @@ contains
 !
     integer,parameter:: ndpnts = 100
     integer:: is,js,ks,ispl,i
-    real(8):: rmin,rmax,dr,ri,phi,dphi,da
+    real(rp):: rmin,rmax,dr,ri,phi,dphi,da
     type(spline):: spl
     character(len=128),parameter:: cfrad = 'out.cspline.radial'
     character(len=128),parameter:: cfang = 'out.cspline.angular'
@@ -727,7 +727,6 @@ contains
   end subroutine alloc_spline
 !=======================================================================
   subroutine bcast_splines(myid,mpi_world,iprint)
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
 
     integer:: i,ierr,npnts
@@ -743,13 +742,13 @@ contains
       call mpi_bcast(spls(i)%jsp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(spls(i)%ksp,1,mpi_integer,0,mpi_world,ierr)
       call mpi_bcast(spls(i)%npnts,1,mpi_integer,0,mpi_world,ierr)
-      call mpi_bcast(spls(i)%rcut,1,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(spls(i)%rcut,1,mpi_real_rp,0,mpi_world,ierr)
       if( myid.ne.0 ) call alloc_spline(spls(i))
       call mpi_barrier(mpi_world,ierr)
       npnts = spls(i)%npnts
-      call mpi_bcast(spls(i)%pnts,npnts,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(spls(i)%vals,npnts,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(spls(i)%coefs,4*(npnts-1),mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(spls(i)%pnts,npnts,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(spls(i)%vals,npnts,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(spls(i)%coefs,4*(npnts-1),mpi_real_rp,0,mpi_world,ierr)
     enddo
   end subroutine bcast_splines
 !=======================================================================
@@ -763,14 +762,14 @@ contains
 !
     type(spline),intent(inout):: spl
 !!$    integer,intent(in):: npnts
-!!$    real(8),intent(in):: pnts(npnts),vals(npnts)
-!!$    real(8),intent(out):: coefs(4,npnts-1)
+!!$    real(rp),intent(in):: pnts(npnts),vals(npnts)
+!!$    real(rp),intent(out):: coefs(4,npnts-1)
     character(len=7),intent(in):: bcl,bcr
     integer,intent(in):: iprint
 
     integer:: i,j,npnts,n,ndim,ibase
-    real(8),allocatable:: vb(:),vx(:),amat(:,:),amati(:,:),dat(:,:)
-    real(8),parameter:: eps = 1e-10
+    real(rp),allocatable:: vb(:),vx(:),amat(:,:),amati(:,:),dat(:,:)
+    real(rp),parameter:: eps = 1e-10
 
     npnts = spl%npnts
     n = npnts -1

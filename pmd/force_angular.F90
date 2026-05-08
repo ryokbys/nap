@@ -2,6 +2,8 @@ module angular
 !-----------------------------------------------------------------------
 !                     Last modified: <2025-03-29 00:03:31 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp
   use memory,only: accum_mem
@@ -13,23 +15,23 @@ module angular
   character(len=128),parameter:: paramsfname = 'in.params.angular'
 
 !.....Small enough value for some criterion
-  real(8),parameter:: eps = 1d-10
+  real(rp),parameter:: eps = 1d-10
   integer,parameter:: msp = nspmax
 
-  real(8):: rc3s(nspmax,nspmax,nspmax)
-  real(8):: alps(nspmax,nspmax,nspmax)
-  real(8):: bets(nspmax,nspmax,nspmax)
-  real(8):: gmms(nspmax,nspmax,nspmax)
-  real(8):: shfts(nspmax,nspmax,nspmax)
+  real(rp):: rc3s(nspmax,nspmax,nspmax)
+  real(rp):: alps(nspmax,nspmax,nspmax)
+  real(rp):: bets(nspmax,nspmax,nspmax)
+  real(rp):: gmms(nspmax,nspmax,nspmax)
+  real(rp):: shfts(nspmax,nspmax,nspmax)
   logical:: interact3(nspmax,nspmax,nspmax)
 
 !.....For fitpot
   logical:: lprmset_angular = .false.
   integer:: nprms
-  real(8),allocatable:: params(:)
-  real(8),allocatable:: ge_alp(:,:,:),ge_bet(:,:,:),ge_gmm(:,:,:)
-  real(8),allocatable:: gf_alp(:,:,:,:,:),gf_bet(:,:,:,:,:),gf_gmm(:,:,:,:,:)
-  real(8),allocatable:: gs_alp(:,:,:,:),gs_bet(:,:,:,:),gs_gmm(:,:,:,:)
+  real(rp),allocatable:: params(:)
+  real(rp),allocatable:: ge_alp(:,:,:),ge_bet(:,:,:),ge_gmm(:,:,:)
+  real(rp),allocatable:: gf_alp(:,:,:,:,:),gf_bet(:,:,:,:,:),gf_gmm(:,:,:,:,:)
+  real(rp),allocatable:: gs_alp(:,:,:,:),gs_bet(:,:,:,:),gs_gmm(:,:,:,:)
   
 contains
   subroutine force_angular(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -42,28 +44,27 @@ contains
 !  the code for them.
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
     logical,intent(in):: lstrs, l1st
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm,shft
-    real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
+    real(rp):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm,shft
+    real(rp):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drijj(3),rcmax
-    real(8):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
+    real(rp):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
-    real(8):: epotl,epotl2,epotl3,epott
-    real(8),save:: rcmax2
-    real(8),allocatable,save:: aa3(:,:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: epotl,epotl2,epotl3,epott
+    real(rp),save:: rcmax2
+    real(rp),allocatable,save:: aa3(:,:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
 !-----only at 1st call
     if( l1st ) then
@@ -221,7 +222,7 @@ contains
 !.....Gather epot
     epott= 0d0
     epotl= epotl3
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot angular = ',epott
 
@@ -231,12 +232,11 @@ contains
   subroutine read_params_angular(myid,mpi_world,iprint,specorder)
     use util, only: num_data, is_numeric
     implicit none
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd,itype
-    real(8):: alp,bet,gmm,shft,rc3
+    real(rp):: alp,bet,gmm,shft,rc3
     logical:: lexist
     character(len=128):: cfname,ctmp,cline,ctype
     character(len=3):: cspi,cspj,cspk
@@ -351,11 +351,11 @@ contains
 20  continue
 
     call mpi_bcast(interact3,nspmax*nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(rc3s,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(alps,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(bets,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(gmms,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(shfts,nspmax*nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rc3s,nspmax*nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(alps,nspmax*nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(bets,nspmax*nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(gmms,nspmax*nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(shfts,nspmax*nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
 
     return
   end subroutine read_params_angular
@@ -377,12 +377,12 @@ contains
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp),rc3
+    real(rp),intent(in):: params_in(ndimp),rc3
     character(len=*),intent(in):: ctype
     logical,intent(in):: interact3_in(nspmax,nspmax,nspmax)
 
     integer:: i,j,k,inc,itmp,nspt,nint
-    real(8):: alp,bet,gmm
+    real(rp):: alp,bet,gmm
 
     nprms = ndimp
     if( .not.allocated(params) ) allocate(params(nprms))
@@ -465,24 +465,24 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),tag(namax),h(3,3)
-    real(8),intent(inout):: rcin
+    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
     logical,intent(in):: lfrc_eval(natm)
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,nfcal),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
 !.....local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,ia,ka,ja,jra,kra
     integer:: ifcal,jfcal,kfcal,ip
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm,shft
-    real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
+    real(rp):: rij,rik,riji,riki,rij2,rik2,rc2,rc3,alp,bet,gmm,shft
+    real(rp):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drijj(3),rcmax,rcmax2
-    real(8):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
+    real(rp):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
-    real(8):: tmpja(3),tmpjb(3),tmpjg(3),tmpka(3),tmpkb(3),tmpkg(3)
-    real(8),save:: rcin2 = -1d0
+    real(rp):: tmpja(3),tmpjb(3),tmpjg(3),tmpka(3),tmpkb(3),tmpkg(3)
+    real(rp),save:: rcin2 = -1d0
     integer,save,allocatable:: ia2ifcal(:)
 
     if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))

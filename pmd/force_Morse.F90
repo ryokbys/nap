@@ -6,6 +6,8 @@ module Morse
 !    - For BVS, see Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !    - Currently no cutoff tail treatment is done. (170310)
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax,rc
   use util,only: csp2isp, num_data
   use memory,only: accum_mem
@@ -28,32 +30,32 @@ module Morse
 !!$  integer,parameter:: nspmax = 9
   integer:: nsp
 !.....Morse parameters
-  real(8):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax), &
+  real(rp):: alp(nspmax,nspmax),d0(nspmax,nspmax),rmin(nspmax,nspmax), &
        rcs(nspmax,nspmax),rc2s(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
 !.....fixed_bond Morse parameters
-  real(8):: rc_fb(nspmax,nspmax)
+  real(rp):: rc_fb(nspmax,nspmax)
   logical:: lfixbond(nspmax,nspmax)
 
 !.....Smooth cutoff
-  real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
+  real(rp):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
 
-  real(8),allocatable:: strsl(:,:,:)
-  real(8),allocatable:: ge_alp(:,:),ge_d0(:,:),ge_rmin(:,:)
-  real(8),allocatable:: gf_alp(:,:,:,:),gf_d0(:,:,:,:),gf_rmin(:,:,:,:)
-  real(8),allocatable:: gs_alp(:,:,:),gs_d0(:,:,:),gs_rmin(:,:,:)
+  real(rp),allocatable:: strsl(:,:,:)
+  real(rp),allocatable:: ge_alp(:,:),ge_d0(:,:),ge_rmin(:,:)
+  real(rp),allocatable:: gf_alp(:,:,:,:),gf_d0(:,:,:,:),gf_rmin(:,:,:,:)
+  real(rp),allocatable:: gs_alp(:,:,:),gs_d0(:,:,:),gs_rmin(:,:,:)
   
 !.....Atomic descriptor
   type atdesc
     integer:: na            ! atomic number
     character(len=3):: csym ! Symbol
-    real(8):: eion1, eion2  ! 1st and 2nd ionization energies (eV)
-    real(8):: eaff          ! electron affinity (eV)
-    real(8):: atrad         ! atomic radius (Ang)
-    real(8):: enpaul        ! Pauling's electronegativity (Pauling unit)
+    real(rp):: eion1, eion2  ! 1st and 2nd ionization energies (eV)
+    real(rp):: eaff          ! electron affinity (eV)
+    real(rp):: atrad         ! atomic radius (Ang)
+    real(rp):: enpaul        ! Pauling's electronegativity (Pauling unit)
   end type atdesc
 
   type(atdesc),allocatable:: atdescs(:)
@@ -69,26 +71,26 @@ module Morse
 !       - na: atomic number
   integer,parameter:: ndesc = 7
   integer,parameter:: nprm  = ndesc*2  ! 2 for each descriptor
-  real(8):: walp(0:nprm),wd(0:nprm),wrmin(0:nprm),&
+  real(rp):: walp(0:nprm),wd(0:nprm),wrmin(0:nprm),&
        pdij(0:nprm)
 !.....Derivatives w.r.t. weights
-  real(8):: gwalp(0:nprm),gwd(0:nprm),gwrmin(0:nprm)
+  real(rp):: gwalp(0:nprm),gwd(0:nprm),gwrmin(0:nprm)
 
 !.....beta: ratio to D_ij such that the absolute value of Eij
 !     should be smaller than beta*Dij
-  real(8),parameter:: beta = 0.1d0
-  real(8):: prefbeta
+  real(rp),parameter:: beta = 0.1d0
+  real(rp):: prefbeta
 
   logical:: lprmset_Morse = .false.
 
 !.....params
   integer:: nprms
-  real(8),allocatable:: params(:)
+  real(rp),allocatable:: params(:)
 
 !.....Limit of exponential term to avoid Inf and NaN...
 !.....The term larger than this is replaced by square of r
-  real(8),parameter:: ecore = 2.d0
-  real(8),parameter:: ln_ecore = log(ecore)
+  real(rp),parameter:: ecore = 2.d0
+  real(rp),parameter:: ln_ecore = log(ecore)
 
 contains
   subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -96,25 +98,24 @@ contains
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
 !!$    include "params_BVS_Morse.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij,dij2,vrc,dvdrc,rc,rc2
-!!$    real(8),save:: rc2
-    real(8),external:: fcut1,dfcut1
+!!$    real(rp),save:: rc2
+    real(rp),external:: fcut1,dfcut1
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -232,7 +233,7 @@ contains
 
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot Morse = ',epott
@@ -246,24 +247,23 @@ contains
 !  Repulsive-only Morse potential
 !
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij
-    real(8),external:: fcut1,dfcut1
-!!$    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp),external:: fcut1,dfcut1
+!!$    real(rp),allocatable,save:: strsl(:,:,:)
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -358,7 +358,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 !!$    write(6,'(a,es15.7)') ' Morse repul epott = ',epott
@@ -378,24 +378,23 @@ contains
 !
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
 !!$    include "params_BVS_Morse.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr,epott &
          ,dxdi(3),dxdj(3),x,y,z,epotl,at(3),tmp,tmp2,texp &
          ,d0ij,alpij,rminij,dij2,vrc,dvdrc,rc,rc2
-    real(8),external:: fcut1,dfcut1
+    real(rp),external:: fcut1,dfcut1
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)
@@ -503,7 +502,7 @@ contains
 
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot Morse = ',epott
@@ -518,26 +517,25 @@ contains
 !  Morse parameters depend on atomic charges which vary time to time.
 !
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),chg(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
-    real(8),external:: fcut1,dfcut1
+    real(rp),external:: fcut1,dfcut1
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
+    real(rp):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,tmp2,diji,rcore,dij2
-!!$    real(8),allocatable,save:: strsl(:,:,:)
+!!$    real(rp),allocatable,save:: strsl(:,:,:)
     type(atdesc):: atdi,atdj
-    real(8),save:: rc2
-    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&
+    real(rp),save:: rc2
+    real(rp),save,allocatable:: xi(:),xj(:),xij(:),rij(:)&
          ,dxdi(:),dxdj(:),at(:)
     if( .not.allocated(xi) ) allocate(xi(3),xj(3),xij(3),rij(3),&
          dxdi(3),dxdj(3),at(3) )
@@ -661,7 +659,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,MPI_REAL8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
  
@@ -674,22 +672,21 @@ contains
 !  Morse parameters depend on atomic charges which vary time to time.
 !
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: lspr(0:nnmax,namax)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc &
          ,tag(namax),chg(namax)
-    real(8),intent(out):: epot,fq(namax)
+    real(rp),intent(out):: epot,fq(namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
+    real(rp):: dij,dedr,epott,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij,rcore &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2,diji
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,dfcut1
-    real(8),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
+    real(rp),external:: fcut1,dfcut1
+    real(rp),save,allocatable:: xi(:),xj(:),xij(:),rij(:) &
          ,dxdi(:),dxdj(:),at(:)
 
     if( .not.allocated(xi) ) then
@@ -771,7 +768,7 @@ contains
     
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
 
@@ -781,13 +778,12 @@ contains
 !
 !  Read pair parameters for Morse potential from file
 !
-    include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
     integer:: i,j,isp,jsp,id,ierr,jerr,ndat
     character(len=128):: cline,fname,ctmp,cerr
     character(len=3):: cspi,cspj
-    real(8):: d,r,a,rct
+    real(rp):: d,r,a,rct
 
     jerr = 0
     if( myid_md.eq.0 ) then
@@ -875,12 +871,12 @@ contains
       stop
     endif
 
-    call mpi_bcast(d0,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rmin,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(alp,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(d0,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rmin,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(alp,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
-    call mpi_bcast(rcs,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(rc_fb,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(rcs,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(rc_fb,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(lfixbond,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_Morse
@@ -889,7 +885,6 @@ contains
 !
 !  Read parameters for VC-Morse potential from file, in.params.vcMorse
 !
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_md_world,iprint
 
     integer:: i,ierr
@@ -917,9 +912,9 @@ contains
 !!$      endif
     endif
 
-    call mpi_bcast(walp,nprm+1,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(wd,nprm+1,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(wrmin,nprm+1,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(walp,nprm+1,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(wd,nprm+1,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(wrmin,nprm+1,mpi_real_rp,0,mpi_md_world,ierr)
 
     lprmset_Morse = .true.
     
@@ -943,12 +938,12 @@ contains
 !
     use Coulomb,only: vid_bvs, npq_bvs, acc
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
     logical,intent(in):: interact_in(nspmax,nspmax)
 
     integer:: i,j,inc,itmp,nspt,nint
-    real(8):: c
+    real(rp):: c
 
     nprms = ndimp
     if( .not.allocated(params) ) allocate(params(nprms))
@@ -1128,7 +1123,7 @@ contains
 ! So no need of treating this as parallel code.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params(ndimp)
+    real(rp),intent(in):: params(ndimp)
 
     integer:: i,inc
 
@@ -1265,7 +1260,7 @@ contains
     character(len=5):: ctmp
     character(len=128):: cline,fname
     type(atdesc):: atd
-    real(8):: eion1,eion2,eaff,atrad,enpaul
+    real(rp):: eion1,eion2,eaff,atrad,enpaul
 
     if( allocated(atdescs) ) deallocate(atdescs)
     allocate(atdescs(nspmax))
@@ -1325,12 +1320,11 @@ contains
 !  Broadcast type atdesc
 !
     implicit none 
-    include 'mpif.h'
     integer,intent(in):: nspt,myid_md,mpi_md_world
 
     integer,allocatable:: nas(:)
     character(len=3),allocatable:: csyms(:)
-    real(8),allocatable:: eion1s(:),eion2s(:),eaffs(:),enpauls(:),atrads(:)
+    real(rp),allocatable:: eion1s(:),eion2s(:),eaffs(:),enpauls(:),atrads(:)
     integer:: isp,ierr
 
     allocate(eion1s(nspt),eion2s(nspt),eaffs(nspt),enpauls(nspt),&
@@ -1350,11 +1344,11 @@ contains
 
     call mpi_bcast(nas,nspt,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(csyms,nspt,mpi_character,0,mpi_md_world,ierr)
-    call mpi_bcast(eion1s,nspt,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(eion2s,nspt,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(eaffs,nspt,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(atrads,nspt,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(enpauls,nspt,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(eion1s,nspt,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(eion2s,nspt,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(eaffs,nspt,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(atrads,nspt,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(enpauls,nspt,mpi_real_rp,0,mpi_md_world,ierr)
     
     deallocate(eion1s,eion2s,eaffs,enpauls,atrads,nas,csyms)
   end subroutine bcast_atdescs
@@ -1363,12 +1357,12 @@ contains
 !
 !  Make a pair descriptor vector from atomic descriptros
 !
-    real(8),intent(in):: chgi,chgj
+    real(rp),intent(in):: chgi,chgj
     type(atdesc),intent(in):: atdi,atdj
-    real(8),intent(inout):: pdij(0:nprm)
+    real(rp),intent(inout):: pdij(0:nprm)
 
     integer:: i
-    real(8):: di(ndesc),dj(ndesc)
+    real(rp):: di(ndesc),dj(ndesc)
 
     di(1) = chgi
     di(2) = atdi%eion1
@@ -1408,20 +1402,20 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
-    real(8),intent(inout):: epot
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    real(rp),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,j,k,l,m,n,jj,ierr,is,js,ixyz,jxyz,inc,nspt &
          ,ne,nf,ns
-    real(8):: dij,dedr,rc2,dij2 &
+    real(rp):: dij,dedr,rc2,dij2 &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
          ,diji,factor,fc1,dfc1,dr,dedrd0,dedralp,dedrrmin
-    real(8),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
-    real(8),external:: fcut1,dfcut1
+    real(rp),allocatable,save:: xi(:),xj(:),xij(:),rij(:),dxdi(:),dxdj(:)
+    real(rp),external:: fcut1,dfcut1
 
     if( .not. allocated(ge_alp) ) then
       allocate(ge_alp(nspmax,nspmax),ge_d0(nspmax,nspmax),ge_rmin(nspmax,nspmax))
@@ -1651,19 +1645,19 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc &
          ,tag(namax),chg(namax)
-    real(8),intent(inout):: epot
+    real(rp),intent(inout):: epot
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,inc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dedr &
          ,x,y,z,epotl,tmp,texp,d0ij,alpij,rminij &
          ,chgi,chgj,dd0dq,dalpdq,drmindq,dedd0,dedalp,dedrmin,tmp2 &
          ,dr
     type(atdesc):: atdi,atdj
-    real(8),external:: fcut1,dfcut1
+    real(rp),external:: fcut1,dfcut1
 
     epotl= 0d0
 

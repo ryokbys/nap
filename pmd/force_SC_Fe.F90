@@ -1,4 +1,6 @@
 module SC_Fe
+  use pmdmpi
+  use mod_precision
 contains
   subroutine force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -10,25 +12,24 @@ contains
 !    - only force on i is calculated, not necessary to send-back
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_SC_Fe.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is
-    real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,phic,dphic,phi,dphi,tmp
+    real(rp):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,phic,dphic,phi,dphi,tmp
 
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: sqrho(:)
-    real(8),save:: rhoc,drhoc
+    real(rp),allocatable,save:: sqrho(:)
+    real(rp),save:: rhoc,drhoc
 
     if( l1st ) then
       allocate(sqrho(namax))
@@ -112,7 +113,7 @@ contains
     enddo
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 

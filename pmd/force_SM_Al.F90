@@ -1,4 +1,6 @@
 module SM_Al
+  use pmdmpi
+  use mod_precision
 contains
   subroutine force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -14,24 +16,23 @@ contains
 !  and non-variable charge implementation.
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     include "params_SM_Al.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,ixyz,jxyz
-    real(8):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
-    real(8):: x,y,z,xi(3),epotl,epott,tmp
+    real(rp):: xij(3),rij,dfi,dfj,drhoij,drdxi(3),drdxj(3),r,dphi,at(3)
+    real(rp):: x,y,z,xi(3),epotl,epott,tmp
     logical,save:: l1st=.true.
-    real(8),allocatable,save:: sqrho(:),strsl(:,:,:)
-    real(8),save:: exrc,phic,dphic
+    real(rp),allocatable,save:: sqrho(:),strsl(:,:,:)
+    real(rp),save:: exrc,phic,dphic
 
     if( l1st ) then
       if( allocated(sqrho) ) deallocate(sqrho)
@@ -152,7 +153,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,MPI_DOUBLE_PRECISION &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
 

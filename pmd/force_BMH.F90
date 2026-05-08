@@ -10,6 +10,8 @@ module BMH
 !  and for (param_type==species) as:
 !    V(rij) = f0*(bi+bj) *exp((ai+aj-rij)/(bi+bj)) -c6i*c6j/rij**6 -c8i*c8j/rij**8
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use util,only: csp2isp, num_data, itotOf
   implicit none
@@ -22,8 +24,8 @@ module BMH
 
 !.....Max number of species available in the potential
   integer:: nspcs
-  real(8):: bmh_fij(nspmax,nspmax), bmh_rc
-  real(8):: bmh_aij(nspmax,nspmax),bmh_bij(nspmax,nspmax), &
+  real(rp):: bmh_fij(nspmax,nspmax), bmh_rc
+  real(rp):: bmh_aij(nspmax,nspmax),bmh_bij(nspmax,nspmax), &
        bmh_c6ij(nspmax,nspmax),bmh_c8ij(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
   character(len=12):: param_type = 'pair'
@@ -32,36 +34,35 @@ module BMH
   
 !.....params
   integer:: nprms
-  real(8),allocatable:: params(:)
+  real(rp),allocatable:: params(:)
 
 contains
   subroutine force_BMH(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rcin &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rcin &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     character(len=3),intent(in):: specorder(nspmax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij(3),dij,diji,diji2,diji6,diji8,dvdr,dij2 &
+    real(rp):: xi(3),xij(3),rij(3),dij,diji,diji2,diji6,diji8,dvdr,dij2 &
          ,drdi(3),drdj(3),x,y,z,epotl,epott,at(3),tmp,tmp2 &
          ,fij,aij,bij,c6ij,c8ij,vs2b &
          ,vrc,dvdrc,dvs2b,rc
-    real(8):: vs2bc,dvs2bc,rc6,rc8
-    real(8),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: vs2bc,dvs2bc,rc6,rc8
+    real(rp),save:: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+    real(rp),allocatable,save:: strsl(:,:,:)
     
-    real(8),save:: rcmax2
+    real(rp),save:: rcmax2
 
     rc = rcin
     if( bmh_rc.gt.0d0 ) rc = bmh_rc
@@ -171,7 +172,7 @@ contains
 !!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print '(a,es15.7)',' epot BMH = ',epott
@@ -195,7 +196,7 @@ contains
 !  Curretnly this routine is supposed to be called only on serial run.
 !
     integer,intent(in):: ndimp
-    real(8),intent(in):: params_in(ndimp)
+    real(rp),intent(in):: params_in(ndimp)
     character(len=*),intent(in):: ctype
     logical,intent(in):: interact_in(nspmax,nspmax)
 
@@ -248,13 +249,12 @@ contains
 !=======================================================================
   subroutine read_params_BMH(myid_md,mpi_md_world,iprint,specorder)
     implicit none
-    include 'mpif.h'
     include './params_unit.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr,ni,nj,nd
-    real(8):: aij,bij,c6ij,c8ij,fij,rc
+    real(rp):: aij,bij,c6ij,c8ij,fij,rc
     character(len=3):: cspi,cspj
     character(len=128):: cline,cfname,mode,ctmp
 
@@ -393,12 +393,12 @@ contains
       endif
     endif  ! myid_md.eq.0
 
-    call mpi_bcast(bmh_rc,1,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(bmh_fij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(bmh_aij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(bmh_bij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(bmh_c6ij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(bmh_c8ij,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_rc,1,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_fij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_aij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_bij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_c6ij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(bmh_c8ij,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
 
   end subroutine read_params_BMH

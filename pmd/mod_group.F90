@@ -4,6 +4,8 @@ module group
 !-----------------------------------------------------------------------
 !  Module for grouping atoms.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: max_group, nspmax
   use util, only: ispOf, igvarOf, replace_igvar
   implicit none
@@ -27,8 +29,8 @@ module group
 !.....species grouping
   integer:: ispc(max_group,nspmax)
 !.....sphere grouping
-  real(8):: sph_org(max_group,3) ! origin vector in h-mat unit
-  real(8):: sph_rad2(max_group) ! radius**2
+  real(rp):: sph_org(max_group,3) ! origin vector in h-mat unit
+  real(rp):: sph_rad2(max_group) ! radius**2
   integer:: isph(max_group,2)  ! 1) inside, 2) outside
 
 contains
@@ -64,7 +66,7 @@ contains
     character(len=20):: c1st,cgname
     integer:: ndat,i,igrp,kin,kout,npair
     integer,allocatable:: itmp(:,:)
-    real(8):: rad,orgx,orgy,orgz
+    real(rp):: rad,orgx,orgy,orgz
 
     ndat = num_data(cline, ' ')
     read(cline,*) c1st
@@ -134,7 +136,6 @@ contains
   end subroutine register_group
 !=======================================================================
   subroutine bcast_group(mpicomm)
-    include 'mpif.h'
     integer,intent(in):: mpicomm
     integer:: ierr
 
@@ -142,8 +143,8 @@ contains
     call mpi_bcast(gtiming,max_group,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(ispc,max_group*nspmax,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(isph,max_group*2,mpi_integer,0,mpicomm,ierr)
-    call mpi_bcast(sph_org,max_group*3,mpi_real8,0,mpicomm,ierr)
-    call mpi_bcast(sph_rad2,max_group*3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(sph_org,max_group*3,mpi_real_rp,0,mpicomm,ierr)
+    call mpi_bcast(sph_rad2,max_group*3,mpi_real_rp,0,mpicomm,ierr)
     
   end subroutine bcast_group
 !=======================================================================
@@ -152,10 +153,10 @@ contains
 !  Grouping according to the given grouping method name.
 !
     integer,intent(in):: namax,natm,myid,mpicomm,iprint,istp
-    real(8),intent(in):: h(3,3),ra(3,namax),sorg(3)
-    real(8),intent(inout):: tag(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),sorg(3)
+    real(rp),intent(inout):: tag(namax)
     integer:: gid,isp,ia,gti,igvar
-    real(8):: ti,ri(3),dri(3),rad2
+    real(rp):: ti,ri(3),dri(3),rad2
 
     do gid=1,4
       if( gtiming(gid).eq.0 ) cycle

@@ -18,6 +18,8 @@ program pmd
 !   out.stress: Stress component normal to z-upper surface of nanorod,
 !               and z-strain of the nanorod.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use pmdio,only: read_pmdtot_bin, read_pmdtot_ascii, write_pmdtot_bin, &
        write_pmdtot_ascii,get_ntot_ascii,get_ntot_bin
@@ -36,26 +38,25 @@ program pmd
   use impulse,only: init_impulse, final_impulse, l_impls, l_macro_impls
 !$  use omp_lib
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
 
 #ifdef __DISL__
 !.....Epot threshold for disl core extraction [Hartree]
-  real(8),parameter:: epith = -0.1410d0
+  real(rp),parameter:: epith = -0.1410d0
 #endif
 
-  real(8):: hunit,hmat(3,3,0:1)
+  real(rp):: hunit,hmat(3,3,0:1)
   integer:: ntot0
-  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
-  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
-  real(8),allocatable:: auxtot(:,:)
+  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(rp),allocatable:: auxtot(:,:)
 
   integer:: i,j,k,l,m,n,ia,ib,is,ifmv,nave,nspl,i_conv,inc
   integer:: mpicolor,mpikey,ierr,jerr,itmp,nprocs,nnmax_est,mem
-  real(8):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
-  real(8):: epot,ekin,stnsr(3,3)
-  real(8):: t0,t1
+  real(rp):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
+  real(rp):: epot,ekin,stnsr(3,3)
+  real(rp):: t0,t1
   character(len=3):: csp
   type(atom):: elem
 
@@ -218,8 +219,8 @@ program pmd
     call set_seed(rseed+myid_md)
   endif
   tmp = urnd()
-  call mpi_bcast(hunit,1,mpi_real8,0,mpi_md_world,ierr)
-  call mpi_bcast(hmat,9*2,mpi_real8,0,mpi_md_world,ierr)
+  call mpi_bcast(hunit,1,mpi_real_rp,0,mpi_md_world,ierr)
+  call mpi_bcast(hmat,9*2,mpi_real_rp,0,mpi_md_world,ierr)
 !.....Broadcast species data read from pmdini  
   call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(has_specorder,1,mpi_logical,0,mpicomm,ierr)
@@ -365,6 +366,8 @@ subroutine write_headline()
 ! Write out headline info for pmd users.
 ! Assuming that this is called only at 0-th node.
 !
+  use pmdmpi
+  use mod_precision
   use time, only: time_stamp
   use version, only: write_revision, write_authors, write_runtime
   
@@ -381,6 +384,7 @@ subroutine write_headline()
 end subroutine write_headline
 !=======================================================================
 subroutine write_initial_setting()
+  use mod_precision
   use pmdvars
   use pmdmpi
   use force
@@ -566,6 +570,8 @@ subroutine write_initial_setting()
 end subroutine write_initial_setting
 !=======================================================================
 subroutine write_inpmd(ionum,cfname)
+  use pmdmpi
+  use mod_precision
   integer,intent(in):: ionum
   character(len=*),intent(in):: cfname
 
@@ -591,10 +597,11 @@ subroutine write_inpmd(ionum,cfname)
 end subroutine write_inpmd
 !=======================================================================
 subroutine check_inpmd_consistency(myid)
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use deform,only: cdeform
   implicit none 
-  include 'mpif.h'
   integer,intent(in):: myid
   integer:: istat,ierr
 
@@ -624,6 +631,8 @@ subroutine check_inpmd_consistency(myid)
 end subroutine check_inpmd_consistency
 !=======================================================================
 subroutine bcast_params(nprocs)
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use force
   use extforce,only: lextfrc,cspc_extfrc,extfrc
@@ -637,7 +646,6 @@ subroutine bcast_params(nprocs)
   use virtual_wall, only: bcast_vwall
   use impulse,only: l_impls, bcast_impulse
   implicit none
-  include 'mpif.h'
   integer,intent(in):: nprocs
   integer:: ierr
 
@@ -652,24 +660,24 @@ subroutine bcast_params(nprocs)
   call mpi_bcast(nnmax,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(nstp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(minstp,1,MPI_INTEGER,0,mpicomm,ierr)
-  call mpi_bcast(dt,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(vardt_len,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(rc,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(rc1nn,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(rbuf,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(dt,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(vardt_len,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(rc,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(rc1nn,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(rbuf,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(cmin,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(dmp,1,MPI_REAL8,0,mpicomm,ierr)
-  call mpi_bcast(eps_conv,1,MPI_REAL8,0,mpicomm,ierr)
+  call mpi_bcast(dmp,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(eps_conv,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(n_conv,1,mpi_integer,0,mpicomm,ierr)
-  call mpi_bcast(tinit,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(tfin,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(tinit,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(tfin,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(ctctl,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(ttgt,maxntemps,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(ttgt,maxntemps,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(lmultemps,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(ntemps,1,mpi_integer,0,mpicomm,ierr)
-  call mpi_bcast(trlx,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(tlimit,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(rseed,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(trlx,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(tlimit,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(rseed,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(nerg,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ifpmd,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(loutforce,1,mpi_logical,0,mpicomm,ierr)
@@ -677,36 +685,36 @@ subroutine bcast_params(nprocs)
   call mpi_bcast(ifsort,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(ifdmp,1,MPI_INTEGER,0,mpicomm,ierr)
   call mpi_bcast(iprint,1,mpi_integer,0,mpicomm,ierr)
-  call mpi_bcast(fmv,30,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(fmv,30,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(nfmv,1,mpi_integer,0,mpicomm,ierr)
-  call mpi_bcast(shrst,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(shrst,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(cpctl,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(ptgt,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(pini,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(pfin,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(srlx,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(stbeta,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(stgt,9,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(sratemax,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(ptgt,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(pini,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(pfin,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(srlx,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(stbeta,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(stgt,9,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(sratemax,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(lcellfix,9,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(czload_type,128,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(zskin_width,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(zshear_angle,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(strfin,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(am,nspmax,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(zskin_width,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(zshear_angle,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(strfin,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(am,nspmax,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(specorder,nspmax*3,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(ciofmt,6,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(nrmtrans,6,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lstrs0,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(lhydrostatic,1,mpi_logical,0,mpicomm,ierr)
   call mpi_bcast(boundary,3,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(pka_energy,1,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(pka_energy,1,mpi_real_rp,0,mpicomm,ierr)
   call mpi_bcast(nomp,1,mpi_integer,0,mpicomm,ierr)
   call mpi_bcast(lrealloc,1,mpi_logical,0,mpicomm,ierr)
 !.....Deformation
   call mpi_bcast(cdeform,20,mpi_character,0,mpicomm,ierr)
-  call mpi_bcast(trlx_deform,1,mpi_real8,0,mpicomm,ierr)
-  call mpi_bcast(dhmat,3*3,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(trlx_deform,1,mpi_real_rp,0,mpicomm,ierr)
+  call mpi_bcast(dhmat,3*3,mpi_real_rp,0,mpicomm,ierr)
 !.....Descriptor
   call mpi_bcast(lout_desc,1,mpi_logical,0,mpicomm,ierr)
 !.....Charge related
@@ -726,7 +734,7 @@ subroutine bcast_params(nprocs)
 !!$  endif
 !!$  call mpi_bcast(force_list,128*num_forces,mpi_character &
 !!$       ,0,mpicomm,ierr)
-  call mpi_bcast(schg,nspmax,mpi_real8,0,mpicomm,ierr)
+  call mpi_bcast(schg,nspmax,mpi_real_rp,0,mpicomm,ierr)
 !.....NEMD
   call mpi_bcast(ltdst,1,mpi_logical,0,mpicomm,ierr)
   if( ltdst ) then
@@ -737,8 +745,8 @@ subroutine bcast_params(nprocs)
   if( lclrchg ) then
     call mpi_bcast(cspc_clrchg,3,mpi_character,0,mpicomm,ierr)
     call mpi_bcast(clr_set,20,mpi_character,0,mpicomm,ierr)
-    call mpi_bcast(clrfield,3,mpi_real8,0,mpicomm,ierr)
-    call mpi_bcast(clrregion,6,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(clrfield,3,mpi_real_rp,0,mpicomm,ierr)
+    call mpi_bcast(clrregion,6,mpi_real_rp,0,mpicomm,ierr)
   endif
 !.....Local flux
   call mpi_bcast(lflux,1,mpi_logical,0,mpicomm,ierr)
@@ -752,7 +760,7 @@ subroutine bcast_params(nprocs)
   call mpi_bcast(lextfrc,1,mpi_logical,0,mpicomm,ierr)
   if( lextfrc ) then
     call mpi_bcast(cspc_extfrc,3,mpi_character,0,mpicomm,ierr)
-    call mpi_bcast(extfrc,3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(extfrc,3,mpi_real_rp,0,mpicomm,ierr)
   endif
 !.....Probability density
   call mpi_bcast(lpdens,1,mpi_logical,0,mpicomm,ierr)
@@ -761,8 +769,8 @@ subroutine bcast_params(nprocs)
     call mpi_bcast(npx,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(npy,1,mpi_integer,0,mpicomm,ierr)
     call mpi_bcast(npz,1,mpi_integer,0,mpicomm,ierr)
-    call mpi_bcast(orig_pdens,3,mpi_real8,0,mpicomm,ierr)
-    call mpi_bcast(hmat_pdens,3*3,mpi_real8,0,mpicomm,ierr)
+    call mpi_bcast(orig_pdens,3,mpi_real_rp,0,mpicomm,ierr)
+    call mpi_bcast(hmat_pdens,3*3,mpi_real_rp,0,mpicomm,ierr)
   endif
 !.....Metadynamics
   call mpi_bcast(lmetaD,1,mpi_logical,0,mpicomm,ierr)
@@ -785,16 +793,18 @@ subroutine bcast_params(nprocs)
 end subroutine bcast_params
 !=======================================================================
 subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
+  use pmdmpi
+  use mod_precision
   use util,only: itotOf
   implicit none
   include "./params_unit.h"
   integer,intent(in):: ionum,ntot
   character(len=*),intent(in):: cpostfix
-  real(8),intent(in):: h(3,3),epot,stnsr(3,3)
-  real(8),intent(inout):: tagtot(ntot),atot(3,ntot)
+  real(rp),intent(in):: h(3,3),epot,stnsr(3,3)
+  real(rp),intent(inout):: tagtot(ntot),atot(3,ntot)
 
   integer:: i,n0,ixyz,ierr
-  real(8):: at(3),ptmp(6)
+  real(rp):: at(3),ptmp(6)
   integer,parameter:: nmpi = 2
 !!$  integer,external:: itotOf
 
@@ -826,11 +836,13 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
 end subroutine write_force
 !=======================================================================
 subroutine set_atomic_charges(ntot,chg,tag,nspmax,chgfix,schg,myid,iprint)
+  use pmdmpi
+  use mod_precision
   implicit none 
   integer,intent(in):: ntot,nspmax,myid,iprint
-  real(8),intent(in):: tag(ntot),schg(nspmax)
+  real(rp),intent(in):: tag(ntot),schg(nspmax)
   character(len=*),intent(in):: chgfix
-  real(8),intent(out):: chg(ntot)
+  real(rp),intent(out):: chg(ntot)
 
   integer:: i,is
 
@@ -847,6 +859,8 @@ subroutine set_atomic_charges(ntot,chg,tag,nspmax,chgfix,schg,myid,iprint)
 end subroutine set_atomic_charges
 !=======================================================================
 subroutine check_ensemble()
+  use pmdmpi
+  use mod_precision
   use pmdvars
   implicit none
 
@@ -885,11 +899,12 @@ subroutine check_tags(ntot,tagtot,iprint)
 !  Check sanity of tags:
 !  - whether the num of atoms is consistent with itotOf(tag)
 !
+  use pmdmpi
+  use mod_precision
   use util,only: ithOf, itotOf
   use pmdvars,only: myid_md, mpicomm
-  include "mpif.h"
   integer,intent(in):: ntot,iprint
-  real(8),intent(in):: tagtot(ntot)
+  real(rp),intent(in):: tagtot(ntot)
 
   integer:: i,itotmax
 
@@ -911,16 +926,18 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 ! 
 ! Add PKA velocity to some atom from a given PKA energy
 ! 
+  use pmdmpi
+  use mod_precision
   use pmdvars
   use random,only: urnd
   implicit none
   include './params_unit.h'
   integer,intent(in):: ntot0
-  real(8),intent(in):: tagtot(ntot0),rtot(3,ntot0),hmat(3,3,0:1)
-  real(8),intent(inout):: vtot(3,ntot0)
+  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),hmat(3,3,0:1)
+  real(rp),intent(inout):: vtot(3,ntot0)
 
   integer:: i,icntr,is
-  real(8):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz
+  real(rp):: dmin,d,theta,phi,rx,ry,rz,vel,vx,vy,vz
 
   if( myid_md.eq.0 ) then
     if( iatom_pka.le.0 ) then
@@ -981,15 +998,17 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 !
 !  Determine parallel division along a1,a2,a3.
 !
+  use pmdmpi
+  use mod_precision
   use vector,only: dot
   implicit none
   include "./const.h"
   integer,intent(in):: nnode,myid,iprint
-  real(8),intent(in):: h(3,3),rc
+  real(rp),intent(in):: h(3,3),rc
   integer,intent(inout):: nx,ny,nz
 
   integer:: imax,nd(3),ndnew(3),nnew,iorder(3),i,j,k,l,m,n,ncycle
-  real(8):: al0(3),al(3)
+  real(rp):: al0(3),al(3)
 
 !.....If serial run, NX,NY,NZ should all be 1.
   if( nnode.eq.1 ) then

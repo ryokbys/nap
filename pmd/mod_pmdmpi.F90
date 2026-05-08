@@ -5,6 +5,7 @@ module pmdmpi
 ! Module that includes variables and parameters used for parallel
 ! computation with mpi for spatial decomposition MD simulation.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   save
   include 'mpif.h'
@@ -48,7 +49,7 @@ contains
 !=======================================================================
   subroutine assign_num_nodes(al1,al2,al3)
     use pmdvars,only: nodes_md
-    real(8),intent(in):: al1,al2,al3
+    real(rp),intent(in):: al1,al2,al3
 
     integer:: nfac,f,n
     integer:: maxfac = 100

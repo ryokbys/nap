@@ -1,8 +1,9 @@
 module LJ
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: nspmax
   use util,only: csp2isp
   implicit none
-  include "mpif.h"
   include "./params_unit.h"
   include "./const.h"
   save
@@ -16,20 +17,20 @@ module LJ
   integer:: nsp
 
 !.....LJ parameters for Argon (default)
-  real(8),parameter:: eps_Ar = 120d0 *fkb
-  real(8),parameter:: sgm_Ar = 3.41d-10 /ang
-  real(8),parameter:: am_Ar = 39.948d0
-  real(8),parameter:: alc_Ar = 2d0**(1d0/6)*sgm_Ar *1.41421356d0*0.996d0
+  real(rp),parameter:: eps_Ar = 120d0 *fkb
+  real(rp),parameter:: sgm_Ar = 3.41d-10 /ang
+  real(rp),parameter:: am_Ar = 39.948d0
+  real(rp),parameter:: alc_Ar = 2d0**(1d0/6)*sgm_Ar *1.41421356d0*0.996d0
 
 !.....Pair parameters to be read from param file
-  real(8):: epss(nspmax,nspmax), sgms(nspmax,nspmax), rcs(nspmax,nspmax)
+  real(rp):: epss(nspmax,nspmax), sgms(nspmax,nspmax), rcs(nspmax,nspmax)
 
-  real(8),allocatable:: strsl(:,:,:),aal(:,:)
+  real(rp),allocatable:: strsl(:,:,:),aal(:,:)
 !$acc declare create(aal,strsl)
   logical:: interact(msp,msp)
 
 
-  real(8):: rpl_c(msp,msp), rpl_rc(msp,msp)
+  real(rp):: rpl_c(msp,msp), rpl_rc(msp,msp)
   integer:: rpl_n(msp,msp)
 
 contains
@@ -47,19 +48,19 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
     integer:: ia,ja,jj,isp,jsp,ierr,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij,rij2,riji,dvdr, &
+    real(rp):: xi(3),xij(3),rij,rij2,riji,dvdr, &
          dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp,sgm6,sgm12, &
          riji6,riji12,epsij,sgmij,rcij,rcij2
 
     logical,save:: l1st=.true.
-    real(8),save:: vrc,dvdrc
-    real(8),save:: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax), &
+    real(rp),save:: vrc,dvdrc
+    real(rp),save:: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax), &
          rc2s(nspmax,nspmax)
 
     if( l1st ) then
@@ -169,7 +170,7 @@ contains
 
 !-----gather epot
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum, &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum, &
          mpi_md_world,ierr)
     epot= epot +epott
 
@@ -188,20 +189,20 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz,jj,nij
-    real(8):: xi(3),xij(3),rij(3),dij,dij2,diji,diji6,diji12,dvdr &
+    real(rp):: xi(3),xij(3),rij(3),dij,dij2,diji,diji6,diji12,dvdr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp,rcij&
          ,vr,vrc,dvdrc,cij
-    real(8),save:: vrcs(msp,msp),dvdrcs(msp,msp)
-!!$    real(8),external:: fcut1,dfcut1
+    real(rp),save:: vrcs(msp,msp),dvdrcs(msp,msp)
+!!$    real(rp),external:: fcut1,dfcut1
 
-    real(8),save:: rcmax2
+    real(rp),save:: rcmax2
 
     if( l1st ) then
 !!$      call init_Morse(natm,tag,mpi_md_world)!
@@ -290,7 +291,7 @@ contains
 
 !-----gather epot
     epott= 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot LJ_repl= ',epott
 
@@ -309,13 +310,13 @@ contains
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in):: rc
+    real(rp),intent(in):: rc
 
     character(len=128):: cline,cfname
     character(len=3):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
     logical:: lexist
-    real(8):: cij,rcij,epsij,sgmij
+    real(rp):: cij,rcij,epsij,sgmij
 !!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
@@ -386,9 +387,9 @@ contains
     endif
 
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(epss,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(epss,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(sgms,nspmax*nspmax,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rcs,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rcs,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
     return
   end subroutine read_params_LJ
 !=======================================================================
@@ -404,7 +405,7 @@ contains
     character(len=3):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
     logical:: lexist
-    real(8):: cij,rcij
+    real(rp):: cij,rcij
 !!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
@@ -467,9 +468,9 @@ contains
     endif
 
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(rpl_c,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rpl_c,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(rpl_n,nspmax*nspmax,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(rpl_rc,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(rpl_rc,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
     return
   end subroutine read_params_LJ_repul
 !=======================================================================

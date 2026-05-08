@@ -7,11 +7,13 @@ module Bonny_WRe
 !-----------------------------------------------------------------------
 !  Species 1 should be W and 2 should be Re.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   implicit none
   include "./const.h"
   character(len=128):: paramsdir = ''
 
-  real(8),external:: hvsd
+  real(rp),external:: hvsd
 
 !.....Max num of species
   integer,parameter:: msp = 9
@@ -19,53 +21,53 @@ module Bonny_WRe
   logical:: interact(msp,msp)
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(8),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
-  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
-  real(8):: qnucl(1:2) = (/ &
+  real(rp):: qnucl(1:2) = (/ &
        74.0d0, & ! 1, W
        75.0d0  & ! 2, Re
        /)
 
-  real(8):: r_inner(1:2,1:2) = reshape( (/ 1d0, 1d0, 1d0, 1d0 /), &
+  real(rp):: r_inner(1:2,1:2) = reshape( (/ 1d0, 1d0, 1d0, 1d0 /), &
        shape(r_inner) )
-  real(8):: r_outer(1:2,1:2) = reshape( (/ 2d0, 2d0, 2d0, 2d0 /), &
+  real(rp):: r_outer(1:2,1:2) = reshape( (/ 2d0, 2d0, 2d0, 2d0 /), &
        shape(r_outer) )
 
-  real(8),parameter:: bonny_rc(1:2,1:2) = reshape( &
+  real(rp),parameter:: bonny_rc(1:2,1:2) = reshape( &
        (/ 5.460d0, 3.825d0 , &  ! 1-1 W-W, 1-2 W-Re
           3.825d0, 5.460d0 /) &  ! 2-1 Re-W, 2-2 Re-Re
           , shape(bonny_rc) )
 
 !.....Pure W parameters
-  real(8),parameter:: gauge_C = 1.848055990d0
-  real(8),parameter:: gauge_S = 0.2232322602d0
+  real(rp),parameter:: gauge_C = 1.848055990d0
+  real(rp),parameter:: gauge_S = 0.2232322602d0
 
-  real(8),parameter:: A0_W  = -5.524855802d0
-  real(8),parameter:: A1_W  =  2.317313103d-1
-  real(8),parameter:: A2_W  = -3.665345949d-2
-  real(8),parameter:: A3_W  =  8.989367404d-3
-  real(8),parameter:: rhoi_W = 1.359141225d0
+  real(rp),parameter:: A0_W  = -5.524855802d0
+  real(rp),parameter:: A1_W  =  2.317313103d-1
+  real(rp),parameter:: A2_W  = -3.665345949d-2
+  real(rp),parameter:: A3_W  =  8.989367404d-3
+  real(rp),parameter:: rhoi_W = 1.359141225d0
   
-  real(8),parameter:: rhospln_rc = 2.002970124727d0
+  real(rp),parameter:: rhospln_rc = 2.002970124727d0
   integer,parameter:: n_rhospln = 4
-  real(8),parameter:: rhospln_a(1:4) = (/&
+  real(rp),parameter:: rhospln_a(1:4) = (/&
        -0.420429107805055d+1, &
         0.518217702261442d0,  &
         0.562720834534370d-1, &
         0.344164178842340d-1 &
         /)
-  real(8),parameter:: rhospln_r(1:4) = (/&
+  real(rp),parameter:: rhospln_r(1:4) = (/&
        2.5d0, &
        3.1d0, &
        3.5d0, &
        4.9d0 &
        /)
-  real(8),parameter:: fspln_a1 = -5.946454472402710d0
-  real(8),parameter:: fspln_a2 = -0.049477376935239d0
+  real(rp),parameter:: fspln_a1 = -5.946454472402710d0
+  real(rp),parameter:: fspln_a2 = -0.049477376935239d0
   integer,parameter:: n_vspln = 15
-  real(8),parameter:: vspln_a(1:15) = (/ &
+  real(rp),parameter:: vspln_a(1:15) = (/ &
         0.960851701343041d+2, &
        -0.184410923895214d+3, &
         0.935784079613550d+2, &
@@ -82,7 +84,7 @@ module Bonny_WRe
        -0.163131143161660d+1, &
         0.138409896486177d+1  &
         /)
-  real(8),parameter:: vspln_r(1:15) = (/ &
+  real(rp),parameter:: vspln_r(1:15) = (/ &
        2.5648975d0, &
        2.6297950d0, &
        2.6946925d0, &
@@ -101,13 +103,13 @@ module Bonny_WRe
        /)
   
 !.....Pure Re parameters
-  real(8),parameter:: A_Re = -7.046791948d0
-  real(8),parameter:: B_Re =  1.236584720d0
-  real(8),parameter:: C_Re =  1.143405627d0
-  real(8),parameter:: C0_Re=  3.704045964d-3
+  real(rp),parameter:: A_Re = -7.046791948d0
+  real(rp),parameter:: B_Re =  1.236584720d0
+  real(rp),parameter:: C_Re =  1.143405627d0
+  real(rp),parameter:: C0_Re=  3.704045964d-3
 
   integer,parameter:: n_veq_ReRe = 6
-  real(8),parameter:: veq_ReRe_a(1:6) = (/ &
+  real(rp),parameter:: veq_ReRe_a(1:6) = (/ &
         6.726805309d0, &
         3.217593889d0, &
        -6.545857587d-1, &
@@ -115,7 +117,7 @@ module Bonny_WRe
        -2.063629464d-1, &
         6.114909116d-2  &
         /)
-  real(8),parameter:: veq_ReRe_r(1:6) = (/ &
+  real(rp),parameter:: veq_ReRe_r(1:6) = (/ &
         2.700d0, &
         3.252d0, &
         3.804d0, &
@@ -126,7 +128,7 @@ module Bonny_WRe
 
 !.....W-Re parameters
   integer,parameter:: n_veq_WRe = 6
-  real(8),parameter:: veq_WRe_a(1:6) = (/ &
+  real(rp),parameter:: veq_WRe_a(1:6) = (/ &
        -2.335000000d+1,  &
         2.456959229d+1,  &
        -2.585878138d0,   &
@@ -134,7 +136,7 @@ module Bonny_WRe
        -7.013105493d-1,  &
        -0.25133241d0     &
        /)
-  real(8),parameter:: veq_WRe_r(1:6) = (/ &
+  real(rp),parameter:: veq_WRe_r(1:6) = (/ &
        2.650d0, &
        2.700d0, &
        3.075d0, &
@@ -148,25 +150,24 @@ contains
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,lspr(0:nnmax,namax)&
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
          ,rc,tag(namax)
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xij(3),rij(3),dij,dij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3) &
+    real(rp):: xij(3),rij(3),dij,dij2,rcij,dfi,dfj,drdxi(3),drdxj(3),r,at(3) &
          ,xi(3),xj(3),epotl,epott,tmp,dtmp,drhoi,drhoj,d
-    real(8),allocatable,save:: rho(:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp),allocatable,save:: rho(:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
-    real(8),save:: rcmax,rcmax2
+    real(rp),save:: rcmax,rcmax2
 
     if( l1st ) then
       if( rc.lt.bonny_rc(1,1) ) then
@@ -313,7 +314,7 @@ contains
     endif
 
 !-----gather epot
-    call mpi_allreduce(epotl,epott,1,mpi_real8 &
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
 
@@ -323,9 +324,9 @@ contains
 !
 ! Calculate rho of atom j at distance rij.
 !
-    real(8),intent(in):: rij
+    real(rp),intent(in):: rij
     integer,intent(in):: js
-    real(8):: rhoij
+    real(rp):: rhoij
 
     rhoij = 0d0
     if( js.eq.1 ) then  ! Only in case of W, scaling with S
@@ -338,9 +339,9 @@ contains
 !=======================================================================
   function drhoij(js,rij)
     implicit none
-    real(8),intent(in):: rij
+    real(rp),intent(in):: rij
     integer,intent(in):: js
-    real(8):: drhoij
+    real(rp):: drhoij
 
     drhoij = 0d0
     if( js.eq.1 ) then
@@ -356,8 +357,8 @@ contains
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
     implicit none
-    real(8),intent(in):: rij
-    real(8):: rhospln,ri
+    real(rp),intent(in):: rij
+    real(rp):: rhospln,ri
     integer:: i
 
     rhospln = 0d0
@@ -382,8 +383,8 @@ contains
 !  rho_j(rij) from Marinica et al., JAP 121 (2017)
 !
     implicit none
-    real(8),intent(in):: rij
-    real(8):: drhospln,ri
+    real(rp),intent(in):: rij
+    real(rp):: drhospln,ri
     integer:: i
 
     drhospln = 0d0
@@ -403,8 +404,8 @@ contains
   function frho(is,rho)
     implicit none
     integer,intent(in):: is
-    real(8),intent(in):: rho
-    real(8):: frho
+    real(rp),intent(in):: rho
+    real(rp):: frho
 
     if( is.eq.1 ) then  ! W
       if( rho.le.rhoi_W ) then
@@ -422,8 +423,8 @@ contains
   function dfrho(is,rho)
     implicit none
     integer,intent(in):: is
-    real(8),intent(in):: rho
-    real(8):: dfrho
+    real(rp),intent(in):: rho
+    real(rp):: dfrho
 
     if( is.eq.1 ) then  ! W
       if( rho.le.rhoi_W ) then
@@ -442,8 +443,8 @@ contains
 !  F^{eff} for pure W
 !
     implicit none
-    real(8),intent(in):: rho
-    real(8):: feff
+    real(rp),intent(in):: rho
+    real(rp):: feff
 
     feff = fspln(rho/gauge_S) +gauge_C/gauge_S*rho
     return
@@ -454,8 +455,8 @@ contains
 !  Derivative of F^{eff} for pure W
 !
     implicit none
-    real(8),intent(in):: rho
-    real(8):: dfeff
+    real(rp),intent(in):: rho
+    real(rp):: dfeff
 
     dfeff = dfspln(rho/gauge_S)/gauge_S +gauge_C/gauge_S
     return
@@ -466,8 +467,8 @@ contains
 !  F[rho] function from Marinica, JAP 121, 165107 (2017)
 !
     implicit none
-    real(8),intent(in):: rho
-    real(8):: fspln
+    real(rp),intent(in):: rho
+    real(rp):: fspln
 
     fspln = fspln_a1*dsqrt(rho) +fspln_a2*rho*rho
     return
@@ -478,8 +479,8 @@ contains
 !  Derivative of F[rho] function from Marinica et al.
 !
     implicit none
-    real(8),intent(in):: rho
-    real(8):: dfspln
+    real(rp),intent(in):: rho
+    real(rp):: dfspln
 
     dfspln = 0.5d0*fspln_a1/dsqrt(rho) +2d0*fspln_a2*rho
     return
@@ -491,9 +492,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: vij
-    real(8):: ri,ro,veqt
+    real(rp),intent(in):: rij
+    real(rp):: vij
+    real(rp):: ri,ro,veqt
 
     ri = r_inner(is,js)
     ro = r_outer(is,js)
@@ -515,9 +516,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dvij
-    real(8):: ri,ro
+    real(rp),intent(in):: rij
+    real(rp):: dvij
+    real(rp):: ri,ro
 
     ri = r_inner(is,js)
     ro = r_outer(is,js)
@@ -539,9 +540,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: vnucl
-    real(8):: rs,qi,qj
+    real(rp),intent(in):: rij
+    real(rp):: vnucl
+    real(rp):: rs,qi,qj
 
     qi = qnucl(is)
     qj = qnucl(js)
@@ -558,9 +559,9 @@ contains
 !
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dvnucl
-    real(8):: rs,qi,qj
+    real(rp),intent(in):: rij
+    real(rp):: dvnucl
+    real(rp):: rs,qi,qj
 
     qi = qnucl(is)
     qj = qnucl(js)
@@ -575,9 +576,9 @@ contains
   function veq(is,js,rij)
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: veq
-    real(8):: rk
+    real(rp),intent(in):: rij
+    real(rp):: veq
+    real(rp):: rk
     integer:: i
 
     veq = 0d0
@@ -604,9 +605,9 @@ contains
   function dveq(is,js,rij)
     implicit none
     integer,intent(in):: is,js
-    real(8),intent(in):: rij
-    real(8):: dveq
-    real(8):: rk
+    real(rp),intent(in):: rij
+    real(rp):: dveq
+    real(rp):: rk
     integer:: i
 
     dveq = 0d0
@@ -634,8 +635,8 @@ contains
 !=======================================================================
   function vspln(rij)
     implicit none
-    real(8),intent(in):: rij
-    real(8):: vspln,ri
+    real(rp),intent(in):: rij
+    real(rp):: vspln,ri
     integer:: i
 
     vspln = 0d0
@@ -649,8 +650,8 @@ contains
 !=======================================================================
   function dvspln(rij)
     implicit none
-    real(8),intent(in):: rij
-    real(8):: dvspln,ri
+    real(rp),intent(in):: rij
+    real(rp):: dvspln,ri
     integer:: i
 
     dvspln = 0d0
@@ -665,8 +666,8 @@ contains
 !=======================================================================
   function xi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: xi
+    real(rp),intent(in):: x
+    real(rp):: xi
 
     xi= 0.1818d0*exp(-3.2d0*x) &
          +0.5099d0*exp(-0.9423d0*x) &
@@ -677,8 +678,8 @@ contains
 !=======================================================================
   function dxi(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dxi
+    real(rp),intent(in):: x
+    real(rp):: dxi
 
     dxi= -0.58176d0*exp(-3.2d0*x) &
          -0.48047877d0*exp(-0.9423d0*x) &
@@ -689,8 +690,8 @@ contains
 !=======================================================================
   function zeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: zeta
+    real(rp),intent(in):: x
+    real(rp):: zeta
 
     zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
     return
@@ -698,8 +699,8 @@ contains
 !=======================================================================
   function dzeta(x)
     implicit none
-    real(8),intent(in):: x
-    real(8):: dzeta
+    real(rp),intent(in):: x
+    real(rp):: dzeta
 
     dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
     return

@@ -3,20 +3,21 @@ module deform
 !  Module for applying deformation to the simulation cell.
 !                     Last-modified: <2022-05-27 22:37:00 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   include "./const.h"
   save
 
   character(len=20):: cdeform= 'none'
-  real(8):: trlx_deform = -1d0  ! default: minus, THIS MUST BE SPECIFIED BY THE USER
-  real(8):: dhmat(1:3,1:3) = 0d0  ! deviation of h-matrix in given trlx_deform
-  real(8):: ddhmat(1:3,1:3) = 0d0  ! deviation of h-matrix per fs
+  real(rp):: trlx_deform = -1d0  ! default: minus, THIS MUST BE SPECIFIED BY THE USER
+  real(rp):: dhmat(1:3,1:3) = 0d0  ! deviation of h-matrix in given trlx_deform
+  real(rp):: ddhmat(1:3,1:3) = 0d0  ! deviation of h-matrix per fs
   
 contains
 !=======================================================================
   subroutine init_deform(hmat,myid,iprint)
     integer,intent(in):: myid,iprint
-    real(8),intent(in):: hmat(3,3)
+    real(rp),intent(in):: hmat(3,3)
 
     integer:: i,j
 
@@ -51,8 +52,8 @@ contains
 !
 !  Apply deformation to the cell
 !
-    real(8),intent(inout):: hmat(3,3)
-    real(8),intent(in):: dt,simtime
+    real(rp),intent(inout):: hmat(3,3)
+    real(rp),intent(in):: dt,simtime
 
     if( simtime.gt.trlx_deform ) return
     hmat(1:3,1:3) = hmat(1:3,1:3) +ddhmat(1:3,1:3)*dt

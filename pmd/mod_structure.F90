@@ -4,11 +4,12 @@ module structure
 !-----------------------------------------------------------------------
 !  Routines of structure analyses.
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
   save
 
   integer:: mem = 0
-  real(8):: time = 0d0
+  real(rp):: time = 0d0
 
 !.....CNA
   integer,parameter:: idfcc = 1
@@ -153,13 +154,13 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,nbndr,nnmax,lspr(0:nnmax,namax)
-    real(8),intent(in):: rcut,h(3,3),ra(3,namax)
+    real(rp),intent(in):: rcut,h(3,3),ra(3,namax)
 
     integer,allocatable:: lsnn(:,:)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,n421,n422,n663,n443
-    real(8):: rc2,xi(3),xij(3),rij(3),dij2
+    real(rp):: rc2,xi(3),xij(3),rij(3),dij2
 
 !-----for parallel code
     if( lcna1st ) then
@@ -217,13 +218,13 @@ contains
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,nbndr,nnmax
-    real(8),intent(in):: rcut,h(3,3),ra(3,namax)
+    real(rp),intent(in):: rcut,h(3,3),ra(3,namax)
     integer,intent(inout):: lspr(0:nnmax,namax)
 
     integer:: i,j,l,m,n,ii,iii,ni,jj,kk,nj,il,jl,n1,n2,iil,nn1,im,iim &
          ,ib1,ib2,iib1,iib2,itmp,lm,istart
-    real(8):: tmp,xi(3),xj(3),xij(3),rij(3),dij2,dsum,dsum1,dsum2
-    real(8),allocatable,save:: rcfccs(:),rcbccs(:),d2lspr(:,:)
+    real(rp):: tmp,xi(3),xj(3),xij(3),rij(3),dij2,dsum,dsum1,dsum2
+    real(rp),allocatable,save:: rcfccs(:),rcbccs(:),d2lspr(:,:)
     integer,allocatable,save:: lsnn(:,:)
 
 !-----for parallel code
@@ -336,7 +337,7 @@ contains
     integer,intent(in):: namax,natm,nbndr,nnmax,lspr(0:nnmax,namax)
 
     integer:: i,ii,l,m,n,n421,n422,n663,n443
-    real(8):: rc2
+    real(rp):: rc2
 
 !.....Identify crystalline structure and assign a digit to each atom
     do i=1,natm

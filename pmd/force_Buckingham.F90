@@ -5,6 +5,8 @@ module Buckingham
 !  Parallel implementation of Buckingham calculation
 !    - only force on i is considered, no need to send back
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   use util,only: csp2isp
   use memory,only: accum_mem
@@ -18,10 +20,10 @@ module Buckingham
 
 !.....Max number of species available in the potential
   integer:: nspcs
-  real(8):: buck_a(nspmax,nspmax), buck_rho(nspmax,nspmax), buck_c(nspmax,nspmax)
+  real(rp):: buck_a(nspmax,nspmax), buck_rho(nspmax,nspmax), buck_c(nspmax,nspmax)
   logical:: interact(nspmax,nspmax)
 !.....Smooth cutoff
-  real(8):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
+  real(rp):: vrcs(nspmax,nspmax), dvdrcs(nspmax,nspmax)
 
   logical:: lprmset_Buckingham
   
@@ -38,25 +40,24 @@ contains
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6)
-    real(8),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st 
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
-    real(8):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2,dij6 &
+    real(rp):: xi(3),xij(3),rij(3),dij,diji,dvdr,dij2,dij6 &
          ,dxdi(3),dxdj(3),epotl,epott,at(3),tmp &
          ,aij,rhoij,cij,texp,vrc,dvdrc
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 
-    real(8),save:: rcmax2
+    real(rp),save:: rcmax2
 
 !!$    integer,external:: itotOf
 
@@ -145,7 +146,7 @@ contains
 
 !-----gather epot
     epott = 0d0
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( myid.eq.0 .and. iprint.ge.ipl_info ) &
          write(6,'(a,es15.7)') ' epot Buckingham = ',epott
@@ -169,11 +170,10 @@ contains
 !     O     O     4869.99      0.2402     27.22
 !-----------------------------------------------------------------------
     implicit none
-    include 'mpif.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
 
     integer:: isp,jsp,ierr
-    real(8):: a,rho,c
+    real(rp):: a,rho,c
     character(len=128):: cline,fname
     character(len=3):: cspi,cspj
 
@@ -219,9 +219,9 @@ contains
       endif
     endif
 
-    call mpi_bcast(buck_a,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(buck_rho,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
-    call mpi_bcast(buck_c,nspmax*nspmax,mpi_real8,0,mpi_md_world,ierr)
+    call mpi_bcast(buck_a,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(buck_rho,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
+    call mpi_bcast(buck_c,nspmax*nspmax,mpi_real_rp,0,mpi_md_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_md_world,ierr)
     
   end subroutine read_params_Buckingham

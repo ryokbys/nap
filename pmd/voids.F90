@@ -9,22 +9,23 @@ program voids
 !    > The mesh point having an atom within cutoff distance ==> 0
 !    > otherwise (void mesh) ==> -1
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   implicit none
 
   character(len=128),parameter:: cpmdini='pmdini'
   integer:: ntot
-  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
-  real(8),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
-  real(8),allocatable:: auxtot(:,:)
+  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
+  real(rp),allocatable:: auxtot(:,:)
 
   integer:: nargc,ix,iy,iz,nx,ny,nz,nxyz,n,i,j,js,iflag,kux,kuy,kuz
   integer:: lcx,lcy,lcz,lcyz,lcxyz,mx,my,mz,m,m1x,m1y,m1z,m1
   integer,allocatable:: imesh(:,:,:),lscl(:),lshd(:)
-  real(8):: vol,sgm(3,3),hi(3,3)
-  real(8):: alx,aly,alz,x,y,z,rcx,rcy,rcz,rcxi,rcyi,rczi,pi(3) &
+  real(rp):: vol,sgm(3,3),hi(3,3)
+  real(rp):: alx,aly,alz,x,y,z,rcx,rcy,rcz,rcxi,rcyi,rczi,pi(3) &
        ,xij(3),rij(3),rij2,rc2,sidelen
-  real(8),allocatable:: pmesh(:,:)
+  real(rp),allocatable:: pmesh(:,:)
   character(len=128):: cusage,cfname,ctmp
 !.....Functions
   integer,external:: iargc
@@ -196,13 +197,14 @@ program voids
 end program voids
 !=======================================================================
 subroutine get_lattice_lengths(hmat,alx,aly,alz)
+  use mod_precision
 !
 !  Assuming the cell is orthogonal.
 !
-  real(8),intent(in):: hmat(3,3)
-  real(8),intent(out):: alx,aly,alz
+  real(rp),intent(in):: hmat(3,3)
+  real(rp),intent(out):: alx,aly,alz
 
-  real(8):: a(3),b(3),c(3)
+  real(rp):: a(3),b(3),c(3)
 
   a(1:3) = hmat(1:3,1)
   b(1:3) = hmat(1:3,2)
@@ -221,11 +223,12 @@ subroutine boxmat(h,hi,vol,sgm)
 !    HI:  inverse MD-box matrix
 !    SGM: cofactor matrix
 !-----------------------------------------------------------------------
+  use mod_precision
   implicit none
-  real(8),intent(in):: h(3,3,0:1)
-  real(8),intent(out):: vol,sgm(3,3),hi(3,3)
+  real(rp),intent(in):: h(3,3,0:1)
+  real(rp),intent(out):: vol,sgm(3,3),hi(3,3)
 
-  real(8):: hit(3,3)
+  real(rp):: hit(3,3)
   integer:: i,j,k,im,ip,jm,jp
 
 !-----cofactor matrix, SGM

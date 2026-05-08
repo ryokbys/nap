@@ -2,6 +2,7 @@ module constraints
 !
 !  Currently only one bond distant constraint is available.
 !
+  use mod_precision
   use vector,only: abc2cart, cart2abc, dot, norm2
   use util, only: num_data, itotOf, is_numeric
   implicit none
@@ -16,25 +17,25 @@ module constraints
   character(len=128):: ctype_const = 'bonds'
   integer:: nconst = 0
   integer:: maxiter = 100
-  real(8),allocatable:: dij(:),dij2(:),dini(:),dfin(:),dtol2(:)
+  real(rp),allocatable:: dij(:),dij2(:),dini(:),dfin(:),dtol2(:)
   integer,allocatable:: idcs0(:,:),idcs(:,:),idxyz(:)
-  real(8),allocatable:: rio(:,:),rjo(:,:)
-  real(8),allocatable:: ris(:,:),rjs(:,:),vis(:,:),vjs(:,:)
-  real(8),allocatable:: rijo(:,:)
-  real(8),allocatable:: dxyzi(:), dxyzf(:),dxyz(:)
+  real(rp),allocatable:: rio(:,:),rjo(:,:)
+  real(rp),allocatable:: ris(:,:),rjs(:,:),vis(:,:),vjs(:,:)
+  real(rp),allocatable:: rijo(:,:)
+  real(rp),allocatable:: dxyzi(:), dxyzf(:),dxyz(:)
   character(len=20),allocatable:: constype(:)
-  real(8):: tol = 1d-2
-  real(8):: vtol = 1d-8
+  real(rp):: tol = 1d-2
+  real(rp):: vtol = 1d-8
   
   
 contains
 !=======================================================================
   subroutine init_const(myid,mpi_world,nnode,iprint,h)
     integer,intent(in):: myid,mpi_world,nnode,iprint
-    real(8),intent(in):: h(3,3)
+    real(rp),intent(in):: h(3,3)
 
     integer:: ierr,ic
-    real(8):: alen(3),dlim
+    real(rp):: alen(3),dlim
 
     if( nnode.gt.1 ) then
       print *,'ERROR: contraints does not work in parallel mode.'
@@ -103,7 +104,7 @@ contains
 !!$    integer,external:: num_data
 
     integer:: i,j,ic,ixyz
-    real(8):: d,di,df,xyzi,xyzf
+    real(rp):: d,di,df,xyzi,xyzf
     character(len=128):: c1st,cline,fname,ctmp
     character(len=20):: cxi,cyi,czi,cxf,cyf,czf
     
@@ -217,7 +218,7 @@ contains
 !  NOTE: This is not applicable to parallel MD...
 !
     integer,intent(in):: namax,natm
-    real(8),intent(in):: tag(namax)
+    real(rp),intent(in):: tag(namax)
 !!$    integer,external:: itotOf
     integer:: ia,ic
     
@@ -239,11 +240,11 @@ contains
 !=======================================================================
   subroutine update_const(namax,natm,tag,ra,h,istp,maxstp)
     integer,intent(in):: namax,natm,istp,maxstp
-    real(8),intent(in):: tag(namax),ra(1:3,namax),h(3,3)
+    real(rp),intent(in):: tag(namax),ra(1:3,namax),h(3,3)
 !!$    integer,external:: itotOf
 
     integer:: ic,i,j
-    real(8):: ri(3),rj(3)
+    real(rp):: ri(3),rj(3)
 
     call get_indice(namax,natm,tag)
     do ic=1,nconst
@@ -281,11 +282,11 @@ contains
 !  Constraints on positions
 !
     integer,intent(in):: namax,natm,nspmax
-    real(8),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
-    real(8),intent(inout):: ra(3,namax),va(3,namax)
+    real(rp),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
+    real(rp),intent(inout):: ra(3,namax),va(3,namax)
 
     integer:: i,j,ia,ic,is,js,iter,ixyz,jxyz
-    real(8):: rij(3),rijos(3),vij(3),ami,amj,amij,dd,gmk,dijtmp(3)
+    real(rp):: rij(3),rijos(3),vij(3),ami,amj,amij,dd,gmk,dijtmp(3)
     logical:: not_conv
 
 !.....Normal velocity Verlet update of positions
@@ -395,11 +396,11 @@ contains
 !  Update velocities of atoms involved by the contraints
 !
     integer,intent(in):: namax,natm,nspmax
-    real(8),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
-    real(8),intent(inout):: va(3,namax)
+    real(rp),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
+    real(rp),intent(inout):: va(3,namax)
 
     integer:: ic,i,j,iter,is,js,ixyz
-    real(8):: vij(3),rij(3),sgm,ami,amj,amij,gmk
+    real(rp):: vij(3),rij(3),sgm,ami,amj,amij,gmk
     logical:: not_conv
 
     do ic=1,nconst

@@ -9,6 +9,8 @@ module tersoff
 !   [4] https://lammps.sandia.gov/doc/pair_tersoff_mod.html#tersoff-12
 !   [5] Shokeen, & Schelling, (1995).IEEE Transactions on Microwave Theory and Techniques, 43(8), 1826–1833
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax, nsp
   use util,only: csp2isp
   implicit none
@@ -20,8 +22,8 @@ module tersoff
 
 !.....global variables
   integer:: mem = 0
-  real(8):: time = 0d0
-  real(8):: ts_epot
+  real(rp):: time = 0d0
+  real(rp):: ts_epot
 
 !.....Tersoff type: (default) Kumagai's modified Tersoff, (Te-dependent) Te-dependent[5]
   character(len=12):: ts_type = 'default'
@@ -30,7 +32,7 @@ module tersoff
   integer:: ts_fc_type = 3
 
 !.....Original parameters from [2]
-  real(8):: ts_a(nspmax,nspmax), ts_b(nspmax,nspmax), ts_lmbd1(nspmax,nspmax), &
+  real(rp):: ts_a(nspmax,nspmax), ts_b(nspmax,nspmax), ts_lmbd1(nspmax,nspmax), &
        ts_lmbd2(nspmax,nspmax), ts_eta(nspmax,nspmax), ts_delta(nspmax,nspmax), &
        ts_alpha(nspmax,nspmax), ts_beta(nspmax,nspmax), ts_c1(nspmax,nspmax), &
        ts_c2(nspmax,nspmax), ts_c3(nspmax,nspmax), ts_c4(nspmax,nspmax),&
@@ -48,7 +50,7 @@ module tersoff
 
 !.....Te-dependent parameters
   integer:: ntemp
-  real(8),allocatable:: ted_te(:),ted_a(:),ted_b(:),ted_lmbd1(:),ted_lmbd2(:) &
+  real(rp),allocatable:: ted_te(:),ted_a(:),ted_b(:),ted_lmbd1(:),ted_lmbd2(:) &
        ,ted_eta(:),ted_delta(:),ted_alpha(:),ted_beta(:) &
        ,ted_h(:),ted_r1(:),ted_r2(:),ted_f0(:) &
        ,ted_c1(:),ted_c2(:),ted_c3(:),ted_c4(:),ted_c5(:)
@@ -92,32 +94,31 @@ contains
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint &
        ,tei)
     use vector,only: dot
-    include 'mpif.h'
     include './params_unit.h'
 !.....arguments
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,tag(namax),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
     character(len=3),intent(in):: specorder(nspmax)
-    real(8),intent(in),optional:: tei(namax)
+    real(rp),intent(in),optional:: tei(namax)
 
 !.....local variables
     integer:: ia,ja,ka,jj,kk,ierr,ixyz,jxyz,is,js,ks
-    real(8):: xi(3),xij(3),rij(3),xik(3),rik(3),dij2,dij,diji &
+    real(rp):: xi(3),xij(3),rij(3),xik(3),rik(3),dij2,dij,diji &
          ,dik2,dik,diki,fc,dfc,fcij,dfcij,fcik,dfcik,tmp,dvdr &
          ,texp2ij,faij,zeta,texp3,zijk,gzijk,bij,dfaij,dvdij &
          ,dbijpref,sumj(3),dirij(3),djrij(3),dirik(3),dkrik(3) &
          ,dexp3ij,dexp3ik,cs,dgzijk,dics(3),djcs(3),dkcs(3) &
          ,diz(3),djz(3),dkz(3),dzdcs,texp,tmpk(3),pref
-    real(8):: epotl,epotl1,epotl2,epott,t0
-    real(8):: rcmax
+    real(rp):: epotl,epotl1,epotl2,epott,t0
+    real(rp):: rcmax
     
     logical,save:: l1st = .true.
-    real(8),allocatable,save:: aa1(:,:),aa2(:,:),strsl(:,:,:)
+    real(rp),allocatable,save:: aa1(:,:),aa2(:,:),strsl(:,:,:)
 
     t0 = mpi_wtime()
 
@@ -412,7 +413,7 @@ contains
 
 !.....gather epot
     epotl = epotl1 +epotl2
-    call mpi_allreduce(epotl,epott,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     ts_epot = epott
     epot= epot +epott
     time = time + (mpi_wtime() -t0)
@@ -422,8 +423,8 @@ contains
   end subroutine force_tersoff
 !=======================================================================
   function f_c(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: f_c
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: f_c
 
     if( ts_fc_type.eq.1 ) then
       f_c = f_c1(r,rcin,rcout)
@@ -438,8 +439,8 @@ contains
   end function f_c
 !=======================================================================
   function df_c(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: df_c
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: df_c
 
     df_c = 0d0
     if( ts_fc_type.eq.1 ) then
@@ -455,8 +456,8 @@ contains
   end function df_c
 !=======================================================================
   function f_c1(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: f_c1
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: f_c1
     include './params_unit.h'
 
     
@@ -471,10 +472,10 @@ contains
   end function f_c1
 !=======================================================================
   function df_c1(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: df_c1
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: df_c1
     include './params_unit.h'
-    real(8):: p
+    real(rp):: p
 
     if( r.lt.rcin ) then
       df_c1 = 0d0
@@ -488,10 +489,10 @@ contains
   end function df_c1
 !=======================================================================
   function f_c3(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: f_c3
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: f_c3
     include './params_unit.h'
-    real(8):: p
+    real(rp):: p
     
     if( r.lt.rcin ) then
       f_c3 = 1d0
@@ -505,10 +506,10 @@ contains
   end function f_c3
 !=======================================================================
   function df_c3(r,rcin,rcout)
-    real(8),intent(in):: r,rcin,rcout
-    real(8):: df_c3
+    real(rp),intent(in):: r,rcin,rcout
+    real(rp):: df_c3
     include './params_unit.h'
-    real(8):: p
+    real(rp):: p
 
     if( r.lt.rcin ) then
       df_c3 = 0d0
@@ -523,9 +524,9 @@ contains
 !=======================================================================
   function gz(z,is,js,ks)
     integer,intent(in):: is,js,ks
-    real(8),intent(in):: z
-    real(8):: gz
-    real(8):: go,ga
+    real(rp),intent(in):: z
+    real(rp):: gz
+    real(rp):: go,ga
     
     go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
     ga = 1d0 +ts_c4(is,js)*exp(-ts_c5(is,js)*z)
@@ -535,9 +536,9 @@ contains
 !=======================================================================
   function dgz(z,is,js,ks)
     integer,intent(in):: is,js,ks
-    real(8),intent(in):: z
-    real(8):: dgz
-    real(8):: dgo,dga,go,ga,texp
+    real(rp),intent(in):: z
+    real(rp):: dgz
+    real(rp):: dgo,dga,go,ga,texp
     
     go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
     dgo = ts_c2(is,js)*ts_c3(is,js)/(ts_c3(is,js) +z)**2
@@ -551,10 +552,10 @@ contains
 !=======================================================================
   subroutine g_dg(z,g,dg,is,js,ks)
     integer,intent(in):: is,js,ks
-    real(8),intent(in):: z
-    real(8),intent(out):: g,dg
+    real(rp),intent(in):: z
+    real(rp),intent(out):: g,dg
 
-    real(8):: texp,go,dgo,ga,dga
+    real(rp):: texp,go,dgo,ga,dga
 
 !.....go term
     go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
@@ -572,12 +573,11 @@ contains
   subroutine read_params_tersoff(myid,mpi_world,iprint,specorder)
     use util, only: num_data
     implicit none
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: ite,ierr,isp,jsp,ksp,nd
-    real(8):: te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h, &
+    real(rp):: te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h, &
          c1,c2,c3,c4,c5,f0, rc2in,rc2out,rc3in,rc3out
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
@@ -780,24 +780,24 @@ contains
            ,ted_eta(ntemp),ted_delta(ntemp),ted_alpha(ntemp),ted_beta(ntemp) &
            ,ted_h(ntemp),ted_r1(ntemp),ted_r2(ntemp),ted_c1(ntemp),ted_c2(ntemp) &
            ,ted_c3(ntemp),ted_c4(ntemp),ted_c5(ntemp),ted_f0(ntemp))
-      call mpi_bcast(ted_te,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_a,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_b,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_lmbd1,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_lmbd2,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_eta,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_delta,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_alpha,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_beta,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_h,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_r1,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_r2,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_c1,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_c2,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_c3,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_c4,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_c5,ntemp,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ted_f0,ntemp,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ted_te,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_a,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_b,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_lmbd1,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_lmbd2,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_eta,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_delta,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_alpha,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_beta,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_h,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_r1,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_r2,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_c1,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_c2,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_c3,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_c4,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_c5,ntemp,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ted_f0,ntemp,mpi_real_rp,0,mpi_world,ierr)
 
       ts_a(:,:) = ted_a(1)
       ts_b(:,:) = ted_b(1)
@@ -821,25 +821,25 @@ contains
       interact(:,:) = .true.
 
     else
-      call mpi_bcast(ts_a,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_b,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_lmbd1,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_lmbd2,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_eta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_delta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_alpha,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_beta,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_h,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_rc2in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_rc2out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_rc3in,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_rc3out,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c1,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c2,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c3,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c4,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_c5,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
-      call mpi_bcast(ts_f0,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+      call mpi_bcast(ts_a,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_b,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_lmbd1,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_lmbd2,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_eta,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_delta,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_alpha,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_beta,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_h,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc2in,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc2out,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc3in,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_rc3out,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_c1,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_c2,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_c3,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_c4,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_c5,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
+      call mpi_bcast(ts_f0,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
       call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
     endif
     return
@@ -851,10 +851,10 @@ contains
 !
     include './params_unit.h'
     integer,intent(in):: is
-    real(8),intent(in):: te
+    real(rp),intent(in):: te
 
     integer:: ite,ite0,ite1
-    real(8):: x,tev
+    real(rp):: x,tev
 
 !.....Since the ted_te is in eV, unit conversion is required
     tev = te*k2ev

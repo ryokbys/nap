@@ -12,28 +12,29 @@ c
 c Output:
 c    - cna0000
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
 c-----max num of neighbors; 12 is enough
       integer,parameter:: nnmax = 100
 cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
-cc      real(8),parameter:: rc    = 3.36d0
-c      real(8),parameter:: rc    = 3.5d0
+cc      real(rp),parameter:: rc    = 3.36d0
+c      real(rp),parameter:: rc    = 3.5d0
 cc.....Cutoff radius for BCC Fe, halfway between 2nd and 3rd N.N.
-c      real(8),parameter:: abcc = 2.835d0
+c      real(rp),parameter:: abcc = 2.835d0
 c.....Cutoff radius for BCC W, halfway between 2nd and 3rd N.N.
 cc.....W @1000K = 3.226d-10
-c      real(8),parameter:: abcc = 3.226d0
+c      real(rp),parameter:: abcc = 3.226d0
 cc.....W @0K = 3.171d-10
-c      real(8),parameter:: abcc = 3.204d0
+c      real(rp),parameter:: abcc = 3.204d0
 c.....Cu @0K = 3.615d-10
-      real(8),parameter:: abcc = 4.2d0
-      real(8),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
+      real(rp),parameter:: abcc = 4.2d0
+      real(rp),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
 
       integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m,ia,ib
       integer:: natm0,natm1,natm,nx,ny,nz,nlsa,ncpx,ncpy,ncpz
-      real(8):: tmp,al(3),al1(3),xi(3),rij(3),r,hunit,h(3,3)
+      real(rp):: tmp,al(3),al1(3),xi(3),rij(3),r,hunit,h(3,3)
       integer,allocatable:: lsa(:),lspr(:,:),itype(:),itag(:),itag1(:)
-      real(8),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
+      real(rp),allocatable:: ra0(:,:),ra1(:,:),ra(:,:),auxdat0(:,:)
      &     ,auxdat(:,:)
       integer nargc
 c      integer,external:: iargc
@@ -142,14 +143,15 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: natm,n1,n2,n3,nlist
-      real(8),intent(inout):: ra(3,natm)
+      real(rp),intent(inout):: ra(3,natm)
       integer,intent(out):: llist(nlist)
       integer:: i,j,n,nr1,nr2,nr3
-      real(8):: a1,a2,a3
+      real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(8),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1d0-1d-8
 
       llist(1:nlist)=0
 
@@ -180,15 +182,16 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c     make Verlet list from linked-list
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none 
       integer,intent(in):: nlls,lls(nlls),nx,ny,nz,natm,nnmax,itag(natm)
-      real(8),intent(in):: al(3),ra(3,natm),rc
+      real(rp),intent(in):: al(3),ra(3,natm),rc
       integer,intent(out):: lspr(0:nnmax,natm)
       integer:: i,j,k,l,m,n,ir,jr,kx,ky,kz,irx,iry,irz,jrx,jry,jrz,ii
      &     ,is,js
-      real(8):: dx,dy,dz,r
+      real(rp):: dx,dy,dz,r
 
-      real(8),allocatable:: da(:)
+      real(rp),allocatable:: da(:)
 
       allocate(da(nnmax))
 
@@ -293,12 +296,13 @@ c=======================================================================
 c-----------------------------------------------------------------------
 c Reduce natm0 to natm by using Common Neighbor Analysis
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
       integer,intent(in):: natm0,natm1,nnmax,lspr(0:nnmax,natm1),nauxdat
      &     ,itag(natm1)
-      real(8),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0)
+      real(rp),intent(in):: ra0(3,natm0),auxdat0(nauxdat,natm0)
       integer,intent(out):: itype(natm0),natm
-      real(8),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
+      real(rp),intent(out):: ra(3,natm0),auxdat(nauxdat,natm0)
 
       integer:: i,j,l,m,n,ii,iii,ni,jj,nj,il,jl,n1,n2,iil,nn1,im,iim
      &     ,ib1,ib2,iib1,iib2,n421,n422,n663,n443,n555

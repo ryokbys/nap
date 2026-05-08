@@ -5,12 +5,13 @@ c-----------------------------------------------------------------------
 c  Molecular dynamics program for systems small enough not to use 
 c  cell-list method and parallelization.
 c-----------------------------------------------------------------------
+      use mod_precision
       use variables
       implicit none
       include "./params_unit.h"
 
       integer:: i,ia
-      real(8):: tmp
+      real(rp):: tmp
       character:: cnum*4 
       integer,external:: itotOf
 
@@ -79,6 +80,7 @@ c.....check whether order of atoms and total-id of atoms match
       end program small_md_main
 c=======================================================================
       subroutine write_initial_setting()
+      use mod_precision
       use variables
       implicit none 
       integer:: i
@@ -119,10 +121,11 @@ c=======================================================================
       end subroutine write_initial_setting
 c=======================================================================
       subroutine write_force(ionum,natm,aa)
+      use mod_precision
       implicit none
       include "./params_unit.h"
       integer,intent(in):: ionum,natm
-      real(8),intent(in):: aa(3,natm)
+      real(rp),intent(in):: aa(3,natm)
       
       integer:: i
 
@@ -137,10 +140,11 @@ c.....Write out forces
       end subroutine write_force
 c=======================================================================
       subroutine write_energy(ionum,erg)
+      use mod_precision
       implicit none
       include "./params_unit.h"
       integer,intent(in):: ionum
-      real(8),intent(in):: erg
+      real(rp),intent(in):: erg
       
 c.....Write out energy
       open(ionum,file='erg.smd',status='replace')
@@ -150,6 +154,7 @@ c.....Write out energy
       end subroutine write_energy
 c=======================================================================
       subroutine check_cmin()
+      use mod_precision
       use variables
       implicit none 
 

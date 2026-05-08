@@ -6,6 +6,7 @@ c-----------------------------------------------------------------------
 c  USAGE:
 c    $ ./sort pmd00000
 c-----------------------------------------------------------------------
+      use mod_precision
       use variables
       implicit none
       include 'params_unit.h'
@@ -13,7 +14,7 @@ c-----------------------------------------------------------------------
       integer,external:: itot_tag
       character:: cin*128
       integer,allocatable,dimension(:):: itag
-      real(8),allocatable:: opt(:,:)
+      real(rp),allocatable:: opt(:,:)
 
       sorg(1:3)= 0d0
       dt= 1d-15/ut
@@ -62,8 +63,9 @@ c-----------------------------------------------------------------------
       end program sort_pmd
 c=======================================================================
       function is_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: is_tag
       
       is_tag= int(tag)
@@ -71,8 +73,9 @@ c=======================================================================
       end function is_tag
 c=======================================================================
       function ifmv_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: ifmv_tag
       
       ifmv_tag= int((tag -int(tag))*10)
@@ -81,10 +84,11 @@ c=======================================================================
       end function ifmv_tag
 c=======================================================================
       function itot_tag(tag)
+      use mod_precision
       implicit none
-      real(8),intent(in):: tag
+      real(rp),intent(in):: tag
       integer:: itot_tag
-      real(8):: tmp
+      real(rp):: tmp
       integer,external:: is_tag,ifmv_tag
 
       tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1

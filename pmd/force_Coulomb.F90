@@ -10,6 +10,8 @@ module Coulomb
 !  For Ewald Coulomb potential:
 !    - ...
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax,nsp
   use util,only: csp2isp, itotOf
   use memory,only: accum_mem
@@ -21,7 +23,7 @@ module Coulomb
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Coulomb'
   logical:: params_read = .false.
-  real(8),parameter:: pi = 3.14159265398979d0
+  real(rp),parameter:: pi = 3.14159265398979d0
 
   logical:: lprmset_Coulomb = .false.
 
@@ -33,9 +35,9 @@ module Coulomb
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0) in eV *Ang /e^2
-  real(8),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737d0
 !.....permittivity of vacuum
-  real(8),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
 
 
 !!$  integer,parameter:: nspmax = 9
@@ -43,96 +45,96 @@ module Coulomb
 !.....Flag for existence of the species
   logical:: ispflag(nspmax)
 !.....Species charge
-  real(8):: schg(nspmax),schg0(nspmax)
+  real(rp):: schg(nspmax),schg0(nspmax)
 !  logical,allocatable:: interact(:,:)
 !.....Interactions
   character(len=20):: cinteract = 'full'
   logical:: interact(nspmax,nspmax)
 !.....ideal valence charges of species
-  real(8):: vid_bvs(nspmax)
-!  real(8),allocatable:: vid_bvs(:)
+  real(rp):: vid_bvs(nspmax)
+!  real(rp),allocatable:: vid_bvs(:)
 !.....principal quantum numbers of species
   integer:: npq_bvs(nspmax)
 !  integer,allocatable:: npq_bvs(:)
 !.....covalent radius
-  real(8):: rad_bvs(nspmax)
-!  real(8),allocatable:: rad_bvs(:)
+  real(rp):: rad_bvs(nspmax)
+!  real(rp),allocatable:: rad_bvs(:)
 !.....screening length
-  real(8):: rho_scr(nspmax,nspmax)
-!  real(8),allocatable:: rho_scr(:,:)
-!!$  real(8):: fbvs = 0.74d0 +- 0.04
-  real(8):: fbvs = 0.74d0
+  real(rp):: rho_scr(nspmax,nspmax)
+!  real(rp),allocatable:: rho_scr(:,:)
+!!$  real(rp):: fbvs = 0.74d0 +- 0.04
+  real(rp):: fbvs = 0.74d0
 !.....Dielectric constant
-  real(8):: dielec = 1d0
+  real(rp):: dielec = 1d0
 !.....Scaling factor multiplied to E_Coulomb
-  real(8):: fscale = 1d0
+  real(rp):: fscale = 1d0
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
-  real(8),parameter:: qthd = 1d-12
+  real(rp),parameter:: qthd = 1d-12
 
 !.....Gaussian width of Ewald sum
-  real(8):: sgm_ew = 3.5355339d0
-  real(8):: sgm(nspmax)
+  real(rp):: sgm_ew = 3.5355339d0
+  real(rp):: sgm(nspmax)
 !.....Rho value for screened_cut
 !     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
-  real(8):: rho_screened_cut = 5.0d0
-  real(8):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-  real(8):: rcut = -1d0
+  real(rp):: rho_screened_cut = 5.0d0
+  real(rp):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
+  real(rp):: rcut = -1d0
 
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
-!  real(8),parameter:: pacc   = 18d0
-  real(8):: pacc = 9.21034d0  ! exp(-pacc) = 1e-4
+!  real(rp),parameter:: pacc   = 18d0
+  real(rp):: pacc = 9.21034d0  ! exp(-pacc) = 1e-4
 !.....real-space cell volume
-  real(8):: vol
+  real(rp):: vol
 !.....k-space variables
-  real(8):: b1(3),b2(3),b3(3)
-  real(8),allocatable:: qcosl(:),qcos(:),qsinl(:),qsin(:),pflr(:,:)
+  real(rp):: b1(3),b2(3),b3(3)
+  real(rp),allocatable:: qcosl(:),qcos(:),qsinl(:),qsin(:),pflr(:,:)
 !.....Initial kmax = 20 is hard coded, which has no meaning.
   integer,parameter:: kmaxini = 20
-  real(8):: bkmax
+  real(rp):: bkmax
   integer:: kmax1,kmax2,kmax3,nk
   logical,allocatable:: lkuse(:,:,:)
 !.....kmax threshold
-  real(8),parameter:: threshold_kmax = 1d-4
+  real(rp),parameter:: threshold_kmax = 1d-4
 
 !.....Variable-charge optimization method: damping, cg, matinv
   character(len=20):: chgopt_method = 'damping'
 !.....Variable-charge potential variables
-  real(8):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
+  real(rp):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
        ,qtop(nspmax),qbot(nspmax)
-  real(8),parameter:: vcg_lambda = 0.5d0
+  real(rp),parameter:: vcg_lambda = 0.5d0
 !.....Convergence criterion for QEq in eV/atom
-  real(8):: conv_eps_qeq = 1.0d-8
+  real(rp):: conv_eps_qeq = 1.0d-8
 !.....chgopt-damping related parameters
   character(len=20):: codmp_method = 'damping' ! or FIRE or damping
   integer:: nstp_qeq = 100
-  real(8):: dt_codmp = 0.005d0  ! fs
-  real(8):: qmass = 0.002d0  ! atomic mass unit
-  real(8):: qtot_qeq = 0d0
+  real(rp):: dt_codmp = 0.005d0  ! fs
+  real(rp):: qmass = 0.002d0  ! atomic mass unit
+  real(rp):: qtot_qeq = 0d0
   integer:: minstp_qeq = 3
   integer:: minstp_conv_qeq = 3
 !.....Velocity-damping related parameters
-  real(8):: fdamp_codmp = 0.7d0
-  real(8):: dfdamp_codmp = 0.9d0
+  real(rp):: fdamp_codmp = 0.7d0
+  real(rp):: dfdamp_codmp = 0.9d0
 !.....FIRE-related parameters
-  real(8):: finc_codmp = 1.1d0
-  real(8):: fdec_codmp = 0.5d0
-  real(8):: alpha0_codmp = 0.1d0
-  real(8):: falpha_codmp = 0.99d0
+  real(rp):: finc_codmp = 1.1d0
+  real(rp):: fdec_codmp = 0.5d0
+  real(rp):: alpha0_codmp = 0.1d0
+  real(rp):: falpha_codmp = 0.99d0
 !.....Gradient descent parameters
-  real(8):: dqmax_cogrd = 1d-1
-  real(8):: dqeps_cogrd = 1d-4
+  real(rp):: dqmax_cogrd = 1d-1
+  real(rp):: dqeps_cogrd = 1d-4
 !.....2nd order potential coeff for bounding q inside [qbot,qtop]
-  real(8):: bound_k2 = 1.0d+2
+  real(rp):: bound_k2 = 1.0d+2
 !.....4-th order potential coeff for bounding q inside [qbot,qtop]
-  real(8):: bound_k4 = 0d0
+  real(rp):: bound_k4 = 0d0
 !.....Extended lagrangian
-  real(8),allocatable:: aauxq(:)
-  real(8):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
-  real(8):: auxomg2 = 32.d0
+  real(rp),allocatable:: aauxq(:)
+  real(rp):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
+  real(rp):: auxomg2 = 32.d0
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
@@ -143,7 +145,6 @@ contains
 !  This is called when force is 'Coulomb'
 !  The *_coulombx methods will replace *_coulomb methods in the future.
 !
-    include "mpif.h"
     integer,intent(in):: myid,mpi_md_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
     logical,intent(inout):: lvc
@@ -168,7 +169,7 @@ contains
 ! Initialization for Ewald method, which should be called in both cases of
 ! variable charge and fixed charge.
 !
-    real(8),intent(in):: h(3,3),rc
+    real(rp),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
     logical,intent(in):: l1st
     
@@ -188,11 +189,11 @@ contains
 !
     implicit none 
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),rc
+    real(rp),intent(in):: h(3,3),rc
     logical,intent(in):: l1st 
 
     integer:: i,ik,k1,k2,k3,isp
-    real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2
+    real(rp):: bk1(3),bk2(3),bk3(3),bk(3),bb2
 
     sgm_ew = rc/sqrt(2d0*pacc)
     sgm(1:nspmax) = sgm_ew
@@ -264,12 +265,12 @@ contains
 !  read from input file in.params.Coulomb.
 !
     implicit none
-    real(8),intent(in):: h(3,3),rc
+    real(rp),intent(in):: h(3,3),rc
     integer,intent(in):: myid,mpi_world,iprint
     logical,intent(in):: l1st
 
     integer:: i,isp,ik,k1,k2,k3,is
-    real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
+    real(rp):: bk1(3),bk2(3),bk3(3),bk(3),bb2,sgm_min,sgm_rcmd
 
 !.....Current implementation does not allow species-dpendent sigma.
     vcg_sgm(1:nspmax) = sgm_ew
@@ -345,14 +346,13 @@ contains
 !  Read parameter file for any Coulomb potential.
 !
     use util, only: num_data
-    include "mpif.h"
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(nspmax)
 
     character(len=128):: cmode,cline,ctmp,fname,c1st
     character(len=3):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
-    real(8):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
+    real(rp):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim, rin,rout,rhoij, rhoii
     logical:: rhoii_set, rhoij_set, rad_set
 
@@ -745,49 +745,49 @@ contains
     call mpi_bcast(cdist,128,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(cchgs,128,mpi_character,0,mpi_world,ierr)
 
-    call mpi_bcast(schg0,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(schg,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_chi,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_jii,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vc_e0,nsp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rcut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dielec,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(fscale,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(sgm_ew,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qbot,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qtop,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(vid_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rad_bvs,nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(schg0,nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(schg,nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(vc_chi,nsp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(vc_jii,nsp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(vc_e0,nsp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rcut,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dielec,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(fscale,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(sgm_ew,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(qbot,nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(qtop,nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(vid_bvs,nspmax,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rad_bvs,nspmax,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(npq_bvs,nspmax,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(cinteract,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(interact,nspmax*nspmax,mpi_logical,0,mpi_world,ierr)
     call mpi_bcast(ispflag,nspmax,mpi_logical,0,mpi_world,ierr)
 
-    call mpi_bcast(pacc,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(fbvs,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_screened_cut,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(pacc,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(fbvs,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rho_screened_cut,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(rho_scr,nspmax*nspmax,mpi_real_rp,0,mpi_world,ierr)
 
     call mpi_bcast(chgopt_method,20,mpi_character,0,mpi_world,ierr)
     call mpi_bcast(codmp_method,20,mpi_character,0,mpi_world,ierr)
-    call mpi_bcast(conv_eps_qeq,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(conv_eps_qeq,1,mpi_real_rp,0,mpi_world,ierr)
     call mpi_bcast(nstp_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(minstp_qeq,1,mpi_integer,0,mpi_world,ierr)
     call mpi_bcast(minstp_conv_qeq,1,mpi_integer,0,mpi_world,ierr)
-    call mpi_bcast(dt_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qmass,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(qtot_qeq,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(fdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dfdamp_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(finc_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(fdec_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(alpha0_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(falpha_codmp,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dqmax_cogrd,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(dqeps_cogrd,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(bound_k2,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(bound_k4,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(omg2dt2,1,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(dt_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(qmass,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(qtot_qeq,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(fdamp_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dfdamp_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(finc_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(fdec_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(alpha0_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(falpha_codmp,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dqmax_cogrd,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(dqeps_cogrd,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(bound_k2,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(bound_k4,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(omg2dt2,1,mpi_real_rp,0,mpi_world,ierr)
 
     if( trim(cterms).eq.'screened_cut' .or. trim(cterms).eq.'short' ) then
       if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -832,28 +832,27 @@ contains
 !  So it is not appropriate to use this routine for large system.
 !
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
 
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
          ,tag(namax),sv(3,6),sorg(3)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
+    real(rp),intent(inout):: chg(namax)
+    real(rp),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
-    real(8):: elrl,elr,esrl,esr,epotl,epott,qi,qj,tmp,ftmp &
+    real(rp):: elrl,elr,esrl,esr,epotl,epott,qi,qj,tmp,ftmp &
          ,bdotr,terfc,diji,dij,ss2i,sgmsq2,rc2,q2tot,q2loc,bb2 &
          ,e0,q2,sgmi
-    real(8),save:: eself,eselfl
-    real(8),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
+    real(rp),save:: eself,eselfl
+    real(rp),allocatable,save:: ri(:),bk(:),bk1(:),bk2(:),bk3(:)&
          ,bb(:),dxdi(:),dxdj(:),rij(:),xij(:),xj(:),xi(:)
-    real(8),allocatable,save:: strsl(:,:,:),aal(:,:)
+    real(rp),allocatable,save:: strsl(:,:,:),aal(:,:)
 
     if( l1st ) then
       if( .not.allocated(ri) ) then
@@ -910,14 +909,14 @@ contains
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
-      call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(eselfl,eself,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'short' ) then
       call Ewald_short(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
-      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
@@ -925,23 +924,23 @@ contains
       call Ewald_long(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs &
            ,lcell_updated)
-      call mpi_allreduce(elrl,elr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(elrl,elr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if( trim(cterms).eq.'direct' ) then
       call force_direct(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
-      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'direct_cut' ) then
       call force_direct_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
-      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
       call force_screened_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
-      call mpi_allreduce(esrl,esr,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
 !.....Scale energies, forces, stresses
@@ -983,15 +982,15 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
-    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+    real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(rp):: rc2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1056,16 +1055,16 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs,l1st
-    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+    real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
+    real(rp):: rc2,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc&
          ,dvdrc,vrc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1125,23 +1124,22 @@ contains
 !    V_smooth(r) = V(r) -V(rc) -(r-rc)*dVdrc
 !
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax)
-    real(8),intent(inout):: chg(namax)
-    real(8),intent(inout):: strsl(3,3,namax),aa(3,namax)&
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax)
+    real(rp),intent(inout):: chg(namax)
+    real(rp),intent(inout):: strsl(3,3,namax),aa(3,namax)&
          ,epi(namax),esrl
     logical,intent(in):: lstrs,l1st
 
     integer:: i,j,jj,k,kk,l,m,n,ierr,is,js,ixyz,jxyz,nconnect(4)
     integer:: itot,jtot
-    real(8):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dij,diji,dedr &
          ,dxdi(3),dxdj(3),x,y,z,epotl,epott,at(3),tmp &
          ,qi,qj,radi,radj,rhoij,terfc,texp &
          ,vrc,dvdrc,terfcc,ri,ro,xs,dz,fc,dfc
-    real(8),save:: sqpi,rc2
+    real(rp),save:: sqpi,rc2
 
     if( l1st ) then
       sqpi = 1d0/sqrt(pi)
@@ -1232,16 +1230,16 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
-    real(8),intent(inout):: aa(3,namax),strsl(3,3,namax), &
+    real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
          epi(namax),esrl
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-    real(8),external:: fcut1,dfcut1
+    real(rp):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(rp),external:: fcut1,dfcut1
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1319,21 +1317,20 @@ contains
 !  Not parallelized and not suitable for large system as it is too slow.
 !
     implicit none
-    include 'mpif.h'
     integer,intent(in):: namax,natm,nnmax,iprint, &
          myid,mpi_md_world,lspr(0:nnmax,namax)
-    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),&
+    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax),&
          h(3,3),hi(3,3),sorg(3)
     logical,intent(in):: lstrs,lcell_updated
-    real(8),intent(inout):: aa(3,namax),epi(namax),&
+    real(rp),intent(inout):: aa(3,namax),epi(namax),&
          elrl,strsl(3,3,namax)
 
     integer:: i,is,ik,k1,k2,k3,ierr,ixyz,jxyz,itot
-    real(8):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
+    real(rp):: qi,xi(3),ri(3),bk1(3),bk2(3),bk3(3),bb(3),bdotr, &
          tmp,ftmp,cs,sn,texp,bb2,bk
-    real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
+    real(rp):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
-    real(8):: emat(3,3)
+    real(rp):: emat(3,3)
 
 !.....Compute reciprocal vectors
     if( lcell_updated ) call get_recip_vectors(h)
@@ -1503,11 +1500,11 @@ contains
     implicit none
     integer,intent(in):: namax,natm,iprint
     logical,intent(in):: lvc
-    real(8),intent(in):: tag(namax),chg(namax)
-    real(8),intent(inout):: epi(namax),eselfl
+    real(rp),intent(in):: tag(namax),chg(namax)
+    real(rp),intent(inout):: epi(namax),eselfl
 
     integer:: i,is
-    real(8):: sgmi,qi,q2,tmp
+    real(rp):: sgmi,qi,q2,tmp
 
 !.....Compute self term.
     if( lvc ) then  ! variable charge
@@ -1542,14 +1539,14 @@ contains
 !
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax),h(3,3),rc
-    real(8),intent(inout):: fq(namax),esr
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax),h(3,3),rc
+    real(rp),intent(inout):: fq(namax),esr
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc &
+    real(rp):: rc2,sgmsq2,ss2i,sqpi,qi,qj,dij,diji,tmp,ftmp,terfc &
          ,sgmi,sgmj,gmmij
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-    real(8),external:: fcut1
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+    real(rp),external:: fcut1
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1607,18 +1604,18 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),rc
-    real(8),intent(inout):: fq(namax),esr
+    real(rp),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp, &
+    real(rp):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp, &
          vrc,dvdrc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-!!$    real(8),external:: fcut1
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+!!$    real(rp),external:: fcut1
 
-    real(8),save:: rc2,sqpi
+    real(rp),save:: rc2,sqpi
 
 !.....Compute direct sum
     rc2 = rc*rc
@@ -1666,18 +1663,18 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(8),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
          h(3,3),rc
-    real(8),intent(inout):: fq(namax),esr
+    real(rp),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
 
     integer:: i,j,jj,is,js,ixyz,jxyz
-    real(8):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp,terfc &
+    real(rp):: sgmsq2,ss2i,qi,qj,dij,dij2,diji,tmp,ftmp,terfc &
          ,sgmi,sgmj,gmmij,rhoij,terfcc,vrc,dvdrc
-    real(8):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
-!!$    real(8),external:: fcut1
+    real(rp):: xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3)
+!!$    real(rp),external:: fcut1
 
-    real(8),save:: rc2,sqpi
+    real(rp),save:: rc2,sqpi
 
     if( l1st ) then
       rc2 = rc*rc
@@ -1753,13 +1750,12 @@ contains
 !  Derivative of Ewald long-range term w.r.t. charges
 !
     implicit none
-    include 'mpif.h'
     integer,intent(in):: namax,natm,mpi_md_world,myid,iprint
-    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3),sorg(3)
-    real(8),intent(inout):: fq(namax),elr
+    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3),sorg(3)
+    real(rp),intent(inout):: fq(namax),elr
 
     integer:: i,ik,k1,k2,k3,is,ierr
-    real(8):: prefac,bk1(3),bk2(3),bk3(3),bb(3),bb2,xi(3),ri(3), &
+    real(rp):: prefac,bk1(3),bk2(3),bk3(3),bb(3),bb2,xi(3),ri(3), &
          sgmi,sgmi2,qi,bdotr,texp,cs,sn,elrl,eselfl,q2,epotl,tmp
 
 !.....Compute reciprocal vectors
@@ -1813,7 +1809,7 @@ contains
     enddo
 
 !!$    epotl = eselfl +elrl
-!!$    call mpi_allreduce(epotl,epot,1,mpi_real8, &
+!!$    call mpi_allreduce(epotl,epot,1,mpi_real_rp, &
 !!$         mpi_sum,mpi_md_world,ierr)
     return
   end subroutine qforce_long
@@ -1823,11 +1819,11 @@ contains
 !  Derivative of self term w.r.t. charges
 !
     integer,intent(in):: namax,natm
-    real(8),intent(in):: tag(namax),chg(namax)
-    real(8),intent(inout):: fq(namax),eself
+    real(rp),intent(in):: tag(namax),chg(namax)
+    real(rp),intent(inout):: fq(namax),eself
 
     integer:: i,is
-    real(8):: qi,q2,sgmi,tmp
+    real(rp):: qi,q2,sgmi,tmp
 
     eself = 0d0
 !$omp parallel
@@ -1853,42 +1849,41 @@ contains
 !
     use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr, &
          rc,sorg,myid_md,mpi_md_world,iprint
-    include "mpif.h"
-    real(8),intent(in):: chg(namax)
+    real(rp),intent(in):: chg(namax)
     logical,intent(in):: l1st
-    real(8),intent(out):: fq(namax),epot
+    real(rp),intent(out):: fq(namax),epot
 
     integer:: ierr
-    real(8):: eclongl,eselfl,ecshortl
-    real(8):: eclong,eself,ecshort
+    real(rp):: eclongl,eselfl,ecshortl
+    real(rp):: eclong,eself,ecshort
 
     fq(:) = 0d0
     call qforce_self(namax,natm,tag,chg,fq,eselfl)
-    call mpi_allreduce(eselfl,eself,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(eselfl,eself,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
 
     if( trim(cterms).eq.'long' ) then
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
            myid_md,iprint,fq,eclongl)
-      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'full' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
       call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
            myid_md,iprint,fq,eclongl)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
-      call mpi_allreduce(eclongl,eclong,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(eclongl,eclong,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'direct_cut'  ) then
       call qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h, &
            lspr,iprint,rc,fq,ecshortl,l1st)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
       call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'screened_cut'  ) then
       call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
            lspr,iprint,rc,fq,ecshortl,l1st)
-      call mpi_allreduce(ecshortl,ecshort,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+      call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
     epot = eself +ecshort + eclong
 !!$    print '(a,3f12.3)',' get_qforce: eself,eshort,elong=',eself,ecshort,eclong
@@ -1903,15 +1898,14 @@ contains
 !
 ! This would be called only once at the beginning.
 !
-    include "mpif.h"
     integer,intent(in):: natm,nb,myid,mpi_md_world,iprint
-    real(8),intent(in):: tag(natm+nb)
-    real(8),intent(out):: chg(natm+nb)
+    real(rp),intent(in):: tag(natm+nb)
+    real(rp),intent(out):: chg(natm+nb)
     character(len=3),intent(in):: specorder(nspmax)
 
     integer,allocatable:: nbvsl(:),nbvs(:)
     integer:: i,is,ierr
-    real(8):: sum_anion,sum_cation
+    real(rp):: sum_anion,sum_cation
     character(len=3):: csp
 
     allocate(nbvsl(nspmax),nbvs(nspmax))
@@ -1978,9 +1972,9 @@ contains
 !=======================================================================
   subroutine get_recip_vectors(h)
     implicit none
-    real(8),intent(in):: h(3,3)
+    real(rp),intent(in):: h(3,3)
 
-    real(8):: a1(3),a2(3),a3(3),a23(3),a12(3),a31(3),pi2
+    real(rp):: a1(3),a2(3),a3(3),a23(3),a12(3),a31(3),pi2
 
     a1(1:3) = h(1:3,1)
     a2(1:3) = h(1:3,2)
@@ -2002,17 +1996,16 @@ contains
 !  Compute qcos and qsin needed for calculation of Ewald long-range term.
 !
     implicit none
-    include 'mpif.h'
     integer,intent(in):: namax,natm,iprint,myid,mpi_md_world
-    real(8),intent(in):: tag(namax),ra(3,namax),chg(namax) &
+    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax) &
          ,h(3,3),sorg(3)
 
     integer:: ik,k1,k2,k3,is,i,ierr
-    real(8):: bk1(3),bk2(3),bk3(3),bb(3),xi(3),qi&
+    real(rp):: bk1(3),bk2(3),bk3(3),bb(3),xi(3),qi&
          ,ri(3),bdotr,cs,sn
-    real(8):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
+    real(rp):: bdk1,bdk2,bdk3,cs1,sn1,cs2,sn2,cs3,sn3,cs10,cs20,cs30, &
          cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm,sn3m,sn3mm
-    real(8):: qcmax,qsmax,qclmax,qslmax
+    real(rp):: qcmax,qsmax,qclmax,qslmax
 
 !.....Compute structure factor of the local processor
     qcosl(1:nk) = 0d0
@@ -2147,9 +2140,9 @@ contains
 !.....Allreduce qcos and qsin, which could be inefficient and time consuming
     qcos(1:nk) = 0d0
     qsin(1:nk) = 0d0
-    call mpi_allreduce(qcosl,qcos,nk,mpi_real8 &
+    call mpi_allreduce(qcosl,qcos,nk,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
-    call mpi_allreduce(qsinl,qsin,nk,mpi_real8 &
+    call mpi_allreduce(qsinl,qsin,nk,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
 
 !!$    qcmax = 0d0
@@ -2172,9 +2165,9 @@ contains
 !  Estimate kmax# so that exp(-sgm^2*k^2/2)/k^2 outside kmax# is small enough.
 !  And set flags to k-points to be used.
 !
-    real(8),allocatable:: bbs(:,:,:)
+    real(rp),allocatable:: bbs(:,:,:)
     integer:: k1,k2,k3
-    real(8):: bk1(3),bk2(3),bk3(3),bk(3),bb,bb2,bbmax
+    real(rp):: bk1(3),bk2(3),bk3(3),bk(3),bb,bb2,bbmax
 
     allocate(bbs(-kmaxini:kmaxini,-kmaxini:kmaxini,-kmaxini:kmaxini))
 
@@ -2245,13 +2238,13 @@ contains
 !
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(8),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
+    real(rp),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
     logical,intent(in):: l1st
-    real(8),intent(inout):: chg(natm)
+    real(rp),intent(inout):: chg(natm)
 
     integer:: ierr,i,j,is
-    real(8):: epot
-    real(8),allocatable,save:: amat(:,:),qvec(:),xvec(:),amati(:,:),fq(:)
+    real(rp):: epot
+    real(rp),allocatable,save:: amat(:,:),qvec(:),xvec(:),amati(:,:),fq(:)
 
     if( l1st ) then
       if( allocated(amat) ) then
@@ -2334,11 +2327,11 @@ contains
     implicit none
     integer,intent(in):: ndim,nstp
     integer,intent(out):: ierr
-    real(8),intent(in):: amat(ndim,ndim),b(ndim),eps
-    real(8),intent(inout):: x(ndim)
+    real(rp),intent(in):: amat(ndim,ndim),b(ndim),eps
+    real(rp),intent(inout):: x(ndim)
 
     integer:: istp
-    real(8):: xp(ndim),bnrm,rr,rrp,beta,ap(ndim), &
+    real(rp):: xp(ndim),bnrm,rr,rrp,beta,ap(ndim), &
          alpha,r(ndim),xd(ndim),p(ndim),xdnrm
 
     xp(1:ndim) = x(1:ndim)
@@ -2391,7 +2384,7 @@ contains
 !  This is supposed to be called only on serial run.
 !
     integer,intent(in):: ndimp,iprint
-    real(8),intent(in):: prms_in(ndimp)
+    real(rp),intent(in):: prms_in(ndimp)
     character(len=*),intent(in):: ctype
     character(len=3),intent(in):: specorder(nspmax)
 
@@ -2488,18 +2481,18 @@ contains
     integer,intent(in):: namax,natm,nb,nnmax,iprint,iprm0 &
          ,myid,mpi_world
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(8),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
-    real(8),intent(inout):: epot,chg(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    real(rp),intent(inout):: epot,chg(namax)
     integer,intent(in):: ndimp
-    real(8),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
+    real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
     character(len=3),intent(in):: specorder(nspmax)
 
     integer:: i,j,k,isp,jsp,ne,nf,ns,maxisp,ixyz,jxyz,jj
-    real(8):: rc2,xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3) &
+    real(rp):: rc2,xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3) &
          ,dedr,ddedrho,dedrho,dij,dij2,diji,fac,rhoij,qi,qj,sqpi &
          ,terfc,terfcc,tmp,vrc
-    real(8),allocatable:: ge_rho(:),gf_rho(:,:,:),gs_rho(:,:)
+    real(rp),allocatable:: ge_rho(:),gf_rho(:,:,:),gs_rho(:,:)
 
     if( .not.allocated(ge_rho) ) then
       allocate(ge_rho(nspmax),gs_rho(nspmax,6),gf_rho(nspmax,3,natm))
@@ -2630,8 +2623,8 @@ contains
 !
 !  Derivative screened Coulomb wrt rho.
 !
-    real(8),intent(in):: r,rho,qi,qj
-    real(8):: dvdrho
+    real(rp),intent(in):: r,rho,qi,qj
+    real(rp):: dvdrho
 
     dvdrho = acc *qi*qj*2d0 /rho**2 /sqrt(pi) *exp(-(r/rho)**2)
     return
@@ -2642,8 +2635,8 @@ contains
 !  Derivative of dvdr wrt rho.
 !  See the memo on 2018-04-11.
 !
-    real(8),intent(in):: r,rho,qi,qj
-    real(8):: ddvdrho
+    real(rp),intent(in):: r,rho,qi,qj
+    real(rp):: ddvdrho
 
     ddvdrho = -4d0*acc*qi*qj*r *exp(-(r/rho)**2) /sqrt(pi) /rho**4
     return
@@ -2654,7 +2647,7 @@ contains
 !  Update velocity of auxq
 !
     use pmdvars,only: dt,namax,natm
-    real(8),intent(inout):: vauxq(namax)
+    real(rp),intent(inout):: vauxq(namax)
 
     vauxq(1:natm) = vauxq(1:natm) +0.5d0 *dt *aauxq(1:natm)
     return
@@ -2665,8 +2658,8 @@ contains
 !  Update auxq
 !
     use pmdvars,only: dt,namax,natm
-    real(8),intent(in):: vauxq(namax)
-    real(8),intent(inout):: auxq(namax)
+    real(rp),intent(in):: vauxq(namax)
+    real(rp),intent(inout):: auxq(namax)
 
     auxq(1:natm) = auxq(1:natm) +dt *vauxq(1:natm)
     call impose_qtot(auxq)
@@ -2680,7 +2673,7 @@ contains
 !  d^2 auxq/dt^2 = omg^2 *(chg -auxq)
 !
     use pmdvars,only: dt,namax,natm
-    real(8),intent(in):: chg(namax),auxq(namax)
+    real(rp),intent(in):: chg(namax),auxq(namax)
 
     if( .not.allocated(aauxq) ) then
       allocate(aauxq(namax))
@@ -2701,19 +2694,18 @@ contains
 !
     use pmdvars,only: namax,natm,myid_md,mpi_md_world,iprint,ntot
     implicit none
-    include 'mpif.h'
     include './const.h'
-    real(8),intent(inout):: chg(namax)
+    real(rp),intent(inout):: chg(namax)
 
     integer:: i,ierr
-    real(8):: ql,qg,dq,qdist
+    real(rp):: ql,qg,dq,qdist
 
     ql = 0d0
     do i=1,natm
       ql = ql +chg(i)
     enddo
     qg = 0d0
-    call mpi_allreduce(ql,qg,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+    call mpi_allreduce(ql,qg,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     dq = qg -qtot_qeq
     qdist = dq /ntot
     do i=1,natm
@@ -2733,12 +2725,11 @@ contains
          myid_md,mpi_md_world,myparity,lsrc,nex,boundary
     use pmdmpi,only: nid2xyz
     implicit none
-    include 'mpif.h'
-    real(8),intent(inout):: chg(namax)
+    real(rp),intent(inout):: chg(namax)
 
     integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
     integer:: inode,nsd,nrc,nbnew
-    real(8),save,allocatable:: dbuf(:),dbufr(:)
+    real(rp),save,allocatable:: dbuf(:),dbufr(:)
     logical,save:: l1st=.true.
 
     if( l1st ) then
@@ -2816,13 +2807,12 @@ contains
          myid_md,mpi_md_world,myparity,lsrc,nex,boundary
     use pmdmpi,only: nid2xyz
     implicit none
-    include 'mpif.h'
 
-    real(8),intent(inout):: auxq(namax),vauxq(namax)
+    real(rp),intent(inout):: auxq(namax),vauxq(namax)
 
     integer:: i,j,kd,kdd,ku,ierr,iex,ix,iy,iz
     integer:: inode,nsd,nrc,nbnew
-    real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+    real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
     integer,parameter:: ndim = 2
     logical,save:: l1st=.true.
 

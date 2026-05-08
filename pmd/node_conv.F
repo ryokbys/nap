@@ -7,16 +7,17 @@ c-----------------------------------------------------------------------
 c USAGE: in case of (1,1,1)-division to (2,2,2)-division
 c   $ ./nconv 1 1 1 2 2 2
 c-----------------------------------------------------------------------
+      use mod_precision
       implicit none
       integer,parameter:: namax = 2000000
 
       integer:: nox,noy,noz,nodeso,nnx,nny,nnz,nodesn,i,j,k,l,m,n
      &     ,nlast,ia,ib,myx,myy,myz
-      real(8):: sxog,syog,szog,h(3,3,0:1),hunit
-      real(8):: tag(namax),tagt(namax)
-      real(8):: ra(3,namax),va(3,namax),eki(namax),epi(namax)
+      real(rp):: sxog,syog,szog,h(3,3,0:1),hunit
+      real(rp):: tag(namax),tagt(namax)
+      real(rp):: ra(3,namax),va(3,namax),eki(namax),epi(namax)
      &     ,strs(3,3,namax)
-      real(8):: rat(3,namax),vat(3,namax)
+      real(rp):: rat(3,namax),vat(3,namax)
      &     ,ekit(namax),epit(namax),strst(3,3,namax)
       character:: filename*8,key*1
 

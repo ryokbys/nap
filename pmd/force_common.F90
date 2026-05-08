@@ -4,6 +4,8 @@ subroutine get_force(l1st,epot,stnsr)
 !  Every force calculation routine is called from this subroutine and
 !  new force routine should also be implemented in this subroutine.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use force
   use pmdvars,only: namax,natm,nb,tag,ra,nnmax,aa,strs,aux,naux,nspmax, &
        h,hi,nb,nbmax,lsb,lsex,nex,lsrc,myparity,nn,sv,rc,lspr, &
@@ -50,13 +52,12 @@ subroutine get_force(l1st,epot,stnsr)
   use fdesc, only: force_fdesc
   use time, only: accum_time
   implicit none
-  include "mpif.h"
   include "./const.h"
   logical,intent(in):: l1st
-  real(8),intent(out):: epot,stnsr(3,3)
+  real(rp),intent(out):: epot,stnsr(3,3)
 
   integer:: ierr,is,i,ichg,ia
-  real(8):: at(3),tmp
+  real(rp):: at(3),tmp
 
   epot = 0d0
   aa(1:3,1:namax)=0d0
@@ -467,6 +468,8 @@ subroutine init_force(linit)
 !  And this routine is called from pmd_main not from pmd_core, so h and ra
 !  are not yet determined but hmat and rtot are.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,nspmax,nsp,myid_md,mpi_md_world,iprint, &
        specorder,rc,lvc,am
   use force
@@ -502,7 +505,7 @@ subroutine init_force(linit)
   logical,intent(in):: linit
 
   integer:: i,j
-  real(8):: ri,ro
+  real(rp):: ri,ro
   character(len=3):: cspi,cspj
 
   if( .not. linit ) return
@@ -709,21 +712,22 @@ subroutine copy_rho_ba(namax,natm,nb,nbmax,lsb &
 !-----------------------------------------------------------------------
 !     Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
 !-----in
   integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world
   integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
-  real(8),intent(in):: sv(3,6)
+  real(rp),intent(in):: sv(3,6)
 !-----out
-  real(8),intent(inout):: rho(natm+nb)
+  real(rp),intent(inout):: rho(natm+nb)
 
 !-----locals
   integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr,mem
   logical,save:: l1st=.true.
-  real(8),allocatable,save:: dbuf(:),dbufr(:)
+  real(rp),allocatable,save:: dbuf(:),dbufr(:)
 
   if( l1st ) then
     call accum_mem('force_common',8*nbmax*2)
@@ -783,22 +787,23 @@ subroutine copy_strs_ba(namax,natm,nb,nbmax,lsb &
 !-----------------------------------------------------------------------
 !  Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
 !-----in
   integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world
   integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6)
-  real(8),intent(in):: sv(3,6)
+  real(rp),intent(in):: sv(3,6)
 !-----out
-  real(8),intent(inout):: strs(9,natm+nb)
+  real(rp),intent(inout):: strs(9,natm+nb)
 
 !-----locals
   integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nrc,nbnew,ierr,mem
 
   logical,save:: l1st=.true.
-  real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
   integer,save:: narrsize
 
   if( l1st ) then
@@ -861,22 +866,23 @@ subroutine copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex &
 !-----------------------------------------------------------------------
 !     Exchanges boundary-atom data among neighbor nodes
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   integer:: status(MPI_STATUS_SIZE)
 !-----in
   integer,intent(in):: namax,natm,nb,nbmax,mpi_md_world,ndim
   integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6) &
        ,nex(3)
-  real(8),intent(in):: sv(3,6)
+  real(rp),intent(in):: sv(3,6)
 !-----out
-  real(8),intent(inout):: x(ndim,namax)
+  real(rp),intent(inout):: x(ndim,namax)
 
 !-----locals
   integer:: i,j,k,l,m,n,kd,kdd,ku,inode,nsd,nsd3,nrc,nrc3,nbnew,ierr
   logical,save:: l1st=.true.
-  real(8),allocatable,save:: dbuf(:,:),dbufr(:,:)
+  real(rp),allocatable,save:: dbuf(:,:),dbufr(:,:)
   integer,save:: maxdim
   integer,save:: maxbmax
 
@@ -958,18 +964,19 @@ subroutine copy_dba_bk(namax,natm,nbmax,nb,lsb,nex &
 !-----------------------------------------------------------------------
 !     Send-back & receive reaction on cached-atoms
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   integer,intent(in):: namax,natm,nbmax,nb,mpi_md_world,ndim
   integer,intent(in):: lsb(0:nbmax,6),lsrc(6),myparity(3),nn(6) &
        ,nex(3)
-  real(8),intent(inout):: x(ndim,namax)
+  real(rp),intent(inout):: x(ndim,namax)
 
   integer:: status(MPI_STATUS_SIZE)
   integer:: i,j,k,l,m,n,kd,kdd,ku,kuc,ibkwd,nsd,nsd3,nrc,nrc3,nsdbk &
        ,ierr,natmx
-  real(8),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
   logical,save:: l1st=.true.
   integer,save:: maxdim
   integer,save:: maxbmax
@@ -1069,11 +1076,13 @@ subroutine reduce_dba_bk(natm,namax,tag,x,ndim)
 !  Send-back or reduce reaction on cached-atoms.
 !  This routine works only on small MD not on parallel version.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use util,only: itotOf
   implicit none
   integer,intent(in):: namax,natm,ndim
-  real(8),intent(in):: tag(namax)
-  real(8),intent(inout):: x(ndim,namax)
+  real(rp),intent(in):: tag(namax)
+  real(rp),intent(inout):: x(ndim,namax)
 !!$  integer,external:: itotOf
   integer:: ia,ja
 
@@ -1090,11 +1099,13 @@ subroutine distribute_dba(natm,namax,tag,x,ndim)
 !  Distribute some values to the cached (boundary) atoms.
 !  This routine works only on small MD not on parallel version.
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use util,only: itotOf
   implicit none
   integer,intent(in):: namax,natm,ndim
-  real(8),intent(in):: tag(namax)
-  real(8),intent(inout):: x(ndim,namax)
+  real(rp),intent(in):: tag(namax)
+  real(rp),intent(inout):: x(ndim,namax)
 !!$  integer,external:: itotOf
   integer:: ia,ja
 
@@ -1110,9 +1121,11 @@ function hvsd(x)
 !
 !  Heaviside's stepwise function
 !
+  use pmdmpi
+  use mod_precision
   implicit none
-  real(8),intent(in):: x
-  real(8):: hvsd
+  real(rp),intent(in):: x
+  real(rp):: hvsd
 
   hvsd= 0d0
   if( x.ge.0 ) then
@@ -1124,16 +1137,18 @@ function hvsd(x)
 end function hvsd
 !=======================================================================
 function fcut1(r,rin,rout)
+  use pmdmpi
+  use mod_precision
 !
 !     Cutof function type-1
 !     f(r) = 1                                  for r <= rin
 !          = 1/2 *[1+cos(pi*(r-rs)/(rc-rs))]    for rin < r <= rout
 !          = 0                                  for rout < r
 !
-  real(8),intent(in):: r,rin,rout
-  real(8),parameter:: pi = 3.14159265358979d0
-!!$  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
-  real(8):: fcut1
+  real(rp),intent(in):: r,rin,rout
+  real(rp),parameter:: pi = 3.14159265358979d0
+!!$  real(rp),parameter:: rsr= 0.9d0  ! rs ratio to rc
+  real(rp):: fcut1
 
 !  rs = rc*rsr
   if( r.le.rin ) then
@@ -1147,13 +1162,15 @@ function fcut1(r,rin,rout)
 end function fcut1
 !=======================================================================
 function dfcut1(r,rin,rout)
+  use pmdmpi
+  use mod_precision
 !
 !     Derivative of the cutoff function type-1
 !
-  real(8),intent(in):: r,rin,rout
-  real(8),parameter:: pi = 3.14159265358979d0
-!!$  real(8),parameter:: rsr= 0.9d0  ! rs ratio to rc
-  real(8):: dfcut1
+  real(rp),intent(in):: r,rin,rout
+  real(rp),parameter:: pi = 3.14159265358979d0
+!!$  real(rp),parameter:: rsr= 0.9d0  ! rs ratio to rc
+  real(rp):: dfcut1
 
 !!$  rs = rc *rsr
   if( r.le.rin ) then
@@ -1167,13 +1184,15 @@ function dfcut1(r,rin,rout)
 end function dfcut1
 !=======================================================================
 function fcut2(r,rc)
+  use pmdmpi
+  use mod_precision
 !
 !     Cutoff function type-2
 !     f(r) = (1-(r/rc)^2)^3      for r <= rc
 !          = 0d0                 for rc < r
 !
-  real(8),intent(in):: r,rc
-  real(8):: fcut2
+  real(rp),intent(in):: r,rc
+  real(rp):: fcut2
 
   if( r.le.rc ) then
     fcut2 = (1d0 -(r/rc)**2)**3
@@ -1183,14 +1202,16 @@ function fcut2(r,rc)
 end function fcut2
 !=======================================================================
 function dfcut2(r,rc)
+  use pmdmpi
+  use mod_precision
 !
 !     Derivative of the cutoff function type-2
 !     f(r) = (1-(r/rc)^2)^3      for r <= rc
 !          = 0d0                 for rc < r
 !
-  real(8),intent(in):: r,rc
-  real(8):: dfcut2
-  real(8):: rrc
+  real(rp),intent(in):: r,rc
+  real(rp):: dfcut2
+  real(rp):: rrc
 
   if( r.le.rc ) then
     rrc = r/rc
@@ -1201,6 +1222,8 @@ function dfcut2(r,rc)
 end function dfcut2
 !=======================================================================
 function force_on(force_name,numff,cffs)
+  use pmdmpi
+  use mod_precision
   implicit none
   character(len=*),intent(in):: force_name
   integer,intent(in):: numff
@@ -1230,6 +1253,8 @@ subroutine chgopt_damping(chg,l1st)
 !    - damping --- simple, stable, but not very efficient.
 !    - FIRE --- it is said that robust and fast, but sometimes unstable, do not know why.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,tag,h,ra,nnmax,lspr,rc, &
        lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,sorg,myid_md, &
        mpi_md_world,iprint,boundary,ntot
@@ -1242,18 +1267,17 @@ subroutine chgopt_damping(chg,l1st)
 !!$  use Morse, only: qforce_vcMorse
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   include "./const.h"
   logical,intent(in):: l1st
 !.....Output
-  real(8),intent(inout):: chg(namax)
+  real(rp),intent(inout):: chg(namax)
 
   integer:: istp,i,istp_pos,istp_conv,is,ierr,iflag
-  real(8):: epot,epotp,epotpp,eMorse,fqnorm,vqnorm,dt,alpha,p &
+  real(rp):: epot,epotp,epotpp,eMorse,fqnorm,vqnorm,dt,alpha,p &
        ,ecoul,dtmax,fdamp, dqmax
-  real(8),save,allocatable:: vq(:),fq(:),dq(:)
+  real(rp),save,allocatable:: vq(:),fq(:),dq(:)
 !.....small value for checking range
-  real(8),parameter:: qeps   = 1d-10
+  real(rp),parameter:: qeps   = 1d-10
 
   integer,external:: count_nonfixed
 
@@ -1378,20 +1402,21 @@ subroutine chgopt_xlag(chg,auxq,iflag)
 !
 !  [1]: Nomura, et al., Comput. Phys. Commun. 192, 91–96 (2015)
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,iprint,myid_md,mpi_md_world,ntot
   use Coulomb,only: qmass,conv_eps_qeq
   use memory, only: accum_mem
   implicit none
-  include "mpif.h"
   include "./const.h"
-  real(8),intent(in):: auxq(namax)
-  real(8),intent(inout):: chg(namax)
+  real(rp),intent(in):: auxq(namax)
+  real(rp),intent(inout):: chg(namax)
   integer,intent(out):: iflag
 
   logical,save:: l1st = .true.
-  real(8),save,allocatable:: fq(:)
+  real(rp),save,allocatable:: fq(:)
   integer:: i,imax,ierr
-  real(8):: alpha,epot,dqmax,dq
+  real(rp):: alpha,epot,dqmax,dq
 
   if( l1st ) then
     if( allocated(fq) ) then
@@ -1443,13 +1468,15 @@ subroutine get_fq_wrapper(chg,fq,epot,l1st)
 !
 !  Wrapper routine for getting forces on charges.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,myid_md
   use Coulomb,only: get_qforce,bacopy_chg_fixed
-  real(8),intent(inout):: chg(namax)
-  real(8),intent(out):: fq(namax),epot
+  real(rp),intent(inout):: chg(namax)
+  real(rp),intent(out):: fq(namax),epot
   logical,intent(in):: l1st
 
-  real(8):: epotb
+  real(rp):: epotb
 
   call bacopy_chg_fixed(chg)
   call get_qforce(chg,fq,epot,l1st)
@@ -1463,20 +1490,21 @@ subroutine set_fqtot_zero(fq)
 !
 !  Set total force on q's as zero, which means the conservation of total charge.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,myid_md,mpi_md_world,ntot
   implicit none
-  include "mpif.h"
-  real(8),intent(inout):: fq(namax)
+  real(rp),intent(inout):: fq(namax)
 
   integer:: i,ierr
-  real(8):: avmul,avmu
+  real(rp):: avmul,avmu
 
   avmul = 0d0
   do i=1,natm
     avmul = avmul +fq(i)
   enddo
   avmu = 0d0
-  call mpi_allreduce(avmul,avmu,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+  call mpi_allreduce(avmul,avmu,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
   avmu = avmu/ntot
   do i=1,natm
     fq(i) = fq(i) -avmu
@@ -1489,17 +1517,18 @@ subroutine get_bounding_fq(chg,fq,epot)
 !
 !  Compute forces on qs that bound qs inside [qbot,qtop].
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,iprint,tag,mpi_md_world
   use Coulomb,only: bound_k2,bound_k4,qtop,qbot
   implicit none
-  include 'mpif.h'
   include './const.h'
-  real(8),intent(in):: chg(namax)
-  real(8),intent(inout):: fq(namax)
-  real(8),intent(out):: epot
+  real(rp),intent(in):: chg(namax)
+  real(rp),intent(inout):: fq(namax)
+  real(rp),intent(out):: epot
 
   integer:: i,is,ierr
-  real(8):: epotl
+  real(rp):: epotl
 
   epotl = 0d0
 
@@ -1518,13 +1547,14 @@ subroutine get_bounding_fq(chg,fq,epot)
     endif
   enddo
   epot = 0d0
-  call mpi_allreduce(epotl,epot,1,mpi_real8,mpi_sum,mpi_md_world,ierr)
+  call mpi_allreduce(epotl,epot,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
   return
 end subroutine get_bounding_fq
 !=======================================================================
 function count_nonfixed(namax,natm,lqfix,myid,mpi_md_world)
+  use pmdmpi
+  use mod_precision
   implicit none
-  include 'mpif.h'
   integer,intent(in):: namax,natm,myid,mpi_md_world
   logical,intent(in):: lqfix(namax)
   integer:: count_nonfixed
@@ -1546,22 +1576,23 @@ subroutine suppress_dq(dq,dqlim,dqmax)
 !
 !  Suppress too large change of charge within dq < dqlim.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,tag,iprint,mpi_md_world,myid_md
   implicit none
-  include "mpif.h"
-  real(8),intent(in):: dqlim
-  real(8),intent(inout):: dq(namax)
-  real(8),intent(out):: dqmax
+  real(rp),intent(in):: dqlim
+  real(rp),intent(inout):: dq(namax)
+  real(rp),intent(out):: dqmax
 
   integer:: i,ierr
-  real(8):: dqmaxl,fac
+  real(rp):: dqmaxl,fac
 
   dqmaxl = 0d0
   do i=1,natm
     dqmaxl = max(dqmaxl,abs(dq(i)))
   enddo
   dqmax = 0d0
-  call mpi_allreduce(dqmaxl,dqmax,1,mpi_real8,mpi_max,mpi_md_world,ierr)
+  call mpi_allreduce(dqmaxl,dqmax,1,mpi_real_rp,mpi_max,mpi_md_world,ierr)
 !!$  if( myid_md.eq.0 ) print *,'dqmax,dqlim=',dqmax,dqlim
   if( dqmax.gt.dqlim ) then
     fac = dqlim/dqmax
@@ -1580,14 +1611,15 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
 ! Method == scale:
 !   To keep ratio between fqs, all the fqs are multiplied by the same factor
 !
+  use pmdmpi
+  use mod_precision
   implicit none
-  include "mpif.h"
   integer,intent(in):: namax,natm,myid,mpi_md_world
-  real(8),intent(inout):: fq(namax)
+  real(rp),intent(inout):: fq(namax)
 
   integer:: i,ierr
-  real(8):: fqmaxl,fqmax,fqfactor
-  real(8),parameter:: fqlimit = 10d0
+  real(rp):: fqmaxl,fqmax,fqfactor
+  real(rp),parameter:: fqlimit = 10d0
   character(len=128),parameter:: method = 'scale'
 !!$  character(len=128),parameter:: method = 'ceiling'
 
@@ -1597,7 +1629,7 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
       fqmaxl = max(fqmaxl,abs(fq(i)))
     enddo
     fqmax = 0d0
-    call mpi_allreduce(fqmaxl,fqmax,1,mpi_real8,mpi_max,mpi_md_world,ierr)
+    call mpi_allreduce(fqmaxl,fqmax,1,mpi_real_rp,mpi_max,mpi_md_world,ierr)
 
     fqfactor = 1d0
     if( fqmax.gt.1d-8 ) fqfactor = fqlimit /fqmax
@@ -1622,6 +1654,8 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
 !  Compute derivative of potential energy (and forces)
 !  w.r.t. potential parameters.
 !
+  use pmdmpi
+  use mod_precision
   use force
 !!$  use Morse,only: gradw_vcMorse, gradw_Morse
   implicit none
@@ -1629,17 +1663,17 @@ subroutine get_gradw(namax,natm,tag,ra,nnmax,aa,strs,chg &
   integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
        ,nnn(6),mpi_md_world,myid_md,nex(3)
   integer,intent(in):: lspr(0:nnmax,namax) !,numff
-  real(8),intent(inout):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
+  real(rp),intent(inout):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
        ,tag(namax)
-  real(8),intent(inout):: rc
-  real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
+  real(rp),intent(inout):: rc
+  real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax) &
        ,chg(namax)
 !!$    character(len=20),intent(in):: cffs(numff)
   logical,intent(in):: l1st
   logical,intent(inout):: lvc
   logical,intent(in):: lstrs
   integer,intent(in):: ndimp
-  real(8),intent(out):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
+  real(rp),intent(out):: gwe(ndimp),gwf(ndimp,3,natm),gws(ndimp,6)
 
 !!$  if( use_force('vcMorse') ) call gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
 !!$       ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
@@ -1651,28 +1685,29 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
 !  Search for coeff, alpha, that are multiplied to fq to get the charge
 !  distribution of minimum energy.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars, only: namax,natm,nnmax,tag,ra,h,lspr,rc, &
        lsb,lsex,nbmax,nb,nn,myparity,lsrc,nex,boundary,sorg, &
        myid_md,mpi_md_world,iprint,ntot
   use Coulomb, only: get_qforce,qbot,qtop
   implicit none
-  include 'mpif.h'
   include './const.h'
 !.....input
-  real(8),intent(in):: chg0(namax),dchg(namax)
-  real(8),intent(in):: ftol
+  real(rp),intent(in):: chg0(namax),dchg(namax)
+  real(rp),intent(in):: ftol
 !.....output
-  real(8),intent(out):: alpha,falpha
+  real(rp),intent(out):: alpha,falpha
   integer,intent(out):: iflag
 
-  real(8),parameter:: stp0 = 0.1d0
-  real(8),parameter:: gr = 0.61803398875d0
-  real(8),parameter:: gr2 = 1d0 -gr
+  real(rp),parameter:: stp0 = 0.1d0
+  real(rp),parameter:: gr = 0.61803398875d0
+  real(rp),parameter:: gr2 = 1d0 -gr
   integer,parameter:: nstp = 100
-  real(8),save,allocatable:: chgt(:),fqt(:)
+  real(rp),save,allocatable:: chgt(:),fqt(:)
 
   integer:: istp
-  real(8):: a,b1,b2,xl,c,fa,fb1,fb2,fc
+  real(rp):: a,b1,b2,xl,c,fa,fb1,fb2,fc
 
   if( .not.allocated(chgt) ) then
     allocate( chgt(namax),fqt(namax) )
@@ -1757,20 +1792,22 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
 !
 !  Get a range of factor of line minimization in QEq.
 !
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr,rc,sorg, &
        myid_md,mpi_md_world,iprint,ntot
   use Coulomb,only: get_qforce
   include './const.h'
-  real(8),intent(in):: chg0(namax),dchg(namax)
-  real(8),intent(inout):: a,b,c,fa,fb,fc
+  real(rp),intent(in):: chg0(namax),dchg(namax)
+  real(rp),intent(inout):: a,b,c,fa,fb,fc
   integer,intent(inout):: iflag
 
-  real(8),parameter:: gr = 1.61803398875d0  ! golden ratio
-  real(8),parameter:: gri = 1d0/gr
-  real(8),parameter:: eps = 1d-12
-  real(8),parameter:: nstp = 100
+  real(rp),parameter:: gr = 1.61803398875d0  ! golden ratio
+  real(rp),parameter:: gri = 1d0/gr
+  real(rp),parameter:: eps = 1d-12
+  real(rp),parameter:: nstp = 100
   integer:: istp
-  real(8),save,allocatable:: fqt(:),chgt(:)
+  real(rp),save,allocatable:: fqt(:),chgt(:)
 
   if( .not.allocated(fqt) ) then
     allocate(fqt(namax),chgt(namax))
@@ -1840,8 +1877,10 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
 end subroutine get_range
 !=======================================================================
 subroutine swap_vals(a,b)
-  real(8),intent(inout):: a,b
-  real(8):: tmp
+  use pmdmpi
+  use mod_precision
+  real(rp),intent(inout):: a,b
+  real(rp):: tmp
   tmp = b
   b = a
   a = tmp

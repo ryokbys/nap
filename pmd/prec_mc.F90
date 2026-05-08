@@ -1,4 +1,6 @@
 module pmc
+  use pmdmpi
+  use mod_precision
 !-----------------------------------------------------------------------
 !                     Last-modified: <2022-11-03 22:40:13 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
@@ -20,13 +22,13 @@ module pmc
   integer:: ncy = 6
   integer:: ncz = 6
   integer:: natm
-  real(8):: hmat(3,3),hmati(3,3)
-  real(8),allocatable:: pos0(:,:),pos(:,:),tagmc(:),epimc(:)
+  real(rp):: hmat(3,3),hmati(3,3)
+  real(rp),allocatable:: pos0(:,:),pos(:,:),tagmc(:),epimc(:)
 !.....symbols and SIDs array
   character,allocatable:: csymbols(:)
   integer(1),allocatable:: i1sids(:)
 !.....lattice constant of unit cell
-  real(8):: alat = 4.0448d0
+  real(rp):: alat = 4.0448d0
 !.....number of solute atoms
   integer:: num_Mg = 10
   integer:: num_Si = 5
@@ -46,18 +48,18 @@ module pmc
        .false. /)
 !.....frequency prefactors in 1/sec
 !.....values taken from Mantina et al., Acta Mater. 57 (2009)
-  real(8):: prefreq(1:3) = (/ &
+  real(rp):: prefreq(1:3) = (/ &
        16.6d+12, &
        18.6d+12, &
        15.7d+12 /)
 !.....average migration barriers in eV
 !.....also taken from Mantina et al.
-!!$  real(8):: demig(1:3) = (/ &
+!!$  real(rp):: demig(1:3) = (/ &
 !!$       0.58d0, &
 !!$       0.42d0, &
 !!$       0.55d0 /)
 !.....obtained by own DFT calculations
-  real(8):: demig(1:3) = (/ &
+  real(rp):: demig(1:3) = (/ &
        0.569d0, &
        0.450d0, &
        0.479d0 /)
@@ -69,9 +71,9 @@ module pmc
   integer:: ny = 1
   integer:: nz = 1
 !.....temperature
-  real(8):: temp = 300d0
+  real(rp):: temp = 300d0
 !.....random seed
-  real(8):: dseed0 = 12345d0
+  real(rp):: dseed0 = 12345d0
   
 contains
 !=======================================================================
@@ -133,16 +135,17 @@ program prec_mc
 !   out.mc.symbols: MC step, symbol array 
 !   poscars/POSCAR_######: Cell info and atom coordinations
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmc
   use random,only: urnd, set_seed
   implicit none 
-  include "mpif.h"
   include "./params_unit.h"
 
   integer:: i,j,k,l,m,n,ierr
   integer:: ihour,imin,isec,iday
   integer:: mpi_md_world,nodes_md,myid_md,myx,myy,myz
-  real(8):: rc,anxi,anyi,anzi,sorg(3),t0,t1
+  real(rp):: rc,anxi,anyi,anzi,sorg(3),t0,t1
   character:: cnum*128
 
 !.....initialize parallel
@@ -245,12 +248,13 @@ end program prec_mc
 subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
      nstps_mc, ncx,ncy,ncz,alat,num_Mg,num_Si,num_Vac, &
      init_strct,nx,ny,nz,nstps_relax,lmove,temp,num_Al_clst)
+  use pmdmpi
+  use mod_precision
   implicit none
-  include 'mpif.h'
   integer,intent(in):: myid_md,mpi_md_world
   integer,intent(inout):: nx,ny,nz,ncx,ncy,ncz,nstps_mc, &
        num_Mg,num_Si,num_Vac,init_strct,nstps_relax,num_Al_clst
-  real(8),intent(inout):: alat,temp
+  real(rp),intent(inout):: alat,temp
   logical,intent(inout):: lmove(0:3),lkinetic
   
   integer:: ierr
@@ -276,8 +280,8 @@ subroutine bcast_params(myid_md,mpi_md_world,lkinetic, &
   call mpi_bcast(lkinetic,1,mpi_logical,0,mpi_md_world,ierr)
   call mpi_bcast(lmove,4,mpi_logical,0,mpi_md_world,ierr)
 
-  call mpi_bcast(alat,1,mpi_double_precision,0,mpi_md_world,ierr)
-  call mpi_bcast(temp,1,mpi_double_precision,0,mpi_md_world,ierr)
+  call mpi_bcast(alat,1,mpi_real_rp,0,mpi_md_world,ierr)
+  call mpi_bcast(temp,1,mpi_real_rp,0,mpi_md_world,ierr)
 
 end subroutine bcast_params
 !=======================================================================
@@ -288,13 +292,14 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
 !
 ! Kinetic MC simulation using
 !
+  use pmdmpi
+  use mod_precision
   use random,only: urnd
   implicit none
-  include 'mpif.h'
   integer,intent(in):: mpi_md_world,nodes_md,myid_md,myx,myy,myz &
        ,nx,ny,nz,natm,nstps_mc,nstps_relax,noutint &
        ,nnmaxmc,lsprmc(0:nnmaxmc,natm)
-  real(8),intent(in):: anxi,anyi,anzi,sorg(3),hmat(3,3),pos0(3,natm), &
+  real(rp),intent(in):: anxi,anyi,anzi,sorg(3),hmat(3,3),pos0(3,natm), &
        temp,demig(3),prefreq(3)
   character,intent(in):: species(0:3)
   character,intent(inout):: csymbols(natm) 
@@ -302,18 +307,18 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   integer:: i,ic,ievent,ihist,iorder,istp,jc,jj,js,ncalc,ncandidate, &
        nhist,nspcs,ierr,isc
   integer:: nstps_pmd,maxhist,mem,nstps_done
-  real(8):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
+  real(rp):: epotmc,epotmc0,de,dt,epot,ergp,ptmp,ptot,rand, &
        tclck,p,efrm,efrm0
-  real(8),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
+  real(rp),allocatable:: epimc(:),ecpot(:),erghist(:),ergtmp(:), &
        probtmp(:)
   integer,allocatable:: nstptmp(:)
   character:: ci*1,cj*1,cfmt*10,cergtxt*1024,cnum*128,csi*1
   character,allocatable:: csymprev(:),csymhist(:,:),csymtmp(:,:) &
        ,cjtmp(:)
   integer,external:: cs2is,check_history
-  real(8),external:: epot2efrm
+  real(rp),external:: epot2efrm
 
-  real(8),parameter:: fkb = 8.61733035d-5  ! eV/K
+  real(rp),parameter:: fkb = 8.61733035d-5  ! eV/K
   integer,parameter:: ioerg = 30
   integer,parameter:: iosym = 31
 
@@ -546,15 +551,17 @@ subroutine create_Al_fcc(nx,ny,nz,natm,alat,pos,csymbols,hmat)
 !
 ! Create Al fcc crystalline structure as an initial template.
 !
+  use pmdmpi
+  use mod_precision
   implicit none 
 !.....arguments
   integer,intent(in):: nx,ny,nz,natm
-  real(8),intent(in):: alat
-  real(8),intent(out):: pos(3,natm),hmat(3,3)
+  real(rp),intent(in):: alat
+  real(rp),intent(out):: pos(3,natm),hmat(3,3)
   character,intent(out):: csymbols(natm)
 !.....local variables
   integer:: ix,iy,iz,m,inc
-  real(8):: upos(3,4)
+  real(rp):: upos(3,4)
 
 !.....set h-matrix
   hmat(1:3,1:3) = 0d0
@@ -595,6 +602,8 @@ subroutine read_in_pmc(ionum,cfname)
 !
 ! Read frexible input format
 !
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cfname
@@ -630,6 +639,8 @@ subroutine read_in_pmc(ionum,cfname)
 end subroutine read_in_pmc
 !=======================================================================
 subroutine read_in_pmc_core(ionum,cname)
+  use pmdmpi
+  use mod_precision
   use pmc
   implicit none
   integer,intent(in):: ionum
@@ -700,8 +711,9 @@ subroutine read_in_pmc_core(ionum,cname)
 end subroutine read_in_pmc_core
 !=======================================================================
 subroutine init_parallel(mpi_world,nodes,myid)
+  use pmdmpi
+  use mod_precision
   implicit none
-  include "mpif.h"
   integer,intent(out):: mpi_world,nodes,myid
   
   integer:: ierr
@@ -719,10 +731,12 @@ end subroutine init_parallel
 !=======================================================================
 subroutine parallel_setting(nx,ny,nz,myid_md,myx,myy,myz &
      ,anxi,anyi,anzi,sorg)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: nx,ny,nz,myid_md
   integer,intent(out):: myx,myy,myz
-  real(8),intent(out):: anxi,anyi,anzi,sorg(3)
+  real(rp),intent(out):: anxi,anyi,anzi,sorg(3)
 
   anxi= 1d0/nx
   anyi= 1d0/ny
@@ -742,10 +756,12 @@ end subroutine parallel_setting
 subroutine write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
      num_Mg,num_Si,num_Vac,num_Al_clst, &
      init_strct,nx,ny,nz,nstps_relax,lmove,temp)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: nstps_mc,ncx,ncy,ncz,num_Mg,num_Si,num_Vac &
        ,init_strct,nx,ny,nz,nstps_relax,num_Al_clst
-  real(8),intent(in):: alat,temp
+  real(rp),intent(in):: alat,temp
   logical,intent(in):: lmove(0:3),lkinetic
 
   write(6,*) '=============== initial parameters =================='
@@ -778,11 +794,13 @@ subroutine write_init_params(lkinetic,nstps_mc, ncx,ncy,ncz,alat, &
 end subroutine write_init_params
 !=======================================================================
 subroutine make_tag(natm,csymbols,tag)
+  use pmdmpi
+  use mod_precision
   use pmc, only: symbol2sid
   implicit none
   integer,intent(in):: natm
   character,intent(in):: csymbols(natm)
-  real(8),intent(out):: tag(natm)
+  real(rp),intent(out):: tag(natm)
 
   integer:: i
   character(len=1):: c
@@ -796,6 +814,8 @@ subroutine make_tag(natm,csymbols,tag)
 end subroutine make_tag
 !=======================================================================
 subroutine random_symbols(natm,csymbols,num_Mg,num_Si,num_Vac)
+  use pmdmpi
+  use mod_precision
   use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac
@@ -840,15 +860,17 @@ end subroutine random_symbols
 !=======================================================================
 subroutine clustered_symbols(natm,pos0,csymbols &
      ,num_Mg,num_Si,num_Vac,nnmaxmc,lsprmc,num_Al_clst)
+  use pmdmpi
+  use mod_precision
   use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac, &
        nnmaxmc,lsprmc(0:nnmaxmc,natm),num_Al_clst
   character,intent(inout):: csymbols(natm)
-  real(8),intent(in):: pos0(3,natm)
+  real(rp),intent(in):: pos0(3,natm)
 
   integer:: i,jj,j,k,irnd,nsol,isol,icntr,nmg,nsi,nvac,inc,nal
-  real(8):: cntr(3),dmin,d,r,rMg,rSi,rAl,rc
+  real(rp):: cntr(3),dmin,d,r,rMg,rSi,rAl,rc
   character,allocatable:: carr(:)
 
 !.....1st, pick one site close to the center
@@ -930,13 +952,15 @@ end subroutine clustered_symbols
 !=======================================================================
 subroutine paired_symbols(natm,pos0,csymbols,&
      num_Mg,num_Si,num_Vac,nnmax,lspr,cpair_type)
+  use pmdmpi
+  use mod_precision
   use random,only: urnd
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac &
        ,nnmax,lspr(0:nnmax,natm)
   character,intent(in):: cpair_type*2
   character,intent(inout):: csymbols(natm)
-  real(8),intent(in):: pos0(3,natm)
+  real(rp),intent(in):: pos0(3,natm)
 
   integer:: npair,ipair,irnd,n,ichosen,jchosen,jj,i,j
   character:: cpairs(2,natm),c1,c2
@@ -1007,6 +1031,8 @@ subroutine loads_symbols(natm,txt,csymbols)
 !
 ! Load symbols from a character string
 !
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: natm
   character,intent(in):: txt(natm)
@@ -1022,6 +1048,8 @@ subroutine loads_symbols(natm,txt,csymbols)
 end subroutine loads_symbols
 !=======================================================================
 subroutine read_symbols(ionum,fname,natm,csymbols)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: ionum,natm
   character(len=*),intent(in):: fname
@@ -1047,11 +1075,13 @@ subroutine write_POSCAR(cfname,natm,csymbols,pos,hmat,species)
 !  Vacancies are written as an atom of species Vanadium in order to
 !  make them visible on purpose.
 !
+  use pmdmpi
+  use mod_precision
   implicit none
   character(len=*),intent(in):: cfname
   integer,intent(in):: natm
   character,intent(in):: csymbols(natm),species(0:3)
-  real(8),intent(in):: pos(3,natm),hmat(3,3)
+  real(rp),intent(in):: pos(3,natm),hmat(3,3)
 
   integer:: i,m,id,ns(0:3),idorder(natm)
   integer:: date_time(8)
@@ -1096,20 +1126,22 @@ end subroutine write_POSCAR
 !=======================================================================
 subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
      ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md,nstps_done)
+  use pmdmpi
+  use mod_precision
   use pmc, only: symbol2sid
   implicit none
   integer,intent(in):: natm,nstps_pmd,nx,ny,nz&
        ,mpi_md_world,nodes_md,myid_md
   integer,intent(out):: nstps_done
-  real(8),intent(in):: hmat(3,3),pos0(3,natm)
-  real(8),intent(out):: epimc(natm),epotmc
+  real(rp),intent(in):: hmat(3,3),pos0(3,natm)
+  real(rp),intent(out):: epimc(natm),epotmc
   character,intent(in):: csymbols(natm)
 
   integer:: i,inc
   integer,parameter:: nismax = 9
   integer:: nstp,nerg,npmd,ifpmd,minstp,ntdst,n_conv,ifsort,iprint &
        ,ifdmp,numff,nrmtrans
-  real(8):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
+  real(rp):: hunit,h(3,3,0:1),am(nismax),dt,rc,dmp,tinit,tfin,ttgt(9)&
        ,trlx,stgt(3,3),ptgt,srlx,stbeta,strfin,fmv(3,0:9),ptnsr(3,3) &
        ,epot,ekin,eps_conv,rbuf,pini,pfin
   character:: ciofmt*6,cforce*20,ctctl*20,cpctl*20,czload_type*5,csi*1&
@@ -1119,7 +1151,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 
   logical,save:: l1st = .true.
   integer,save:: ntot = 0
-  real(8),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
+  real(rp),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
        ,epitot(:),ekitot(:,:,:),stot(:,:,:),chgtot(:),chitot(:)
 
 !.....at the 1st call, evaluate number of total atoms to be used in pmd
@@ -1254,18 +1286,20 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
 !
 ! Calculate chemical potentials
 !
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: nspcs,natm,nx,ny,nz,nstps_pmd&
        ,mpi_md_world,nodes_md,myid_md
-  real(8),intent(in):: hmat(3,3),pos0(3,natm)
+  real(rp),intent(in):: hmat(3,3),pos0(3,natm)
   character,intent(in):: species(0:nspcs)
-  real(8),intent(out):: ecpot(0:nspcs)
+  real(rp),intent(out):: ecpot(0:nspcs)
 
   integer:: ispcs,i,nstps_done
   character:: cspcs*1
   character,allocatable:: csymtmp(:)
-  real(8):: epot
-  real(8),allocatable:: epi(:)
+  real(rp):: epot
+  real(rp),allocatable:: epi(:)
 
   allocate(csymtmp(natm),epi(natm))
 
@@ -1302,6 +1336,8 @@ subroutine calc_chem_pot(nspcs,species,ecpot,hmat,natm,pos0 &
 end subroutine calc_chem_pot
 !=======================================================================
 function check_history(natm,nhist,csymbols,csymhist) result(ihist)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: natm,nhist
   character,intent(in):: csymbols(natm),csymhist(natm,nhist)
@@ -1326,6 +1362,8 @@ function check_history(natm,nhist,csymbols,csymhist) result(ihist)
 end function check_history
 !=======================================================================
 function symbols_same(ndim,csym1,csym2) result(lsame)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: ndim
   character,intent(in):: csym1(ndim),csym2(ndim)
@@ -1345,6 +1383,8 @@ function symbols_same(ndim,csym1,csym2) result(lsame)
 end function symbols_same
 !=======================================================================
 function cs2is(cspcs) result(ispcs)
+  use pmdmpi
+  use mod_precision
   use pmc
   implicit none
   character,intent(in):: cspcs*1
@@ -1361,11 +1401,13 @@ function cs2is(cspcs) result(ispcs)
 end function cs2is
 !=======================================================================
 function epot2efrm(natm,ecpot,csym,epot)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: natm
-  real(8),intent(in):: ecpot(0:4),epot
+  real(rp),intent(in):: ecpot(0:4),epot
   character,intent(in):: csym(natm)
-  real(8):: epot2efrm
+  real(rp):: epot2efrm
 
   integer:: i,isc
   character:: csi
@@ -1382,6 +1424,8 @@ function epot2efrm(natm,ecpot,csym,epot)
 end function epot2efrm
 !=======================================================================
 function solute_in_neighbors(isite,natm,csymbols,nnmax,lspr)
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: isite,natm,nnmax,lspr(0:nnmax,natm)
   character,intent(in):: csymbols(natm)
@@ -1408,6 +1452,8 @@ subroutine create_pairs(natm,csymbols,num_Mg,num_Si,num_Vac, &
 !  Create pairs of X-X or X-Y if possible.
 !  If it is not possible, put '0' in cpair(2,i).
 !
+  use pmdmpi
+  use mod_precision
   implicit none
   integer,intent(in):: natm,num_Mg,num_Si,num_Vac
   character,intent(in):: csymbols(natm),cpair_type*2

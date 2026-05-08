@@ -17,6 +17,7 @@ program cluster_analysis
 ! -------
 !   - STDOUT
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars
   use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   use pairlist,only: mk_lspr_sngl
@@ -25,13 +26,13 @@ program cluster_analysis
   integer,parameter:: maxpair = 5
   character(len=20),parameter:: cfinput='in.cluster'
 
-  real(8):: hunit,hmat(3,3,0:1)
-  real(8),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(rp):: hunit,hmat(3,3,0:1)
+  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
 
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nacmax
   integer,allocatable:: ictot(:),nacs(:),icouts(:),nhist(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax),lrecur
-  real(8):: rcut,outthd,t0,tmp
+  real(rp):: rcut,outthd,t0,tmp
   character(len=20):: cnum
 
   t0 = mpi_wtime()
@@ -157,13 +158,14 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 !  out_threshold   10
 !  recursive  T
 !-----------------------------------------------------------------------
+  use mod_precision
   use pmdvars,only: nspmax
   use pmdio,only: split_pair
   use util, only: num_data,csp2isp
   implicit none 
   integer,intent(in):: ionum,maxpair
   character(len=*),intent(in):: cfname
-  real(8),intent(out):: rcut,outthd
+  real(rp),intent(out):: rcut,outthd
   logical,intent(out):: lpair(nspmax,nspmax),lrecur
 
   integer:: i,nentry,isp1,isp2,npair
@@ -211,12 +213,13 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
 end subroutine read_in_cluster
 !=======================================================================
 subroutine get_hi(h,hi)
+  use mod_precision
   implicit none 
-  real(8),intent(in):: h(3,3)
-  real(8),intent(out):: hi(3,3)
+  real(rp),intent(in):: h(3,3)
+  real(rp),intent(out):: hi(3,3)
 
   integer:: i,j,im,ip,jm,jp
-  real(8):: vol,sgm(3,3),hit(3,3)
+  real(rp):: vol,sgm(3,3),hit(3,3)
 
 !-----cofactor matrix, SGM
   do j=1,3
@@ -248,10 +251,11 @@ subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
 !
 !  Clustering not using the recursive routine.
 !
+  use mod_precision
   implicit none 
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
   logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
-  real(8),intent(in):: tagtot(ntot)
+  real(rp),intent(in):: tagtot(ntot)
   integer,intent(out):: ictot(ntot),nc
 
   integer:: iter,icid,num_update,ia,is,icmin0,icmax,icmin,jj,ja,js,jc,ic
@@ -317,10 +321,11 @@ subroutine clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
 !
 !  Clustering using the recursive routine.
 !
+  use mod_precision
   implicit none 
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
   logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
-  real(8),intent(in):: tagtot(ntot)
+  real(rp),intent(in):: tagtot(ntot)
   integer,intent(out):: ictot(ntot),nc
 
   integer:: is,js,ic,ia
@@ -344,7 +349,7 @@ recursive subroutine neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,&
      lpair,ia,is,ic)
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax,ia,is,ic
   logical,intent(in):: lpair(nspmax,nspmax)
-  real(8),intent(in):: tagtot(ntot)
+  real(rp),intent(in):: tagtot(ntot)
   integer,intent(inout):: ictot(ntot)
 
   ictot(ia) = ic

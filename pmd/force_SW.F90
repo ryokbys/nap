@@ -2,6 +2,8 @@ module SW
 !-----------------------------------------------------------------------
 !                     Last modified: <2025-04-02 22:04:51 KOBAYASHI Ryo>
 !-----------------------------------------------------------------------
+  use pmdmpi
+  use mod_precision
   use pmdvars,only: nspmax
   include "./const.h"
   
@@ -9,47 +11,47 @@ module SW
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.SW'
 !-----Si mass (to be multiplied by umass)
-  real(8),parameter:: am_si = 28.0855d0
+  real(rp),parameter:: am_si = 28.0855d0
 !.....length scaling factor for matching this potential to VASP
-!  real(8),parameter:: sfac  = 1.0062662d0
-  real(8),parameter:: sfac  = 1d0
+!  real(rp),parameter:: sfac  = 1.0062662d0
+  real(rp),parameter:: sfac  = 1d0
 !.....number of parameters
   integer,parameter:: nprms = 10
 !.....Small enough value for some criterion
-  real(8),parameter:: eps = 1d-10
+  real(rp),parameter:: eps = 1d-10
 
 !-----SW unit energy in eV
-  real(8):: swe   = 2.1678d0
+  real(rp):: swe   = 2.1678d0
 !-----SW unit length in Ang
-  real(8):: swl   = 2.0951d0*sfac
+  real(rp):: swl   = 2.0951d0*sfac
 !.....Si element energy if needed
-  real(8):: swei  = 0.d0
+  real(rp):: swei  = 0.d0
 !-----si-si
-  real(8):: swa   = 7.049556277d0
-  real(8):: swb   = 0.6022245584d0
-  real(8):: swp   = 4.d0
-  real(8):: swq   = 0.d0
-  real(8):: swc   = 1.d0
-  real(8):: swrc  = 1.8d0
+  real(rp):: swa   = 7.049556277d0
+  real(rp):: swb   = 0.6022245584d0
+  real(rp):: swp   = 4.d0
+  real(rp):: swq   = 0.d0
+  real(rp):: swc   = 1.d0
+  real(rp):: swrc  = 1.8d0
 !-----si-si-si
-  real(8):: sws   = 21.d0
-  real(8):: swt   = 1.2d0
+  real(rp):: sws   = 21.d0
+  real(rp):: swt   = 1.2d0
 
   integer,parameter:: msp = nspmax
   integer:: nsp
 
   logical:: interact(msp,msp)
   logical:: interact3(msp,msp,msp)
-  real(8):: aswe,aswl
-  real(8):: aswei(msp)
-  real(8):: aswa(msp,msp)
-  real(8):: aswb(msp,msp)
-  real(8):: aswp(msp,msp)
-  real(8):: aswq(msp,msp)
-  real(8):: aswc(msp,msp)
-  real(8):: aswrc(msp,msp)
-  real(8):: asws(msp,msp,msp)
-  real(8):: aswt(msp,msp,msp)
+  real(rp):: aswe,aswl
+  real(rp):: aswei(msp)
+  real(rp):: aswa(msp,msp)
+  real(rp):: aswb(msp,msp)
+  real(rp):: aswp(msp,msp)
+  real(rp):: aswq(msp,msp)
+  real(rp):: aswc(msp,msp)
+  real(rp):: aswrc(msp,msp)
+  real(rp):: asws(msp,msp,msp)
+  real(rp):: aswt(msp,msp,msp)
 
 contains
   subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
@@ -63,29 +65,28 @@ contains
 !      1st version.
 !-----------------------------------------------------------------------
     implicit none
-    include "mpif.h"
     include "./params_unit.h"
 !    include "params_SW_Si.h"
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(8),intent(in):: ra(3,namax),tag(namax) &
+    real(rp),intent(in):: ra(3,namax),tag(namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
-    real(8),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
+    real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
     logical,intent(in):: lstrs
 
 !-----local
     integer:: i,j,k,l,m,n,ixyz,jxyz,is,js,ks,ierr,nbl
-    real(8):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2,srcij,srcij2,srcik,srcik2
-    real(8):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
+    real(rp):: rij,rik,riji,riki,rij2,rik2,rc2,src,src2,srcij,srcij2,srcik,srcik2
+    real(rp):: tmp,tmpj(3),tmpk(3),vexp,df2,csn,tcsn,tcsn2,dhrij,dhrik &
          ,dhcsn,vol,voli,volj,volk,drij(3),rcmax
-    real(8):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
+    real(rp):: drik(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
-    real(8):: epotl,epotl1,epotl2,epotl3,epott,epot1,epot2,epot3
-    real(8),save:: swli,a8d3r3,rcmax2
-    real(8),save,allocatable:: aa2(:,:),aa3(:,:)
-    real(8),allocatable,save:: strsl(:,:,:)
+    real(rp):: epotl,epotl1,epotl2,epotl3,epott,epot1,epot2,epot3
+    real(rp),save:: swli,a8d3r3,rcmax2
+    real(rp),save,allocatable:: aa2(:,:),aa3(:,:)
+    real(rp),allocatable,save:: strsl(:,:,:)
 !-----1st call
     logical,save:: l1st=.true.
 
@@ -306,9 +307,9 @@ contains
     epot1 = 0d0
     epot2 = 0d0
     epot3 = 0d0
-    call mpi_allreduce(epotl1,epot1,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(epotl2,epot2,1,mpi_real8,mpi_sum,mpi_world,ierr)
-    call mpi_allreduce(epotl3,epot3,1,mpi_real8,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl1,epot1,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
+    call mpi_allreduce(epotl3,epot3,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
 !!$    epot= epot +epott
     epot = epot +epot1 +epot2 +epot3
     if( iprint.ge.ipl_info ) print '(a,3es12.3)', &
@@ -320,12 +321,11 @@ contains
   subroutine read_params_SW(myid,mpi_world,iprint,specorder)
     use util, only: num_data
     implicit none
-    include 'mpif.h'
     integer,intent(in):: myid,mpi_world,iprint
     character(len=3),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd
-    real(8):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt,tswei
+    real(rp):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt,tswei
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
     character(len=3):: cspi,cspj
@@ -482,30 +482,30 @@ contains
 
 20  continue
     call mpi_bcast(interact,msp*msp,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(aswe,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswl,1,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswei,msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswa,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswb,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswp,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswq,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswc,msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswrc,msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(aswe,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswl,1,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswei,msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswa,msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswb,msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswp,msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswq,msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswc,msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswrc,msp*msp,mpi_real_rp,0,mpi_world,ierr)
 
     call mpi_bcast(interact3,msp*msp*msp,mpi_logical,0,mpi_world,ierr)
-    call mpi_bcast(asws,msp*msp*msp,mpi_real8,0,mpi_world,ierr)
-    call mpi_bcast(aswt,msp*msp*msp,mpi_real8,0,mpi_world,ierr)
+    call mpi_bcast(asws,msp*msp*msp,mpi_real_rp,0,mpi_world,ierr)
+    call mpi_bcast(aswt,msp*msp*msp,mpi_real_rp,0,mpi_world,ierr)
 
-!!$    call mpi_bcast(swe,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swl,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swa,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swb,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swp,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swq,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swc,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swrc,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(sws,1,mpi_double_precision,0,mpi_world,ierr)
-!!$    call mpi_bcast(swt,1,mpi_double_precision,0,mpi_world,ierr)
+!!$    call mpi_bcast(swe,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swl,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swa,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swb,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swp,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swq,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swc,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swrc,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(sws,1,mpi_real_rp,0,mpi_world,ierr)
+!!$    call mpi_bcast(swt,1,mpi_real_rp,0,mpi_world,ierr)
     return
   end subroutine read_params_SW
 end module SW
