@@ -162,10 +162,11 @@ contains
 !.....Common terms
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) *(riji*riki)
           tcsn = csn -gmm
-          tcsn2= (tcsn*tcsn +shft)
+!!$          tcsn2= (tcsn*tcsn +shft)
+          tcsn2 = tcsn*tcsn
           vexp= dexp(bet*drijc +bet*drikc)
 !.....Potential
-          tmp= alp *vexp *tcsn2
+          tmp= vexp * (alp*tcsn2 + shft)
           epi(i)= epi(i) +tmp
           epotl3= epotl3 +tmp
 !.....Force
