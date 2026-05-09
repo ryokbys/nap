@@ -10,7 +10,7 @@ c-----------------------------------------------------------------------
       implicit none
       integer,parameter:: namax= 100000
       integer,parameter:: nnmax= 20
-      real(rp),parameter:: rcut = 3.0d0
+      real(rp),parameter:: rcut = 3.0_rp
       character,parameter:: ciofmt*6 = 'ascii '
       integer,parameter:: is_int= 2
 
@@ -81,7 +81,7 @@ c.....choose 'num-of-interstitial' sites to be occupied
       do i=1,nint
         natm= natm+1
         ri(1:3)= ptet(1:3,ntet-(i-1))
-        tagi= 1d0*is_int +1d-1 +1d-14*natm
+        tagi= 1.0_rp*is_int +1e-1_rp +1e-14_rp*natm
         ra(1:3,natm)= ri(1:3)
         tag(natm)= tagi
       enddo

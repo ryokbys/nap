@@ -41,8 +41,8 @@ contains
     gtype(:) = 0
     ispc(:,:) = 0
     isph(:,:) = 0
-    sph_org(:,:) = 0d0
-    sph_rad2(:) = 0d0
+    sph_org(:,:) = 0.0_rp
+    sph_rad2(:) = 0.0_rp
 
   end subroutine init_group
 !=======================================================================

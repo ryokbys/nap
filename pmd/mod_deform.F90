@@ -9,9 +9,9 @@ module deform
   save
 
   character(len=20):: cdeform= 'none'
-  real(rp):: trlx_deform = -1d0  ! default: minus, THIS MUST BE SPECIFIED BY THE USER
-  real(rp):: dhmat(1:3,1:3) = 0d0  ! deviation of h-matrix in given trlx_deform
-  real(rp):: ddhmat(1:3,1:3) = 0d0  ! deviation of h-matrix per fs
+  real(rp):: trlx_deform = -1.0_rp  ! default: minus, THIS MUST BE SPECIFIED BY THE USER
+  real(rp):: dhmat(1:3,1:3) = 0.0_rp  ! deviation of h-matrix in given trlx_deform
+  real(rp):: ddhmat(1:3,1:3) = 0.0_rp  ! deviation of h-matrix per fs
   
 contains
 !=======================================================================
@@ -21,7 +21,7 @@ contains
 
     integer:: i,j
 
-    if( trlx_deform.lt.0d0 ) then
+    if( trlx_deform.lt.0.0_rp ) then
       if( myid.eq.0 ) print *,'ERROR: trlx_deform must be specified'&
            //' if you use deformation.'
       stop 1

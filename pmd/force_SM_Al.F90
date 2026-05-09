@@ -43,9 +43,9 @@ contains
       exrc= exp(-ea_bt*(rc-ea_re))
 !-----smoothing 2-body term
       r= rc -ea_re
-      phic= 2d0*ea_b*exp(-0.5d0*ea_bt*r) &
-           -ea_c*(1d0+ea_al*r)*exp(-ea_al*r)
-      dphic= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r)  &
+      phic= 2.0_rp*ea_b*exp(-0.5_rp*ea_bt*r) &
+           -ea_c*(1.0_rp+ea_al*r)*exp(-ea_al*r)
+      dphic= -ea_bt*ea_b*exp(-0.5_rp*ea_bt*r)  &
            +ea_c*ea_al*ea_al*r*exp(-ea_al*r)
       l1st=.false.
     endif
@@ -55,9 +55,9 @@ contains
       allocate(sqrho(namax),strsl(3,3,namax))
     endif
     
-    epotl= 0d0
-    sqrho(1:natm)= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    sqrho(1:natm)= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -74,7 +74,7 @@ contains
         sqrho(i)=sqrho(i) +exp(-ea_bt*(rij-ea_re)) &
              -exrc -(rij-rc)*(-ea_bt)*exrc
       enddo
-      sqrho(i)= dsqrt(sqrho(i))
+      sqrho(i)= sqrt(sqrho(i))
     enddo
 
 !-----copy rho of boundary atoms
@@ -86,7 +86,7 @@ contains
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      dfi= -0.5d0*ea_a/sqrho(i)
+      dfi= -0.5_rp*ea_a/sqrho(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -100,8 +100,8 @@ contains
         drdxi(1:3)= -xij(1:3)/rij
         r= rij -ea_re
 !---------2-body term
-        tmp= 0.5d0 *( 2d0*ea_b*exp(-0.5d0*ea_bt*r) &
-             -ea_c*(1d0+ea_al*r)*exp(-ea_al*r) &
+        tmp= 0.5_rp *( 2.0_rp*ea_b*exp(-0.5_rp*ea_bt*r) &
+             -ea_c*(1.0_rp+ea_al*r)*exp(-ea_al*r) &
              -phic -(rij-rc)*dphic )
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
@@ -110,7 +110,7 @@ contains
         else
           epotl=epotl +tmp
         endif
-        dphi= -ea_bt*ea_b*exp(-0.5d0*ea_bt*r)  &
+        dphi= -ea_bt*ea_b*exp(-0.5_rp*ea_bt*r)  &
              +ea_c*ea_al*ea_al*r*exp(-ea_al*r) &
              -dphic
         aa(1:3,i)=aa(1:3,i) -dphi*drdxi(1:3)
@@ -120,15 +120,15 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dphi*xij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dphi*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dphi*xij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
 !---------embedded term
         drhoij= -ea_bt*exp(-ea_bt*r) +ea_bt*exrc
-        dfj= -0.5d0*ea_a/sqrho(j)
+        dfj= -0.5_rp*ea_a/sqrho(j)
         tmp = (dfi+dfj)*drhoij
         aa(1:3,i)=aa(1:3,i) -tmp*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +tmp*drdxi(1:3)
@@ -137,9 +137,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif

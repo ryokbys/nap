@@ -58,7 +58,7 @@ contains
     real(rp):: norm
     integer:: i
 
-    norm = 0d0
+    norm = 0.0_rp
     do i=1,ubound(v,1)
       norm = norm +v(i)*v(i)
     enddo
@@ -71,7 +71,7 @@ contains
     real(rp):: norm2
     integer:: i
 
-    norm2 = 0d0
+    norm2 = 0.0_rp
     do i=1,ubound(r,1)
       norm2 = norm2 +r(i)*r(i)
     enddo

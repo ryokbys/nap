@@ -32,8 +32,8 @@ subroutine ludc_inv( n,a,c )
     ENDDO
 !     Initialize.
     DO j=1,n
-      IF( j.EQ.i ) c(j,i)=1.D0
-      IF( j.NE.i ) c(j,i)=0.D0
+      IF( j.EQ.i ) c(j,i)=1._rp
+      IF( j.NE.i ) c(j,i)=0._rp
     ENDDO
   ENDDO
 
@@ -106,10 +106,10 @@ subroutine chckinv(n,a,ai)
 
   write(6,'(A)') "---chckinv"
   allocate(e(n,n),dum(n,n))
-  e(1:n,1:n)=0.d0
-  dum(1:n,1:n)=0.d0
+  e(1:n,1:n)=0._rp
+  dum(1:n,1:n)=0._rp
   do i=1,n
-    e(i,i)=1.d0
+    e(i,i)=1._rp
   enddo
 
   write(6,*) "a:"
@@ -120,7 +120,7 @@ subroutine chckinv(n,a,ai)
   do j=1,min(n,6)
     write(6,'(6E11.3)') (ai(i,j),i=1,min(n,6))
   enddo
-  tmp=0.d0
+  tmp=0._rp
   do i=1,n
     do j=1,n
       do k=1,n
@@ -165,8 +165,8 @@ subroutine choldc_inv(n,a,c)
 !      enddo
 
   do i=1,n
-    b(1:n)=0d0
-    b(i)=1d0
+    b(1:n)=0.0_rp
+    b(i)=1.0_rp
     call cholsl(c,n,p,b,x)
     ar(1:n,i)=x(1:n)
   enddo
@@ -202,7 +202,7 @@ subroutine choldc(a,n,p)
         sum=sum-a(i,k)*a(j,k)
       enddo
       if(i.eq.j)then
-        if(sum.le.0d0) then
+        if(sum.le.0.0_rp) then
           write(6,'(A,I5,E11.3)') "Error (choldc): i,sum=",i,sum
           stop
         endif

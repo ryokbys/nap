@@ -59,11 +59,11 @@ subroutine get_force(l1st,epot,stnsr)
   integer:: ierr,is,i,ichg,ia
   real(rp):: at(3),tmp
 
-  epot = 0d0
-  aa(1:3,1:namax)=0d0
-  epi(1:natm)= 0d0
-  strs(1:3,1:3,1:namax)= 0d0
-  stnsr(1:3,1:3) = 0d0
+  epot = 0.0_rp
+  aa(1:3,1:namax)=0.0_rp
+  epi(1:natm)= 0.0_rp
+  strs(1:3,1:3,1:namax)= 0.0_rp
+  stnsr(1:3,1:3) = 0.0_rp
 
 !.....Compute overlay coefficient first
   if( loverlay ) then
@@ -77,7 +77,7 @@ subroutine get_force(l1st,epot,stnsr)
 
 !.....If varaible charge, optimize charges before any charge-dependent potential
   if( lvc ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     if( l1st .and. myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       write(6,'(/a)') ' Charges are to be equilibrated.'
     endif
@@ -94,7 +94,7 @@ subroutine get_force(l1st,epot,stnsr)
     endif
     if( chgopt_method(1:4).eq.'damp' .or. chgopt_method(1:4).eq.'FIRE' ) then
       call chgopt_damping(aux(iaux_chg,:),l1st)
-      call accum_time('chgopt_damping',mpi_wtime() -tmp)
+      call accum_time('chgopt_damping',real(mpi_wtime(),rp) -tmp)
     else if( chgopt_method(1:4).eq.'xlag' ) then
       if( l1st ) then
         call chgopt_damping(aux(iaux_chg,:),l1st)
@@ -107,7 +107,7 @@ subroutine get_force(l1st,epot,stnsr)
 !!$          aux(iaux_q,:) = aux(iaux_chg,:)
         endif
       endif
-      call accum_time('chgopt_xlag',mpi_wtime() -tmp)
+      call accum_time('chgopt_xlag',real(mpi_wtime(),rp) -tmp)
     else
       if( myid_md.eq.0 ) print *,'Non-available chgopt_method: '//trim(chgopt_method)
       stop 1
@@ -116,176 +116,176 @@ subroutine get_force(l1st,epot,stnsr)
 
 !.....Non-exclusive (additive) choice of force-fields
   if( use_force('LJ') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_LJ',mpi_wtime() -tmp)
+    call accum_time('force_LJ',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('LJ_repul') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_LJ_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_LJ',mpi_wtime() -tmp)
+    call accum_time('force_LJ',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Ito3_WHe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Ito3_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_Ito3_WHe',mpi_wtime() -tmp)
+    call accum_time('force_Ito3_WHe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('RK_WHe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_RK_WHe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_RK_WHe',mpi_wtime() -tmp)
+    call accum_time('force_RK_WHe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('RK_FeH') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_RK_FeH(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_RK_FeH',mpi_wtime() -tmp)
+    call accum_time('force_RK_FeH',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Ramas_FeH') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Ramas_FeH(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_Ramas_FeH',mpi_wtime() -tmp)
+    call accum_time('force_Ramas_FeH',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Ackland_Fe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Ackland_Fe(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs &
        ,iprint)
-    call accum_time('force_Ackland_Fe',mpi_wtime() -tmp)
+    call accum_time('force_Ackland_Fe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('SW') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_SW(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint)
-    call accum_time('force_SW',mpi_wtime() -tmp)
+    call accum_time('force_SW',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('EDIP_Si') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_EDIP_Si(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_EDIP',mpi_wtime() -tmp)
+    call accum_time('force_EDIP',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Tersoff') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_tersoff(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint &
        ,aux(iaux_tei,:))
-    call accum_time('force_Tersoff',mpi_wtime() -tmp)
+    call accum_time('force_Tersoff',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Brenner') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Brenner(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_Brenner',mpi_wtime() -tmp)
+    call accum_time('force_Brenner',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Brenner_vdW') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Brenner_vdW(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs &
        ,iprint)
-    call accum_time('force_Brenner_vdW',mpi_wtime() -tmp)
+    call accum_time('force_Brenner_vdW',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Lu_WHe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Lu_Whe(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_Lu_WHe',mpi_wtime() -tmp)
+    call accum_time('force_Lu_WHe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Branicio_AlN') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Branicio_AlN(namax,natm,tag,ra &
        ,nnmax,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn &
        ,sv,rc,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs &
        ,iprint)
-    call accum_time('force_Branicio_AlN',mpi_wtime() -tmp)
+    call accum_time('force_Branicio_AlN',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Mishin_Al') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Mishin_Al(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Mishin_Al',mpi_wtime() -tmp)
+    call accum_time('force_Mishin_Al',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Mishin_Ni') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Mishin_Ni(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc &
        ,lspr,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Mishin_Ni',mpi_wtime() -tmp)
+    call accum_time('force_Mishin_Ni',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('AFS_W') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_AFS_W(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_AFS_W',mpi_wtime() -tmp)
+    call accum_time('force_AFS_W',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('SC_Fe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_SC_Fe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_SC_Fe',mpi_wtime() -tmp)
+    call accum_time('force_SC_Fe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('SM_Al') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_SM_Al(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint)
-    call accum_time('force_SM_Al',mpi_wtime() -tmp)
+    call accum_time('force_SM_Al',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('EAM') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_EAM',mpi_wtime() -tmp)
+    call accum_time('force_EAM',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('RFMEAM') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_RFMEAM',mpi_wtime() -tmp)
+    call accum_time('force_RFMEAM',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Pellenq') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Pellenq(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Pellenq',mpi_wtime() -tmp)
+    call accum_time('force_Pellenq',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('repel') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_repel(namax,natm,tag,ra,nnmax,aa,strs,h &
        ,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_repel',mpi_wtime() -tmp)
+    call accum_time('force_repel',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('linreg') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_linreg(namax,natm,tag,ra,nnmax,aa &
        ,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_linreg',mpi_wtime() -tmp)
+    call accum_time('force_linreg',real(mpi_wtime(),rp) -tmp)
   endif
 !!$  if( use_force('NN') ) call force_NN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
 !!$       ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
@@ -308,112 +308,112 @@ subroutine get_force(l1st,epot,stnsr)
 !!$    endif
 !!$  endif
   if( use_force('DNN') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_DNN',mpi_wtime() -tmp)
+    call accum_time('force_DNN',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Morse') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Morse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Morse',mpi_wtime() -tmp)
+    call accum_time('force_Morse',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Morse_repul') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Morse_repul(namax,natm,tag,ra,nnmax &
        ,aa,strs,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Morse_repul',mpi_wtime() -tmp)
+    call accum_time('force_Morse_repul',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('fbMorse') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_fbMorse(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_fbMorse',mpi_wtime() -tmp)
+    call accum_time('force_fbMorse',real(mpi_wtime(),rp) -tmp)
   endif
 !!$  if( use_force('vcMorse') ) then
-!!$    tmp = mpi_wtime()
+!!$    tmp = real(mpi_wtime(),rp)
 !!$    call force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs &
 !!$       ,aux(iaux_chg,:),h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
 !!$       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-!!$    call accum_time('force_vcMorse',mpi_wtime() -tmp)
+!!$    call accum_time('force_vcMorse',real(mpi_wtime(),rp) -tmp)
 !!$  endif
   if( use_force('Buckingham') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Buckingham(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Buckingham',mpi_wtime() -tmp)
+    call accum_time('force_Buckingham',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Bonny_WRe') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_Bonny_WRe',mpi_wtime() -tmp)
+    call accum_time('force_Bonny_WRe',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('ZBL') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_ZBL(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_ZBL',mpi_wtime() -tmp)
+    call accum_time('force_ZBL',real(mpi_wtime(),rp) -tmp)
   endif
   if( loverlay .and. trim(ol_force).eq.'ZBL' .and. ol_type(1:3).eq.'pot' ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
-    call accum_time('force_ZBL',mpi_wtime() -tmp)
+    call accum_time('force_ZBL',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('dipole') ) then
     call force_dipole(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_dipole',mpi_wtime() -tmp)
+    call accum_time('force_dipole',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('cspline') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_cspline(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_cspline',mpi_wtime() -tmp)
+    call accum_time('force_cspline',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('BMH') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_BMH(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_BMH',mpi_wtime() -tmp)
+    call accum_time('force_BMH',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('Abell') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_Abell(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_Abell',mpi_wtime() -tmp)
+    call accum_time('force_Abell',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('fpc') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_fpc(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_fpc',mpi_wtime() -tmp)
+    call accum_time('force_fpc',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('angular') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_angular(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nspmax,specorder,lstrs,iprint,l1st)
-    call accum_time('force_angular',mpi_wtime() -tmp)
+    call accum_time('force_angular',real(mpi_wtime(),rp) -tmp)
   endif
 
   if( use_force('Coulomb') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     if( lvc .and. chgopt_method(1:4).eq.'xlag' .and. .not.l1st ) then
       call force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
            ,aux(iaux_q,:),h,hi,nb,nbmax &
@@ -427,29 +427,29 @@ subroutine get_force(l1st,epot,stnsr)
            ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint &
            ,l1st,lcell_updated,lvc,specorder)
     endif
-    call accum_time('force_Coulomb',mpi_wtime() -tmp)
+    call accum_time('force_Coulomb',real(mpi_wtime(),rp) -tmp)
   endif
 
   if( use_force('UF3').or.use_force('uf3') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_uf3(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,lstrs,iprint,l1st)
-    call accum_time('force_UF3',mpi_wtime() -tmp)
+    call accum_time('force_UF3',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('UF3L').or.use_force('uf3l') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_uf3l(namax,natm,tag,ra,nnmax,aa,strs &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,lstrs,iprint,l1st)
-    call accum_time('force_UF3L',mpi_wtime() -tmp)
+    call accum_time('force_UF3L',real(mpi_wtime(),rp) -tmp)
   endif
   if( use_force('UF3D').or.use_force('uf3d') ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call force_uf3d(namax,natm,tag,ra,nnmax,aa,strs &
          ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
          ,mpi_md_world,myid_md,epi,epot,lstrs,iprint,l1st)
-    call accum_time('force_UF3D',mpi_wtime() -tmp)
+    call accum_time('force_UF3D',real(mpi_wtime(),rp) -tmp)
   endif
 
   if( use_force('fdesc') ) then
@@ -1087,7 +1087,7 @@ subroutine reduce_dba_bk(natm,namax,tag,x,ndim)
   integer:: ia,ja
 
   do ia=natm+1,namax
-    if( tag(ia).lt.1d0 ) cycle
+    if( tag(ia).lt.1.0_rp ) cycle
     ja= itotOf(tag(ia))
     x(1:ndim,ja)= x(1:ndim,ja) +x(1:ndim,ia)
   enddo
@@ -1110,7 +1110,7 @@ subroutine distribute_dba(natm,namax,tag,x,ndim)
   integer:: ia,ja
 
   do ia=natm+1,namax
-    if( tag(ia).lt.1d0 ) cycle
+    if( tag(ia).lt.1.0_rp ) cycle
     ja= itotOf(tag(ia))
     x(1:ndim,ia)= x(1:ndim,ja)
   enddo
@@ -1127,9 +1127,9 @@ function hvsd(x)
   real(rp),intent(in):: x
   real(rp):: hvsd
 
-  hvsd= 0d0
+  hvsd= 0.0_rp
   if( x.ge.0 ) then
-    hvsd= 1d0
+    hvsd= 1.0_rp
     return
   endif
   return
@@ -1146,17 +1146,17 @@ function fcut1(r,rin,rout)
 !          = 0                                  for rout < r
 !
   real(rp),intent(in):: r,rin,rout
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
 !!$  real(rp),parameter:: rsr= 0.9d0  ! rs ratio to rc
   real(rp):: fcut1
 
 !  rs = rc*rsr
   if( r.le.rin ) then
-    fcut1 = 1d0
+    fcut1 = 1.0_rp
   else if( rin.lt.r .and. r.le.rout ) then
-    fcut1 = 0.5d0 *(1d0 +cos(pi*(r-rin)/(rout-rin)))
+    fcut1 = 0.5_rp *(1.0_rp +cos(pi*(r-rin)/(rout-rin)))
   else
-    fcut1 = 0d0
+    fcut1 = 0.0_rp
   endif
   return
 end function fcut1
@@ -1168,17 +1168,17 @@ function dfcut1(r,rin,rout)
 !     Derivative of the cutoff function type-1
 !
   real(rp),intent(in):: r,rin,rout
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
 !!$  real(rp),parameter:: rsr= 0.9d0  ! rs ratio to rc
   real(rp):: dfcut1
 
 !!$  rs = rc *rsr
   if( r.le.rin ) then
-    dfcut1 = 0d0
+    dfcut1 = 0.0_rp
   else if( rin.lt.r .and. r.le.rout ) then
-    dfcut1 = -0.5d0 *pi/(rout-rin) *sin(pi*(r-rin)/(rout-rin))
+    dfcut1 = -0.5_rp *pi/(rout-rin) *sin(pi*(r-rin)/(rout-rin))
   else
-    dfcut1 = 0d0
+    dfcut1 = 0.0_rp
   endif
   return
 end function dfcut1
@@ -1195,9 +1195,9 @@ function fcut2(r,rc)
   real(rp):: fcut2
 
   if( r.le.rc ) then
-    fcut2 = (1d0 -(r/rc)**2)**3
+    fcut2 = (1.0_rp -(r/rc)**2)**3
   else
-    fcut2 = 0d0
+    fcut2 = 0.0_rp
   endif
 end function fcut2
 !=======================================================================
@@ -1215,9 +1215,9 @@ function dfcut2(r,rc)
 
   if( r.le.rc ) then
     rrc = r/rc
-    dfcut2 = 3d0 *(1d0-rrc**2)**2  *(-2d0*rrc) /rc
+    dfcut2 = 3.0_rp *(1.0_rp-rrc**2)**2  *(-2.0_rp*rrc) /rc
   else
-    dfcut2 = 0d0
+    dfcut2 = 0.0_rp
   endif
 end function dfcut2
 !=======================================================================
@@ -1277,7 +1277,7 @@ subroutine chgopt_damping(chg,l1st)
        ,ecoul,dtmax,fdamp, dqmax
   real(rp),save,allocatable:: vq(:),fq(:),dq(:)
 !.....small value for checking range
-  real(rp),parameter:: qeps   = 1d-10
+  real(rp),parameter:: qeps   = 1e-10_rp
 
   integer,external:: count_nonfixed
 
@@ -1304,14 +1304,14 @@ subroutine chgopt_damping(chg,l1st)
   call impose_qtot(chg)
   call get_fq_wrapper(chg,fq,epot,l1st)
 
-  vq(:) = 0d0
+  vq(:) = 0.0_rp
   fdamp = fdamp_codmp
   istp_pos = 0
   istp_conv = 0
   alpha = alpha0_codmp
   dt = dt_codmp
   dtmax = dt_codmp *10
-  epotp = 0d0
+  epotp = 0.0_rp
   do istp=1,nstp_qeq
     epotpp = epotp
     epotp = epot
@@ -1322,23 +1322,23 @@ subroutine chgopt_damping(chg,l1st)
       p = dot_product(fq(1:natm),vq(1:natm))
       vqnorm = sqrt(dot_product(vq(1:natm),vq(1:natm)))
       fqnorm = sqrt(dot_product(fq(1:natm),fq(1:natm)))
-      vq(1:natm) = (1d0-alpha)*vq(1:natm) -alpha*vqnorm*fq(1:natm)/fqnorm
-      if( p.gt.0d0 ) then
+      vq(1:natm) = (1.0_rp-alpha)*vq(1:natm) -alpha*vqnorm*fq(1:natm)/fqnorm
+      if( p.gt.0.0_rp ) then
         istp_pos = istp_pos +1
         if( istp_pos.gt.minstp_qeq ) then
           dt = min(dt*finc_codmp,dtmax)
           alpha = alpha *falpha_codmp
           istp_pos = 0
         endif
-      else if( p.le.0d0 ) then
+      else if( p.le.0.0_rp ) then
         istp_pos = 0
         dt = dt*fdec_codmp
         alpha = alpha0_codmp
-        vq(1:natm) = 0d0
+        vq(1:natm) = 0.0_rp
       endif
     else  ! simple velocity damping
       do i=1,natm
-        if( vq(i)*fq(i).lt.0d0 ) then
+        if( vq(i)*fq(i).lt.0.0_rp ) then
           vq(i) = dt/qmass *fq(i)
         else
           vq(i) = vq(i)*fdamp
@@ -1348,12 +1348,12 @@ subroutine chgopt_damping(chg,l1st)
 
 !.....update charges
     dq(1:natm) = vq(1:natm)*dt
-    call suppress_dq(dq,0.2d0,dqmax)
+    call suppress_dq(dq,0.2_rp,dqmax)
     chg(1:natm)= chg(1:natm) +dq(1:natm)
 !.....Check charges
     if( iprint.ge.ipl_debug ) then
       do i=1,natm
-        if( chg(i)*0d0 .ne. 0d0 ) then
+        if( chg(i)*0.0_rp .ne. 0.0_rp ) then
           print *,'ERROR: chg is NaN !?'
           print '(a,i8,es12.3)',' i,chg(i)= ',i,chg(i)
           stop
@@ -1435,7 +1435,7 @@ subroutine chgopt_xlag(chg,auxq,iflag)
     call accum_mem('force_common',+8*size(fq))
   endif
 
-  dqmax = -1d0
+  dqmax = -1.0_rp
   imax = -1
   do i=1,natm
     dq = abs(chg(i) -auxq(i))
@@ -1499,11 +1499,11 @@ subroutine set_fqtot_zero(fq)
   integer:: i,ierr
   real(rp):: avmul,avmu
 
-  avmul = 0d0
+  avmul = 0.0_rp
   do i=1,natm
     avmul = avmul +fq(i)
   enddo
-  avmu = 0d0
+  avmu = 0.0_rp
   call mpi_allreduce(avmul,avmu,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
   avmu = avmu/ntot
   do i=1,natm
@@ -1530,23 +1530,23 @@ subroutine get_bounding_fq(chg,fq,epot)
   integer:: i,is,ierr
   real(rp):: epotl
 
-  epotl = 0d0
+  epotl = 0.0_rp
 
   do i=1,natm
     is = int(tag(i))
     if( chg(i).ge.qtop(is) ) then
       epotl = epotl +bound_k2*(chg(i)-qtop(is))**2 &
            +bound_k4*(chg(i)-qtop(is))**4
-      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qtop(is)) &
-           -4d0*bound_k4*(chg(i)-qtop(is))**3
+      fq(i) = fq(i) -2.0_rp*bound_k2*(chg(i)-qtop(is)) &
+           -4.0_rp*bound_k4*(chg(i)-qtop(is))**3
     else if( chg(i).le.qbot(is) ) then
       epotl = epotl +bound_k2*(chg(i)-qbot(is))**2 &
            +bound_k4*(chg(i)-qbot(is))**4
-      fq(i) = fq(i) -2d0*bound_k2*(chg(i)-qbot(is)) &
-           -4d0*bound_k4*(chg(i)-qbot(is))**3
+      fq(i) = fq(i) -2.0_rp*bound_k2*(chg(i)-qbot(is)) &
+           -4.0_rp*bound_k4*(chg(i)-qbot(is))**3
     endif
   enddo
-  epot = 0d0
+  epot = 0.0_rp
   call mpi_allreduce(epotl,epot,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
   return
 end subroutine get_bounding_fq
@@ -1587,11 +1587,11 @@ subroutine suppress_dq(dq,dqlim,dqmax)
   integer:: i,ierr
   real(rp):: dqmaxl,fac
 
-  dqmaxl = 0d0
+  dqmaxl = 0.0_rp
   do i=1,natm
     dqmaxl = max(dqmaxl,abs(dq(i)))
   enddo
-  dqmax = 0d0
+  dqmax = 0.0_rp
   call mpi_allreduce(dqmaxl,dqmax,1,mpi_real_rp,mpi_max,mpi_md_world,ierr)
 !!$  if( myid_md.eq.0 ) print *,'dqmax,dqlim=',dqmax,dqlim
   if( dqmax.gt.dqlim ) then
@@ -1619,26 +1619,26 @@ subroutine suppress_fq(namax,natm,fq,myid,mpi_md_world)
 
   integer:: i,ierr
   real(rp):: fqmaxl,fqmax,fqfactor
-  real(rp),parameter:: fqlimit = 10d0
+  real(rp),parameter:: fqlimit = 10.0_rp
   character(len=128),parameter:: method = 'scale'
 !!$  character(len=128),parameter:: method = 'ceiling'
 
   if( trim(method).eq.'scale' ) then
-    fqmaxl = 0d0
+    fqmaxl = 0.0_rp
     do i=1,natm
       fqmaxl = max(fqmaxl,abs(fq(i)))
     enddo
-    fqmax = 0d0
+    fqmax = 0.0_rp
     call mpi_allreduce(fqmaxl,fqmax,1,mpi_real_rp,mpi_max,mpi_md_world,ierr)
 
-    fqfactor = 1d0
-    if( fqmax.gt.1d-8 ) fqfactor = fqlimit /fqmax
+    fqfactor = 1.0_rp
+    if( fqmax.gt.1e-8_rp ) fqfactor = fqlimit /fqmax
     do i=1,natm
       fq(i) = fq(i)*fqfactor
     enddo
   else if( trim(method).eq.'ceiling' ) then
     do i=1,natm
-      fq(i) = sign(1d0,fq(i)) *min(abs(fq(i)),fqlimit)
+      fq(i) = sign(1.0_rp,fq(i)) *min(abs(fq(i)),fqlimit)
     enddo
   endif
 
@@ -1700,9 +1700,9 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
   real(rp),intent(out):: alpha,falpha
   integer,intent(out):: iflag
 
-  real(rp),parameter:: stp0 = 0.1d0
-  real(rp),parameter:: gr = 0.61803398875d0
-  real(rp),parameter:: gr2 = 1d0 -gr
+  real(rp),parameter:: stp0 = 0.1_rp
+  real(rp),parameter:: gr = 0.61803398875_rp
+  real(rp),parameter:: gr2 = 1.0_rp -gr
   integer,parameter:: nstp = 100
   real(rp),save,allocatable:: chgt(:),fqt(:)
 
@@ -1716,7 +1716,7 @@ subroutine linmin_chg(chg0,dchg,ftol,alpha,falpha,iflag)
     allocate( chgt(namax),fqt(namax) )
   endif
 
-  a = 0d0
+  a = 0.0_rp
   b1 = stp0
   call get_range(chg0,dchg,a,b1,c,fa,fb1,fc,iflag)
   if( iflag/1000.ne.0 ) return
@@ -1802,9 +1802,9 @@ subroutine get_range(chg0,dchg,a,b,c,fa,fb,fc,iflag)
   real(rp),intent(inout):: a,b,c,fa,fb,fc
   integer,intent(inout):: iflag
 
-  real(rp),parameter:: gr = 1.61803398875d0  ! golden ratio
-  real(rp),parameter:: gri = 1d0/gr
-  real(rp),parameter:: eps = 1d-12
+  real(rp),parameter:: gr = 1.61803398875_rp  ! golden ratio
+  real(rp),parameter:: gri = 1.0_rp/gr
+  real(rp),parameter:: eps = 1e-12_rp
   real(rp),parameter:: nstp = 100
   integer:: istp
   real(rp),save,allocatable:: fqt(:),chgt(:)

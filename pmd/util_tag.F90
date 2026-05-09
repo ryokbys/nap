@@ -12,7 +12,7 @@ function ifmvOf(tag)
   implicit none
   real(rp),intent(in):: tag
   integer:: ifmvOf
-  ifmvOf= int(mod(tag*10,10d0))
+  ifmvOf= int(mod(tag*10,10.0_rp))
   return
 end function ifmvOf
 !=======================================================================
@@ -23,8 +23,8 @@ function itotOf(tag)
   integer:: itotOf
   real(rp):: tmp
 
-  tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
-  itotOf= nint(tmp*1d+14)
+  tmp= tag -ispOf(tag) -ifmvOf(tag)*1e-1_rp
+  itotOf= nint(tmp*1e+14_rp)
   return
 end function itotOf
 !=======================================================================

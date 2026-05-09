@@ -15,10 +15,10 @@ module dipole
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(rp),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737_rp
   real(rp):: acc2 = acc*acc
 !.....permittivity of vacuum
-  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836_rp  ! e^2 /Ang /eV
 
 !.....Max number of species available in the potential
   integer:: nspcs
@@ -67,8 +67,8 @@ contains
       allocate(strsl(3,3,namax))
       rcmax2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:)= 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:)= 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           if( .not. interact(is,js) ) cycle
@@ -76,8 +76,8 @@ contains
           c8ij= dip_dij(is,js)
           vrc6 = -acc2*c6ij/rc**6
           vrc8 = -acc2*c8ij/rc**8
-          dvdrc6 = 6d0*acc2*c6ij/rc**7
-          dvdrc8 = 8d0*acc2*c8ij/rc**9
+          dvdrc6 = 6.0_rp*acc2*c6ij/rc**7
+          dvdrc8 = 8.0_rp*acc2*c8ij/rc**9
           vrcs(is,js) = vrc6 +vrc8
           vrcs(js,is) = vrcs(is,js)
           dvdrcs(is,js) = dvdrc6 +dvdrc8
@@ -91,8 +91,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
 
 !-----loop over resident atoms
     do i=1,natm
@@ -108,8 +108,8 @@ contains
         rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
         dij2= rij(1)**2+ rij(2)**2 +rij(3)**2
         if( dij2.gt.rcmax2 ) cycle
-        dij = dsqrt(dij2)
-        diji= 1d0/dij
+        dij = sqrt(dij2)
+        diji= 1.0_rp/dij
         drdi(1:3)= -rij(1:3)*diji
         drdj(1:3)=  rij(1:3)*diji
         c6ij = dip_cij(is,js)
@@ -122,7 +122,7 @@ contains
         v6 = -acc2*c6ij/dij6
         v8 = -acc2*c8ij/dij8
         tmp = v6 +v8
-        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+        tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
 !!$        tmp2 = 0.5d0 *tmp
         if(j.le.natm) then
           epi(i)=epi(i) +tmp2
@@ -133,8 +133,8 @@ contains
           epotl= epotl +tmp2
         endif
 !.....Force
-        dv6 = 6d0*acc2*c6ij/dij6*diji
-        dv8 = 8d0*acc2*c8ij/dij8*diji
+        dv6 = 6.0_rp*acc2*c6ij/dij6*diji
+        dv8 = 8.0_rp*acc2*c8ij/dij8*diji
         dvdr = dv6 +dv8 -dvdrc
         aa(1:3,i)= aa(1:3,i) -drdi(1:3)*dvdr
         aa(1:3,j)= aa(1:3,j) -drdj(1:3)*dvdr
@@ -143,9 +143,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
           enddo
         enddo
       enddo
@@ -157,7 +157,7 @@ contains
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
-    epott = 0d0
+    epott = 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
@@ -191,9 +191,9 @@ contains
 
     if( myid_md.eq.0 ) then
       dip_ni(:) = -1
-      dip_ei(:) = -1d0
-      dip_cij(:,:) = 0d0
-      dip_dij(:,:) = 0d0
+      dip_ei(:) = -1.0_rp
+      dip_cij(:,:) = 0.0_rp
+      dip_dij(:,:) = 0.0_rp
       interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(cprmfname)
       open(ioprms,file=trim(fname),status='old')
@@ -230,8 +230,8 @@ contains
           nj = dip_ni(jsp)
           ej = dip_ei(jsp)
           aj = nj*plankh**2 /amass(jsp) /ei**2
-          cij = 3d0*ai*aj*ei*ej /2d0/(ei+ej)
-          dij = 9d0*cij /4d0 *(ai*ei/ni +aj*ej/nj)
+          cij = 3.0_rp*ai*aj*ei*ej /2.0_rp/(ei+ej)
+          dij = 9.0_rp*cij /4.0_rp *(ai*ei/ni +aj*ej/nj)
           dip_cij(isp,jsp) = cij
           dip_dij(isp,jsp) = dij
           interact(isp,jsp) = .true.

@@ -7,7 +7,7 @@ c-----------------------------------------------------------------------
       use mod_precision
       implicit none
 c.....Threshold potential energy
-      real(rp),parameter:: pth = -0.1410d0
+      real(rp),parameter:: pth = -0.1410_rp
 
       integer:: i,n,itmp,nauxdat,j,ia,ib,l,natm
       real(rp):: h(3,3),hunit

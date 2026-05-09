@@ -16,8 +16,8 @@ c-----------------------------------------------------------------------
       integer,allocatable,dimension(:):: itag
       real(rp),allocatable:: opt(:,:)
 
-      sorg(1:3)= 0d0
-      dt= 1d-15/ut
+      sorg(1:3)= 0.0_rp
+      dt= 1e-15_rp/ut
 
       nargc= command_argument_count()
       if( nargc.ne.1 ) then
@@ -91,8 +91,8 @@ c=======================================================================
       real(rp):: tmp
       integer,external:: is_tag,ifmv_tag
 
-      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1
-      itot_tag= nint(tmp*1d+14)
+      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1e-1_rp
+      itot_tag= nint(tmp*1e+14_rp)
       return
       end function itot_tag
 c-----------------------------------------------------------------------

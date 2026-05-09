@@ -50,26 +50,26 @@ contains
       allocate(teda(2,2),tedb(2,2),tedc(2,2),teds(2,2),tedg(2,2))
       teda(1,1)= ed_a
       teda(2,2)= ed_a*ratio
-      teda(1,2)= (teda(1,1)+teda(2,2))*0.5d0
-      teda(2,1)= (teda(1,1)+teda(2,2))*0.5d0
+      teda(1,2)= (teda(1,1)+teda(2,2))*0.5_rp
+      teda(2,1)= (teda(1,1)+teda(2,2))*0.5_rp
       tedb(1,1)= ed_bb
       tedb(2,2)= ed_bb*ratio
-      tedb(1,2)= (tedb(1,1)+tedb(2,2))*0.5d0
-      tedb(2,1)= (tedb(1,1)+tedb(2,2))*0.5d0
+      tedb(1,2)= (tedb(1,1)+tedb(2,2))*0.5_rp
+      tedb(2,1)= (tedb(1,1)+tedb(2,2))*0.5_rp
       tedc(1,1)= ed_c
       tedc(2,2)= ed_c*ratio
-      tedc(1,2)= (tedc(1,1)+tedc(2,2))*0.5d0
-      tedc(2,1)= (tedc(1,1)+tedc(2,2))*0.5d0
+      tedc(1,2)= (tedc(1,1)+tedc(2,2))*0.5_rp
+      tedc(2,1)= (tedc(1,1)+tedc(2,2))*0.5_rp
       tedg(1,1)= ed_gam
       tedg(2,2)= ed_gam*ratio
-      tedg(1,2)= (tedg(1,1)+tedg(2,2))*0.5d0
-      tedg(2,1)= (tedg(1,1)+tedg(2,2))*0.5d0
+      tedg(1,2)= (tedg(1,1)+tedg(2,2))*0.5_rp
+      tedg(2,1)= (tedg(1,1)+tedg(2,2))*0.5_rp
       teds(1,1)= ed_sgm
       teds(2,2)= ed_sgm*ratio
-      teds(1,2)= (teds(1,1)+teds(2,2))*0.5d0
-      teds(2,1)= (teds(1,1)+teds(2,2))*0.5d0
+      teds(1,2)= (teds(1,1)+teds(2,2))*0.5_rp
+      teds(2,1)= (teds(1,1)+teds(2,2))*0.5_rp
 !-------check rc
-      if( int(rc*100d0).ne.int(max(teda(1,1),teda(2,2))*100d0) ) then
+      if( int(rc*100.0_rp).ne.int(max(teda(1,1),teda(2,2))*100.0_rp) ) then
         if(myid.eq.0) then
           write(6,'(1x,a)') "!!! Cutoff radius is not appropriate !!!"
           write(6,'(1x,a,es12.4)') "rc should be" &
@@ -92,16 +92,16 @@ contains
       allocate(dz(3,0:nnmax,namax))
     endif
 
-    epotl= 0d0
-    epi(1:namax)= 0d0
-    aa2(1:3,1:namax)= 0d0
-    aa3(1:3,1:namax)= 0d0
-    epotl2= 0d0
-    epotl3= 0d0
+    epotl= 0.0_rp
+    epi(1:namax)= 0.0_rp
+    aa2(1:3,1:namax)= 0.0_rp
+    aa3(1:3,1:namax)= 0.0_rp
+    epotl2= 0.0_rp
+    epotl3= 0.0_rp
 
 !-----set Z
-    z(1:natm)= 0d0
-    dz(1:3,0:nnmax,natm)= 0d0
+    z(1:natm)= 0.0_rp
+    dz(1:3,0:nnmax,natm)= 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -115,13 +115,13 @@ contains
         eda= teda(is,js)
         eda2= eda*eda
         if( rij2.ge.eda2 ) cycle
-        rij= dsqrt(rij2)
+        rij= sqrt(rij2)
         edc= tedc(is,js)
         z(i)= z(i) +f_r(eda,edc,rij,ed_alp)
         dz(1:3,k,i)= df_r(eda,edc,rij,ed_alp)*xij(1:3)/rij
         dz(1:3,0,i)= dz(1:3,0,i) -dz(1:3,k,i)
       enddo
-      pz(i)= dexp(-ed_bet*z(i)*z(i))
+      pz(i)= exp(-ed_bet*z(i)*z(i))
     enddo
 
 !-----2-body term
@@ -138,8 +138,8 @@ contains
         eda= teda(is,js)
         eda2= eda*eda
         if( rij2.ge.eda2 ) cycle
-        rij= dsqrt(rij2)
-        riji= 1d0/rij
+        rij= sqrt(rij2)
+        riji= 1.0_rp/rij
         eds= teds(is,js)
         aexp= exp(eds/(rij-eda))
 !---------potential
@@ -149,7 +149,7 @@ contains
         epotl2= epotl2 +v2
 !---------force
         t1= -ed_rho*(edb*riji)**ed_rho*riji *ed_aa*aexp
-        t2= -2d0*ed_bet*z(i)*pz(i) *ed_aa*aexp
+        t2= -2.0_rp*ed_bet*z(i)*pz(i) *ed_aa*aexp
         t3= -eds/(rij-eda)**2 *v2
         dxi(1:3)= -xij(1:3)*riji
         dxj(1:3)=  xij(1:3)*riji
@@ -168,11 +168,11 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
-      qz=ed_q0*dexp(-ed_mu*z(i))
+      qz=ed_q0*exp(-ed_mu*z(i))
       dqz= -ed_mu*qz
-      tz= ed_u1 +ed_u2*(ed_u3*dexp(-ed_u4*z(i))-dexp(-2d0*ed_u4*z(i)))
-      dtz= -ed_u2*ed_u4*(ed_u3*dexp(-ed_u4*z(i)) &
-           -2d0*dexp(-2d0*ed_u4*z(i)))
+      tz= ed_u1 +ed_u2*(ed_u3*exp(-ed_u4*z(i))-exp(-2.0_rp*ed_u4*z(i)))
+      dtz= -ed_u2*ed_u4*(ed_u3*exp(-ed_u4*z(i)) &
+           -2.0_rp*exp(-2.0_rp*ed_u4*z(i)))
       do jj=1,lspr(0,i)
         j=lspr(jj,i)
         if(j.eq.0) exit
@@ -183,10 +183,10 @@ contains
         eda= teda(is,js)
         eda2= eda*eda
         if( rij2.ge.eda2 ) cycle
-        rij= dsqrt(rij2)
+        rij= sqrt(rij2)
         edg= tedg(is,js)
-        grij= dexp(edg/(rij-eda))
-        riji= 1d0/rij
+        grij= exp(edg/(rij-eda))
+        riji= 1.0_rp/rij
         dgrij= -edg/(rij-eda)**2*grij
         dixij(1:3)= -xij(1:3)*riji
         djxij(1:3)=  xij(1:3)*riji
@@ -201,17 +201,17 @@ contains
           eda= teda(is,ks)
           eda2= eda*eda
           if( rik2.ge.eda2 ) cycle
-          rik=dsqrt(rik2)
+          rik=sqrt(rik2)
           edg= tedg(is,ks)
-          grik= dexp(edg/(rik-eda))
+          grik= exp(edg/(rik-eda))
           dgrik= -edg/(rik-eda)**2 *grik
-          riki= 1d0/rik
+          riki= 1.0_rp/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
           cs=(xij(1)*xik(1)+xij(2)*xik(2)+xij(3)*xik(3))*riji*riki
           t1= qz*(cs+tz)**2
-          aexp= dexp(-t1)
-          h1= ed_lam*(1d0-aexp)
+          aexp= exp(-t1)
+          h1= ed_lam*(1.0_rp-aexp)
           h2= ed_lam*ed_eta*t1
           hijk= h1 +h2
 !-----------potential
@@ -232,28 +232,28 @@ contains
           aa3(1:3,k)= aa3(1:3,k) +dkxik(1:3)*dgrik*grij*hijk
 !-----------deriv. of t1 about i
           dit1(1:3)=dz(1:3,0,i)*dqz*(cs+tz)**2 &
-               +2d0*qz*(cs+tz)*(dcsi(1:3)+dz(1:3,0,i)*dtz)
+               +2.0_rp*qz*(cs+tz)*(dcsi(1:3)+dz(1:3,0,i)*dtz)
 !-----------deriv. of h2 about i
           aa3(1:3,i)=aa3(1:3,i) +dit1(1:3)*ed_lam*ed_eta*gg
 !-----------deriv. of h1 about i
           aa3(1:3,i)=aa3(1:3,i) +dit1(1:3)*ed_lam*aexp*gg
 !-----------deriv. of h2 about j,k only cs part
           aa3(1:3,j)=aa3(1:3,j) &
-               +2d0*qz*(cs+tz)*dcsj(1:3)*ed_lam*ed_eta*gg
+               +2.0_rp*qz*(cs+tz)*dcsj(1:3)*ed_lam*ed_eta*gg
           aa3(1:3,k)=aa3(1:3,k) &
-               +2d0*qz*(cs+tz)*dcsk(1:3)*ed_lam*ed_eta*gg
+               +2.0_rp*qz*(cs+tz)*dcsk(1:3)*ed_lam*ed_eta*gg
 !-----------deriv. of h1 about j,k only cs part
           aa3(1:3,j)=aa3(1:3,j) &
-               +2d0*qz*(cs+tz)*dcsj(1:3)*ed_lam*aexp*gg
+               +2.0_rp*qz*(cs+tz)*dcsj(1:3)*ed_lam*aexp*gg
           aa3(1:3,k)=aa3(1:3,k) &
-               +2d0*qz*(cs+tz)*dcsk(1:3)*ed_lam*aexp*gg
+               +2.0_rp*qz*(cs+tz)*dcsk(1:3)*ed_lam*aexp*gg
           do ll=1,lspr(0,i)
             l=lspr(ll,i)
 !-------------deriv. of t1 about l except cs part
 !              dlt1(1:3)= dz(1:3,ll,i)*dqz*(cs+tz)**2
 !     &             +2d0*qz*(cs+tz)*dz(1:3,ll,i)*dtz
             dlt1(1:3)= dz(1:3,ll,i)*(cs+tz) &
-                 *( dqz*(cs+tz) +2d0*qz*dtz )
+                 *( dqz*(cs+tz) +2.0_rp*qz*dtz )
 !-------------deriv. of h2 about l except cs part
             aa3(1:3,l)=aa3(1:3,l)+dlt1(1:3)*ed_lam*ed_eta*gg
 !-------------deriv. of h1 about l except cs part
@@ -304,12 +304,12 @@ contains
     real(rp),intent(in):: a,c,r,alpha
     real(rp):: f_r,x
 
-    f_r= 0d0
+    f_r= 0.0_rp
     if(r.lt.c) then
-      f_r= 1d0
+      f_r= 1.0_rp
     elseif(c.le.r .and. r.lt.a) then
       x= (r-c)/(a-c)
-      f_r= exp(alpha/(1d0-1d0/x**3))
+      f_r= exp(alpha/(1.0_rp-1.0_rp/x**3))
     endif
     return
   end function f_r
@@ -320,12 +320,12 @@ contains
     real(rp),intent(in):: a,c,r,alpha
     real(rp):: df_r,x,t1,t2,t3
 
-    df_r= 0d0
+    df_r= 0.0_rp
     if(c.le.r .and. r.lt.a) then
       x= (r-c)/(a-c)
-      t1= 1d0/(a-c)
-      t2= exp(alpha/(1d0-1d0/x**3))
-      t3= -3d0/x**4*alpha/(1d0 -1d0/x**3)**2
+      t1= 1.0_rp/(a-c)
+      t2= exp(alpha/(1.0_rp-1.0_rp/x**3))
+      t3= -3.0_rp/x**4*alpha/(1.0_rp -1.0_rp/x**3)**2
       df_r= t1 *t2 *t3
     endif
     return

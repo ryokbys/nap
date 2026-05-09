@@ -77,23 +77,23 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   character(len=20):: cfetime = 'f12.2' ! for elapsed time
   character(len=20):: cftave  = 'f12.2' ! or 'es12.4' for high-T
 
-  tcpu0= mpi_wtime()
+  tcpu0= real(mpi_wtime(),rp)
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
   call mpi_bcast(ntot,1,mpi_integer,0,mpi_md_world,ierr)
 
   istp= 0
-  simtime = 0d0
+  simtime = 0.0_rp
   rbufres = rbuf
 
   if( nstp.le.0 ) then
     cfistp = 'i2'
   else
-    write(cfistp(2:3),'(i2.2)') int(log10(dble(nstp)))+2
+    write(cfistp(2:3),'(i2.2)') int(log10(real(nstp, rp)))+2
   endif
 
 !.....Variable time-step
-  if( dt.lt.0d0 ) then
+  if( dt.lt.0.0_rp ) then
     dtmax = abs(dt)
     lvardt = .true.
     if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -107,27 +107,27 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Set 0d0 to z of fmv(9) in case of z-loading
   if( trim(czload_type).eq.'atoms' .or. &
        trim(czload_type).eq.'box' ) then
-    fmv(3,9) = 0d0
+    fmv(3,9) = 0.0_rp
     if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
-      write(6,'(a)') 'Set fmv(3,9)=0d0, because czload_type=' &
+      write(6,'(a)') 'Set fmv(3,9)=0.0_rp, because czload_type=' &
            //trim(czload_type)
     endif
   else if( trim(czload_type).eq.'shear' ) then
-    fmv(1,9) = 0d0
-    fmv(3,9) = 0d0
+    fmv(1,9) = 0.0_rp
+    fmv(3,9) = 0.0_rp
     if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
-      write(6,'(a)') 'Set fmv(1,9) and fmv(3,9) = 0d0,' &
+      write(6,'(a)') 'Set fmv(1,9) and fmv(3,9) = 0.0_rp,' &
            //' because czload_type='//trim(czload_type)
     endif
   endif
 
 !-----parallel configuration
   nxyz= nx*ny*nz
-  anxi= 1d0/nx
-  anyi= 1d0/ny
-  anzi= 1d0/nz
+  anxi= 1.0_rp/nx
+  anyi= 1.0_rp/ny
+  anzi= 1.0_rp/nz
 !-----error trap
   if(nodes_md.ne.nxyz) then
     write(6,'(a)') " error: nodes_md .ne. nxyz!!"
@@ -159,7 +159,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-----ntset
   call ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
 
-!!$  print *,'Time at 0 = ',mpi_wtime() -tcpu0
+!!$  print *,'Time at 0 = ',real(mpi_wtime(),rp) -tcpu0
 !-----output every these steps, NOUTERG, NOUTPMD
   if( nerg.gt.0 ) then
     nouterg = max(nstp/nerg,1)
@@ -172,9 +172,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     noutpmd = nstp +1
   endif
 !.....perform space decomposition after reading atomic configuration
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
-  call accum_time('space_decomp',mpi_wtime()-tmp)
+  call accum_time('space_decomp',real(mpi_wtime(),rp)-tmp)
 !.....Some conversions
   do i=1,natm
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
@@ -195,7 +195,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   enddo
 #endif
 
-!!$  print *,'Time at 1 = ',mpi_wtime() -tcpu0
+!!$  print *,'Time at 1 = ',real(mpi_wtime(),rp) -tcpu0
 
 !.....NEMD setting
   if( ltdst ) then
@@ -250,10 +250,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !.....Set initial temperature if needed
-  if( tinit.gt.1d-5 ) then
+  if( tinit.gt.1e-5_rp ) then
     call setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
-  elseif( abs(tinit).le.1d-5 ) then
-    va(1:3,1:natm)= 0d0
+  elseif( abs(tinit).le.1e-5_rp ) then
+    va(1:3,1:natm)= 0.0_rp
   endif
   if( lclrchg ) then  ! special treatment for translational momentum
     call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
@@ -262,8 +262,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
   if( ifdmp.eq.2 ) then
-    va(1:3,1:natm) = 0d0
-    h(1:3,1:3,1) = 0d0
+    va(1:3,1:natm) = 0.0_rp
+    h(1:3,1:3,1) = 0.0_rp
   endif
 
 !-----calc kinetic energy
@@ -274,7 +274,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( index(ctctl,'langevin').ne.0 ) then
     call setup_langevin(myid_md,iprint)
   else if( index(ctctl,'ttm').ne.0 ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
          boundary,myid_md,mpi_md_world,iprint)
 !!$    call assign_atom2cell(namax,natm,ra,sorg,boundary)
@@ -285,33 +285,33 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call couple_3d1d(myid_md,mpi_md_world,iprint)
     endif
     call output_ttm(0,simtime,myid_md,iprint)
-    call accum_time('ttm',mpi_wtime()-tmp)
+    call accum_time('ttm',real(mpi_wtime(),rp)-tmp)
   endif
 
-  tcpu1= mpi_wtime()
+  tcpu1= real(mpi_wtime(),rp)
 
 !!$  call init_force(.true.)
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
        ,nx,ny,nz,myid_md)
   l1st = .true.
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   call bacopy(.true.)
-  call accum_time('ba_xxx',mpi_wtime()-tmp)
+  call accum_time('ba_xxx',real(mpi_wtime(),rp)-tmp)
 !-----Make pair list
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
 !$acc update device(ra,h)
 !!$  call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
 !!$       ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
   call mk_lspr_para(l1st)
-  call accum_time('lspr',mpi_wtime()-tmp)
+  call accum_time('lspr',real(mpi_wtime(),rp)-tmp)
 
   if( iprint.gt.0 .and. myid_md.eq.0 ) then
     print '(/a,i5)', ' Max num of neighbors = ',maxnn
   endif
 
   if( chgopt_method(1:4).eq.'xlag' ) then
-    aux(iaux_vq,:) = 0d0
+    aux(iaux_vq,:) = 0.0_rp
   endif
 
 !.....Output descriptor and stop
@@ -321,27 +321,27 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          myid_md,mpi_md_world,iprint)
   endif
 
-!!$  print *,'Time at 2 = ',mpi_wtime() -tcpu0
+!!$  print *,'Time at 2 = ',real(mpi_wtime(),rp) -tcpu0
 !.....Calc forces
   lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
   lcell_updated = .true.
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   call get_force(.true.,epot0,stnsr)
   if( chgopt_method(1:4).eq.'xlag' ) then
     call get_aauxq(aux(iaux_chg,:),aux(iaux_q,:))
   endif
-  call accum_time('get_force',mpi_wtime()-tmp)
+  call accum_time('get_force',real(mpi_wtime(),rp)-tmp)
   lcell_updated = .false.
   lstrs = .false.
   epot= epot0
-  epotp = 0d0
+  epotp = 0.0_rp
 !.....In damping-MD, scale large-forces as log-scale.
   if( ifdmp .gt. 0 ) then
     do i=1,natm
       tmp = aa(1,i)**2 +aa(2,i)**2 +aa(3,i)**2
-      if( tmp.gt.1d0 ) then
-        tmp = log(tmp)/2 +1d0
+      if( tmp.gt.1.0_rp ) then
+        tmp = log(tmp)/2 +1.0_rp
         aa(1:3,i) = aa(1:3,i) /tmp
       endif
     enddo
@@ -389,10 +389,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot &
          ,' eV = ',epot/ntot0,' eV/atom'
     nave= 0
-    tave= 0d0
+    tave= 0.0_rp
     do itemp=1,ntemps
       if( ndof(itemp).eq.0 ) cycle
-      temps(itemp)= eks(itemp) /max(ndof(itemp)-3,3) /fkb *2d0
+      temps(itemp)= eks(itemp) /max(ndof(itemp)-3,3) /fkb *2.0_rp
       nave= nave +ndof(itemp)
       if( lmultemps ) then
         write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",itemp &
@@ -406,7 +406,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Human-friendly stress unit GPa
     sth(:,:) = stnsr(:,:) *up2gpa
     prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
-    if( prss.lt.0d0 ) then
+    if( prss.lt.0.0_rp ) then
       ctmp = '(tensile)'
     else
       ctmp = '(compressive)'
@@ -418,8 +418,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          sth(2,3),sth(3,1),sth(1,2)
     write(6,*) ''
 
-    if( tave.gt.100000d0 ) cftave = 'es12.4'
-    tcpu = mpi_wtime() -tcpu0
+    if( tave.gt.100000.0_rp ) cftave = 'es12.4'
+    tcpu = real(mpi_wtime(),rp) -tcpu0
     write(6,'(a,'//cfistp//','//cfetime//','//cftave &
          //',es13.4,2es11.3)') &
          " istp,etime,temp,epot,vol,prss=" &
@@ -429,22 +429,22 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call sanity_check(ekin,epot,stnsr,tave,myid_md,mpi_md_world,ifwrong)
   if( ifwrong .gt. 0 ) goto 90
 
-!!$  print *,'Time at 3 = ',mpi_wtime() -tcpu0
+!!$  print *,'Time at 3 = ',real(mpi_wtime(),rp) -tcpu0
 !.....output initial configuration including epi, eki, and strs
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot)
-  call accum_time('space_comp',mpi_wtime()-tmp)
+  call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
   if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
     if( ifsort.gt.0 ) then
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       call sort_by_tag(ntot,tagtot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
-      call accum_time('sort_by_tag',mpi_wtime()-tmp)
+      call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
     endif
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     if( ifpmd.eq.1 ) then  ! pmd format
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
@@ -471,7 +471,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
            rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0)
     endif
-    call accum_time('write_xxx',mpi_wtime() -tmp)
+    call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
   endif
 
 !-----initialize the counter for output
@@ -486,7 +486,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            //'   3:etot[eV],  4:ekin,' &
            //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
       write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
-      if( tave.gt.10000d0) cftave = 'es12.4'
+      if( tave.gt.10000.0_rp) cftave = 'es12.4'
       write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
            //','//cftave//',2es16.7e3)') istp &
            ,simtime,ekin+epot,ekin,epot,tave,vol,prss
@@ -541,7 +541,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
        ,myid_md,mpi_md_world,nxyz)
   if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
 
-!!$  print *,'Time at 4 = ',mpi_wtime() -tcpu0
+!!$  print *,'Time at 4 = ',real(mpi_wtime(),rp) -tcpu0
   i_conv = 0
   lconverged = .false.
 !-----velocity-Verlet loop starts---------------------------------------
@@ -571,18 +571,18 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif
 !.....Update dt-related values
       if( index(ctctl,'lange').ne.0 ) then
-        tgmm = 1d0/trlx
+        tgmm = 1.0_rp/trlx
         do itemp=1,ntemps
-          if( ttgt(itemp).lt.0d0 ) then
-            tfac(itemp)= -1d0
+          if( ttgt(itemp).lt.0.0_rp ) then
+            tfac(itemp)= -1.0_rp
           else
-            tfac(itemp)= dsqrt(2d0*tgmm*ttgt(itemp)/dt *k2ue)
+            tfac(itemp)= sqrt(2.0_rp*tgmm*ttgt(itemp)/dt *k2ue)
           endif
         enddo
       else if( index(ctctl,'ttm').ne.0 ) then
-        tmp = mpi_wtime()
+        tmp = real(mpi_wtime(),rp)
         call set_inner_dt(dt,myid_md,iprint)
-        call accum_time('ttm',mpi_wtime()-tmp)
+        call accum_time('ttm',real(mpi_wtime(),rp)-tmp)
       endif
     endif
 
@@ -611,7 +611,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !-------multiply fmv
     do i=1,natm
-      l= int(mod(tag(i)*10,10d0))
+      l= int(mod(tag(i)*10,10.0_rp))
       va(1:3,i)=va(1:3,i) *fmv(1:3,l)
     enddo
 
@@ -622,7 +622,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            ,mpi_md_world,myid_md,iprint)
     endif
 
-!!$    print *,'Time at 5 = ',mpi_wtime() -tcpu0
+!!$    print *,'Time at 5 = ',real(mpi_wtime(),rp) -tcpu0
 !.....Update positions
     if( lconst ) then
       call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
@@ -668,43 +668,43 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( lcell_updated ) call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
 
 !.....Update rbufres considering change of vmax
-    rbufres = rbufres -vmax*dt*2d0
+    rbufres = rbufres -vmax*dt*2.0_rp
 
 !.....Update pair list and boundary atoms
 !.....if making new pair list is needed.
-    if( rbufres.le.0d0 .or. &
+    if( rbufres.le.0.0_rp .or. &
          (ifpmd.gt.0.and.mod(istp,noutpmd).eq.0) .or. &
          nvwall > 0 ) then  ! if virtual_wall exists, update do bacopy every step.
       if( iprint.ge.ipl_info .and. myid_md.eq.0 ) then
         print *,'Update boundary atoms and thus pair-list, too.'
-        if( rbufres.le.0d0 ) then
+        if( rbufres.le.0.0_rp ) then
           print *,'  because of rbufres < 0.'
         else
           print *,'  because of writing out positions.'
         endif
       endif
 !.....Move atoms that cross the boundary
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       call bamove()
       l1st = .false.
 !.....Copy RA of boundary atoms
       call bacopy(.false.)
-      call accum_time('ba_xxx',mpi_wtime()-tmp)
+      call accum_time('ba_xxx',real(mpi_wtime(),rp)-tmp)
 !.....Make pair list
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
 !$acc update device(ra,h)
       call mk_lspr_para(l1st)
-      call accum_time('lspr',mpi_wtime()-tmp)
+      call accum_time('lspr',real(mpi_wtime(),rp)-tmp)
       rbufres = rbuf
 !!$!$acc update device(lspr)
     else
 !.....Copy RA of boundary atoms determined by 'bacopy'
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       call bacopy_fixed()
-      call accum_time('ba_xxx',mpi_wtime()-tmp)
+      call accum_time('ba_xxx',real(mpi_wtime(),rp)-tmp)
 !$acc update device(ra,h)
     endif
-!!$    print *,'Time at 6 = ',mpi_wtime() -tcpu0
+!!$    print *,'Time at 6 = ',real(mpi_wtime(),rp) -tcpu0
 
 #ifdef IMPULSE
     call set_ia_impls(natm,tag,mpi_md_world)
@@ -714,12 +714,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       lstrs = lstrs0
     endif
 !-------Calc forces
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call get_force(.false.,epot,stnsr)
     if( chgopt_method(1:4).eq.'xlag' ) then
       call get_aauxq(aux(iaux_chg,:),aux(iaux_q,:))
     endif
-    call accum_time('get_force',mpi_wtime()-tmp)
+    call accum_time('get_force',real(mpi_wtime(),rp)-tmp)
     lcell_updated = .false.
     lstrs = lstrs0
 !.....Structure analysis
@@ -747,13 +747,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Force_modify
     if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
          ,h,nnmax,lspr)
-!!$    print *,'Time at 7 = ',mpi_wtime() -tcpu0
+!!$    print *,'Time at 7 = ',real(mpi_wtime(),rp) -tcpu0
 !.....In damping-MD, scale large-forces as log-scale.
     if( ifdmp .gt. 0 ) then
       do i=1,natm
         tmp = aa(1,i)**2 +aa(2,i)**2 +aa(3,i)**2
-        if( tmp.gt.1d0 ) then
-          tmp = log(tmp)/2 +1d0
+        if( tmp.gt.1.0_rp ) then
+          tmp = log(tmp)/2 +1.0_rp
           aa(1:3,i) = aa(1:3,i) /tmp
         endif
       enddo
@@ -787,13 +787,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     vmaxold= vmax
     call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
          ,vmax,mpi_md_world)
-!!$    print *,'Time at 8 = ',mpi_wtime() -tcpu0
+!!$    print *,'Time at 8 = ',real(mpi_wtime(),rp) -tcpu0
 
 !.....Some thermostats come after get_ekin, since they require eks values
     if( index(ctctl,'beren').ne.0 ) then
       call vel_update_berendsen(natm,tag,va)
     else if( index(ctctl,'ttm').ne.0 ) then
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       call assign_atom2cell(namax,natm,ra,sorg,boundary)
       call compute_nac(natm,myid_md,mpi_md_world,iprint)
       call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
@@ -808,10 +808,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call set_3d1d_bc_pos(natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
         call couple_3d1d(myid_md,mpi_md_world,iprint)
       endif
-      call accum_time('ttm',mpi_wtime()-tmp)
+      call accum_time('ttm',real(mpi_wtime(),rp)-tmp)
     endif
 
-    if( abs(pini-pfin).gt.0.1d0 ) then
+    if( abs(pini-pfin).gt.0.1_rp ) then
       ptgt = ( pini +(pfin-pini)*istp/nstp ) *gpa2up
     endif
     call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
@@ -837,10 +837,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
          (ifpmd.gt.0.and. mod(istp,noutpmd).eq.0) ) then
       iocnterg=iocnterg+1
       nave= 0
-      tave= 0d0
+      tave= 0.0_rp
       do itemp=1,ntemps
         if( ndof(itemp).le.0 ) cycle
-        temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
+        temps(itemp)= eks(itemp) *2.0_rp /fkb /max(ndof(itemp)-3,3)
         nave= nave +ndof(itemp)
         tave= tave +temps(itemp)*max(ndof(itemp)-3,3)
       enddo
@@ -854,14 +854,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
       if( iprint.ne.0 ) then
         ediff(1:9)= ediff(1:9) /nouterg
-        ediff0(1:9)= 0d0
+        ediff0(1:9)= 0.0_rp
         call mpi_reduce(ediff,ediff0,9 &
              ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
       endif
 
       if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
 !.....write energies
-        if( tave.gt.10000d0) cftave = 'es12.4'
+        if( tave.gt.10000.0_rp) cftave = 'es12.4'
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
              //','//cftave//',2es16.7e3)') istp &
              ,simtime,ekin+epot,ekin,epot,tave,vol,prss
@@ -871,7 +871,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              ,simtime, sth(1,1), sth(2,2), sth(3,3), sth(2,3), sth(1,3), sth(1,2)
         call flush(iostrs)
 !.....write temperature
-        ediff(1:9)= 0d0
+        ediff(1:9)= 0.0_rp
         if( trim(czload_type).eq.'atoms' .or. &
              trim(czload_type).eq.'shear' ) then
           write(iozload,'(i8,3es15.7)') istp,strnow,ftop,fbot
@@ -882,10 +882,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       endif   ! myid_md.eq.0
 
 !---------output step, time, and temperature
-      tcpu= mpi_wtime() -tcpu1
+      tcpu= real(mpi_wtime(),rp) -tcpu1
       if( myid_md.eq.0 .and. iprint.ne.0 ) then
-        if( tave.gt.10000d0 ) cftave = 'es12.4'
-        tcpu = mpi_wtime() -tcpu0
+        if( tave.gt.10000.0_rp ) cftave = 'es12.4'
+        tcpu = real(mpi_wtime(),rp) -tcpu0
         write(6,'(a,'//cfistp//','//cfetime//','//cftave &
              //',es13.4,2es11.3)') &
              " istp,etime,temp,epot,vol,prss=" &
@@ -920,7 +920,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     if( ifwrong .gt. 0 ) goto 90
 
 !.....check convergence criteria if it is damped MD
-    if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and. n_conv.gt.0 .and. &
+    if( ifdmp.gt.0 .and. epot-epotp.le.0.0_rp .and. n_conv.gt.0 .and. &
          abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
       i_conv = i_conv + 1
       if( i_conv.ge.n_conv ) then
@@ -948,23 +948,23 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !-------write the particle positions
     if(ifpmd.gt.0.and. &
          (mod(istp,noutpmd).eq.0.or.lconverged) )then
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
 !---------decide pmd-file name
       iocntpmd=iocntpmd+1
       write(cnum,'(i0)') istp
 !.....vtot and atot are scaled by hmat in space_comp
       call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
            ekitot,epitot,auxtot)
-      call accum_time('space_comp',mpi_wtime()-tmp)
+      call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
       ltot_updated = .true.
       if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
         if( ifsort.gt.0 ) then
-          tmp = mpi_wtime()
+          tmp = real(mpi_wtime(),rp)
           call sort_by_tag(ntot0,tagtot,rtot,vtot &
                ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
-          call accum_time('sort_by_tag',mpi_wtime()-tmp)
+          call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
         endif
-        tmp = mpi_wtime()
+        tmp = real(mpi_wtime(),rp)
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
@@ -991,7 +991,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
                rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
         endif
-        call accum_time('write_xxx',mpi_wtime() -tmp)
+        call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
       endif
     endif
 
@@ -1006,21 +1006,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( lcomb_pos ) close(20)
 
   if( .not. ltot_updated ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
 !.....vtot and atot are scaled by hmat in space_comp
     call space_comp(ntot0,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
          auxtot)
-    call accum_time('space_comp',mpi_wtime()-tmp)
+    call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
     if( myid_md.eq.0 ) then
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       call sort_by_tag(ntot0,tagtot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
-      call accum_time('sort_by_tag',mpi_wtime()-tmp)
+      call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
     endif
   endif
 
   nstp_done = istp
-  tcpu2= mpi_wtime()
+  tcpu2= real(mpi_wtime(),rp)
 
   if(myid_md.eq.0) then
     if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
@@ -1043,10 +1043,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot &
          ,' eV = ',epot/ntot0,' eV/atom'
     nave= 0
-    tave= 0d0
+    tave= 0.0_rp
     do itemp=1,ntemps
       if( ndof(itemp).le.0 ) cycle
-      temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
+      temps(itemp)= eks(itemp) *2.0_rp /fkb /max(ndof(itemp)-3,3)
       nave= nave +ndof(itemp)
       if( lmultemps ) then
         write(6,'(1x,a,i1,a,f16.5,a)') "  Temperature ",itemp &
@@ -1056,7 +1056,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     enddo
     tave= tave/(nave-3)
     write(6,'(1x,a,f16.5,a)') "  Temperature     = ",tave,' K'
-    if( prss.lt.0d0 ) then
+    if( prss.lt.0.0_rp ) then
       ctmp = '(tensile)'
     else
       ctmp = '(compressive)'
@@ -1241,7 +1241,7 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   logical:: l1st
   character(len=3):: csp
 
-  ttmp = mpi_wtime()
+  ttmp = real(mpi_wtime(),rp)
   ntot = ntot0
   h(:,:,:) = hmat(:,:,:)
 
@@ -1300,10 +1300,10 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   endif
   if( lgrad ) then
     if( iprint.ge.ipl_basic ) print *,'gradw_xxxx...'
-    epot = 0d0
-    gwe(1:ndimp) = 0d0
-    gwf(1:3,1:ndimp,:) = 0d0
-    gws(1:6,1:ndimp) = 0d0
+    epot = 0.0_rp
+    gwe(1:ndimp) = 0.0_rp
+    gwf(1:3,1:ndimp,:) = 0.0_rp
+    gws(1:6,1:ndimp) = 0.0_rp
     if( use_force('Morse') &
          .and. use_force('screened_Coulomb') ) then
       iprm0 = 0
@@ -1348,7 +1348,7 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   endif
 
   if( iprint.ge.ipl_basic ) print *,'sa2stnsr...'
-  eki(:,:,:) = 0d0
+  eki(:,:,:) = 0.0_rp
   call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   stnsr(:,:) = stnsr(:,:) *up2gpa
 
@@ -1386,7 +1386,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   use force
   use vector,only: dot
   use random,only: box_muller
-  use pmdmpi,only: nid2xyz,xyz2nid
+  use pmdmpi
   use util,only: itotOf, ifmvOf
   use time, only: sec2hms, accum_time
   use pairlist, only: mk_lspr_para
@@ -1421,7 +1421,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     stop
   endif
 
-  tcpu0= mpi_wtime()
+  tcpu0= real(mpi_wtime(),rp)
   h(:,:,:) = hmat(:,:,:)  ! use pmdvars variable h instead of hmat
   ntot = ntot0
 
@@ -1429,9 +1429,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !-----parallel configuration
   nxyz= nx*ny*nz
-  anxi= 1d0/nx
-  anyi= 1d0/ny
-  anzi= 1d0/nz
+  anxi= 1.0_rp/nx
+  anyi= 1.0_rp/ny
+  anzi= 1.0_rp/nz
 !-----error trap
   if(nodes_md.ne.nxyz) then
     write(6,'(a)') " error: nodes_md .ne. nxyz!!"
@@ -1449,9 +1449,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   sorg(3)= anzi*myz
 
 !.....perform space decomposition after reading atomic configuration
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
-  call accum_time('space_decomp',mpi_wtime()-tmp)
+  call accum_time('space_decomp',real(mpi_wtime(),rp)-tmp)
 !.....Some conversions
   do i=1,natm
     ra(1:3,i)= ra(1:3,i) -sorg(1:3)
@@ -1469,9 +1469,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   call get_num_dof()
 
 !.....Set initial velocity as zero
-  va(1:3,1:natm) = 0d0
+  va(1:3,1:natm) = 0.0_rp
 
-  tcpu1= mpi_wtime()
+  tcpu1= real(mpi_wtime(),rp)
 
 !-----copy RA of boundary atoms
   call check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
@@ -1508,15 +1508,15 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       lstrs = lstrs0
     endif
 
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call bacopy(.true.)
-    call accum_time('ba_xxx',mpi_wtime()-tmp)
+    call accum_time('ba_xxx',real(mpi_wtime(),rp)-tmp)
 !-----Make pair list
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
 !!$    call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,va,rc+rbuf &
 !!$         ,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
     call mk_lspr_para(l1st)
-    call accum_time('lspr',mpi_wtime()-tmp)
+    call accum_time('lspr',real(mpi_wtime(),rp)-tmp)
 
     if( iprint.gt.0 .and. myid_md.eq.0 ) then
       print '(/a,i5)', ' Max num of neighbors = ',maxnn
@@ -1526,25 +1526,25 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     lstrs = lstrs0 .or. (index(cpctl,'beren').ne.0)
 !.....Cell is new at the first call of get_force
     lcell_updated = .true.
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call get_force(.true.,epot0,stnsr)
-    call accum_time('get_force',mpi_wtime()-tmp)
+    call accum_time('get_force',real(mpi_wtime(),rp)-tmp)
     lcell_updated = .false.
     lstrs = .false.
     epot= epot0
-    epotp = 0d0
+    epotp = 0.0_rp
 
     call sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
     call setup_cell_min(myid_md,iprint)
 
-    simtime = 0d0
+    simtime = 0.0_rp
 
     if(myid_md.eq.0 .and. iprint.ne.0 ) then
 
 !.....Human-friendly stress unit GPa
       sth(:,:) = stnsr(:,:) *up2gpa
       prss = (sth(1,1)+sth(2,2)+sth(3,3))/3
-      if( prss.lt.0d0 ) then
+      if( prss.lt.0.0_rp ) then
         ctmp = '(tensile)'
       else
         ctmp = '(compressive)'
@@ -1556,8 +1556,8 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
            sth(2,3),sth(3,1),sth(1,2)
       write(6,*) ''
 
-      tcpu = mpi_wtime() -tcpu0
-      tave = 0d0
+      tcpu = real(mpi_wtime(),rp) -tcpu0
+      tave = 0.0_rp
       write(6,'(a,'//cfistp//','//cfetime//','//cftave &
            //',es13.4,2es11.3)') &
            " istp,etime,temp,epot,vol,prss=" &
@@ -1566,18 +1566,18 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....output initial configuration including epi, eki, and strs
     write(cnum,'(i0)') istp
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
          ekitot,epitot,auxtot)
-    call accum_time('space_comp',mpi_wtime()-tmp)
+    call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
     if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
       if( ifsort.gt.0 ) then
-        tmp = mpi_wtime()
+        tmp = real(mpi_wtime(),rp)
         call sort_by_tag(ntot,tagtot,rtot,vtot &
              ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
-        call accum_time('sort_by_tag',mpi_wtime()-tmp)
+        call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
       endif
-      tmp = mpi_wtime()
+      tmp = real(mpi_wtime(),rp)
       if( ifpmd.eq.1 ) then  ! pmd format
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
@@ -1604,13 +1604,13 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
         call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
              rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
       endif
-      call accum_time('write_xxx',mpi_wtime() -tmp)
+      call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
     endif
 
     if( myid_md.eq.0 ) then
       if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
 !.....write out energies
-        tave = 0d0
+        tave = 0.0_rp
         write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
              //','//cftave//',2es16.7e3)') istp &
              ,simtime,ekin+epot0,ekin,epot0,tave,vol,prss
@@ -1627,7 +1627,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   end do  ! istp
 
   nstp_done = istp
-  tcpu2= mpi_wtime()
+  tcpu2= real(mpi_wtime(),rp)
 
   if(myid_md.eq.0) then
     if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
@@ -1642,7 +1642,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     write(6,'(1x,a)') "Final values:"
     write(6,'(1x,a,f16.5,a,f10.3,a)') "  Potential energy= ",epot &
          ,' eV = ',epot/ntot0,' eV/atom'
-    if( prss.lt.0d0 ) then
+    if( prss.lt.0.0_rp ) then
       ctmp = '(tensile)'
     else
       ctmp = '(compressive)'
@@ -1674,16 +1674,16 @@ subroutine set_fmv(fmv)
   real(rp),intent(out):: fmv(3,0:9)
 
 !-----set fmv(1:3,ifmv) to be multiplied to the velocities
-  fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
-  fmv(1:3,1)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,2)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,3)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,4)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,5)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,6)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,7)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,8)= (/ 1d0, 1d0, 1d0 /) ! free move
-  fmv(1:3,9)= (/ 1d0, 1d0, 1d0 /) ! free move
+  fmv(1:3,0)= (/ 0.0_rp, 0.0_rp, 0.0_rp /) ! fix
+  fmv(1:3,1)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,2)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,3)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,4)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,5)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,6)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,7)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,8)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+  fmv(1:3,9)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
 
 end subroutine set_fmv
 !=======================================================================
@@ -1729,9 +1729,9 @@ subroutine set_domain_vars()
   implicit none
   
   nxyz = nx*ny*nz
-  anxi= 1d0/nx
-  anyi= 1d0/ny
-  anzi= 1d0/nz
+  anxi= 1.0_rp/nx
+  anyi= 1.0_rp/ny
+  anzi= 1.0_rp/nz
 !-----vector node indices: range [0:nx-1]
   myx=myid_md/(ny*nz)
   myy=mod(myid_md/nz,ny)
@@ -1762,8 +1762,8 @@ subroutine setup(nspmax,am,fekin,fa2v)
 !.....Position: Ang
 !.....Energy: eV = 1.0/1.602e-19 [J = kg*m**2/s**2]
   do is=1,nspmax
-    fa2v(is) = 0.5d0 *ev2j *(kg2ump *m2ang**2/s2fs**2) /am(is)
-    fekin(is)= 0.5d0 *(am(is)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
+    fa2v(is) = 0.5_rp *ev2j *j2ue /am(is)
+    fekin(is)= 0.5_rp *(am(is)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
   enddo
 
 end subroutine setup
@@ -1817,7 +1817,7 @@ subroutine boxmat(h,hi,ht,g,gi,gt,vol,sgm)
   enddo
 
 !.....Set G-matrix
-  g(1:3,1:3,0:1)= 0d0
+  g(1:3,1:3,0:1)= 0.0_rp
   do j=1,3
     do i=1,3
       do k=1,3
@@ -1908,10 +1908,10 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
   integer:: i,ierr,is,ixyz,jxyz,imax,igrp,itemp
   real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(nspmax),tmp
 
-  ekinl=0d0
-  eki(1:3,1:3,1:natm)= 0d0
-  eksl(:)= 0d0
-  vmaxl= 0d0
+  ekinl=0.0_rp
+  eki(1:3,1:3,1:natm)= 0.0_rp
+  eksl(:)= 0.0_rp
+  vmaxl= 0.0_rp
 
   igrp = 1  ! temperature category is Group-#1 (same as fmv)
   do i=1,natm
@@ -1936,18 +1936,18 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
 !      print *,'imax,vmax,ekin=',imax,vmaxl,ekinl
 !      print *,'va(1:3,imax)=',va(1:3,imax)
 
-  tmp = mpi_wtime()  
-  ekin= 0d0
+  tmp = real(mpi_wtime(),rp)  
+  ekin= 0.0_rp
   call mpi_allreduce(ekinl,ekin,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
-  eks(:)= 0d0
+  eks(:)= 0.0_rp
   call mpi_allreduce(eksl,eks,nspmax,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
-  vmax= 0d0
+  vmax= 0.0_rp
   call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp &
        ,mpi_max,mpi_md_world,ierr)
-  vmax=dsqrt(vmax)
-  call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+  vmax=sqrt(vmax)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
 
 end subroutine get_ekin
 !=======================================================================
@@ -1963,7 +1963,7 @@ subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
   integer:: i,ierr
   real(rp):: vx,vy,vz,v(3),v2,vmaxl,tmp
 
-  vmaxl = 0d0
+  vmaxl = 0.0_rp
   do i=1,natm
 !!$    vx = va(1,i)
 !!$    vy = va(2,i)
@@ -1973,12 +1973,12 @@ subroutine get_vmax(namax,natm,va,h,vmax,mpi_md_world)
     v2 = va(1,i)**2 +va(2,i)**2 +va(3,i)**2
     vmaxl = max(vmaxl,v2)
   enddo
-  tmp = mpi_wtime()
-  vmax= 0d0
+  tmp = real(mpi_wtime(),rp)
+  vmax= 0.0_rp
   call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp &
        ,mpi_max,mpi_md_world,ierr)
-  vmax=dsqrt(vmax)
-  call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+  vmax=sqrt(vmax)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
   return
 end subroutine get_vmax
 !=======================================================================
@@ -2003,11 +2003,11 @@ subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
   if( l1st ) then
     allocate(tdl(ntdst),ndl(ntdst))
     l1st= .false.
-    tdst(1:ntdst)= 0d0
+    tdst(1:ntdst)= 0.0_rp
     nadst(1:ntdst)= 0
   endif
 
-  dx= 1d0/ntdst
+  dx= 1.0_rp/ntdst
   do i=1,natm
     xi= ra(1,i)+sorg(1)
     ix= int(xi/dx)+1
@@ -2019,21 +2019,21 @@ subroutine calc_temp_dist(iotdst,ntdst,tdst,nadst,natm,ra,eki &
 
   if( mod(istp,nouterg).eq.0 ) then
 !.....before writing to file, accumurate data of other nodes
-    tdl(1:ntdst)= 0d0
+    tdl(1:ntdst)= 0.0_rp
     ndl(1:ntdst)= 0
     call mpi_reduce(nadst,ndl,ntdst &
          ,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
     call mpi_reduce(tdst,tdl,ntdst &
          ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
     do i=1,ntdst
-      if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
+      if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2.0_rp/3/ndl(i)/fkb
       if( myid_md.eq.0 ) then
         write(iotdst,'(f10.5,f15.3)') ((i-1)+0.5)/ntdst, tdl(i)
       endif
     enddo
     if( myid_md.eq.0 ) write(iotdst,*) ''
 !.....initialize tdst
-    tdst(1:ntdst)= 0d0
+    tdst(1:ntdst)= 0.0_rp
     nadst(1:ntdst)= 0
   endif
 
@@ -2055,7 +2055,7 @@ subroutine get_num_dof()
 
   integer:: i,l,k,ndofl(9),ierr,igrp,ifmv
   real(rp):: tmp
-  real(rp),parameter:: deps= 1d-12
+  real(rp),parameter:: deps= 1e-12_rp
 
   igrp = 1  ! Group-#1 for multiple-temperature (same as fmv)
   ndofl(1:9)= 0
@@ -2063,16 +2063,16 @@ subroutine get_num_dof()
 !!$    l= int(mod(tag(i)*10,10d0))
     ifmv= ithOf(tag(i),igrp)
     do k=1,3
-      if( abs(fmv(k,ifmv)).lt.0.5d0 ) cycle
+      if( abs(fmv(k,ifmv)).lt.0.5_rp ) cycle
       ndofl(ifmv)= ndofl(ifmv) +1
     enddo
   enddo
 
-  tmp = mpi_wtime()
+  tmp = real(mpi_wtime(),rp)
   ndof(1:9)= 0
   call mpi_allreduce(ndofl,ndof,9,mpi_integer,mpi_sum &
        ,mpi_md_world,ierr)
-  call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
   if(myid_md.eq.0 .and. iprint.ge.ipl_basic ) &
        write(6,'(/a,9(2x,i0,") ",i0))') &
        ' Degrees of freedom for each ifmv =',(i,ndof(i),i=1,nfmv)
@@ -2091,9 +2091,9 @@ subroutine check_size_and_parallel(sgm,vol,rc,anxi,anyi,anzi &
   real(rp):: vala,valb,valc,rca,rcb,rcc
 
 !-----calculate the cut-off lengths
-  vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
-  valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
-  valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
+  vala=sqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
+  valb=sqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
+  valc=sqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
   rca=rc*vala
   rcb=rc*valb
   rcc=rc*valc
@@ -2129,7 +2129,7 @@ subroutine bacopy(l1st)
   use mod_precision
   use pmdvars
   use force
-  use pmdmpi,only: nid2xyz
+  use pmdmpi
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2167,7 +2167,7 @@ subroutine bacopy(l1st)
 !-----calculate the cut-off lengths
   do kd=1,3
 !.....ASGM is like a inverse of the lengh of cell vector
-    asgm= dsqrt(sgm(1,kd)**2 +sgm(2,kd)**2 +sgm(3,kd)**2)
+    asgm= sqrt(sgm(1,kd)**2 +sgm(2,kd)**2 +sgm(3,kd)**2)
 !.....RCV is like rc/(length of cell vector)
     rcv(kd)= rc*asgm/vol
 !.....NEX > 1 if the cell vector is shorter than the rc,
@@ -2276,10 +2276,10 @@ subroutine bacopy(l1st)
       ku=2*kd+kdd
       itmp = itmp +lsb(0,ku)
     enddo
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call mpi_allreduce(itmp,maxb,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
-    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
     if(maxb.gt.nbmax) then
       if( lrealloc ) then
         if (myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -2351,10 +2351,10 @@ subroutine bacopy(l1st)
 
 !-------Error trap
     nav=natm+nbnew
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call mpi_allreduce(nav,maxna,1,mpi_integer,mpi_max &
          ,mpi_md_world,ierr)
-    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
     if (maxna.gt.namax) then
       if (myid_md.eq.0) then
         write(*,*)'NAMAX overflowed at bacopy'
@@ -2384,7 +2384,7 @@ subroutine bacopy_fixed()
   use mod_precision
   use pmdvars
   use force
-  use pmdmpi,only: nid2xyz
+  use pmdmpi
   use clrchg,only: lclrchg
   implicit none
 
@@ -2476,7 +2476,7 @@ subroutine bamove()
   use mod_precision
   use pmdvars
   use force
-  use pmdmpi,only: nid2xyz
+  use pmdmpi
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2568,10 +2568,10 @@ subroutine bamove()
 !!$      print *,'# in MVQUE=',mvque(0,kuh)
 !!$      stop
 !!$    endif
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call mpi_allreduce(mvql,mvqg,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
-    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
     if( mvqg.gt.nbmax ) then
       if( lrealloc ) then
         if( myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -2594,10 +2594,10 @@ subroutine bamove()
       ku = 2*kd +kdd
       itmp = itmp +mvque(0,ku)
     enddo
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     call mpi_allreduce(itmp,maxa,1,mpi_integer,mpi_max, &
          mpi_md_world,ierr)
-    call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+    call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
     if( maxa.gt.namax-nbmax ) then
       if( lrealloc ) then
         if( myid_md.eq.0 .and. iprint.ne.0 ) then
@@ -2630,7 +2630,7 @@ subroutine bamove()
         dbuf(4:6,i)= va(1:3,j)
         dbuf(7,i)  = tag(j)
 !-----------Eliminate the record of a moved-out atom
-        tag(j)= 0d0
+        tag(j)= 0.0_rp
         m = 7
         do iaux=1,naux
           dbuf(7+iaux,i) = aux(iaux,j)
@@ -2717,15 +2717,15 @@ function bmv(xv,yv,zv,ku,anxi,anyi,anzi)
   logical:: bmv
   bmv = .false.
   if (ku.eq.1) then
-    bmv = xv.lt.0d0
+    bmv = xv.lt.0.0_rp
   else if (ku.eq.2) then
     bmv = anxi.lt.xv
   else if (ku.eq.3) then
-    bmv = yv.lt.0d0
+    bmv = yv.lt.0.0_rp
   else if (ku.eq.4) then
     bmv = anyi.lt.yv
   else if (ku.eq.5) then
-    bmv = zv.lt.0d0
+    bmv = zv.lt.0.0_rp
   else if (ku.eq.6) then
     bmv = anzi.lt.zv
   else
@@ -2750,12 +2750,12 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   integer:: i,ixyz,jxyz,ierr
   real(rp):: stp(3,3),stk(3,3),stl(3,3),stg(3,3),tmp
 
-  stp(1:3,1:3)= 0d0
-  stk(1:3,1:3)= 0d0
+  stp(1:3,1:3)= 0.0_rp
+  stk(1:3,1:3)= 0.0_rp
   do i=1,natm
     do jxyz=1,3
       do ixyz=1,3
-        stk(ixyz,jxyz)=stk(ixyz,jxyz) +2d0*eki(ixyz,jxyz,i)  ! eki in eV
+        stk(ixyz,jxyz)=stk(ixyz,jxyz) +2.0_rp*eki(ixyz,jxyz,i)  ! eki in eV
         stp(ixyz,jxyz)=stp(ixyz,jxyz) +strs(ixyz,jxyz,i)  ! strs as rij*fij in eV
       enddo
     enddo
@@ -2763,11 +2763,11 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
 
   stl(1:3,1:3) = stk(1:3,1:3) +stp(1:3,1:3)
 !!$  stl(1:3,1:3) = stp(1:3,1:3)
-  stg(1:3,1:3)= 0d0
-  tmp = mpi_wtime()
+  stg(1:3,1:3)= 0.0_rp
+  tmp = real(mpi_wtime(),rp)
   call mpi_allreduce(stl,stg,9,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
-  call accum_time('mpi_allreduce',mpi_wtime()-tmp)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
   stnsr(1:3,1:3) = stg(1:3,1:3)/vol
   return
 end subroutine sa2stnsr
@@ -2787,7 +2787,7 @@ subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
 
 !      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
 !     &     *m2ang /s2fs
-  facv(1:nspmax) = dsqrt(tinit *k2j &
+  facv(1:nspmax) = sqrt(tinit *k2j &
        *(kg2ump* m2ang**2/s2fs**2) /am(1:nspmax))
 
 !-----velocities in Maxwell-Boltzmann distribution
@@ -2822,10 +2822,10 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
   real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp,ttmp
 
 !-----set center of mass motion to zero
-  sumpx=0d0
-  sumpy=0d0
-  sumpz=0d0
-  amtot=0d0
+  sumpx=0.0_rp
+  sumpy=0.0_rp
+  sumpz=0.0_rp
+  amtot=0.0_rp
   do i=1,natm
     is= int(tag(i))
     amss= am(is)
@@ -2834,7 +2834,7 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
     sumpz=sumpz+amss*va(3,i)
     amtot= amtot +amss
   enddo
-  ttmp = mpi_wtime()
+  ttmp = real(mpi_wtime(),rp)
   tmp= sumpx
   call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
@@ -2847,7 +2847,7 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
   tmp= amtot
   call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
-  call accum_time('mpi_allreduce',mpi_wtime()-ttmp)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-ttmp)
   do i=1,natm
     va(1,i)=va(1,i)-sumpx/amtot
     va(2,i)=va(2,i)-sumpy/amtot
@@ -2880,9 +2880,9 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
   real(rp):: fdotv,vnorm,fnorm,tmp
   real(rp):: fdotvl,vnorml,fnorml
 
-  fdotvl = 0d0
-  vnorml = 0d0
-  fnorml = 0d0
+  fdotvl = 0.0_rp
+  vnorml = 0.0_rp
+  fnorml = 0.0_rp
   do i=1,natm
     do ixyz=1,3
       fdotvl = fdotvl +aa(ixyz,i)*va(ixyz,i)
@@ -2890,28 +2890,28 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
       fnorml = fnorml +aa(ixyz,i)*aa(ixyz,i)
     enddo
   enddo
-  vnorm = 0d0
-  fnorm = 0d0
-  fdotv = 0d0
-  tmp = mpi_wtime()
+  vnorm = 0.0_rp
+  fnorm = 0.0_rp
+  fdotv = 0.0_rp
+  tmp = real(mpi_wtime(),rp)
   call mpi_allreduce(vnorml,vnorm,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   call mpi_allreduce(fnorml,fnorm,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   call mpi_allreduce(fdotvl,fdotv,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
-  call accum_time('mpi_allreduce',mpi_wtime()-tmp)
-  vnorm = dsqrt(vnorm)
-  fnorm = dsqrt(fnorm)
+  call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-tmp)
+  vnorm = sqrt(vnorm)
+  fnorm = sqrt(fnorm)
   do i=1,natm
     do ixyz=1,3
-      va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i) &
+      va(ixyz,i) = (1.0_rp -alp_fire)*va(ixyz,i) &
            +alp_fire*aa(ixyz,i)/fnorm *vnorm
     enddo
   enddo
 !      print '(a,2e14.5)','vnorm,fnorm =',vnorm,fnorm
 
-  if( fdotv.gt.0d0  ) then
+  if( fdotv.gt.0.0_rp  ) then
     num_fire = num_fire + 1
     if( num_fire.gt.nmin_fire ) then
       dt = min(dtmax_fire,dt*finc_fire)
@@ -2923,7 +2923,7 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
     endif
   else
     dt = min(dtmax_fire,dt*fdec_fire)
-    va(1:3,1:natm) = 0d0
+    va(1:3,1:natm) = 0.0_rp
     alp_fire = alp0_fire
     num_fire = 0
     if( iprint.ge.ipl_info .and. myid_md.eq.0 ) then
@@ -2958,7 +2958,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   real(rp):: sxogt,syogt,szogt
   real(rp):: t0
 
-  t0 = mpi_wtime()
+  t0 = real(mpi_wtime(),rp)
 
 !.....at 1st call
   if( .not. allocated(ra) ) then
@@ -2966,10 +2966,10 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
 !.....wrap atoms into [0:1)
       do i =1,ntot0
         do ixyz=1,3
-          if( rtot(ixyz,i).lt.0d0 ) then
-            rtot(ixyz,i) = rtot(ixyz,i) +1d0
-          else if( rtot(ixyz,i).ge.1d0 ) then
-            rtot(ixyz,i) = rtot(ixyz,i) -1d0
+          if( rtot(ixyz,i).lt.0.0_rp ) then
+            rtot(ixyz,i) = rtot(ixyz,i) +1.0_rp
+          else if( rtot(ixyz,i).ge.1.0_rp ) then
+            rtot(ixyz,i) = rtot(ixyz,i) -1.0_rp
           endif
         enddo
       enddo
@@ -2982,18 +2982,18 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
         myxt = ixyz/(ny*nz)
         myyt = mod(ixyz/nz,ny)
         myzt = mod(ixyz,nz)
-        sxogt = dble(myxt)/nx
-        syogt = dble(myyt)/ny
-        szogt = dble(myzt)/nz
+        sxogt = real(myxt, rp)/nx
+        syogt = real(myyt, rp)/ny
+        szogt = real(myzt, rp)/nz
         n = 0
         do i=1,ntot0
           if(  rtot(1,i).ge.sxogt .and. &
-               rtot(1,i).le.sxogt+1d0/nx .and. &
+               rtot(1,i).le.sxogt+1.0_rp/nx .and. &
                rtot(2,i).ge.syogt .and. &
-               rtot(2,i).le.syogt+1d0/ny .and. &
+               rtot(2,i).le.syogt+1.0_rp/ny .and. &
                rtot(3,i).ge.szogt .and. &
-               rtot(3,i).le.szogt+1d0/nz .and. &
-               tagtot(i).gt.0d0) then
+               rtot(3,i).le.szogt+1.0_rp/nz .and. &
+               tagtot(i).gt.0.0_rp) then
             n = n+1
 !.....Set the tag negative if the atom is assigned to a certain cell
             tagtot(i) = -tagtot(i)
@@ -3026,7 +3026,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
     call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(nbmax,1,mpi_integer,0,mpi_md_world,ierr)
     call alloc_namax_related()
-    eki(1:3,1:3,1:namax) = 0d0
+    eki(1:3,1:3,1:namax) = 0.0_rp
 
   else  ! if already allocated(ra)
 !.....Even if ra is already allocated, natm could change a lot abruptly
@@ -3050,7 +3050,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
       call mpi_bcast(newnbmax,1,mpi_integer,0,mpi_md_world,ierr)
       call realloc_namax_related(newnamax-newnbmax,newnbmax)
 ! call realloc_namax_related()
-      eki(1:3,1:3,1:namax) = 0d0
+      eki(1:3,1:3,1:namax) = 0.0_rp
     endif  ! (ntot0.gt.namax-nbmax)
   endif  ! (.not.allocated(ra))
 
@@ -3060,18 +3060,18 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
       myxt = ixyz/(ny*nz)
       myyt = mod(ixyz/nz,ny)
       myzt = mod(ixyz,nz)
-      sxogt = dble(myxt)/nx
-      syogt = dble(myyt)/ny
-      szogt = dble(myzt)/nz
+      sxogt = real(myxt, rp)/nx
+      syogt = real(myyt, rp)/ny
+      szogt = real(myzt, rp)/nz
       natm = 0
       do i=1,ntot0
         if(  rtot(1,i).ge.sxogt .and. &
-             rtot(1,i).le.sxogt+1d0/nx .and. &
+             rtot(1,i).le.sxogt+1.0_rp/nx .and. &
              rtot(2,i).ge.syogt .and. &
-             rtot(2,i).le.syogt+1d0/ny .and. &
+             rtot(2,i).le.syogt+1.0_rp/ny .and. &
              rtot(3,i).ge.szogt .and. &
-             rtot(3,i).le.szogt+1d0/nz .and. &
-             tagtot(i).gt.0d0 ) then
+             rtot(3,i).le.szogt+1.0_rp/nz .and. &
+             tagtot(i).gt.0.0_rp ) then
           natm = natm +1
           tag(natm)= tagtot(i)
           ra(1:3,natm)= rtot(1:3,i)
@@ -3098,7 +3098,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
         endif
       endif
     enddo
-!        write(6,'(a,f10.3)') ' time space_decomp = ',mpi_wtime() -t0
+!        write(6,'(a,f10.3)') ' time space_decomp = ',real(mpi_wtime(),rp) -t0
 !.....Reset the tags positive
     do i=1,ntot0
       tagtot(i) = abs(tagtot(i))
@@ -3276,13 +3276,13 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
     itag(i)= itotOf(tag(i))
   enddo
 
-!!$  tmp = mpi_wtime()
+!!$  tmp = real(mpi_wtime(),rp)
   if( ifsort.eq.1 ) then
     call arg_heapsort_iarr(natm,natm,itag,idxarr)
   else  ! default 2
     call arg_qsort_iarr(natm,1,natm,itag,idxarr)
   endif
-!!$  call accum_time('sorting',mpi_wtime()-tmp)
+!!$  call accum_time('sorting',real(mpi_wtime(),rp)-tmp)
 
   buf(1:3,1:natm) = ra(1:3,1:natm)
   buf(4:6,1:natm) = va(1:3,1:natm)
@@ -3368,17 +3368,17 @@ subroutine estimate_nbmax(nalmax,h,nx,ny,nz,vol,rcut,rbuf,nbmax,boundary)
   real(rp):: alx,aly,alz,area,dens_2A3,densl,dens,rc,volex,dvol
 
   rc = rcut +rbuf
-  alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx +2*rc
-  aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny +2*rc
-  alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz +2*rc
+  alx = sqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2)/nx +2*rc
+  aly = sqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2)/ny +2*rc
+  alz = sqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2)/nz +2*rc
 !.....Estimated volume of extended system including immigrants region
   volex = alx*aly*alz
   dvol = volex -vol/(nx*ny*nz)
 !.....Density cannot be obtained from nalmax because sometimes the system contains vacuum.
 !.....Density = 0.1 means 1 atom in 10 A^3 which is dense enough for most cases.
-  dens_2A3 = 0.1d0
+  dens_2A3 = 0.1_rp
 !.....But for very dense cases, used the higher density.
-  densl = dble(nalmax)/(vol/(nx*ny*nz))
+  densl = real(nalmax, rp)/(vol/(nx*ny*nz))
   dens = max(dens_2A3,densl)
 !!$  area = 0.0d0
 !!$  if( boundary(1:1).eq.'p' ) area = area + aly*alz*2
@@ -3579,18 +3579,18 @@ subroutine sanity_check(ekin,epot,stnsr,tave, &
   msg = ''
   ifwrong = 0
 
-  if( epot*0d0 .ne. 0d0 ) then
+  if( epot*0.0_rp .ne. 0.0_rp ) then
     msg = 'ERROR: epot == NaN !'
     goto 10
   endif
-  if( ekin*0d0 .ne. 0d0 ) then
+  if( ekin*0.0_rp .ne. 0.0_rp ) then
     msg = 'ERROR: ekin == NaN !'
     goto 10
   endif
 !.....Check stress values
   do j=1,3
     do i=1,3
-      if( stnsr(i,j)*0d0 .ne. 0d0 ) then
+      if( stnsr(i,j)*0.0_rp .ne. 0.0_rp ) then
         msg = 'ERROR: stnsr(i,j) == NaN !'
         goto 10
       endif

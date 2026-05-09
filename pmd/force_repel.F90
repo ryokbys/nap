@@ -49,10 +49,10 @@ contains
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:nspmax,1:nspmax) = .false.
-      Aij(:,:)= 0d0
-      rhoij(:,:)= 0d0
-      sgmij(:,:)= 0d0
-      rcij(:,:)= 0d0
+      Aij(:,:)= 0.0_rp
+      rhoij(:,:)= 0.0_rp
+      sgmij(:,:)= 0.0_rp
+      rcij(:,:)= 0.0_rp
       ctype = 'exp'
       if( iprint.ne.0 ) write(6,'(/,a)') ' repel parameters:'
       do while(.true.)
@@ -179,10 +179,10 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_repel',8*size(strsl))
-      rc2 = -1d0
+      rc2 = -1.0_rp
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           if( .not.(interact(is,js).or.interact(js,is)) ) cycle
@@ -214,8 +214,8 @@ contains
       call accum_mem('force_repel',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !.....Loop over resident atoms
 !$omp parallel
@@ -239,7 +239,7 @@ contains
         dij= sqrt(dij2)
         rc = rcij(is,js)
         if( dij.ge.rc ) cycle
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         A = Aij(is,js)
         rho= rhoij(is,js)
@@ -249,7 +249,7 @@ contains
         expbr = exp(-(dij-sgm)/rho)
 !.....potential
         tmp= A*expbr
-        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+        tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
         epi(i)= epi(i) +tmp2
         epotl= epotl +tmp2
 !!$        if( j.le.natm ) then
@@ -272,7 +272,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
 !!$!$omp atomic
 !!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
@@ -286,7 +286,7 @@ contains
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott

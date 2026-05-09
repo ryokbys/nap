@@ -5,68 +5,68 @@
 !  cut off should be larger than R+D (=4.13158A+0.93018A =5.06176A)
 !
 !.....length scaling for hybrid QMCL calculation
-      real(rp),parameter:: slen= real(1d0, rp) /real(3.165d0, rp) *real(3.172d0, rp)
+      real(rp),parameter:: slen= 1.0_rp /3.165_rp *3.172_rp
 !.....W-W and W-He parameters
       real(rp),parameter:: p_D0(1:2,1:2)= reshape([ &
-           real(2.87454d0, rp), &
-           real(0.377472d0, rp), &
-           real(0.377472d0, rp), &
-           real(0d0, rp)],[2,2])
+           2.87454_rp, &
+           0.377472_rp, &
+           0.377472_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_r0(1:2,1:2)=reshape([  &
-           real(2.38631d0, rp) *slen, &
-           real(3.40623d0, rp) *slen, &
-           real(3.40623d0, rp) *slen, &
-           real(0d0, rp) *slen],[2,2])
+           2.38631_rp *slen, &
+           3.40623_rp *slen, &
+           3.40623_rp *slen, &
+           0.0_rp *slen],[2,2])
       real(rp),parameter:: p_beta(1:2,1:2)=reshape([  &
-           real(1.33682d0, rp)  /slen, &
-           real(0.602677d0, rp) /slen, &
-           real(0.602677d0, rp) /slen, &
-           real(0d0, rp) /slen],[2,2])
+           1.33682_rp  /slen, &
+           0.602677_rp /slen, &
+           0.602677_rp /slen, &
+           0.0_rp /slen],[2,2])
       real(rp),parameter:: p_S(1:2,1:2)=reshape([ &
-           real(1.25348d0, rp), &
-           real(4.399296d0, rp), &
-           real(4.399296d0, rp), &
-           real(0d0, rp)],[2,2])
+           1.25348_rp, &
+           4.399296_rp, &
+           4.399296_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_gamma(1:2,1:2)=reshape([ &
-           real(8.3879d-4, rp), &
-           real(2.623239d-2, rp), &
-           real(2.623239d-2, rp), &
-           real(0d0, rp)],[2,2])
+           8.3879e-4_rp, &
+           2.623239e-2_rp, &
+           2.623239e-2_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_c(1:2,1:2)=reshape([ &
-           real(0.850284d0, rp), &
-           real(0.371185d0, rp), &
-           real(0.371185d0, rp), &
-           real(0d0, rp)],[2,2])
+           0.850284_rp, &
+           0.371185_rp, &
+           0.371185_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_d(1:2,1:2)=reshape([ &
-           real(0.144317d0, rp), &
-           real(0.252377d0, rp), &
-           real(0.252377d0, rp), &
-           real(0d0, rp)],[2,2])
+           0.144317_rp, &
+           0.252377_rp, &
+           0.252377_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_h(1:2,1:2)=reshape([ &
-           -real(0.36846d0, rp), &
-           real(0.741345d0, rp), &
-           real(0.741345d0, rp), &
-           real(0d0, rp)],[2,2])
+           -0.36846_rp, &
+           0.741345_rp, &
+           0.741345_rp, &
+           0.0_rp],[2,2])
       real(rp),parameter:: p_R1(1:2,1:2)=reshape([ &
-           real(4.131580d0, rp) *slen, &
-           real(3.00d0, rp) *slen, &
-           real(3.00d0, rp) *slen, &
-           real(0d0, rp) *slen],[2,2])
+           4.131580_rp *slen, &
+           3.00_rp *slen, &
+           3.00_rp *slen, &
+           0.0_rp *slen],[2,2])
       real(rp),parameter:: p_D1(1:2,1:2)=reshape([ &
-           real(0.930180d0, rp) *slen, &
-           real(0.35d0, rp) *slen, &
-           real(0.35d0, rp) *slen, &
-           real(0d0, rp) *slen],[2,2])
+           0.930180_rp *slen, &
+           0.35_rp *slen, &
+           0.35_rp *slen, &
+           0.0_rp *slen],[2,2])
 !.....He-He parameters
       real(rp),parameter:: p_HeHe_rc    = p_R1(1,1) +p_D1(1,1)
-      real(rp),parameter:: p_HeHe_rm    = real(2.970d0, rp) *slen
-      real(rp),parameter:: p_HeHe_A     = real(1.9211529d+5, rp)
-      real(rp),parameter:: p_HeHe_alpha = real(10.73520708d0, rp)
-      real(rp),parameter:: p_HeHe_c6    = real(1.34920045d0, rp)
-      real(rp),parameter:: p_HeHe_c8    = real(0.41365922d0, rp)
-      real(rp),parameter:: p_HeHe_c10   = real(0.17078164d0, rp)
-      real(rp),parameter:: p_HeHe_beta  = -real(1.89296514d0, rp)
-      real(rp),parameter:: p_HeHe_D     = real(1.4132d0, rp)
-      real(rp),parameter:: p_HeHe_eps   = real(10.94d0, rp) *fkb
+      real(rp),parameter:: p_HeHe_rm    = 2.970_rp *slen
+      real(rp),parameter:: p_HeHe_A     = 1.9211529e+5_rp
+      real(rp),parameter:: p_HeHe_alpha = 10.73520708_rp
+      real(rp),parameter:: p_HeHe_c6    = 1.34920045_rp
+      real(rp),parameter:: p_HeHe_c8    = 0.41365922_rp
+      real(rp),parameter:: p_HeHe_c10   = 0.17078164_rp
+      real(rp),parameter:: p_HeHe_beta  = -1.89296514_rp
+      real(rp),parameter:: p_HeHe_D     = 1.4132_rp
+      real(rp),parameter:: p_HeHe_eps   = 10.94_rp *fkb
 
       

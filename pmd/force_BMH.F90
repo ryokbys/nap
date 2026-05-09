@@ -65,15 +65,15 @@ contains
     real(rp),save:: rcmax2
 
     rc = rcin
-    if( bmh_rc.gt.0d0 ) rc = bmh_rc
+    if( bmh_rc.gt.0.0_rp ) rc = bmh_rc
     
     if( l1st ) then
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
       rcmax2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:)= 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:)= 0.0_rp
       rc6 = rc**6
       rc8 = rc6 *rc**2
       do is=1,nspmax
@@ -85,7 +85,7 @@ contains
           c6ij= bmh_c6ij(is,js)
           c8ij= bmh_c8ij(is,js)
           vs2bc = fij*bij *exp((aij-rc)/bij) -c6ij/rc6 -c8ij/rc8
-          dvs2bc= -fij *exp((aij-rc)/bij) +6d0*c6ij/rc6/rc +8d0*c8ij/rc8/rc
+          dvs2bc= -fij *exp((aij-rc)/bij) +6.0_rp*c6ij/rc6/rc +8.0_rp*c8ij/rc8/rc
           vrcs(is,js) = vs2bc
           vrcs(js,is) = vs2bc
           dvdrcs(is,js) = dvs2bc
@@ -99,8 +99,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
 
 !-----loop over resident atoms
     do i=1,natm
@@ -116,8 +116,8 @@ contains
         rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
         dij2= rij(1)**2+ rij(2)**2 +rij(3)**2
         if( dij2.gt.rcmax2 ) cycle
-        dij = dsqrt(dij2)
-        diji= 1d0/dij
+        dij = sqrt(dij2)
+        diji= 1.0_rp/dij
         drdi(1:3)= -rij(1:3)*diji
         drdj(1:3)=  rij(1:3)*diji
         vrc = vrcs(is,js)
@@ -131,8 +131,8 @@ contains
         diji2 = diji*diji
         diji6 = diji2*diji2*diji2
         diji8 = diji6*diji2
-        vs2b = fij*bij*dexp((aij-dij)/bij) -c6ij*diji6 -c8ij*diji8
-        tmp2 = 0.5d0 *(vs2b -vrc -dvdrc*(dij-rc))
+        vs2b = fij*bij*exp((aij-dij)/bij) -c6ij*diji6 -c8ij*diji8
+        tmp2 = 0.5_rp *(vs2b -vrc -dvdrc*(dij-rc))
         if(j.le.natm) then
           epi(i)=epi(i) +tmp2
           epi(j)=epi(j) +tmp2
@@ -142,7 +142,7 @@ contains
           epotl= epotl +tmp2
         endif
 !.....Force
-        dvs2b = -fij *dexp((aij-dij)/bij) +6d0*c6ij*diji6*diji +8d0*c8ij*diji8*diji
+        dvs2b = -fij *exp((aij-dij)/bij) +6.0_rp*c6ij*diji6*diji +8.0_rp*c8ij*diji8*diji
         dvdr = dvs2b -dvdrc
         aa(1:3,i)= aa(1:3,i) -drdi(1:3)*dvdr
         aa(1:3,j)= aa(1:3,j) -drdj(1:3)*dvdr
@@ -153,9 +153,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
           enddo
         enddo
       enddo
@@ -171,7 +171,7 @@ contains
 !!$    print *,' 1:  ',strsl(1,1,1),strsl(2,2,1),strsl(3,3,1)
 !!$    print *,'65:  ',strsl(1,1,65),strsl(2,2,65),strsl(3,3,65)
 
-    epott = 0d0
+    epott = 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
@@ -228,8 +228,8 @@ contains
       stop
     endif
 
-    bmh_aij(:,:)= 0d0
-    bmh_bij(:,:)= 0d0
+    bmh_aij(:,:)= 0.0_rp
+    bmh_bij(:,:)= 0.0_rp
 
     inc = 0
     do i=1,nspmax
@@ -260,12 +260,12 @@ contains
 
     if( myid_md.eq.0 ) then
 !.....Initialize params
-      bmh_rc = -1d0    ! apply global rcut if this is negative
-      bmh_aij(:,:)= 0d0
-      bmh_bij(:,:)= 0d0
-      bmh_c6ij(:,:)= 0d0
-      bmh_c8ij(:,:)= 0d0
-      bmh_fij(:,:)= 0d0
+      bmh_rc = -1.0_rp    ! apply global rcut if this is negative
+      bmh_aij(:,:)= 0.0_rp
+      bmh_bij(:,:)= 0.0_rp
+      bmh_c6ij(:,:)= 0.0_rp
+      bmh_c8ij(:,:)= 0.0_rp
+      bmh_fij(:,:)= 0.0_rp
       interact(:,:) = .false.
       cfname = trim(paramsdir)//'/'//trim(cprmfname)
 
@@ -389,7 +389,7 @@ contains
       endif
 10    close(ioprms)
       if( iprint.ge.ipl_basic ) then
-        if( bmh_rc.gt.0d0 ) print '(a,f7.3)','  cutoff radius = ',bmh_rc
+        if( bmh_rc.gt.0.0_rp ) print '(a,f7.3)','  cutoff radius = ',bmh_rc
       endif
     endif  ! myid_md.eq.0
 

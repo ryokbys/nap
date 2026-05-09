@@ -78,7 +78,7 @@ contains
 
     luse_force(:) = .false.
 
-    ol_ranges(:,:) = -1d0
+    ol_ranges(:,:) = -1.0_rp
 !!$    do i=1,num_forces
 !!$
 !!$    enddo
@@ -188,15 +188,15 @@ contains
     ro = ol_pair(2,isp,jsp)
 
     if( r.ge.ro ) then
-      fol = 1d0
-      dfol = 0d0
+      fol = 1.0_rp
+      dfol = 0.0_rp
     else if( r.ge.ri .and. r.lt.ro ) then
       x = (r-ro)/(ri-ro)*pi
-      fol = 0.5d0 *(1d0 +cos(x))
-      dfol = -0.5d0*pi /(ri-ro) *sin(x)
+      fol = 0.5_rp *(1.0_rp +cos(x))
+      dfol = -0.5_rp*pi /(ri-ro) *sin(x)
     else
-      fol = 0d0
-      dfol = 0d0
+      fol = 0.0_rp
+      dfol = 0.0_rp
     endif
 
     return
@@ -218,9 +218,9 @@ contains
 !.....Check rcut of lspr, which should be larger than 2*rout.
 
     call ol_allocate(namax,nnmax)
-    ol_alphas(1:nnmax,:) = 0d0
-    ol_alphas(0,:) = 1d0
-    ol_dalphas(:,:) = 1d0
+    ol_alphas(1:nnmax,:) = 0.0_rp
+    ol_alphas(0,:) = 1.0_rp
+    ol_dalphas(:,:) = 1.0_rp
 
     do ia=1,natm+nb
       xi(1:3) = ra(1:3,ia)
@@ -232,7 +232,7 @@ contains
         xij(1:3)= xj(1:3) -xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
         call get_fol_dfol(dij,is,js,fol,dfol)
         ol_alphas(jj,ia)= fol
         ol_alphas(0,ia) = ol_alphas(0,ia) *fol

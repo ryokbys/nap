@@ -18,12 +18,12 @@ module clrchg
   character(len=3):: cspc_clrchg = 'non'
   integer:: ispc_clrchg
   character(len=20):: clr_set = 'random'
-  real(rp):: clrfield(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
-  real(rp):: clraccel(3) = (/ 0d0, 0d0, 0d0 /)   ! scaled acceleration
-  real(rp):: vacc(3) = (/ 0d0, 0d0, 0d0 /)
+  real(rp):: clrfield(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)   ! in [eV/Ang]
+  real(rp):: clraccel(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)   ! scaled acceleration
+  real(rp):: vacc(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)
   real(rp):: clrregion(3,2)  ! regional condition
-  data clrregion(1:3,1) / -1d0, -1d0, -1d0 / ! sufficiently smaller than 0
-  data clrregion(1:3,2) /  2d0,  2d0,  2d0 / ! sufficiently greater than 1
+  data clrregion(1:3,1) / -1.0_rp, -1.0_rp, -1.0_rp / ! sufficiently smaller than 0
+  data clrregion(1:3,2) /  2.0_rp,  2.0_rp,  2.0_rp / ! sufficiently greater than 1
   
 contains
 !=======================================================================
@@ -47,7 +47,7 @@ contains
       ispc_clrchg = csp2isp(trim(cspc_clrchg))
     endif
 
-    clrtot(:) = 0d0
+    clrtot(:) = 0.0_rp
     if( trim(clr_set).eq.'read' ) then  ! read from clrini
       call read_clr(ntot,clrtot,myid)
       initialized = .true.
@@ -100,11 +100,11 @@ contains
     integer:: i,is
     
     if( myid.eq.0 ) then
-      clrtot(:) = 0d0
+      clrtot(:) = 0.0_rp
       do i=1,ntot
         is = int(tagtot(i))
         if( is.eq.ispc_clrchg ) then
-          clrtot(i) = 1d0
+          clrtot(i) = 1.0_rp
         endif
       enddo
     endif
@@ -153,26 +153,26 @@ contains
 !.....Set color charges to those ions
       np = nclr/2
       nm = nclr/2
-      clrtot(:) = 0d0
+      clrtot(:) = 0.0_rp
       do i=1,ntot
         is = int(tagtot(i))
         if( is.ne.ispc_clrchg ) cycle
 !!$        r = urnd()  !<=== something wrong with urnd() func...
         call random_number(r)
-        if( r.lt.0.5d0 ) then  ! +1
+        if( r.lt.0.5_rp ) then  ! +1
           if( np.le.0 ) then
-            clrtot(i) = -1d0
+            clrtot(i) = -1.0_rp
             nm = nm -1
           else
-            clrtot(i) = 1d0
+            clrtot(i) = 1.0_rp
             np = np -1
           endif
         else  ! -1
           if( nm.le.0 ) then
-            clrtot(i) = 1d0
+            clrtot(i) = 1.0_rp
             np = np -1
           else
-            clrtot(i) = -1d0
+            clrtot(i) = -1.0_rp
             nm = nm -1
           endif
         endif
@@ -208,7 +208,7 @@ contains
           if( trim(clr_set).eq.'region' ) then
             print '(a)', '   regional condition:'
             do i=1,3
-              print '(i6,2f6.3)', i, max(clrregion(i,1),0d0), min(clrregion(i,2),1d0)
+              print '(i6,2f6.3)', i, max(clrregion(i,1),0.0_rp), min(clrregion(i,2),1.0_rp)
             enddo
           endif
         endif
@@ -230,22 +230,22 @@ contains
     else if( trim(clr_set).eq.'chg_cation' ) then
       !...Only cations with greater 0.1 e charges
       do i=1,natm
-        if( aux(iaux_chg,i).gt.0.1d0 ) then
-          aux(iaux_clr,i) = 1d0
+        if( aux(iaux_chg,i).gt.0.1_rp ) then
+          aux(iaux_clr,i) = 1.0_rp
         else
-          aux(iaux_clr,i) = 0d0
+          aux(iaux_clr,i) = 0.0_rp
         endif
       enddo
 !.....Set color charges on the atoms inside specified region
     else if( trim(clr_set).eq.'region') then
-      aux(iaux_clr,1:natm) = 0d0
+      aux(iaux_clr,1:natm) = 0.0_rp
       do i=1,natm
         if( int(tag(i)).ne.ispc_clrchg ) cycle
         ri(1:3) = ra(1:3,i) +sorg(1:3)
         if( clrregion(1,1).lt.ri(1) .and. ri(1).lt.clrregion(1,2) .and. &
             clrregion(2,1).lt.ri(2) .and. ri(2).lt.clrregion(2,2) .and. &
             clrregion(3,1).lt.ri(3) .and. ri(3).lt.clrregion(3,2) ) then
-          aux(iaux_clr,i) = 1d0
+          aux(iaux_clr,i) = 1.0_rp
         endif
       enddo
     endif
@@ -295,8 +295,8 @@ contains
 !.....because the user must set that intentionally.
     if( nrmtrans.lt.0 ) return
 
-    sump(:)= 0d0
-    amtot = 0d0
+    sump(:)= 0.0_rp
+    amtot = 0.0_rp
     do i=1,natm
       is = int(tag(i))
       if( is.eq.ispc_clrchg ) cycle
@@ -308,7 +308,7 @@ contains
     call mpi_allreduce(tmps,sump,3,mpi_real_rp,mpi_sum,mpi_world,ierr)
     tmp= amtot
     call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
-    if( amtot.lt.1d-1 ) then
+    if( amtot.lt.1e-1_rp ) then
       print *,'Error: amtot.le.0.1 !, myid=',myid
       stop
     endif

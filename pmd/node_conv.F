@@ -59,9 +59,9 @@ c      nargc= iargc()
         myx=i/(noy*noz)
         myy=mod(i/noz,noy)
         myz=mod(i,noz)
-        sxog=dble(myx)/dble(nox)
-        syog=dble(myy)/dble(noy)
-        szog=dble(myz)/dble(noz)
+        sxog=real(myx, rp)/real(nox, rp)
+        syog=real(myy, rp)/real(noy, rp)
+        szog=real(myz, rp)/real(noz, rp)
 c-------obtain filename
         write(filename(4:8),'(i5.5)') i
 cc.....Binary format
@@ -92,14 +92,14 @@ c.....Ascii format
      &       ,strs(2,3,j),strs(1,3,j),strs(1,2,j),j=nlast+1,nlast+n)
 c.....Some check
         do j=nlast+1,nlast+n
-          if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1d0/nox.or.
-     &         ra(2,j).lt.syog.or.ra(2,j).ge.syog+1d0/noy.or.
-     &         ra(3,j).lt.szog.or.ra(3,j).ge.szog+1d0/noz)then
+          if(  ra(1,j).lt.sxog.or.ra(1,j).ge.sxog+1.0_rp/nox.or.
+     &         ra(2,j).lt.syog.or.ra(2,j).ge.syog+1.0_rp/noy.or.
+     &         ra(3,j).lt.szog.or.ra(3,j).ge.szog+1.0_rp/noz)then
             write(6,'(a)')'Old node-layout error!'
             write(6,'(i10,3es24.15)') j,ra(1:3,j)
-            write(6,'(2es24.15)') sxog, sxog+1d0/nox
-            write(6,'(2es24.15)') syog, syog+1d0/noy
-            write(6,'(2es24.15)') szog, szog+1d0/noz
+            write(6,'(2es24.15)') sxog, sxog+1.0_rp/nox
+            write(6,'(2es24.15)') syog, syog+1.0_rp/noy
+            write(6,'(2es24.15)') szog, szog+1.0_rp/noz
             stop
           endif
         enddo
@@ -114,18 +114,18 @@ c.....Some check
         myx=i/(nny*nnz)
         myy=mod(i/nnz,nny)
         myz=mod(i,nnz)
-        sxog=dble(myx)/nnx
-        syog=dble(myy)/nny
-        szog=dble(myz)/nnz
+        sxog=real(myx, rp)/nnx
+        syog=real(myy, rp)/nny
+        szog=real(myz, rp)/nnz
         
         n=0
         do j=1,nlast
           if(ra(1,j).ge.sxog .and.
-     &       ra(1,j).lt.sxog+1d0/(nnx) .and.
+     &       ra(1,j).lt.sxog+1.0_rp/(nnx) .and.
      &       ra(2,j).ge.syog .and.
-     &       ra(2,j).lt.syog+1d0/(nny) .and.  
+     &       ra(2,j).lt.syog+1.0_rp/(nny) .and.  
      &       ra(3,j).ge.szog .and.
-     &       ra(3,j).lt.szog+1d0/(nnz)) then
+     &       ra(3,j).lt.szog+1.0_rp/(nnz)) then
             n=n+1
             tagt(n)=tag(j)
             rat(1:3,n)=ra(1:3,j)

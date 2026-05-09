@@ -24,14 +24,14 @@ contains
       if( zi.ge.wtop ) then
         va(3,i)=-abs(va(3,i))
         va(3,i)= min(va(3,i),dwtop)
-        ptop=ptop +am(is)*2d0*abs(va(3,i))*h(3,3,0)/dt
+        ptop=ptop +am(is)*2.0_rp*abs(va(3,i))*h(3,3,0)/dt
         nitop=nitop +1
       endif
 !.....if atom under wbot (bottom wall), go upward
       if( zi.le.wbot ) then
         va(3,i)= abs(va(3,i))
         va(3,i)= max(va(3,i),dwbot)
-        pbot=pbot +am(is)*2d0*abs(va(3,i))*h(3,3,0)/dt
+        pbot=pbot +am(is)*2.0_rp*abs(va(3,i))*h(3,3,0)/dt
         nibot=nibot +1
       endif
     enddo
@@ -52,8 +52,8 @@ contains
     if(l1st) then
       if( wtop.lt.wbot ) stop ' [Error] wtop.lt.wbot !!!'
 !.....btop,bbot: top/bottom of bulk material are fixed
-      btop=0d0
-      bbot=1d0
+      btop=0.0_rp
+      bbot=1.0_rp
       do i=1,natm
         is= int(tag(i))
         if( is.ne.1 ) cycle
@@ -75,8 +75,8 @@ contains
         write(6,'(a,es12.4)') ' area =',area_wall
       endif
 !.....reset pressure
-      ptop= 0d0
-      pbot= 0d0
+      ptop= 0.0_rp
+      pbot= 0.0_rp
       nitop= 0
       nibot= 0
       l1st=.false.

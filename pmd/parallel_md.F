@@ -26,7 +26,7 @@ c-----------------------------------------------------------------------
 
 #ifdef __DISL__
 c.....Epot threshold for disl core extraction [Hartree]
-      real(rp),parameter:: epith = -0.1410d0
+      real(rp),parameter:: epith = -0.1410_rp
 #endif
 
 
@@ -84,9 +84,9 @@ c-----output every these steps, NOUTERG, NOUTPMD
       endif
 c-----parallel configuration
       nxyz= nx*ny*nz
-      anxi= 1d0/nx
-      anyi= 1d0/ny
-      anzi= 1d0/nz
+      anxi= 1.0_rp/nx
+      anyi= 1.0_rp/ny
+      anzi= 1.0_rp/nz
 c-----error trap
       if(nodes_md.ne.nxyz) then
         write(6,'(a)') " error: nodes_md .ne. nxyz!!"
@@ -164,7 +164,7 @@ c.....check whether order of atoms and total-id of atoms match
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
         alp_fire = alp0_fire
-        am(1:nismax) = 10.d0
+        am(1:nismax) = 10._rp
         num_fire = 0
         dtmax_fire = dtmfctr_fire * dt
       endif
@@ -188,25 +188,25 @@ c     &     ,mpi_md_world,ierr)
       endif
 
 c.....Set initial temperature if needed
-      if( tinit.gt.1d-5 ) then
+      if( tinit.gt.1e-5_rp ) then
         call setv()
         call rm_trans_motion()
-      elseif( abs(tinit).le.1d-5 ) then
-        va(1:3,1:natm)= 0d0
+      elseif( abs(tinit).le.1e-5_rp ) then
+        va(1:3,1:natm)= 0.0_rp
       endif
 
       if( ifdmp.eq.2 ) then
-        va(1:3,1:natm) = 0d0
+        va(1:3,1:natm) = 0.0_rp
       endif
 
       if( trim(ctctl).eq.'Langevin' ) then
         dt2= dt/2
-        tgmm= 1d0/trlx
+        tgmm= 1.0_rp/trlx
         do ifmv=1,9
-          if( ttgt(ifmv).lt.0d0 ) then
-            tfac(ifmv)= -1d0
+          if( ttgt(ifmv).lt.0.0_rp ) then
+            tfac(ifmv)= -1.0_rp
           else
-            tfac(ifmv)= sqrt(2d0*tgmm*dt*(fkb*ev2j)*ttgt(ifmv))
+            tfac(ifmv)= sqrt(2.0_rp*tgmm*dt*(fkb*ev2j)*ttgt(ifmv))
      &           *m2ang/s2fs
           endif
         enddo
@@ -218,7 +218,7 @@ c.....Set initial temperature if needed
 #endif
 
       tcpu1= mpi_wtime()
-      tcom = 0d0
+      tcom = 0.0_rp
 
 c-----copy RA of boundary atoms
       call check_size_and_parallel()
@@ -236,7 +236,7 @@ c.....Calc forces
      &     ,cforce,iprint)
       lstrs = .false.
       epot= epot0
-      epotp = 0d0
+      epotp = 0.0_rp
 
 #ifdef __SHEAR__
       call add_shear_stress(natm,ra,aa,tag,sorg,shrfx)
@@ -286,7 +286,7 @@ c      ptnsr(1:3,1:3)= ptnsr(1:3,1:3)/vol
       istp= 0
       istps= istp
       ts= istps*dt
-      te= rbuf/(2d0*vmax/dt) +istp*dt
+      te= rbuf/(2.0_rp*vmax/dt) +istp*dt
       istpe= te/dt
 c.....Considering vmax==0d0, make istpe small only for the first step
       if( istpe.gt.100 ) istpe=100
@@ -298,10 +298,10 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
         nave= 0
-        tave= 0d0
+        tave= 0.0_rp
         do ifmv=1,9
           if( ndof(ifmv).eq.0 ) cycle
-          temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2d0
+          temp(ifmv)= ekl(ifmv) /ndof(ifmv) /fkb *2.0_rp
           nave= nave +ndof(ifmv)
           write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
      &         ,"   =",temp(ifmv),' K'
@@ -362,7 +362,7 @@ c.....write out energies
 c.....write out temperatures
         open(iotemp,file='out.temperature',status='replace')
         write(iotemp,'(a)') '# istp, temperature[0-9]'
-        ediff(1:9)= 0d0
+        ediff(1:9)= 0.0_rp
         write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff(1:9)
         call flush(iotemp)
         
@@ -410,7 +410,7 @@ c-------first kick of velocities
 
 c-------multiply fmv or damping
         do i=1,natm
-          l= int(mod(tag(i)*10,10d0))
+          l= int(mod(tag(i)*10,10.0_rp))
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
@@ -452,7 +452,7 @@ c.....Make pair list
           call mk_lspr_para(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf,h
      &         ,hi,anxi,anyi,anzi,lspr)
           ts= istp*dt
-          te=rbuf/(2d0*vmax/dt) +ts
+          te=rbuf/(2.0_rp*vmax/dt) +ts
           istpe= te/dt
 c          if(myid_md.eq.0) write(6,'(a,i10)')
 c     &         " Next update step will be ",istpe
@@ -480,20 +480,20 @@ c-------Calc forces
 c.....Second kick of velocities
         if( ctctl.eq.'Langevin' ) then
 c.....Langevin thermostat with Mannella integrator
-          hscl(1:3)= 0d0
+          hscl(1:3)= 0.0_rp
           do l=1,3
             hscl(l)= sqrt(h(1,l,0)**2 +h(2,l,0)**2 +h(3,l,0)**2)
           enddo
           do i=1,natm
-            ifmv= int(mod(tag(i)*10,10d0))
-            if( ifmv.eq.0 .or. tfac(ifmv).lt.0d0 ) then
+            ifmv= int(mod(tag(i)*10,10.0_rp))
+            if( ifmv.eq.0 .or. tfac(ifmv).lt.0.0_rp ) then
               va(1:3,i)=va(1:3,i) +aa(1:3,i)
               cycle
             else
               is= int(tag(i))
               ami= am(is)
-              aai(1:3)= 0d0
-              tmp= tfac(ifmv) /sqrt(2d0*ami*amu2kg)*dt
+              aai(1:3)= 0.0_rp
+              tmp= tfac(ifmv) /sqrt(2.0_rp*ami*amu2kg)*dt
               do l=1,3
                 aai(l)= -va(l,i)*tgmm*dt2 +tmp*box_muller()/hscl(l)
               enddo
@@ -507,7 +507,7 @@ c.....accumulate energy difference
      &             +h(1:3,2,0)*aai(2)
      &             +h(1:3,3,0)*aai(3)
               ediff(ifmv)= ediff(ifmv) +fack(is)
-     &             *(2d0*sprod(vi,vl)+sprod(vl,vl))
+     &             *(2.0_rp*sprod(vi,vl)+sprod(vl,vl))
               va(1:3,i)= va(1:3,i) +aai(1:3)
             endif
           enddo
@@ -527,29 +527,29 @@ c.....Calc kinetic energy
 
 c-------temperature control by Berendsen thermostat
         if( trim(ctctl).eq.'Berendsen' ) then
-          tfac(1:9)= 0d0
+          tfac(1:9)= 0.0_rp
 c.....if final temperature is assigned,
 c.....target temperatures are forced to be set intermediate temperatures
-          if( tfin.gt.0d0 ) then
+          if( tfin.gt.0.0_rp ) then
             ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
           endif
           do ifmv=1,9
-            if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
-            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-              tfac(ifmv)= sqrt(1d0 +dt/trlx*100d0 )
+            if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0.0_rp ) cycle
+            temp(ifmv)= ekl(ifmv) *2.0_rp /fkb /ndof(ifmv)
+            if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100.0_rp ) then
+              tfac(ifmv)= sqrt(1.0_rp +dt/trlx*100.0_rp )
             else
-              tfac(ifmv)= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
+              tfac(ifmv)= sqrt(1.0_rp +dt/trlx*(ttgt(ifmv)-temp(ifmv))
      &             /temp(ifmv))
             endif
           enddo
           do i=1,natm
-            ifmv= int(mod(tag(i)*10,10d0))
-            if( ifmv.le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
+            ifmv= int(mod(tag(i)*10,10.0_rp))
+            if( ifmv.le.0 .or. ttgt(ifmv).lt.0.0_rp ) cycle
             va(1:3,i)= va(1:3,i) *tfac(ifmv)
 c.....accumulate energy difference
             is= int(tag(i))
-            ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1d0)*fack(is)
+            ediff(ifmv)= ediff(ifmv) +(tfac(ifmv)**2-1.0_rp)*fack(is)
           enddo
         endif
 
@@ -565,10 +565,10 @@ c-------output energies
         if(mod(istp,nouterg).eq.0) then
           iocnterg=iocnterg+1
           nave= 0
-          tave= 0d0
+          tave= 0.0_rp
           do ifmv=1,9
             if( ndof(ifmv).le.0 ) cycle
-            temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+            temp(ifmv)= ekl(ifmv) *2.0_rp /fkb /ndof(ifmv)
             nave= nave +ndof(ifmv)
             tave= tave +temp(ifmv)*ndof(ifmv)
           enddo
@@ -580,7 +580,7 @@ c-------output energies
           endif
 
           ediff(1:9)= ediff(1:9) /nouterg
-          ediff0(1:9)= 0d0
+          ediff0(1:9)= 0.0_rp
           call mpi_reduce(ediff,ediff0,9
      &         ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
           
@@ -594,7 +594,7 @@ c.....write energies
 c.....write temperature
             write(iotemp,'(i10,18es16.7e3)') istp,temp(1:9),ediff0(1:9)
             call flush(iotemp)
-            ediff(1:9)= 0d0
+            ediff(1:9)= 0.0_rp
 
             if(czload_type.eq.'atoms') then
               write(iostrs,'(i8,3es15.7)') istp,strnow,ftop,fbot
@@ -634,7 +634,7 @@ c.....Output disl core pos
         endif ! energy output
 
 c.....check convergence criteria if it is dumped MD
-        if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
+        if( ifdmp.gt.0 .and. epot-epotp.le.0.0_rp .and.
      &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
           i_conv = i_conv + 1
           if( i_conv.ge.n_conv ) then
@@ -706,10 +706,10 @@ c.....write energy and forces only for fitpot (2nd digit of iprint==1)
         write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
         write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
         nave= 0
-        tave= 0d0
+        tave= 0.0_rp
         do ifmv=1,9
           if( ndof(ifmv).le.0 ) cycle
-          temp(ifmv)= ekl(ifmv) *2d0 /fkb /ndof(ifmv)
+          temp(ifmv)= ekl(ifmv) *2.0_rp /fkb /ndof(ifmv)
           nave= nave +ndof(ifmv)
           write(6,'(1x,a,i1,a,es15.7,a)') " temperature ",ifmv
      &         ,"   =",temp(ifmv),' K'
@@ -769,7 +769,7 @@ c=======================================================================
       write(6,'(2x,a)') ''
 c.....temperature control
       write(6,'(2x,a25,f12.4)') 'initial_temperature',tinit
-      if( tfin.ge.0d0 ) then
+      if( tfin.ge.0.0_rp ) then
         write(6,'(2x,a25,f12.4)') 'final_temperature',tfin
       endif
       write(6,'(2x,a25,2x,a)') 'temperature_control',ctctl
@@ -903,12 +903,12 @@ c     &     ,tmp,' Joule =',tmp*j2ev,' eV'
 
 c-----prefactors for normalized accelerration
       do i=1,nismax
-        acon(i)=  ev2j/ang2m *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
+        acon(i)=  ev2j/ang2m *0.5_rp *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
       enddo
 
 c-----prefactors for kinetic energy in eV
       do i=1,nismax
-        fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
+        fack(i)= 0.5_rp*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
       enddo
 
       end subroutine setup
@@ -962,7 +962,7 @@ c.....Set transpose
       enddo
 
 c.....Set G-matrix
-      g(1:3,1:3,0:1)= 0d0
+      g(1:3,1:3,0:1)= 0.0_rp
       do j=1,3
         do i=1,3
           do k=1,3
@@ -1055,16 +1055,16 @@ c
       real(rp),intent(out):: fmv(3,0:9)
 
 c-----set fmv(1:3,ifmv) to be multiplied to the velocities
-      fmv(1:3,0)= (/ 0d0, 0d0, 0d0 /) ! fix
-      fmv(1:3,1)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,2)= (/ 1d0, 1d0, 0d0 /) ! xy-only
-      fmv(1:3,3)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,4)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,5)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,6)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,7)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,8)= (/ 1d0, 1d0, 1d0 /) ! free move
-      fmv(1:3,9)= (/ 1d0, 1d0, 1d0 /) ! free move
+      fmv(1:3,0)= (/ 0.0_rp, 0.0_rp, 0.0_rp /) ! fix
+      fmv(1:3,1)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,2)= (/ 1.0_rp, 1.0_rp, 0.0_rp /) ! xy-only
+      fmv(1:3,3)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,4)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,5)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,6)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,7)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,8)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
+      fmv(1:3,9)= (/ 1.0_rp, 1.0_rp, 1.0_rp /) ! free move
 
       end subroutine set_fmv
 c=======================================================================
@@ -1079,14 +1079,14 @@ c-----locals
       integer:: i,ierr,is,ixyz,jxyz,imax,ifmv
       real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,ekll(9)
 
-      ekinl=0d0
-      eki(1:3,1:3,1:natm)= 0d0
-      ekll(1:9)= 0d0
-      vmaxl= 0d0
+      ekinl=0.0_rp
+      eki(1:3,1:3,1:natm)= 0.0_rp
+      ekll(1:9)= 0.0_rp
+      vmaxl= 0.0_rp
 
       do i=1,natm
         is= int(tag(i))
-        ifmv= int(mod(tag(i)*10,10d0))
+        ifmv= int(mod(tag(i)*10,10.0_rp))
         if( ifmv.eq.0 ) cycle
         x= va(1,i)
         y= va(2,i)
@@ -1108,13 +1108,13 @@ c.....Find max speed
         vmaxl=max(vmaxl,v2)
       enddo
 
-      ekin= 0d0
+      ekin= 0.0_rp
       call mpi_allreduce(ekinl,ekin,1,mpi_real_rp
      &     ,MPI_SUM,mpi_md_world,ierr)
-      ekl(1:9)= 0d0
+      ekl(1:9)= 0.0_rp
       call mpi_allreduce(ekll,ekl,9,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
-      vmax= 0d0
+      vmax= 0.0_rp
       call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp
      &     ,mpi_max,mpi_md_world,ierr)
       vmax=sqrt(vmax)
@@ -1134,11 +1134,11 @@ c=======================================================================
       if( l1st ) then
         allocate(tdl(ntdst),ndl(ntdst))
         l1st= .false.
-        tdst(1:ntdst)= 0d0
+        tdst(1:ntdst)= 0.0_rp
         nadst(1:ntdst)= 0
       endif
 
-      dx= 1d0/ntdst
+      dx= 1.0_rp/ntdst
       do i=1,natm
         xi= ra(1,i)+sorg(1)
         ix= int(xi/dx)+1
@@ -1150,21 +1150,21 @@ c=======================================================================
       
       if( mod(istp,nouterg).eq.0 ) then
 c.....before writing to file, accumurate data of other nodes
-        tdl(1:ntdst)= 0d0
+        tdl(1:ntdst)= 0.0_rp
         ndl(1:ntdst)= 0
         call mpi_reduce(nadst,ndl,ntdst
      &       ,mpi_integer,mpi_sum,0,mpi_md_world,ierr)
         call mpi_reduce(tdst,tdl,ntdst
      &       ,mpi_real_rp,mpi_sum,0,mpi_md_world,ierr)
         do i=1,ntdst
-          if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2d0/3/ndl(i)/fkb
+          if( ndl(i).ne.0 ) tdl(i)= tdl(i)*2.0_rp/3/ndl(i)/fkb
           if( myid_md.eq.0 ) then
             write(iotdst,'(f10.5,f15.3)') ((i-1)+0.5)/ntdst, tdl(i)
           endif
         enddo
         if( myid_md.eq.0 ) write(iotdst,*) ''
 c.....initialize tdst
-        tdst(1:ntdst)= 0d0
+        tdst(1:ntdst)= 0.0_rp
         nadst(1:ntdst)= 0
       endif
 
@@ -1174,13 +1174,13 @@ c=======================================================================
       use variables
       implicit none
       integer:: i,l,k,ndofl(9)
-      real(rp),parameter:: deps= 1d-12
+      real(rp),parameter:: deps= 1e-12_rp
 
-      ndofl(1:9)= 0d0
+      ndofl(1:9)= 0.0_rp
       do i=1,natm
-        l= int(mod(tag(i)*10,10d0))
+        l= int(mod(tag(i)*10,10.0_rp))
         do k=1,3
-          if( abs(fmv(k,l)).lt.0.5d0 ) cycle
+          if( abs(fmv(k,l)).lt.0.5_rp ) cycle
           ndofl(l)= ndofl(l) +1
         enddo
       enddo
@@ -1200,9 +1200,9 @@ c=======================================================================
       real(rp):: vala,valb,valc,rca,rcb,rcc
       
 c-----calculate the cut-off lengths
-      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
-      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
-      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
+      vala=sqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
+      valb=sqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
+      valc=sqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
       rca=rc*vala
       rcb=rc*valb
       rcc=rc*valc
@@ -1257,9 +1257,9 @@ c-----reset the num of "received" boundary atoms
       nbnew=0
 
 c-----calculate the cut-off lengths
-      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
-      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
-      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
+      vala=sqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/vol
+      valb=sqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/vol
+      valc=sqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/vol
       rca=rc*vala
       rcb=rc*valb
       rcc=rc*valc
@@ -1399,7 +1399,7 @@ c-----reset the num of "received" boundary atoms
 
 c-----calculate the cut-off lengths
       do kd=1,3
-        asgm= dsqrt(sgm(1,kd)**2 +sgm(2,kd)**2 +sgm(3,kd)**2)
+        asgm= sqrt(sgm(1,kd)**2 +sgm(2,kd)**2 +sgm(3,kd)**2)
         rcv(kd)= rc*asgm/vol
         nex(kd)= int(rcv(kd)) +1
       enddo
@@ -1785,7 +1785,7 @@ c---------move atom positions, RA
             dbuf(4:6,i)= va(1:3,j)
             dbuf(7,i)  = tag(j)
 c-----------Eliminate the record of a moved-out atom
-            tag(j)= 0d0
+            tag(j)= 0.0_rp
           enddo
           call mespasd(inode,myparity(kd),dbuf,dbufr,7*nsd,7*nrc,71
      &         ,mpi_md_world)
@@ -1906,8 +1906,8 @@ c---------move atom positions, RA
             dbuf(7,i)  = tag(j)
             dbuf(8:16,i)= strs(1:9,j)
 c-----------Eliminate the record of a moved-out atom
-            tag(j)= 0d0
-            strs(1:9,j)= 0d0
+            tag(j)= 0.0_rp
+            strs(1:9,j)= 0.0_rp
           enddo
           call mespasd(inode,myparity(kd),dbuf,dbufr,16*nsd,16*nrc,71
      &         ,mpi_md_world)
@@ -1979,15 +1979,15 @@ c------------------------------------------------------------------------
       logical bmv
 
       if (ku.eq.1) then
-        bmv = xv.lt.0d0
+        bmv = xv.lt.0.0_rp
       else if (ku.eq.2) then
         bmv = anxi.lt.xv
       else if (ku.eq.3) then
-        bmv = yv.lt.0d0
+        bmv = yv.lt.0.0_rp
       else if (ku.eq.4) then
         bmv = anyi.lt.yv
       else if (ku.eq.5) then
-        bmv = zv.lt.0d0
+        bmv = zv.lt.0.0_rp
       else if (ku.eq.6) then
         bmv = anzi.lt.zv
       else
@@ -2012,19 +2012,19 @@ c
       integer:: i,ixyz,jxyz,kxyz,ierr
       real(rp):: pt(3,3),prss,fac
 
-      pt(1:3,1:3)= 0d0
+      pt(1:3,1:3)= 0.0_rp
       do i=1,natm
         do jxyz=1,3
           do ixyz=1,3
 c            pt(ixyz,jxyz)=pt(ixyz,jxyz)
 c     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i)*avol
             pt(ixyz,jxyz)=pt(ixyz,jxyz)
-     &           +2d0*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i) !*avol
+     &           +2.0_rp*eki(ixyz,jxyz,i) +strs(ixyz,jxyz,i) !*avol
           enddo
         enddo
       enddo
 
-      ptnsr(1:3,1:3)= 0d0
+      ptnsr(1:3,1:3)= 0.0_rp
       call mpi_allreduce(pt,ptnsr,9,mpi_real_rp,mpi_sum
      &     ,mpi_md_world,ierr)
       ptnsr(1:3,1:3)=ptnsr(1:3,1:3) /vol
@@ -2033,18 +2033,18 @@ c.....Berendsen for variable-cell
       if( trim(cpctl).eq.'Berendsen' .or.
      &     trim(cpctl).eq.'vc-Berendsen') then
 c.....now ah is scaling factor for h-mat
-        ah(1:3,1:3)= 0d0
-        ah(1,1)= 1d0
-        ah(2,2)= 1d0
-        ah(3,3)= 1d0
+        ah(1:3,1:3)= 0.0_rp
+        ah(1,1)= 1.0_rp
+        ah(2,2)= 1.0_rp
+        ah(3,3)= 1.0_rp
         ah(1:3,1:3)= ah(1:3,1:3)
      &       -stbeta*dt/3/srlx*( stgt(1:3,1:3)-ptnsr(1:3,1:3) )
 c.....Berendsen for variable-volume not variable-cell
       else if( trim(cpctl).eq.'vv-Berendsen' ) then
-        ah(1:3,1:3)= 0d0
-        ah(1,1)= 1d0
-        ah(2,2)= 1d0
-        ah(3,3)= 1d0
+        ah(1:3,1:3)= 0.0_rp
+        ah(1,1)= 1.0_rp
+        ah(2,2)= 1.0_rp
+        ah(3,3)= 1.0_rp
         prss = (ptnsr(1,1)+ptnsr(2,2)+ptnsr(3,3))/3
         fac = 1.0 -stbeta/dt/3/srlx *(ptgt-prss)
         ah(1:3,1:3) = ah(1:3,1:3)*fac
@@ -2129,10 +2129,10 @@ c=======================================================================
       include 'params_unit.h'
       integer:: i,l,is
       real(rp):: dseed,sumvx,sumvy,sumvz,tmp,facv(nismax)
-      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),parameter:: pi = 3.14159265358979_rp
       real(rp),external:: box_muller
 
-      facv(1:nismax)=dsqrt(tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
+      facv(1:nismax)=sqrt(tinit*fkb*ev2j /(am(1:nismax)*amu2kg))
      &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
@@ -2160,10 +2160,10 @@ c=======================================================================
       real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp
 
 c-----set center of mass motion to zero
-      sumpx=0d0
-      sumpy=0d0
-      sumpz=0d0
-      amtot=0d0
+      sumpx=0.0_rp
+      sumpy=0.0_rp
+      sumpz=0.0_rp
+      amtot=0.0_rp
       do i=1,natm
         is= int(tag(i))
         amss= am(is)
@@ -2228,9 +2228,9 @@ c=======================================================================
       real(rp):: fdotv,vnorm,fnorm
       real(rp):: fdotvl,vnorml,fnorml
 
-      fdotvl = 0d0
-      vnorml = 0d0
-      fnorml = 0d0
+      fdotvl = 0.0_rp
+      vnorml = 0.0_rp
+      fnorml = 0.0_rp
       do i=1,natm
         do ixyz=1,3
           fdotvl = fdotvl +aa(ixyz,i)*va(ixyz,i)
@@ -2238,9 +2238,9 @@ c=======================================================================
           fnorml = fnorml +aa(ixyz,i)*aa(ixyz,i)
         enddo
       enddo
-      vnorm = 0d0
-      fnorm = 0d0
-      fdotv = 0d0
+      vnorm = 0.0_rp
+      fnorm = 0.0_rp
+      fdotv = 0.0_rp
       call mpi_allreduce(vnorml,vnorm,1,mpi_real_rp
      &     ,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(fnorml,fnorm,1,mpi_real_rp
@@ -2251,13 +2251,13 @@ c=======================================================================
       fnorm = sqrt(fnorm)
       do i=1,natm
         do ixyz=1,3
-          va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i)
+          va(ixyz,i) = (1.0_rp -alp_fire)*va(ixyz,i)
      &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
         enddo
       enddo
       
       if( myid_md.eq.0 ) then
-        if( fdotv.gt.0d0  ) then
+        if( fdotv.gt.0.0_rp  ) then
           num_fire = num_fire + 1
           if( num_fire.gt.nmin_fire ) then
             dt = min(dtmax_fire,dt*finc_fire)
@@ -2267,7 +2267,7 @@ c=======================================================================
           endif
         else
           dt = min(dtmax_fire,dt*fdec_fire)
-          va(1:3,1:natm) = 0d0
+          va(1:3,1:natm) = 0.0_rp
           alp_fire = alp0_fire
           num_fire = 0
           write(6,'(a,2f10.3,es12.4)') ' dt,alp_fire,fdotv = '
@@ -2301,20 +2301,20 @@ c.....at 1st call
         if( myid_md.eq.0 ) then
 c.....wrap atom position inside [0:1)
           do i =1,ntot
-            if( rtot(1,i).lt.0d0 ) then
-              rtot(1,i) = rtot(1,i) +1d0
-            else if( rtot(1,i).ge.1d0 ) then
-              rtot(1,i) = rtot(1,i) -1d0
+            if( rtot(1,i).lt.0.0_rp ) then
+              rtot(1,i) = rtot(1,i) +1.0_rp
+            else if( rtot(1,i).ge.1.0_rp ) then
+              rtot(1,i) = rtot(1,i) -1.0_rp
             endif
-            if( rtot(2,i).lt.0d0 ) then
-              rtot(2,i) = rtot(2,i) +1d0
-            else if( rtot(2,i).ge.1d0 ) then
-              rtot(2,i) = rtot(2,i) -1d0
+            if( rtot(2,i).lt.0.0_rp ) then
+              rtot(2,i) = rtot(2,i) +1.0_rp
+            else if( rtot(2,i).ge.1.0_rp ) then
+              rtot(2,i) = rtot(2,i) -1.0_rp
             endif
-            if( rtot(3,i).lt.0d0 ) then
-              rtot(3,i) = rtot(3,i) +1d0
-            else if( rtot(3,i).ge.1d0 ) then
-              rtot(3,i) = rtot(3,i) -1d0
+            if( rtot(3,i).lt.0.0_rp ) then
+              rtot(3,i) = rtot(3,i) +1.0_rp
+            else if( rtot(3,i).ge.1.0_rp ) then
+              rtot(3,i) = rtot(3,i) -1.0_rp
             endif
           enddo
 
@@ -2325,17 +2325,17 @@ c.....count max number of atoms in a node
             myxt = ixyz/(ny*nz)
             myyt = mod(ixyz/nz,ny)
             myzt = mod(ixyz,nz)
-            sxogt = dble(myxt)/nx
-            syogt = dble(myyt)/ny
-            szogt = dble(myzt)/nz
+            sxogt = real(myxt, rp)/nx
+            syogt = real(myyt, rp)/ny
+            szogt = real(myzt, rp)/nz
             n = 0
             do i=1,ntot
               if(  rtot(1,i).ge.sxogt .and.
-     &             rtot(1,i).lt.sxogt+1d0/nx .and.
+     &             rtot(1,i).lt.sxogt+1.0_rp/nx .and.
      &             rtot(2,i).ge.syogt .and.
-     &             rtot(2,i).lt.syogt+1d0/ny .and.
+     &             rtot(2,i).lt.syogt+1.0_rp/ny .and.
      &             rtot(3,i).ge.szogt .and.
-     &             rtot(3,i).lt.szogt+1d0/nz ) then
+     &             rtot(3,i).lt.szogt+1.0_rp/nz ) then
                 n = n+1
               endif
             enddo
@@ -2371,17 +2371,17 @@ c.....allocate memory for local arrays of length namax
           myxt = ixyz/(ny*nz)
           myyt = mod(ixyz/nz,ny)
           myzt = mod(ixyz,nz)
-          sxogt = dble(myxt)/nx
-          syogt = dble(myyt)/ny
-          szogt = dble(myzt)/nz
+          sxogt = real(myxt, rp)/nx
+          syogt = real(myyt, rp)/ny
+          szogt = real(myzt, rp)/nz
           natm = 0
           do i=1,ntot
             if(  rtot(1,i).ge.sxogt .and.
-     &           rtot(1,i).lt.sxogt+1d0/nx .and.
+     &           rtot(1,i).lt.sxogt+1.0_rp/nx .and.
      &           rtot(2,i).ge.syogt .and.
-     &           rtot(2,i).lt.syogt+1d0/ny .and.
+     &           rtot(2,i).lt.syogt+1.0_rp/ny .and.
      &           rtot(3,i).ge.szogt .and.
-     &           rtot(3,i).lt.szogt+1d0/nz ) then
+     &           rtot(3,i).lt.szogt+1.0_rp/nz ) then
               natm = natm +1
               tag(natm)= tagtot(i)
               ra(1:3,natm)= rtot(1:3,i)

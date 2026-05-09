@@ -17,18 +17,18 @@ c-----max num of neighbors; 12 is enough
 cc.....Lattice constant for BCC W
 c      real(rp),parameter:: abcc = 3.171d0
 c.....Lattice constant for BCC Fe
-      real(rp),parameter:: abcc = 2.835d0
+      real(rp),parameter:: abcc = 2.835_rp
 c.....Cutoff radius: halfway between 1st and 2nd N.N.
-      real(rp),parameter:: rc   = 0.5d0*(1d0+sqrt(3d0)/2)*abcc
+      real(rp),parameter:: rc   = 0.5_rp*(1.0_rp+sqrt(3.0_rp)/2)*abcc
 c.....Cutoff radius: halfway between 2nd and 3rd N.N.
 c      real(rp),parameter:: rc   = 0.5d0*(1d0+sqrt(2d0))*abcc
 c.....Scaling factor
       real(rp),parameter:: sfac = 4
 c.....radius of a circle
-      real(rp),parameter:: rcrc = 1.5d0
+      real(rp),parameter:: rcrc = 1.5_rp
 c.....width,height of the paper
-      real(rp),parameter:: alx  = 590d0
-      real(rp),parameter:: aly  = 840d0
+      real(rp),parameter:: alx  = 590.0_rp
+      real(rp),parameter:: aly  = 840.0_rp
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm,nx,ny,nz,nlsa,ndisp,nvec,isrc,idst
@@ -72,8 +72,8 @@ c-----read akrref file
       read(10,*) tmp,tmp,al(3)*hunit
       read(10,*) itmp
       if( itmp.ne.natm ) stop ' [Error] itmp.ne.natm !!!'
-      xmax= 0d0
-      ymax= 0d0
+      xmax= 0.0_rp
+      ymax= 0.0_rp
       do i=1,natm
         read(10,*) itmp,ra0(1:3,i)
         xmax= max(xmax,ra0(1,i)*al(1)*sfac)
@@ -81,12 +81,12 @@ c-----read akrref file
       enddo
       close(10)
 
-      rlz= abcc*sqrt(3d0)/2
+      rlz= abcc*sqrt(3.0_rp)/2
       call get_z_layer(natm,ra0,al,lsza,rlz,ga)
 
       write(6,'(a,2es12.4)') ' rlz,rlz/al(3)=',rlz,rlz/al(3)
       call get_display_atoms(natm,ra0,ndisp,lsdisp
-     &     ,0d0,rlz/al(3))
+     &     ,0.0_rp,rlz/al(3))
 
 c-----prepare for linked-list
       nx=max(int(al(1)/rc),1)
@@ -104,7 +104,7 @@ c-----make 1st nearest neighbor pair-list
       deallocate(lsa)
 
       call get_dd_vector(natm,ra,ra0,al,nvec,ijdd,vdd,nnmax,lspr
-     &     ,abcc*sqrt(3d0)/2)
+     &     ,abcc*sqrt(3.0_rp)/2)
 
       sx= (alx-xmax)/2
       sy= (aly-ymax)/2
@@ -121,18 +121,18 @@ c.....Draw circles at atom positions
       do i=1,ndisp
         j= lsdisp(i)
         if( lsza(j).eq.1 ) then
-          gray= 0.0d0 ! black
+          gray= 0.0_rp ! black
         elseif( lsza(j).eq.2 ) then
-          gray= 0.5d0 ! gray
+          gray= 0.5_rp ! gray
         else
-          gray= 1.0d0 ! white
+          gray= 1.0_rp ! white
         endif
         x= ra0(1,j)*al(1)*sfac +sx
         y= ra0(2,j)*al(2)*sfac +sy
         call draw_circle(12,x,y,rcrc,gray)
       enddo
 c.....Draw vectors of DDM
-      vmax= 0d0
+      vmax= 0.0_rp
       do i=1,nvec
         vmax= max(vmax,vdd(i))
       enddo
@@ -171,11 +171,11 @@ c
       do i=1,natm
         z10= ra(3,i)*al(3)
         ga(i)= (z10-int(z10/rlz)*rlz)/rlz
-        if( ga(i).lt.1d0/6 .or. ga(i).gt.5d0/6 ) then
+        if( ga(i).lt.1.0_rp/6 .or. ga(i).gt.5.0_rp/6 ) then
           lsza(i)= 1 ! to be black
-        elseif( 1d0/6.le.ga(i) .and. ga(i).lt.3d0/6 ) then
+        elseif( 1.0_rp/6.le.ga(i) .and. ga(i).lt.3.0_rp/6 ) then
           lsza(i)= 2 ! to be gray
-        elseif( 3d0/6.le.ga(i) .and. ga(i).lt.5d0/6 ) then
+        elseif( 3.0_rp/6.le.ga(i) .and. ga(i).lt.5.0_rp/6 ) then
           lsza(i)= 3 ! to be white
         endif
 c        if( i.lt.9762 ) write(6,'(2i10,2es12.4)') i,lsza(i),z10,ga(i)
@@ -193,7 +193,7 @@ c
       integer,intent(in):: natm
       real(rp),intent(in):: ra(3,natm),z0,zw
       integer,intent(out):: ndisp,lsdisp(natm)
-      real(rp),parameter:: eps= 1d-8
+      real(rp),parameter:: eps= 1e-8_rp
 
       integer:: i
 
@@ -220,20 +220,20 @@ c-----------------------------------------------------------------------
       integer:: i,j,n,nr1,nr2,nr3
       real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(rp),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1.0_rp-1e-8_rp
 
       llist(1:nlist)=0
 
-      a1= 1d0/n1
-      a2= 1d0/n2
-      a3= 1d0/n3
+      a1= 1.0_rp/n1
+      a2= 1.0_rp/n2
+      a3= 1.0_rp/n3
       do i=1,natm
-        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
-        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
-        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
-        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
-        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
-        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
+        if( ra(1,i).ge.1.0_rp ) ra(1,i)=ra(1,i) -1.0_rp
+        if( ra(1,i).lt.0.0_rp ) ra(1,i)=ra(1,i) +1.0_rp
+        if( ra(2,i).ge.1.0_rp ) ra(2,i)=ra(2,i) -1.0_rp
+        if( ra(2,i).lt.0.0_rp ) ra(2,i)=ra(2,i) +1.0_rp
+        if( ra(3,i).ge.1.0_rp ) ra(3,i)=ra(3,i) -1.0_rp
+        if( ra(3,i).lt.0.0_rp ) ra(3,i)=ra(3,i) +1.0_rp
 c-------region index in order z,y,x
         nr3= int(ra(3,i)*small/a3)+1
         nr2= int(ra(2,i)*small/a2)
@@ -294,7 +294,7 @@ c---------region (jr)
                   dx=(ra(1,j)-ra(1,i)-anint(ra(1,j)-ra(1,i)))*al(1)
                   dy=(ra(2,j)-ra(2,i)-anint(ra(2,j)-ra(2,i)))*al(2)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*al(3)
-                  r= dsqrt(dx*dx +dy*dy +dz*dz)
+                  r= sqrt(dx*dx +dy*dy +dz*dz)
 c                  if(i.eq.1) write(6,'(a,4i4,2es11.3)')
 c     &                 "ir,i,jr,j,r,rc=",ir,i,jr,j,r,rc*1.3d0
                   if(r.lt.rc .and. j.ne.i) then
@@ -368,7 +368,7 @@ c=======================================================================
         xi(1:3)= ra(1:3,i)
         ui(1:3)= (xi(1:3)-xi0(1:3)-anint(xi(1:3)-xi0(1:3)))*al(1:3)
 c.....make z-displacement positive
-        if( ui(3).lt.0d0 ) ui(3)=ui(3) +bv
+        if( ui(3).lt.0.0_rp ) ui(3)=ui(3) +bv
 c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
         do l=1,lspr(0,i)
           j= lspr(l,i)
@@ -379,7 +379,7 @@ c        write(6,'(a,2i6)') ' i,lspr(0,i)=',i,lspr(0,i)
      &        nint((xi0(2)-xj0(2))*al(2)).eq.0 ) cycle
           uj(1:3)= (xj(1:3)-xj0(1:3)-anint(xj(1:3)-xj0(1:3)))*al(1:3)
 c.....make z-displacement positive
-          if( uj(3).lt.0d0 ) uj(3)=uj(3) +bv
+          if( uj(3).lt.0.0_rp ) uj(3)=uj(3) +bv
           du(1:3)= abs(uj(1:3)-ui(1:3))
           nvec=nvec +1
           if( nvec.gt.8*natm ) stop ' [Error] nvec.gt.8*natm !!!'
@@ -450,8 +450,8 @@ c
       implicit none
       integer,intent(in):: ionum
       real(rp),intent(in):: x,y,al,cs,sn
-      real(rp),parameter:: pi = 3.14159265358979d0
-      real(rp),parameter:: ang= pi*5d0/6
+      real(rp),parameter:: pi = 3.14159265358979_rp
+      real(rp),parameter:: ang= pi*5.0_rp/6
 
       real(rp):: ex,ey,ex1,ey1,ex2,ey2
 
@@ -465,7 +465,7 @@ c
       ey2= sn*ex +cs*ey
 
       write(ionum,'(a)') ' newpath'
-      write(ionum,'(2f8.2,a)')  x+cs*al/sqrt(3d0),y+sn*al/sqrt(3d0)
+      write(ionum,'(2f8.2,a)')  x+cs*al/sqrt(3.0_rp),y+sn*al/sqrt(3.0_rp)
      &     ,' moveto'
       write(ionum,'(2f8.2,a)')  ex1*al, ey1*al,' rlineto'
       write(ionum,'(2f8.2,a)')  ex2*al, ey2*al,' rlineto'
@@ -482,10 +482,10 @@ c=======================================================================
 
       real(rp):: rx,ry,r,cs,sn,rl,dr,x0,y0,dx,dy,x3,y3,ex,ey
      &     ,ex1,ey1,ex2,ey2
-      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),parameter:: pi = 3.14159265358979_rp
       real(rp),parameter:: angv = pi -pi/6
 c.....arrow length, 3 points
-      real(rp),parameter:: alen = 2d0
+      real(rp),parameter:: alen = 2.0_rp
 
       rx= x2-x1
       ry= y2-y1
@@ -493,7 +493,7 @@ c.....arrow length, 3 points
       cs= rx/r
       sn= ry/r
 
-      rl= r-2d0*rcrc
+      rl= r-2.0_rp*rcrc
       dr= rl*scale
       x0= x1+ (r-dr)/2 *cs
       y0= y1+ (r-dr)/2 *sn

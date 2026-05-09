@@ -26,7 +26,7 @@ module RFMEAM
   integer,parameter:: ioprms = 20
   integer,parameter:: lmax = 3
   integer,parameter:: mmax = 3
-  real(rp),parameter:: tiny = 1d-14
+  real(rp),parameter:: tiny = 1e-14_rp
   integer,parameter:: allspcs = 1000
   
   logical:: lprmset_RFMEAM = .false.
@@ -68,7 +68,7 @@ contains
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
-    real(rp):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rp,e0i,e1i,e2i,n, &
+    real(rp):: rc,rs,cmaxi,cmini,ep,alp,c2,c3,w(0:lmax),rprm,e0i,e1i,e2i,n, &
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
          bmax,srmax,sgmi
     character(len=128):: cline,fname,c1
@@ -76,30 +76,30 @@ contains
     logical:: latomic(nspmax)
 
     if( myid_md.eq.0 ) then
-      rcij(:,:) = 0d0
-      rsij(:,:) = 0d0
-      cmax(:,:,:) = 0d0
-      cmin(:,:,:) = 0d0
-      epij(:,:) = 0d0
-      alpij(:,:) = 0d0
-      c2ij(:,:) = 0d0
-      c3ij(:,:) = 0d0
-      rpij(:,:) = 0d0
-      pj(:,:) = 0d0
-      qj(:,:) = 0d0
-      wij(:,:,:) = 0d0
-      e0(:) = 0d0
-      e1(:) = 0d0
-      e2(:) = 0d0
-      sgm(:) = 0.1d0
-      ni(:) = 0d0
-      ti(:,:) = 0d0
+      rcij(:,:) = 0.0_rp
+      rsij(:,:) = 0.0_rp
+      cmax(:,:,:) = 0.0_rp
+      cmin(:,:,:) = 0.0_rp
+      epij(:,:) = 0.0_rp
+      alpij(:,:) = 0.0_rp
+      c2ij(:,:) = 0.0_rp
+      c3ij(:,:) = 0.0_rp
+      rpij(:,:) = 0.0_rp
+      pj(:,:) = 0.0_rp
+      qj(:,:) = 0.0_rp
+      wij(:,:,:) = 0.0_rp
+      e0(:) = 0.0_rp
+      e1(:) = 0.0_rp
+      e2(:) = 0.0_rp
+      sgm(:) = 0.1_rp
+      ni(:) = 0.0_rp
+      ti(:,:) = 0.0_rp
       interact(:,:) = .false.
       interact3(:,:,:) = .false.
       latomic(:) = .false.
       itype2(:,:) = 0
-      bij(:,:,:) = 0d0
-      srij(:,:,:) = 0d0
+      bij(:,:,:) = 0.0_rp
+      srij(:,:,:) = 0.0_rp
 
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
@@ -165,7 +165,7 @@ contains
           endif
           if( it2.eq.1 ) then  ! Timonova-type pair potential
             backspace(ioprms)
-            read(ioprms,*) c1,cspi,cspj,itmp,rc,rs,rp,alp,ep,c2,c3,w(0:lmax)
+            read(ioprms,*) c1,cspi,cspj,itmp,rc,rs,rprm,alp,ep,c2,c3,w(0:lmax)
 !.....Set imask,jmask
             imask(:) = 1
             jmask(:) = 1
@@ -236,11 +236,11 @@ contains
 !.....rs and rc are necessary for embed part
                 rcij(is,js) = srij(mmax,is,js)
                 rcij(js,is) = srij(mmax,is,js)
-                rsij(is,js) = srij(mmax,is,js) -0.5d0
-                rsij(js,is) = srij(mmax,is,js) -0.5d0
+                rsij(is,js) = srij(mmax,is,js) -0.5_rp
+                rsij(js,is) = srij(mmax,is,js) -0.5_rp
 !.....If srij(mmax,is,js) is not the longest, replace it with the longest one.
                 maxm = 0
-                srmax = 0d0
+                srmax = 0.0_rp
                 do m=1,mmax
                   if( srij(m,is,js).gt.srmax ) then
                     srmax = srij(m,is,js)
@@ -466,11 +466,11 @@ contains
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
            +size(dgam) +size(drho) +size(rijs) +size(skij)))
 !.....True rcut = max(rc, rc*Cmax/(2*sqrt(Cmax -1)))
-      cmaxmax = 0d0
-      rcmax = 0d0
-      rcij2(:,:) = 0d0
-      trcij2(:,:) = 0d0
-      rcfac2(:,:) = 1d0
+      cmaxmax = 0.0_rp
+      rcmax = 0.0_rp
+      rcij2(:,:) = 0.0_rp
+      trcij2(:,:) = 0.0_rp
+      rcfac2(:,:) = 1.0_rp
       do is=1,nspmax
         do js=1,nspmax
           if( .not.interact(is,js) ) cycle
@@ -481,10 +481,10 @@ contains
           endif
           do ks=1,nspmax
             cmaxkij = cmax(ks,is,js)
-            if( cmaxkij.le.1d0 ) cycle
-            truerc = max(rc, rc*cmaxkij/(2d0*sqrt(cmaxkij -1d0)))
+            if( cmaxkij.le.1.0_rp ) cycle
+            truerc = max(rc, rc*cmaxkij/(2.0_rp*sqrt(cmaxkij -1.0_rp)))
             rcfac2(is,js) = max(rcfac2(is,js), &
-                 cmaxkij**2/(4d0*(cmaxkij -1d0)))
+                 cmaxkij**2/(4.0_rp*(cmaxkij -1.0_rp)))
           enddo
           trcij(is,js) = truerc
           rcij2(is,js) = rc*rc
@@ -527,12 +527,12 @@ contains
            +size(dgam) +size(drho) +size(rijs) +size(skij)))
     endif
 
-    epotl= 0d0
-    epot2l= 0d0
-    epotml= 0d0
-    epil(:) = 0d0
-    aal(:,:) = 0d0
-    strsl(:,:,:) = 0d0
+    epotl= 0.0_rp
+    epot2l= 0.0_rp
+    epotml= 0.0_rp
+    epil(:) = 0.0_rp
+    aal(:,:) = 0.0_rp
+    strsl(:,:,:) = 0.0_rp
 
 !$omp parallel 
 !$omp do reduction(+:epot2l,epotml,epil) &
@@ -546,14 +546,14 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is = int(tag(i))
-      sij(:) = 0d0
-      dsij(:,:) = 0d0
-      dsfc(:,:,:) = 0d0
-      sfc(:) = 0d0
-      fl(:,:) = 0d0
-      dfl(:,:,:) = 0d0
+      sij(:) = 0.0_rp
+      dsij(:,:) = 0.0_rp
+      dsfc(:,:,:) = 0.0_rp
+      sfc(:) = 0.0_rp
+      fl(:,:) = 0.0_rp
+      dfl(:,:,:) = 0.0_rp
 !.....Create ij vector and distances and store them for after heavy use
-      rijs(:,:) = 0d0
+      rijs(:,:) = 0.0_rp
       nni = lspr(0,i)
       do jj=1,nni
         j = lspr(jj,i)
@@ -596,24 +596,24 @@ contains
           dp = rpij(is,js)
 !.....Cutoff function, fc
           if( fcij.lt.tiny ) cycle
-          eta = alpha *(dij/dp -1d0)
+          eta = alpha *(dij/dp -1.0_rp)
           expeta = exp(-eta)
-          phi = -ep*(1d0 +eta +c2*eta**2 +c3*eta**3) *expeta
-          tmp = 0.5d0 *phi*fcij*sij(jj)
-          epil(i) = epil(i) +0.5d0 *tmp
-          epil(j) = epil(j) +0.5d0 *tmp
+          phi = -ep*(1.0_rp +eta +c2*eta**2 +c3*eta**3) *expeta
+          tmp = 0.5_rp *phi*fcij*sij(jj)
+          epil(i) = epil(i) +0.5_rp *tmp
+          epil(j) = epil(j) +0.5_rp *tmp
           epot2l = epot2l +tmp
 !.....Forces related to pair potential, which also depends on k != i,j
-          dphi = alpha/dp *ep*expeta *(eta*(1d0 -2d0*c2) &
-               +eta**2 *(c2 -3d0*c3) +c3*eta**3)
-          dtmp = 0.5d0 *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
+          dphi = alpha/dp *ep*expeta *(eta*(1.0_rp -2.0_rp*c2) &
+               +eta**2 *(c2 -3.0_rp*c3) +c3*eta**3)
+          dtmp = 0.5_rp *(dphi*sij(jj)*fcij +phi*sij(jj)*dfcij)
           do ixyz=1,3
 !$omp atomic
             aal(ixyz,i) = aal(ixyz,i) -dtmp*driji(ixyz)
 !$omp atomic
             aal(ixyz,j) = aal(ixyz,j) -dtmp*drijj(ixyz)
           enddo
-          phifc = 0.5d0 *phi *fcij
+          phifc = 0.5_rp *phi *fcij
           do kk=1,nni
             k = lspr(kk,i)
             do ixyz=1,3
@@ -628,10 +628,10 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                   -0.5_rp*dtmp*rij(ixyz)*(-driji(jxyz))
 !$omp atomic
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                   -0.5_rp*dtmp*rij(ixyz)*(-driji(jxyz))
             enddo
           enddo
           do kk=1,nni
@@ -640,10 +640,10 @@ contains
               do jxyz=1,3
 !$omp atomic
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                     -0.5d0*phifc*dsij(jxyz,kk)
+                     -0.5_rp*phifc*dsij(jxyz,kk)
 !$omp atomic
                 strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                     -0.5d0*phifc*dsij(jxyz,kk)
+                     -0.5_rp*phifc*dsij(jxyz,kk)
               enddo
             enddo
           enddo  ! kk-loop
@@ -651,12 +651,12 @@ contains
           if( dij.le.srij(mmax,is,js) ) then
 !.....Type-2 2-body potential
             call calc_phi2(is,js,dij,phi2,dphi2)
-            tmp = 0.5d0 *phi2*sij(jj)
-            epil(i) = epil(i) +0.5d0*tmp
-            epil(j) = epil(j) +0.5d0*tmp
+            tmp = 0.5_rp *phi2*sij(jj)
+            epil(i) = epil(i) +0.5_rp*tmp
+            epil(j) = epil(j) +0.5_rp*tmp
             epot2l = epot2l +tmp
 !.....Type-2 2-body forces
-            dtmp = 0.5d0 *dphi2 *sij(jj)
+            dtmp = 0.5_rp *dphi2 *sij(jj)
             do ixyz=1,3
 !$omp atomic
               aal(ixyz,i) = aal(ixyz,i) -dtmp *driji(ixyz)
@@ -667,9 +667,9 @@ contains
               k = lspr(kk,i)
               do ixyz=1,3
 !$omp atomic
-                aal(ixyz,i) = aal(ixyz,i) +0.5d0*phi2*dsij(ixyz,kk)
+                aal(ixyz,i) = aal(ixyz,i) +0.5_rp*phi2*dsij(ixyz,kk)
 !$omp atomic
-                aal(ixyz,k) = aal(ixyz,k) -0.5d0*phi2*dsij(ixyz,kk)
+                aal(ixyz,k) = aal(ixyz,k) -0.5_rp*phi2*dsij(ixyz,kk)
               enddo
             enddo
 !.....Atomic stress for pair part
@@ -677,10 +677,10 @@ contains
               do jxyz=1,3
 !$omp atomic
                 strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                     -0.5_rp*dtmp*rij(ixyz)*(-driji(jxyz))
 !$omp atomic
                 strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                     -0.5d0*dtmp*rij(ixyz)*(-driji(jxyz))
+                     -0.5_rp*dtmp*rij(ixyz)*(-driji(jxyz))
               enddo
             enddo
             do kk=1,nni
@@ -689,10 +689,10 @@ contains
                 do jxyz=1,3
 !$omp atomic
                   strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                       -0.25d0*phi2*dsij(jxyz,kk)
+                       -0.25_rp*phi2*dsij(jxyz,kk)
 !$omp atomic
                   strsl(jxyz,ixyz,k)=strsl(jxyz,ixyz,k) &
-                       -0.25d0*phi2*dsij(jxyz,kk)
+                       -0.25_rp*phi2*dsij(jxyz,kk)
                 enddo
               enddo
             enddo  ! kk-loop
@@ -726,7 +726,7 @@ contains
              +sij(jj)*dfcij*rij(1:3)/dij
       enddo ! jj-loop
 
-      rhoi2(:) = 0d0
+      rhoi2(:) = 0.0_rp
       do jj=1,nni
         if( sfc(jj).lt.tiny ) cycle
         j = lspr(jj,i)
@@ -746,10 +746,10 @@ contains
           dik = rijs(5,kk)
           cs = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3))/dij/dik
           cs2 = cs*cs
-          plcs(0) = 1d0
+          plcs(0) = 1.0_rp
           plcs(1) = cs
-          plcs(2) = (3d0*cs2 -1d0)/2
-          plcs(3) = (5d0*cs*cs2 -3d0*cs)/2
+          plcs(2) = (3.0_rp*cs2 -1.0_rp)/2
+          plcs(3) = (5.0_rp*cs*cs2 -3.0_rp*cs)/2
           sfcjk = sfc(jj)*sfc(kk)
           do l=0,lmax
             rhoi2(l) = rhoi2(l) +sfcjk*fl(l,jj)*fl(l,kk)*plcs(l)
@@ -761,25 +761,25 @@ contains
       rhoi2(0) = max(rhoi2(0),tiny)
 !.....F[rhoi]
       rhoi0 = sqrt(rhoi2(0))
-      gam = 0d0
+      gam = 0.0_rp
       do l=1,lmax
         gam = gam +ti(l,is)*rhoi2(l)
       enddo
       gam = gam /rhoi2(0)
       egam = exp(-gam)
-      ggam = 2d0 /(1d0 +egam)
+      ggam = 2.0_rp /(1.0_rp +egam)
       rhoi = rhoi0 *ggam
       yi = rhoi/ni(is)
       sgmi = sgm(is)
-      gyi = 1d0 -exp(-yi*yi /2d0/sgmi**2)
+      gyi = 1.0_rp -exp(-yi*yi /2.0_rp/sgmi**2)
       fyi = e0(is)*yi*log(yi) +e1(is)*yi +e2(is)*yi*yi
       frhoi = fyi*gyi
       epil(i)= epil(i) +frhoi
       epotml = epotml +frhoi
 
 !.....d(rhoi(l)^2)/dr_{il} needed for dF[rhoi]/dr_{il}
-      drhoi2(:,:,:) = 0d0
-      drhoi0(:,:) = 0d0
+      drhoi2(:,:,:) = 0.0_rp
+      drhoi0(:,:) = 0.0_rp
       do jj=1,nni
         if( sij(jj).lt.tiny ) cycle
         j = lspr(jj,i)
@@ -800,18 +800,18 @@ contains
           dik = rijs(5,kk)
           fcik = fcut(is,ks,dik)
           pcs = dij*dik
-          pcsi = 1d0/pcs
+          pcsi = 1.0_rp/pcs
           cs = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *pcsi
           dcsdij(1:3) = (rik(1:3) -cs*dik/dij*rij(1:3)) *pcsi
           dcsdik(1:3) = (rij(1:3) -cs*dij/dik*rik(1:3)) *pcsi
           sfcjk = sfc(jj)*sfc(kk)
           cs2 = cs*cs
           plcs(1) = cs
-          plcs(2) = (3d0*cs2 -1d0)/2
-          plcs(3) = (5d0*cs*cs2 -3d0*cs)/2
-          dplcs(1)= 1d0
-          dplcs(2)= 3d0*cs
-          dplcs(3)= (15d0*cs2 -3d0)/2
+          plcs(2) = (3.0_rp*cs2 -1.0_rp)/2
+          plcs(3) = (5.0_rp*cs*cs2 -3.0_rp*cs)/2
+          dplcs(1)= 1.0_rp
+          dplcs(2)= 3.0_rp*cs
+          dplcs(3)= (15.0_rp*cs2 -3.0_rp)/2
           do l=1,lmax
             drhoi2(1:3,1:nni,l) = drhoi2(1:3,1:nni,l) &
                  +fl(l,jj)*fl(l,kk)*plcs(l) &
@@ -821,28 +821,28 @@ contains
             drhoi2(1:3,kk,l) = drhoi2(1:3,kk,l) +sfcjk*fl(l,jj) &
                  *(plcs(l)*dfl(1:3,l,kk) +fl(l,kk)*dcsdik(1:3)*dplcs(l))
           enddo
-          drhoi0(1:3,1:nni) = drhoi0(1:3,1:nni) +0.5d0/rhoi0 &
+          drhoi0(1:3,1:nni) = drhoi0(1:3,1:nni) +0.5_rp/rhoi0 &
                *fl(0,jj)*fl(0,kk) &
                *(dsfc(1:3,1:nni,jj)*sfc(kk) +sfc(jj)*dsfc(1:3,1:nni,kk))
-          drhoi0(1:3,jj) = drhoi0(1:3,jj) +0.5d0/rhoi0*dfl(1:3,0,jj)*fl(0,kk)*sfcjk
-          drhoi0(1:3,kk) = drhoi0(1:3,kk) +0.5d0/rhoi0*dfl(1:3,0,kk)*fl(0,jj)*sfcjk
+          drhoi0(1:3,jj) = drhoi0(1:3,jj) +0.5_rp/rhoi0*dfl(1:3,0,jj)*fl(0,kk)*sfcjk
+          drhoi0(1:3,kk) = drhoi0(1:3,kk) +0.5_rp/rhoi0*dfl(1:3,0,kk)*fl(0,jj)*sfcjk
         enddo  ! kk-loop
       enddo  ! jj-loop
 
 !.....dF[rhoi]
-      strho2 = 0d0
-      dstrho2(:,:) = 0d0
+      strho2 = 0.0_rp
+      dstrho2(:,:) = 0.0_rp
       do l=1,lmax
         strho2 = strho2 +ti(l,is)*rhoi2(l)
         dstrho2(1:3,1:nni)= dstrho2(1:3,1:nni) +ti(l,is)*drhoi2(1:3,1:nni,l)
       enddo
-      dgam(1:3,1:nni) = -2d0/rhoi0**3 *strho2 *drhoi0(1:3,1:nni) &
-           +1d0/rhoi2(0) *dstrho2(1:3,1:nni)
-      dgdgam = 2d0*egam/(1d0+egam)**2
+      dgam(1:3,1:nni) = -2.0_rp/rhoi0**3 *strho2 *drhoi0(1:3,1:nni) &
+           +1.0_rp/rhoi2(0) *dstrho2(1:3,1:nni)
+      dgdgam = 2.0_rp*egam/(1.0_rp+egam)**2
       drho(1:3,1:nni) = drhoi0(1:3,1:nni)*ggam &
            +rhoi0 *dgdgam *dgam(1:3,1:nni)
       dgdy = yi /sgmi**2 *exp(-yi*yi/2/sgmi**2)
-      dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2d0*e2(is)*yi)*gyi +dgdy*fyi
+      dfdy = (e0(is)*log(yi) +e0(is) +e1(is) +2.0_rp*e2(is)*yi)*gyi +dgdy*fyi
 
       do jj=1,nni
 !!$        if( sij(jj).lt.tiny ) cycle
@@ -863,10 +863,10 @@ contains
           do jxyz=1,3
 !$omp atomic
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*rij(ixyz)*atmp(jxyz)
+                 -0.5_rp*rij(ixyz)*atmp(jxyz)
 !$omp atomic
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*rij(ixyz)*atmp(jxyz)
+                 -0.5_rp*rij(ixyz)*atmp(jxyz)
           enddo
         enddo
       enddo ! jj-loop
@@ -936,9 +936,9 @@ contains
     dij2 = rijs(4,jj)
     dij = rijs(5,jj)
     dij4 = dij2*dij2
-    sij = 1d0
-    skij(:) = 0d0
-    dsij(:,:) = 0d0
+    sij = 1.0_rp
+    skij(:) = 0.0_rp
+    dsij(:,:) = 0.0_rp
 !.....Firstly compute all the Skij
     do kk=1,lspr(0,i)
       dik2 = rijs(4,kk)
@@ -952,18 +952,18 @@ contains
       rik(1:3) = rijs(1:3,kk)
       dik = rijs(5,kk)
       cs = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3))/dij/dik
-      numer = 1d0 -cs*cs
+      numer = 1.0_rp -cs*cs
       denom = (dij/dik -cs)*cs
       ckij = numer/denom
       y = (ckij -cminkij)/(cmaxkij -cminkij)
-      if( denom.le.tiny .or. y.ge.1d0 ) then
-        skij(kk) = 1d0
+      if( denom.le.tiny .or. y.ge.1.0_rp ) then
+        skij(kk) = 1.0_rp
       else if( y.le.tiny ) then
-        skij(kk) = 0d0
-        sij = 0d0
+        skij(kk) = 0.0_rp
+        sij = 0.0_rp
         exit
       else  ! case: 0 < y < 1
-        skij(kk) = (1d0 -(1d0-y)**4)**2
+        skij(kk) = (1.0_rp -(1.0_rp-y)**4)**2
       endif
       sij = sij *skij(kk)
     enddo  ! kk
@@ -971,7 +971,7 @@ contains
     if( sij.lt.tiny ) return
 !.....Secondly, compute dSkij/dr_(i,x), dSkij/dr_(j,y), ...
     do kk=1,lspr(0,i)
-      if( skij(kk).gt.1d0-tiny .or. skij(kk).lt.tiny ) cycle
+      if( skij(kk).gt.1.0_rp-tiny .or. skij(kk).lt.tiny ) cycle
       k= lspr(kk,i)
       if( k.eq.j ) cycle
       ks = int(tag(k))
@@ -984,25 +984,25 @@ contains
       rik(1:3) = rijs(1:3,kk)
       dik = rijs(5,kk)
       pcs = dij*dik
-      pcsi= 1d0/pcs
+      pcsi= 1.0_rp/pcs
       qcs = rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
       cs = qcs *pcsi
-      numer = 1d0 -cs*cs
+      numer = 1.0_rp -cs*cs
       denom = (dij/dik -cs)*cs
       ckij = numer/denom
       denom2 = denom*denom
       dcsdij(1:3) = (rik(1:3) -cs*dik/dij*rij(1:3)) *pcsi
       dcsdik(1:3) = (rij(1:3) -cs*dij/dik*rik(1:3)) *pcsi
-      dcdij(1:3) = -(1d0-cs*cs)/denom2 *cs /dik *rij(1:3)/dij
-      dcdik(1:3) =  (1d0-cs*cs)/denom2 *cs /dik/dik *dij *rik(1:3)/dik
-      dnumdcs = -2d0 *cs
-      ddendcs = dij/dik -2d0*cs
+      dcdij(1:3) = -(1.0_rp-cs*cs)/denom2 *cs /dik *rij(1:3)/dij
+      dcdik(1:3) =  (1.0_rp-cs*cs)/denom2 *cs /dik/dik *dij *rik(1:3)/dik
+      dnumdcs = -2.0_rp *cs
+      ddendcs = dij/dik -2.0_rp*cs
       dcdcs = (dnumdcs*denom -numer*ddendcs)/denom2
       dcdij(1:3) = dcdij(1:3) +dcdcs*dcsdij(1:3)
       dcdik(1:3) = dcdik(1:3) +dcdcs*dcsdik(1:3)
       y = (ckij -cminkij)/(cmaxkij -cminkij)
-      dydc = 1d0 /(cmaxkij -cminkij)
-      dbdy = 8d0*(1d0 -(1d0-y)**4) *(1d0-y)**3
+      dydc = 1.0_rp /(cmaxkij -cminkij)
+      dbdy = 8.0_rp*(1.0_rp -(1.0_rp-y)**4) *(1.0_rp-y)**3
       sijperkij = sij/skij(kk)
       tmp = dbdy *dydc *sijperkij
       dsij(1:3,jj) = dsij(1:3,jj) +tmp*dcdij(1:3)
@@ -1020,13 +1020,13 @@ contains
     rs = rsij(is,js)
     rc = rcij(is,js)
     zij = (rij-rs)/(rc-rs)
-    if(zij.lt.0d0) then
-      fcut = 1d0
-    else if(zij.ge.1d0 ) then
-      fcut = 0d0
+    if(zij.lt.0.0_rp) then
+      fcut = 1.0_rp
+    else if(zij.ge.1.0_rp ) then
+      fcut = 0.0_rp
     else
       z2 = zij*zij
-      fcut = 1d0 -z2*zij*(6d0*z2 -15d0*zij +10d0)
+      fcut = 1.0_rp -z2*zij*(6.0_rp*z2 -15.0_rp*zij +10.0_rp)
     endif
     return
   end function fcut
@@ -1040,13 +1040,13 @@ contains
     rs = rsij(is,js)
     rc = rcij(is,js)
     zij = (rij-rs)/(rc-rs)
-    if(zij.lt.0d0) then
-      dfcut = 0d0
-    else if(zij.ge.1d0 ) then
-      dfcut = 0d0
+    if(zij.lt.0.0_rp) then
+      dfcut = 0.0_rp
+    else if(zij.ge.1.0_rp ) then
+      dfcut = 0.0_rp
     else
       z2 = zij*zij
-      dfcut = -30d0*(z2*z2 -2d0*z2*zij +z2)/(rc -rs)
+      dfcut = -30.0_rp*(z2*z2 -2.0_rp*z2*zij +z2)/(rc -rs)
     endif
     return
   end function dfcut
@@ -1059,14 +1059,14 @@ contains
     integer:: m
     real(rp):: x,x2
 
-    phi2 = 0d0
-    dphi2 = 0d0
+    phi2 = 0.0_rp
+    dphi2 = 0.0_rp
     do m=1,mmax
       x = srij(m,is,js) -rij
-      if( x.lt.0d0 ) cycle
+      if( x.lt.0.0_rp ) cycle
       x2 = x*x
       phi2 = phi2 +bij(m,is,js)*x*x2
-      dphi2= dphi2 -3d0*bij(m,is,js)*x2
+      dphi2= dphi2 -3.0_rp*bij(m,is,js)*x2
     end do
     return
   end subroutine calc_phi2

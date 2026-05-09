@@ -29,29 +29,29 @@ module ZBL
   integer,parameter:: msp = nspmax
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(rp),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737_rp
 !.....permittivity of vacuum
-  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836_rp  ! e^2 /Ang /eV
 
   logical:: interact(1:msp,1:msp) = .true.
   real(rp):: qnucl(msp)
   real(rp):: zbl_rc
-  real(rp):: r_inner(1:msp) = -1d0
-  real(rp):: r_outer(1:msp) = -1d0
+  real(rp):: r_inner(1:msp) = -1.0_rp
+  real(rp):: r_outer(1:msp) = -1.0_rp
 
 !.....ZBL parameters
-  real(rp):: zbl_aa = 0.4683766d0
-  real(rp):: zbl_gamma = 0.23d0
+  real(rp):: zbl_aa = 0.4683766_rp
+  real(rp):: zbl_gamma = 0.23_rp
   real(rp):: zbl_alpha(1:4) = (/ &
-       0.18180d0, &
-       0.50990d0, &
-       0.28020d0, &
-       0.02817d0 /)
+       0.18180_rp, &
+       0.50990_rp, &
+       0.28020_rp, &
+       0.02817_rp /)
   real(rp):: zbl_beta(1:4) = (/ &
-       3.20d0, &
-       0.94230d0, &
-       0.40290d0, &
-       0.20160d0 /)
+       3.20_rp, &
+       0.94230_rp, &
+       0.40290_rp, &
+       0.20160_rp /)
 
 contains
 !=======================================================================
@@ -69,7 +69,7 @@ contains
       if( trim(csp).eq.'x' ) cycle
       do iz=1,nelem
         if( trim(csp).eq.trim(elmts(iz)%symbol) ) then
-          qnucl(isp) = dble(iz)
+          qnucl(isp) = real(iz, rp)
           exit
         endif
       enddo
@@ -88,7 +88,7 @@ contains
     real(rp):: qnucli,ri,ro
     character(len=128):: cline,fname,cmode,ctmp
     character(len=5):: cspi,cspj
-    real(rp),parameter:: qtiny = 1d-10
+    real(rp),parameter:: qtiny = 1e-10_rp
 !!$    integer,external:: num_data
 
     if( myid.eq.0 ) then
@@ -96,8 +96,8 @@ contains
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:msp,1:msp) = .true.
-      qnucl(1:msp) = 0d0
-      zbl_rc = 0d0
+      qnucl(1:msp) = 0.0_rp
+      zbl_rc = 0.0_rp
       
       if( iprint.ne.0 ) write(6,'(/,a)') ' ZBL parameters:'
       do while(.true.)
@@ -212,8 +212,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
     
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !-----dE/dr_i
     do i=1,natm
@@ -235,7 +235,7 @@ contains
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         tmp = vij(is,js,rij)
-        tmp2 = 0.5d0 *tmp
+        tmp2 = 0.5_rp *tmp
         if(j.le.natm) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -252,9 +252,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
@@ -314,10 +314,10 @@ contains
       allocate(strsl(3,3,namax),epit(namax),aal(3,namax))
     endif
 
-    epotl= 0d0
-    epit(1:natm+nb) = 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
-    aal(:,1:natm+nb)= 0d0
+    epotl= 0.0_rp
+    epit(1:natm+nb) = 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
+    aal(:,1:natm+nb)= 0.0_rp
 
     do i=1,natm
       xi(1:3) = ra(1:3,i)
@@ -337,11 +337,11 @@ contains
         dij = sqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....2-body term, taking overlay into account
-        tmp = 0.5d0 *vnucl(is,js,dij) 
+        tmp = 0.5_rp *vnucl(is,js,dij) 
         epit(i)= epit(i) +tmp
-        epotl=epotl +tmp *(1d0-alpi)
+        epotl=epotl +tmp *(1.0_rp-alpi)
 !.....Force
-        dtmp = 0.5d0 *dvnucl(is,js,dij) *(1d0 -alpi)
+        dtmp = 0.5_rp *dvnucl(is,js,dij) *(1.0_rp -alpi)
         aal(1:3,i)=aal(1:3,i) -dtmp*drdxi(1:3)
         aal(1:3,j)=aal(1:3,j) +dtmp*drdxi(1:3)
 !.....Stress
@@ -349,13 +349,13 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo  ! k=
-      epi(i) = epi(i) +epit(i) *(1d0-alpi)
+      epi(i) = epi(i) +epit(i) *(1.0_rp-alpi)
     enddo
 
 !.....Derivatives wrt alphas, which requires energy per atom, epit
@@ -375,7 +375,7 @@ contains
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         dij2= xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
         if( dij2.gt.ro*ro .or. dij2.le.ri*ri ) cycle
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
         drdxi(1:3)= -xij(1:3)/dij
 !.....Force
         dtmp = -epit(i) *alpi/ol_alphas(k,i) *ol_dalphas(k,i)
@@ -386,9 +386,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
@@ -421,11 +421,11 @@ contains
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
-    vij = 0d0
+    vij = 0.0_rp
     if( rij.lt.ri ) then
       vij = vnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
-      vij = zeta((ro+ri-2d0*rij)/(ro-ri)) &
+      vij = zeta((ro+ri-2.0_rp*rij)/(ro-ri)) &
            *vnucl(is,js,rij)
     endif
     return
@@ -443,12 +443,12 @@ contains
 
     ri = (r_inner(is)+r_inner(js))/2
     ro = (r_outer(is)+r_outer(js))/2
-    dvij = 0d0
+    dvij = 0.0_rp
     if( rij.lt.ri ) then
       dvij = dvnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
-      x = (ro+ri-2d0*rij)/(ro-ri)
-      dvij = dzeta(x)*(-2d0/(ro-ri)) &
+      x = (ro+ri-2.0_rp*rij)/(ro-ri)
+      dvij = dzeta(x)*(-2.0_rp/(ro-ri)) &
            *vnucl(is,js,rij) &
            +zeta(x)*dvnucl(is,js,rij)
     endif
@@ -485,7 +485,7 @@ contains
     qi = qnucl(is)
     qj = qnucl(js)
     rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
-    dvnucl = -acc *qi*qj/rij* ( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
+    dvnucl = -acc *qi*qj/rij* ( 1.0_rp/rij*xi(rij/rs) -dxi(rij/rs)/rs )
     return
   end function dvnucl
 !=======================================================================
@@ -495,7 +495,7 @@ contains
     real(rp):: xi
     integer:: i
 
-    xi = 0d0
+    xi = 0.0_rp
     do i=1,4
       xi = xi +zbl_alpha(i)*exp(-zbl_beta(i)*x)
     enddo
@@ -512,7 +512,7 @@ contains
     real(rp):: dxi
     integer:: i
 
-    dxi = 0d0
+    dxi = 0.0_rp
     do i=1,4
       dxi = dxi -zbl_beta(i)*zbl_alpha(i)*exp(-zbl_beta(i)*x)
     enddo
@@ -528,7 +528,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: zeta
 
-    zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
+    zeta = (3.0_rp*x**5 -10.0_rp*x**3 +15.0_rp*x +8.0_rp)/16.0_rp
     return
   end function zeta
 !=======================================================================
@@ -537,7 +537,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: dzeta
 
-    dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
+    dzeta = (15.0_rp*x**4 -30.0_rp*x**2 +15.0_rp)/16.0_rp
     return
   end function dzeta
 !=======================================================================
@@ -602,7 +602,7 @@ contains
       rs = zbl_aa  /(qi**zbl_gamma +qj**zbl_gamma)
       rij = rijs(i)
       dvnucls(i) = -acc *qi*qj/rij &
-           *( 1d0/rij*xi(rij/rs) -dxi(rij/rs)/rs )
+           *( 1.0_rp/rij*xi(rij/rs) -dxi(rij/rs)/rs )
     enddo
     return
   end subroutine get_dvnucl

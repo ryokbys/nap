@@ -219,7 +219,7 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'pressure_target' ) then
     call read_r1(ionum,ptgt)
 !.....As ptgt can be also used for vc-X isobaric methods, copy it to stgt(i,i)
-    stgt(:,:) = 0d0
+    stgt(:,:) = 0.0_rp
     stgt(1,1) = ptgt
     stgt(2,2) = ptgt
     stgt(3,3) = ptgt

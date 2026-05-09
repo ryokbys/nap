@@ -25,7 +25,7 @@ contains
     ifac = 1
     if( n.eq.1 ) return
 
-    imax = int(sqrt(dble(n)))
+    imax = int(sqrt(real(n, rp)))
     if( mod(n,2).eq.0 ) then
       ifac = 2
       return

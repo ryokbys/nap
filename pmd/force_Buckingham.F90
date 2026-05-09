@@ -70,8 +70,8 @@ contains
       call accum_mem('force_Buckingham',8*size(strsl))
       rcmax2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,nspmax
         do js=1,nspmax
           aij = buck_a(is,js)
@@ -80,7 +80,7 @@ contains
           vrc = aij*exp(-rc/rhoij) -cij/(rc**6)
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
-          dvdrc = -aij/rhoij*exp(-rc/rhoij) +6d0*cij/(rc**7)
+          dvdrc = -aij/rhoij*exp(-rc/rhoij) +6.0_rp*cij/(rc**7)
           dvdrcs(is,js) = dvdrc
           dvdrcs(js,is) = dvdrc
         enddo
@@ -94,8 +94,8 @@ contains
       call accum_mem('force_Buckingham',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !-----loop over resident atoms
     do i=1,natm
@@ -110,8 +110,8 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2= rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.ge.rcmax2 ) cycle
-        dij = dsqrt(dij2)
-        diji= 1d0/dij
+        dij = sqrt(dij2)
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         aij = buck_a(is,js)
         rhoij = buck_rho(is,js)
@@ -121,11 +121,11 @@ contains
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
         texp = exp(-dij/rhoij)
-        dvdr= -aij/rhoij *texp +6d0 *cij/dij6 *diji -dvdrc
+        dvdr= -aij/rhoij *texp +6.0_rp *cij/dij6 *diji -dvdrc
 !---------force
         aa(1:3,i)=aa(1:3,i) -dxdi(1:3)*dvdr
 !---------potential
-        tmp= 0.5d0 *(aij*texp -cij/dij6 -vrc -dvdrc*(dij-rc))
+        tmp= 0.5_rp *(aij*texp -cij/dij6 -vrc -dvdrc*(dij-rc))
         epi(i)= epi(i) +tmp
         epotl = epotl +tmp
 !.....Stress
@@ -133,7 +133,7 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dvdr*rij(ixyz)*(-dxdi(jxyz))
+                   -0.5_rp*dvdr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -145,7 +145,7 @@ contains
     endif
 
 !-----gather epot
-    epott = 0d0
+    epott = 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( myid.eq.0 .and. iprint.ge.ipl_info ) &
@@ -181,9 +181,9 @@ contains
       fname = trim(paramsdir)//'/'//trim(cprmfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:nspmax,1:nspmax) = .false.
-      buck_a(1:nspmax,1:nspmax) = 0d0
-      buck_rho(1:nspmax,1:nspmax) = 0d0
-      buck_c(1:nspmax,1:nspmax) = 0d0
+      buck_a(1:nspmax,1:nspmax) = 0.0_rp
+      buck_rho(1:nspmax,1:nspmax) = 0.0_rp
+      buck_c(1:nspmax,1:nspmax) = 0.0_rp
       if( iprint.ge.ipl_basic ) write(6,'(/,a)') ' Buckingham parameters:'
       do while(.true.)
         read(ioprms,*,end=10) cline

@@ -348,6 +348,7 @@ recursive subroutine qsort_iarr(nmax,il,ir,iarr,ndim,arr)
 !
 !  Sort arr using iarr by quick sort algorithm.
 !
+  use mod_precision
   implicit none
   integer,intent(in):: nmax,ndim,il,ir
   integer,intent(inout):: iarr(nmax)
@@ -376,6 +377,7 @@ recursive subroutine arg_qsort_iarr(nmax,il,ir,iarr,idxarr)
 !
 !  Sort iarr array by quick sort algorithm and return sorted index array.
 !
+  use mod_precision
   implicit none
   integer,intent(in):: nmax,il,ir
   integer,intent(inout):: iarr(nmax)
@@ -407,6 +409,7 @@ recursive subroutine arg_qsort_arr(nmax,il,ir,arr,idxarr)
 !
 !  Sort arr array by quick sort algorithm and return sorted index array.
 !
+  use mod_precision
   implicit none
   integer,intent(in):: nmax,il,ir
   real(rp),intent(inout):: arr(nmax)

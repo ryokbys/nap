@@ -84,26 +84,26 @@ c-----output every these steps, NOUTERG, NOUTPMD
 c.....Setup for FIRE
       if( ifdmp.eq.2 ) then
         alp_fire = alp0_fire
-        am(1:nismax) = 10.d0
+        am(1:nismax) = 10._rp
         num_fire = 0
       endif
 
       call setup(nismax,am,acon,fack,dt)
       call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
-      sorg(1:3) = 0d0
+      sorg(1:3) = 0.0_rp
 
 c.....Set initial temperature if needed
-      if( tinit.gt.1d-5 ) then
+      if( tinit.gt.1e-5_rp ) then
         call setv(natm,tag,va,h,dt,tinit,nismax,am)
         call rm_trans_motion(natm,tag,va,nismax,am)
-      elseif( abs(tinit).le.1d-5 ) then
-        va(1:3,1:natm)= 0d0
+      elseif( abs(tinit).le.1e-5_rp ) then
+        va(1:3,1:natm)= 0.0_rp
       endif
 
       call pbc(natm,ra)
 
       if( ifdmp.eq.2 ) then
-        va(1:3,1:natm) = 0d0
+        va(1:3,1:natm) = 0.0_rp
       endif
 
       call mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc+rbuf
@@ -130,7 +130,7 @@ c      enddo
       call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
       call get_num_dof(natm,tag,fmv,ndof)
 c.....only use ifmv(1) for temperature
-      temp(1)= ekin /fkb *2d0 /ndof(1)
+      temp(1)= ekin /fkb *2.0_rp /ndof(1)
 
       if( iolevel.gt.0 ) then
         write(6,'(1x,a)') "initial values:"
@@ -162,7 +162,7 @@ c.....make MD loop starts
         ra(1:3,1:natm)= ra(1:3,1:natm) +va(1:3,1:natm)
 c-------multiply fmv or damping
         do i=1,natm
-          l= int(mod(tag(i)*10,10d0))
+          l= int(mod(tag(i)*10,10.0_rp))
           va(1:3,i)=va(1:3,i) *fmv(1:3,l)
         enddo
 
@@ -180,7 +180,7 @@ c-------multiply fmv or damping
         va(1:3,1:natm)= va(1:3,1:natm) +aa(1:3,1:natm)
 
         call get_ekin(namax,natm,va,tag,h,nismax,fack,ekin,eki)
-        temp(1)= ekin /fkb *2d0 /ndof(1)
+        temp(1)= ekin /fkb *2.0_rp /ndof(1)
         if( iolevel.gt.0 ) then
           write(6,'(a,i8,f10.2)') ' istp,temp = ',istp,temp(1)
           write(ioerg,'(i8,3es15.7,f10.2,2es15.7)') istp
@@ -193,29 +193,29 @@ c.....temperature control by velocity scaling
 c.....note: only 1st element of array is used
         if( trim(ctctl).eq.'Berendsen' ) then
           ifmv = 1
-          tfac(ifmv)= 0d0
-          if( tfin.gt.0d0 ) then
+          tfac(ifmv)= 0.0_rp
+          if( tfin.gt.0.0_rp ) then
             ttgt(ifmv) = tinit +(tfin-tinit)*istp/nstp
           endif
-          if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0d0 ) cycle
-          temp(ifmv)= ekin *2d0 /fkb /ndof(ifmv)
-          if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100d0 ) then
-            tfac(ifmv)= sqrt(1d0 +dt/trlx*100d0 )
+          if(ndof(ifmv).le.0 .or. ttgt(ifmv).lt.0.0_rp ) cycle
+          temp(ifmv)= ekin *2.0_rp /fkb /ndof(ifmv)
+          if( abs(ttgt(ifmv)-temp(ifmv))/temp(ifmv).gt.100.0_rp ) then
+            tfac(ifmv)= sqrt(1.0_rp +dt/trlx*100.0_rp )
           else
-            tfac(ifmv)= sqrt(1d0 +dt/trlx*(ttgt(ifmv)-temp(ifmv))
+            tfac(ifmv)= sqrt(1.0_rp +dt/trlx*(ttgt(ifmv)-temp(ifmv))
      &           /temp(ifmv))
           endif
 c          write(6,*) ttgt(ifmv),ndof(ifmv),temp(ifmv),tfac(ifmv)
           do i=1,natm
-            ifmv= int(mod(tag(i)*10,10d0))
-            if( ifmv.ne.1 .or. ttgt(ifmv).lt.0d0 ) cycle
+            ifmv= int(mod(tag(i)*10,10.0_rp))
+            if( ifmv.ne.1 .or. ttgt(ifmv).lt.0.0_rp ) cycle
             va(1:3,i)= va(1:3,i) *tfac(ifmv)
           enddo
           
         endif
 
 c.....check convergence criteria if it is dumping simulation
-        if( ifdmp.gt.0 .and. epot-epotp.le.0d0 .and.
+        if( ifdmp.gt.0 .and. epot-epotp.le.0.0_rp .and.
      &       abs(epot-epotp).lt.eps_conv .and. istp.gt.minstp ) then
           i_conv = i_conv + 1
           if( i_conv.eq.n_conv ) then
@@ -291,13 +291,13 @@ c.....umass*Ang^2/fs^2 ---> kg*m^2/sec^2 (=Joule)
 c-----prefactors for normalized accelerration
       do i=1,nismax
 c        acon(i)= 0.5d0*dt**2/am(i)
-        acon(i)= ev2j/ang2m *0.5d0 *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
+        acon(i)= ev2j/ang2m *0.5_rp *(dt*fs2s)**2 /(am(i)*amu2kg) *m2ang
       enddo
 
 c-----prefactors for kinetic energy, FACK
       do i=1,nismax
 c        fack(i)= 0.5d0*am(i)/dt**2
-        fack(i)= 0.5d0*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
+        fack(i)= 0.5_rp*(am(i)*amu2kg)/(dt*fs2s)**2 *ang2m**2 *j2ev
       enddo
 
 
@@ -351,7 +351,7 @@ c.....Set transpose
       enddo
 
 c.....Set G-matrix
-      g(1:3,1:3,0:1)= 0d0
+      g(1:3,1:3,0:1)= 0.0_rp
       do j=1,3
         do i=1,3
           do k=1,3
@@ -384,10 +384,10 @@ c.....arguments
 c.....local variables
       integer:: i,l,is
       real(rp):: sumvx,sumvy,sumvz,rnd1,rnd2,tmp,facv(nismax)
-      real(rp),parameter:: pi = 3.14159265358979d0
+      real(rp),parameter:: pi = 3.14159265358979_rp
       real(rp),external:: box_muller
 
-      facv(1:nismax)=dsqrt(tinit*fkb*ev2j/(am(1:nismax)*amu2kg))
+      facv(1:nismax)=sqrt(tinit*fkb*ev2j/(am(1:nismax)*amu2kg))
      &     *m2ang /s2fs
 
 c-----velocities in Maxwell-Boltzmann distribution
@@ -418,10 +418,10 @@ c.....local variables
       real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp
 
 c-----set center of mass motion to zero
-      sumpx=0d0
-      sumpy=0d0
-      sumpz=0d0
-      amtot=0d0
+      sumpx=0.0_rp
+      sumpy=0.0_rp
+      sumpz=0.0_rp
+      amtot=0.0_rp
       do i=1,natm
         is= int(tag(i))
         amss= am(is)
@@ -451,8 +451,8 @@ c.....locals
       integer:: i,ierr,is,ixyz,jxyz,imax
       real(rp):: x,y,z,v(3)
 
-      ekin=0d0
-      eki(1:3,1:3,1:natm)= 0d0
+      ekin=0.0_rp
+      eki(1:3,1:3,1:natm)= 0.0_rp
 
       do i=1,natm
         is= int(tag(i))
@@ -479,13 +479,13 @@ c=======================================================================
       real(rp),intent(in):: fmv(3,0:9),tag(natm)
       integer,intent(inout):: ndof(9)
       integer:: i,l,k
-      real(rp),parameter:: deps= 1d-12
+      real(rp),parameter:: deps= 1e-12_rp
 
-      ndof(1:9)= 0d0
+      ndof(1:9)= 0.0_rp
       do i=1,natm
-        l= int(mod(tag(i)*10,10d0))
+        l= int(mod(tag(i)*10,10.0_rp))
         do k=1,3
-          if( abs(fmv(k,l)).lt.0.5d0 ) cycle
+          if( abs(fmv(k,l)).lt.0.5_rp ) cycle
           ndof(l)= ndof(l) +1
         enddo
       enddo
@@ -507,9 +507,9 @@ c=======================================================================
       integer:: i,ixyz
       real(rp):: fdotv,vnorm,fnorm
 
-      fdotv = 0d0
-      vnorm = 0d0
-      fnorm = 0d0
+      fdotv = 0.0_rp
+      vnorm = 0.0_rp
+      fnorm = 0.0_rp
       do i=1,natm
         do ixyz=1,3
           fdotv = fdotv +aa(ixyz,i)*va(ixyz,i)
@@ -521,12 +521,12 @@ c=======================================================================
       fnorm = sqrt(fnorm)
       do i=1,natm
         do ixyz=1,3
-          va(ixyz,i) = (1d0 -alp_fire)*va(ixyz,i)
+          va(ixyz,i) = (1.0_rp -alp_fire)*va(ixyz,i)
      &         +alp_fire*aa(ixyz,i)/fnorm *vnorm
         enddo
       enddo
       
-      if( fdotv.gt.0d0  ) then
+      if( fdotv.gt.0.0_rp  ) then
         num_fire = num_fire + 1
         if( num_fire.gt.nmin_fire ) then
           dt = min(dtmax_fire,dt*finc_fire)
@@ -535,7 +535,7 @@ c=======================================================================
         endif
       else
         dt = min(dtmax_fire,dt*fdec_fire)
-        va(1:3,1:natm) = 0d0
+        va(1:3,1:natm) = 0.0_rp
         alp_fire = alp0_fire
         num_fire = 0
         write(6,'(a,2f10.3)') ' dt,alp_fire = ',dt,alp_fire
@@ -549,18 +549,18 @@ c=======================================================================
       real(rp),intent(inout):: ra(3,natm)
 
       integer:: i,ixyz
-      real(rp),parameter:: tiny = 1d-10
+      real(rp),parameter:: tiny = 1e-10_rp
 
       do i=1,natm
         do ixyz=1,3
-          if( ra(ixyz,i).ge.1.d0 ) then
-            ra(ixyz,i) = ra(ixyz,i) - 1.d0
-          else if( ra(ixyz,i).lt.0d0 ) then
-            ra(ixyz,i) = ra(ixyz,i) + 1.d0
+          if( ra(ixyz,i).ge.1._rp ) then
+            ra(ixyz,i) = ra(ixyz,i) - 1._rp
+          else if( ra(ixyz,i).lt.0.0_rp ) then
+            ra(ixyz,i) = ra(ixyz,i) + 1._rp
           endif
           ! if still ra(ixyz,i) < 0.0 or ra(ixyz,i) >= 1.0, stop
-          if( ra(ixyz,i).ge.1.d0+tiny
-     &         .or. ra(ixyz,i).lt.0d0 -tiny ) then
+          if( ra(ixyz,i).ge.1._rp+tiny
+     &         .or. ra(ixyz,i).lt.0.0_rp -tiny ) then
             print *,'something wrong'
             print *,'i,ixyz,ra(ixyz,i)=',i,ixyz,ra(ixyz,i)
             stop

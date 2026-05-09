@@ -33,7 +33,7 @@ module isostat
   save
 
 !.....Max strain rate (1%)
-  real(rp):: sratemax = 0.01d0
+  real(rp):: sratemax = 0.01_rp
   
   public:: setup_langevin, setup_cell_langevin, setup_cell_berendsen, &
        setup_cell_min, &
@@ -49,16 +49,16 @@ contains
 
     integer:: itemp
     
-    tgmm= 1d0/trlx
+    tgmm= 1.0_rp/trlx
     do itemp=1,ntemps
-      if( ttgt(itemp).lt.0d0 ) then
-        tfac(itemp)= -1d0
+      if( ttgt(itemp).lt.0.0_rp ) then
+        tfac(itemp)= -1.0_rp
       else
 !.....TFAC should have [sqrt(ue/fs**2)] = [ue/Ang/sqrt(ump)] unit
 !            tfac(itemp)= sqrt(2d0*tgmm*(fkb*ev2j)*ttgt(itemp)/dt)
 !     &           *m2ang/s2fs
 !            tfac(itemp)= dsqrt(2d0*tgmm*fkb*ttgt(itemp)/dt)
-        tfac(itemp)= dsqrt(2d0*tgmm*ttgt(itemp)/dt *k2ue)
+        tfac(itemp)= sqrt(2.0_rp*tgmm*ttgt(itemp)/dt *k2ue)
       endif
     enddo
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -81,28 +81,28 @@ contains
 !!$         pini,pfin,cpctl,ifdmp
     implicit none
     integer,intent(in):: myid,iprint
-    real(rp),parameter:: temp_min = 10d0
+    real(rp),parameter:: temp_min = 10.0_rp
     integer:: is,ndoftot
     real(rp):: ttgtmax,temp,j2
     
     ndoftot = 0
-    ttgtmax = 0d0
+    ttgtmax = 0.0_rp
     do is=1,nspmax
       ndoftot = ndoftot +ndof(is)
       ttgtmax = max(ttgt(is),ttgtmax)
     enddo
     ttgt_lang = max(temp_min, ttgtmax)
-    cgmm = 1d0/srlx
+    cgmm = 1.0_rp/srlx
 !.....T [K] * k2ev ==> [eV], so [cmass] == [eV*fs**2]
     cmass = ndoftot *ttgt_lang /3 /cgmm**2 *k2ev
 !.....In case of damping, set T as 0, but mass as finite value.
     if( ifdmp.gt.0 ) then
       cmass = ndoftot *temp_min /3 /cgmm**2 *k2ev
-      ttgt_lang = 0d0
+      ttgt_lang = 0.0_rp
     endif
 
 
-    if( index(cpctl,'vv-').ne.0 .and. abs(pini-pfin).gt.0.1d0 ) ptgt = pini
+    if( index(cpctl,'vv-').ne.0 .and. abs(pini-pfin).gt.0.1_rp ) ptgt = pini
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
       print *,'Langevin barostat parameters:'
@@ -111,7 +111,7 @@ contains
       print '(a,f11.2,a)', '   Temperature     = ',ttgt_lang,' K'
       if( index(cpctl,'vv-').ne.0 ) then
         write(6,'(a)') '   Variable-volume to'
-        if( abs(pini-pfin).gt.0.1d0 ) then
+        if( abs(pini-pfin).gt.0.1_rp ) then
           write(6,'(a,f0.3,a,f0.3,a)') &
                '   target pressure from = ',pini,' GPa to ',pfin,' GPa'
         else
@@ -137,7 +137,7 @@ contains
     integer,intent(in):: myid,iprint
 
     if( index(cpctl,'vv-').ne.0 ) then
-      if( abs(pini-pfin).gt. 0.1d0 ) then
+      if( abs(pini-pfin).gt. 0.1_rp ) then
         if(myid.eq.0 .and. iprint.ne.0 ) then
           write(6,*) ''
           write(6,'(a)') ' Barostat: variable-volume Berendsen'
@@ -207,25 +207,25 @@ contains
 
 !.....For G-JF algorithm
     eta = tgmm*dt/2
-    bfac = 1d0 /(1d0 +eta)
-    afac = bfac *(1d0 -eta)
+    bfac = 1.0_rp /(1.0_rp +eta)
+    afac = bfac *(1.0_rp -eta)
 
 !.....If final temperature is assigned,
 !.....target temperatures are forced to be set intermediate temperatures
-    if( tfin.gt.0d0 ) then
+    if( tfin.gt.0.0_rp ) then
       ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
-      tfac(1:9) = dsqrt(2d0*tgmm*ttgt(1:9)/dt *k2ue)
+      tfac(1:9) = sqrt(2.0_rp*tgmm*ttgt(1:9)/dt *k2ue)
     endif
 
     do i=1,natm
       itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
       is = int(tag(i))
       if( itemp.eq.0 ) cycle
-      if( tfac(itemp).lt.0d0 ) cycle
+      if( tfac(itemp).lt.0.0_rp ) cycle
       ami= am(is)
 !.....Here unit of TMP should be [eV/Ang],
 !     whereas TFAC is [eu/Ang/sqrt(ump)], so need to multiply ue2ev
-      tmp= tfac(itemp)*dsqrt(ami)*ue2ev
+      tmp= tfac(itemp)*sqrt(ami)*ue2ev
 !!$!.....Here the unit of va*tgmm*ami is [ump*(Ang)/fs**2 = ue/(Ang)],
 !!$!.....where (Ang) is actually scaled to unitless,
 !!$!.....but this should be [eV/Ang], so need to multiply ue2ev.
@@ -239,7 +239,7 @@ contains
       do l=1,3
         aai(l) = tmp*box_muller()
       enddo
-      va(1:3,i) = afac*va(1:3,i) +fa2v(is)*dt*(aa(1:3,i) +bfac*aai(1:3)*2d0 )
+      va(1:3,i) = afac*va(1:3,i) +fa2v(is)*dt*(aa(1:3,i) +bfac*aai(1:3)*2.0_rp )
     enddo
   end subroutine vel_update_langevin
 !=======================================================================
@@ -254,25 +254,25 @@ contains
 
     integer:: i,is,itemp
     
-    tfac(1:9)= 0d0
+    tfac(1:9)= 0.0_rp
 !.....if final temperature is assigned,
 !.....target temperatures are forced to be set intermediate temperatures
-    if( tfin.gt.0d0 ) then
+    if( tfin.gt.0.0_rp ) then
       ttgt(1:9) = tinit +(tfin-tinit)*istp/nstp
     endif
     do itemp=1,ntemps
-      if(ndof(itemp).le.0 .or. ttgt(itemp).lt.0d0 ) cycle
-      temps(itemp)= eks(itemp) *2d0 /fkb /max(ndof(itemp)-3,3)
-      if( abs(ttgt(itemp)-temps(itemp))/temps(itemp).gt.100d0 ) then
-        tfac(itemp)= dsqrt(1d0 +dt/trlx*100d0 )
+      if(ndof(itemp).le.0 .or. ttgt(itemp).lt.0.0_rp ) cycle
+      temps(itemp)= eks(itemp) *2.0_rp /fkb /max(ndof(itemp)-3,3)
+      if( abs(ttgt(itemp)-temps(itemp))/temps(itemp).gt.100.0_rp ) then
+        tfac(itemp)= sqrt(1.0_rp +dt/trlx*100.0_rp )
       else
-        tfac(itemp)= dsqrt(1d0 +dt/trlx*(ttgt(itemp)-temps(itemp)) &
+        tfac(itemp)= sqrt(1.0_rp +dt/trlx*(ttgt(itemp)-temps(itemp)) &
              /temps(itemp))
       endif
     enddo
     do i=1,natm
       itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
-      if( itemp.le.0 .or. ttgt(itemp).lt.0d0 ) cycle
+      if( itemp.le.0 .or. ttgt(itemp).lt.0.0_rp ) cycle
       va(1:3,i)= va(1:3,i) *tfac(itemp)
     enddo
   end subroutine vel_update_berendsen
@@ -294,10 +294,10 @@ contains
     real(rp):: detah,ahcof(3,3)
 
 !.....now ah is scaling factor for h-mat
-      ah(1:3,1:3)= 0d0
-      ah(1,1)= 1d0
-      ah(2,2)= 1d0
-      ah(3,3)= 1d0
+      ah(1:3,1:3)= 0.0_rp
+      ah(1,1)= 1.0_rp
+      ah(2,2)= 1.0_rp
+      ah(3,3)= 1.0_rp
 !.....Berendsen for variable-cell
     if( trim(cpctl).eq.'berendsen' .or. &
          trim(cpctl).eq.'vc-berendsen' .or. &
@@ -306,7 +306,7 @@ contains
       do jxyz=1,3
         sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
         do ixyz=1,3
-          tmp = 0d0
+          tmp = 0.0_rp
           if( lhydrostatic ) then
             tmp = tmp + ( stgt(ixyz,ixyz)-stnsr(ixyz,ixyz) ) *sgm(ixyz,jxyz)
           else
@@ -331,14 +331,14 @@ contains
           enddo
         enddo
         detah = ah(1,1)*ahcof(1,1) +ah(2,1)*ahcof(2,1) +ah(3,1)*ahcof(3,1)
-        ah(:,:) = ah(:,:) /detah**(1d0/3)
+        ah(:,:) = ah(:,:) /detah**(1.0_rp/3)
       endif
 !.....Berendsen for variable-volume not variable-cell
     else if( trim(cpctl).eq.'vv-berendsen' ) then
       prss = (stnsr(1,1)+stnsr(2,2)+stnsr(3,3))/3
       fac = 1.0 -(stbeta/gpa2up)*dt/3/srlx *(ptgt-prss)
 !.....Limit change rate of h (ah) to RMAX
-      fac = min(max(fac,1d0-sratemax),1d0+sratemax)
+      fac = min(max(fac,1.0_rp-sratemax),1.0_rp+sratemax)
       ah(1:3,1:3) = ah(1:3,1:3)*fac
     endif
     return
@@ -391,12 +391,12 @@ contains
 
 !.....For G-JF algorithm
     eta = cgmm *dt/2
-    bfac = 1d0 /(1d0 +eta)
-    afac = bfac *(1d0 -eta)
-    if( ikick.eq.1 ) afac = 1d0
+    bfac = 1.0_rp /(1.0_rp +eta)
+    afac = bfac *(1.0_rp -eta)
+    if( ikick.eq.1 ) afac = 1.0_rp
 !.....[K] *k2ue ==> special energy unit (ue)
 !.....cmass*cgmm/dt = [ump*ang**2 /fs**2] = [ue] *ue2ev = [eV]
-    tfac_lang = dsqrt(2d0*cgmm*cmass*(ttgt_lang*k2ue)/dt) *ue2ev
+    tfac_lang = sqrt(2.0_rp*cgmm*cmass*(ttgt_lang*k2ue)/dt) *ue2ev
     
     if( index(cpctl,'vv-').ne.0 ) then  ! variable-volume
       prss = (stnsr(1,1) +stnsr(2,2) +stnsr(3,3))/3
@@ -409,7 +409,7 @@ contains
       do jxyz=1,3
         sgmnrm = sqrt(sgm(1,jxyz)**2 +sgm(2,jxyz)**2 +sgm(3,jxyz)**2)
         do ixyz=1,3
-          tmp2 = 0d0
+          tmp2 = 0.0_rp
           do l=1,3
             tmp2 = tmp2 + sdiff(ixyz,l)*sgm(l,jxyz)
           enddo
@@ -437,9 +437,9 @@ contains
     
 !.....For G-JF algorithm
     eta = cgmm *dt/2
-    bfac = 1d0 /(1d0 +eta)
-    ah(1:3,1:3) = 0d0
-    elemax = 0d0
+    bfac = 1.0_rp /(1.0_rp +eta)
+    ah(1:3,1:3) = 0.0_rp
+    elemax = 0.0_rp
     do jxyz=1,3
       do ixyz=1,3
         ah(ixyz,jxyz) = bfac*dt*h(ixyz,jxyz,1) !/cmass
@@ -451,9 +451,9 @@ contains
       ah(:,:) = ah(:,:) *fac
       h(:,:,1) = h(:,:,1) *fac
     endif
-    ah(1,1) = ah(1,1) +1d0
-    ah(2,2) = ah(2,2) +1d0
-    ah(3,3) = ah(3,3) +1d0
+    ah(1,1) = ah(1,1) +1.0_rp
+    ah(2,2) = ah(2,2) +1.0_rp
+    ah(3,3) = ah(3,3) +1.0_rp
     
     htmp(1:3,1:3) = matmul(ah,h(1:3,1:3,0))
     do ixyz=1,3

@@ -50,7 +50,7 @@ contains
     integer:: ivw,i123,iside,is,ia
     real(rp):: spw,vt(3),rt
 
-    frc_vwall(:) = 0d0
+    frc_vwall(:) = 0.0_rp
     do ivw=1,nvwall
       i123 = ivwall(ivw)
       spw = spos_vwall(ivw)
@@ -63,15 +63,15 @@ contains
 !!$        ra(1:3,ia) = ra(1:3,ia) +vt(1:3)
 !!$        if( myid_md.eq.1 ) print *,'itot,r(t-dt),r(t)=',itotOf(tag(ia)), &
 !!$             iside*(rt-vt(i123)-spw), iside*(rt-spw)
-        if( iside*(rt-vt(i123)-spw) > 0d0 .and. &
-             iside*(rt-spw) < 0d0 )  then
+        if( iside*(rt-vt(i123)-spw) > 0.0_rp .and. &
+             iside*(rt-spw) < 0.0_rp )  then
           ra(i123,ia) = spw -(rt -spw) -sorg(i123)
           vt(i123) = -vt(i123)
           va(1:3,ia) = (h(1:3,1,0)*vt(1) +h(1:3,2,0)*vt(2) &
                +h(1:3,3,0)*vt(3)) /dt
 !.....Note: this vt is in scaled by h-mat, thus frc_vwall should be scaled later.
           is = int(tag(ia))
-          frc_vwall(ivw) = frc_vwall(ivw) +2d0*vt(i123)/dt /(fa2v(is)*2d0)
+          frc_vwall(ivw) = frc_vwall(ivw) +2.0_rp*vt(i123)/dt /(fa2v(is)*2.0_rp)
         endif
       enddo
     enddo

@@ -6,7 +6,7 @@
 !      real(rp),parameter:: am_al = 26.9815d0
 !
 !      integer,parameter:: neamd = 25
-  real(rp),parameter:: rc_eam_Al = real(6.2872d0, rp)
+  real(rp),parameter:: rc_eam_Al = 6.2872_rp
   real(rp):: rtbl_Al(1:neamd)=(/ &
        2.0000, &
        2.1786, &

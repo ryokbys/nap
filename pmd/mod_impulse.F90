@@ -49,7 +49,7 @@ contains
     endif
 
 !.....normalize tau vector
-    dtau = dsqrt(tau_impls(1)**2 +tau_impls(2)**2 +tau_impls(3)**2)
+    dtau = sqrt(tau_impls(1)**2 +tau_impls(2)**2 +tau_impls(3)**2)
     tau_impls(:) = tau_impls(:)/dtau
 
 !.....Original position
@@ -117,13 +117,13 @@ contains
       do ixyz=1,3
         di(ixyz) = di(ixyz) - anint(di(ixyz))
       enddo
-      displ = 0d0
+      displ = 0.0_rp
       do ixyz=1,3
         displ = displ +(h(ixyz,1)*di(1) +h(ixyz,2)*di(2) &
              +h(ixyz,3)*di(3))*tau_impls(ixyz)
       enddo
 !.....Momentum x tau
-      ptaul = 0d0
+      ptaul = 0.0_rp
       do ixyz=1,3
         ptaul = ptaul +va(ixyz,ia_impls)*tau_impls(ixyz)
       enddo
@@ -145,17 +145,17 @@ contains
 !.....Scale forces
     do is=1,nsp
 !.....x2 is necessary because fa2v contains x0.5 factor
-      ftaul(is) = ftaul(is) *fa2v(is)*dt*am(is)*2d0
+      ftaul(is) = ftaul(is) *fa2v(is)*dt*am(is)*2.0_rp
     enddo
     
 !.....Gather information from child nodes
-    disp= 0d0
+    disp= 0.0_rp
     call mpi_reduce(displ,disp,1,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
-    ptau= 0d0
+    ptau= 0.0_rp
     call mpi_reduce(ptaul,ptau,1,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
-    ftau(:) = 0d0
+    ftau(:) = 0.0_rp
     call mpi_reduce(ftaul,ftau,nsp,mpi_real_rp,mpi_sum, &
          0,mpi_world,ierr)
 

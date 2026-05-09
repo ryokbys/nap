@@ -14,7 +14,7 @@ module metadynamics
   integer,parameter:: ioprms = 40
   integer,parameter:: iopot  = 41
 
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
 
 !.....CV type:
 !       - species_pair: mainly for the purpose of sample collection for fitpot
@@ -26,8 +26,8 @@ module metadynamics
   
   integer:: nhistory
   integer:: nskip
-  real(rp):: gwidth = 0.2d0
-  real(rp):: gheight = 0.001d0  ! in eV per Gaussian
+  real(rp):: gwidth = 0.2_rp
+  real(rp):: gheight = 0.001_rp  ! in eV per Gaussian
   real(rp):: rc = 5.0
   real(rp):: rc2, dr
   integer:: ndiv = 1024
@@ -59,39 +59,39 @@ contains
 
     nskip = nstp/nhistory +1
 
-    resrcs = 0d0
+    resrcs = 0.0_rp
 
     if( trim(cvtype).eq.'species_pair' ) then
       allocate(fpair(ndiv,nsp,nsp))
       resrcs = resrcs +ndiv*nsp*nsp*8
-      fpair(:,:,:) = 0d0
+      fpair(:,:,:) = 0.0_rp
     else if( trim(cvtype).eq.'bonds' ) then
       if( nbond.gt.2 ) then
         print *,'NBOND is limited up to 2, but NBOND=',nbond
         stop
-      else if( dble(ndiv)**nbond *8.gt.1d+10 ) then
+      else if( real(ndiv, rp)**nbond *8.gt.1e+10_rp ) then
         print *,'Dimension would be too large, > ' &
-             ,dble(ndiv)**nbond*8 /1d+9,' GB'
+             ,real(ndiv, rp)**nbond*8 /1e+9_rp,' GB'
         stop
       endif
       if( nbond.eq.1 ) then
         resrcs = resrcs +ndiv*8
         allocate(fbonds1(0:ndiv))
-        fbonds1(:) = 0d0
+        fbonds1(:) = 0.0_rp
       else if( nbond.eq.2 ) then
         resrcs = resrcs +ndiv*ndiv*8
         allocate(fbonds2(0:ndiv,0:ndiv))
-        fbonds2(:,:) = 0d0
+        fbonds2(:,:) = 0.0_rp
       endif
     else if( trim(cvtype).eq.'bonds_from_atoms' ) then
-      resrcs = namax*nhistory*natm4bnd*8d0
-      if( resrcs.gt.1d+10 ) then
+      resrcs = namax*nhistory*natm4bnd*8.0_rp
+      if( resrcs.gt.1e+10_rp ) then
         print *,'Dimension would be too large, > ' &
-             ,resrcs /1d+9,' GB'
+             ,resrcs /1e+9_rp,' GB'
         stop
       endif
       allocate(dbonds(namax,natm4bnd,nhistory))
-      dbonds(:,:,:) = 0d0
+      dbonds(:,:,:) = 0.0_rp
     endif
 
     rc2 = rc**2
@@ -106,7 +106,7 @@ contains
       print '(a,f8.4)', '   gaussian_height = ',gheight
       print '(a,i0)', '   num_division    = ',ndiv
       print '(a,f8.4,f8.5)', '   cutoff_radius,dr= ',rc,dr
-      print '(a,f8.4,a)', '   Memory = ',resrcs/1d6,' MB'
+      print '(a,f8.4,a)', '   Memory = ',resrcs/1e6_rp,' MB'
       if( trim(cvtype).eq.'bonds' ) then
         print '(a,i0)', '   Num of bonds = ',nbond
         do ib=1,nbond
@@ -271,8 +271,8 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        pref = 1d0/(4d0*pi*dij*dij*dr)
-        fc = fcut(dij,0d0,rc)
+        pref = 1.0_rp/(4.0_rp*pi*dij*dij*dr)
+        fc = fcut(dij,0.0_rp,rc)
         do idiv=1,ndiv
           r = idiv*dr
           fval = gheight*exp(-(r-dij)**2/2/gwidth**2)*pref
@@ -297,11 +297,11 @@ contains
     real(rp):: fcut
 
     if( r.lt.rin ) then
-      fcut = 1d0
+      fcut = 1.0_rp
     else if( rin.le.r .and. r.lt.rout ) then
-      fcut = 0.5d0 *(1d0 +cos((r-rin)/(rout-rin)*pi))
+      fcut = 0.5_rp *(1.0_rp +cos((r-rin)/(rout-rin)*pi))
     else
-      fcut = 0d0
+      fcut = 0.0_rp
     endif
     return
   end function fcut
@@ -456,8 +456,8 @@ contains
       allocate(aal(3,namax))
     endif
     
-    epotl = 0d0
-    aal(:,:) = 0d0
+    epotl = 0.0_rp
+    aal(:,:) = 0.0_rp
     
     do ia=1,natm
       is = int(tag(ia))
@@ -481,7 +481,7 @@ contains
         if( ja.le.natm ) then
           epotl = epotl + fval
         else
-          epotl = epotl +0.5d0
+          epotl = epotl +0.5_rp
         endif
         dfval = dfpair_at(dij,isp,jsp)
         dxdi(1:3) = -rij(1:3)/dij
@@ -567,8 +567,8 @@ contains
       allocate(aal(3,namax))
     endif
 
-    epotl = 0d0
-    aal(:,:) = 0d0
+    epotl = 0.0_rp
+    aal(:,:) = 0.0_rp
 
     if( nbond.eq.1 ) then
       ib = 1
@@ -748,15 +748,15 @@ contains
       allocate(aal(3,namax))
     endif
 
-    epotl = 0d0
-    aal(:,:) = 0d0
+    epotl = 0.0_rp
+    aal(:,:) = 0.0_rp
 
     do ih=1,ihist
       do i=1,natm4bnd
         iat = iatm4bnd(i)
         ia = ia_from_itot(iat,natm,tag)
         xi(1:3) = ra(1:3,ia)
-        tmp = 0d0
+        tmp = 0.0_rp
         do ja=1,natm
           jat = itotOf(tag(ja))
           l_jat_in_lspr = .false.

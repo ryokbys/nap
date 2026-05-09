@@ -78,7 +78,7 @@ module Morse
 
 !.....beta: ratio to D_ij such that the absolute value of Eij
 !     should be smaller than beta*Dij
-  real(rp),parameter:: beta = 0.1d0
+  real(rp),parameter:: beta = 0.1_rp
   real(rp):: prefbeta
 
   logical:: lprmset_Morse = .false.
@@ -89,7 +89,7 @@ module Morse
 
 !.....Limit of exponential term to avoid Inf and NaN...
 !.....The term larger than this is replaced by square of r
-  real(rp),parameter:: ecore = 2.d0
+  real(rp),parameter:: ecore = 2._rp
   real(rp),parameter:: ln_ecore = log(ecore)
 
 contains
@@ -128,22 +128,22 @@ contains
       call accum_mem('force_Morse',8*size(strsl))
 !!$      rc2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           rc = rcs(is,js)
           rc2s(is,js) = rc**2
           rc2s(js,is) = rc**2
           rminij = rmin(is,js)
-          if( rmin(is,js).lt.0d0 ) cycle
+          if( rmin(is,js).lt.0.0_rp ) cycle
           alpij = alp(is,js)
           d0ij = d0(is,js)
           texp = exp( alpij*(rminij -rc))
-          vrc = d0ij*( (texp-1d0)**2 -1d0 )
+          vrc = d0ij*( (texp-1.0_rp)**2 -1.0_rp )
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
-          dvdrc = 2d0 *alpij *d0ij *texp *(1d0-texp)
+          dvdrc = 2.0_rp *alpij *d0ij *texp *(1.0_rp-texp)
           dvdrcs(is,js) = dvdrc
           dvdrcs(js,is) = dvdrc
         enddo
@@ -160,8 +160,8 @@ contains
       call accum_mem('force_Morse',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !.....Loop over resident atoms
 !$omp parallel
@@ -184,7 +184,7 @@ contains
         rc2 = rc2s(is,js)
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         d0ij = d0(is,js)
         alpij= alp(is,js)
@@ -194,8 +194,8 @@ contains
         dvdrc = dvdrcs(is,js)
         texp = exp(alpij*(rminij-dij))
 !.....potential
-        tmp= d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+        tmp= d0ij*((texp-1.0_rp)**2 -1.0_rp)
+        tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
         epi(i)= epi(i) +tmp2
         epotl= epotl +tmp2
 !!$        if( j.le.natm ) then
@@ -208,7 +208,7 @@ contains
 !!$          epotl= epotl +tmp2
 !!$        endif
 !.....force
-        dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
+        dedr= 2.0_rp *alpij *d0ij *texp *(1.0_rp -texp) -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$        do ixyz=1,3
 !!$!$omp atomic
@@ -218,7 +218,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
 !!$!$omp atomic
 !!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
@@ -232,7 +232,7 @@ contains
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
@@ -286,8 +286,8 @@ contains
       call accum_mem('force_Morse',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !!$    do i=1,natm+nb
 !!$      write(6,'(a,i5,3f10.5)') 'i,ra(1:3,i)=',i,ra(1:3,i)
@@ -309,16 +309,16 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.gt.rc ) cycle
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
-        texp = exp(2d0*alpij*(rminij-dij))
+        texp = exp(2.0_rp*alpij*(rminij-dij))
 !.....potential
         tmp= d0ij*texp
-        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
+        tmp2 = 0.5_rp *tmp *fcut1(dij,0.0_rp,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -332,8 +332,8 @@ contains
 !!$               ,i,j,is,js,dij,d0ij,alpij,rminij,texp,tmp2
 !!$        endif
 !.....force
-        dedr= -2d0 *alpij *d0ij *texp *fcut1(dij,0d0,rc) &
-             + tmp*dfcut1(dij,0d0,rc)
+        dedr= -2.0_rp *alpij *d0ij *texp *fcut1(dij,0.0_rp,rc) &
+             + tmp*dfcut1(dij,0.0_rp,rc)
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
         aa(1:3,j)= aa(1:3,j) -dxdj(1:3)*dedr
 !.....stress
@@ -341,9 +341,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                   -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
               strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                   -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -357,7 +357,7 @@ contains
     endif
     
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
@@ -407,22 +407,22 @@ contains
       call accum_mem('force_fbMorse',8*size(strsl))
 !!$      rc2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           rc = rcs(is,js)
           rc2s(is,js) = rc**2
           rc2s(js,is) = rc**2
           rminij = rmin(is,js)
-          if( rmin(is,js).lt.0d0 ) cycle
+          if( rmin(is,js).lt.0.0_rp ) cycle
           alpij = alp(is,js)
           d0ij = d0(is,js)
           texp = exp( alpij*(rminij -rc))
-          vrc = d0ij*( (texp-1d0)**2 -1d0 )
+          vrc = d0ij*( (texp-1.0_rp)**2 -1.0_rp )
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
-          dvdrc = 2d0 *alpij *d0ij *texp *(1d0-texp)
+          dvdrc = 2.0_rp *alpij *d0ij *texp *(1.0_rp-texp)
           dvdrcs(is,js) = dvdrc
           dvdrcs(js,is) = dvdrc
         enddo
@@ -439,8 +439,8 @@ contains
       call accum_mem('force_fbMorse',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !.....Loop over resident atoms
 !$omp parallel
@@ -463,25 +463,25 @@ contains
         rc2 = rc2s(is,js)
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         d0ij = d0(is,js)
         alpij= alp(is,js)
         rminij=rmin(is,js)
         rc = rcs(is,js)
         if( lfixbond(is,js) .and. dij.lt.rc_fb(is,js) .and. dij.gt.rminij ) then
-          tmp2 = 0.25d0 *2d0 *alpij**2 *d0ij *(dij-rminij)**2  &
-               -0.5d0*(d0ij -vrc -dvdrc*(dij-rc))
-          dedr = 2d0 *alpij**2 *d0ij *(dij-rminij)
+          tmp2 = 0.25_rp *2.0_rp *alpij**2 *d0ij *(dij-rminij)**2  &
+               -0.5_rp*(d0ij -vrc -dvdrc*(dij-rc))
+          dedr = 2.0_rp *alpij**2 *d0ij *(dij-rminij)
         else
           vrc = vrcs(is,js)
           dvdrc = dvdrcs(is,js)
           texp = exp(alpij*(rminij-dij))
 !.....potential
-          tmp= d0ij*((texp-1d0)**2 -1d0)
-          tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+          tmp= d0ij*((texp-1.0_rp)**2 -1.0_rp)
+          tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
 !.....force
-          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) -dvdrc
+          dedr= 2.0_rp *alpij *d0ij *texp *(1.0_rp -texp) -dvdrc
         endif
         epi(i)= epi(i) +tmp2
         epotl= epotl +tmp2
@@ -490,7 +490,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -501,7 +501,7 @@ contains
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
@@ -549,7 +549,7 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Morse',8*size(strsl))
-      prefbeta = log(1d0 -sqrt(1d0 -beta))
+      prefbeta = log(1.0_rp -sqrt(1.0_rp -beta))
       rc2 = rc*rc
     endif
 
@@ -563,8 +563,8 @@ contains
       call accum_mem('force_Morse',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !!$    do is = 1,nsp
 !!$      atdi = atdescs(is)
@@ -593,7 +593,7 @@ contains
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
 !!$        if( dij.gt.rc ) cycle
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         chgj = chg(j)
@@ -604,7 +604,7 @@ contains
         d0ij = dot(wd,pdij)
         alpij= dot(walp,pdij)
         rminij= dot(wrmin,pdij)
-        d0ij = max(d0ij, 0d0)
+        d0ij = max(d0ij, 0.0_rp)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
 !!$        if( j.le.natm ) then
@@ -615,16 +615,16 @@ contains
         if( texp.gt.ecore ) then
           rcore = rminij -ln_ecore/alpij
           texp = -dij*dij +rcore*rcore +ecore
-          tmp= d0ij*((texp-1d0)**2 -1d0)
-          dedr= -4d0 *dij *d0ij *(texp-1d0) *fcut1(dij,0d0,rc) &
-               + tmp *dfcut1(dij,0d0,rc)
+          tmp= d0ij*((texp-1.0_rp)**2 -1.0_rp)
+          dedr= -4.0_rp *dij *d0ij *(texp-1.0_rp) *fcut1(dij,0.0_rp,rc) &
+               + tmp *dfcut1(dij,0.0_rp,rc)
         else
-          tmp= d0ij*((texp-1d0)**2 -1d0)
-          dedr= -2d0 *alpij *d0ij *texp *(texp-1d0) *fcut1(dij,0d0,rc) &
-               + tmp *dfcut1(dij,0d0,rc)
+          tmp= d0ij*((texp-1.0_rp)**2 -1.0_rp)
+          dedr= -2.0_rp *alpij *d0ij *texp *(texp-1.0_rp) *fcut1(dij,0.0_rp,rc) &
+               + tmp *dfcut1(dij,0.0_rp,rc)
         endif
 !.....potential
-        tmp2 = 0.5d0 *tmp *fcut1(dij,0d0,rc)
+        tmp2 = 0.5_rp *tmp *fcut1(dij,0.0_rp,rc)
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp2
           epi(j)= epi(j) +tmp2
@@ -641,9 +641,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                   -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
               strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                   -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
             enddo
           enddo
         endif
@@ -658,7 +658,7 @@ contains
 
     
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,MPI_SUM,mpi_md_world,ierr)
     epot= epot +epott
@@ -692,10 +692,10 @@ contains
     if( .not.allocated(xi) ) then
       allocate(xi(3),xj(3),xij(3),rij(3), &
            dxdi(3),dxdj(3),at(3) )
-      prefbeta = log(1d0 -sqrt(1d0 -beta))
+      prefbeta = log(1.0_rp -sqrt(1.0_rp -beta))
     endif
 
-    epotl= 0d0
+    epotl= 0.0_rp
 
 !!$    write(6,'(a,9f10.6)') 'h(1:3,1:3) in qforce_vcMorse=',h(1:3,1:3)
 !!$    write(6,'(a,30es10.2)') 'chg in qforce_Morse =',chg(1:natm)
@@ -716,7 +716,7 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= sqrt(rij(1)**2 +rij(2)**2 +rij(3)**2)
         if( dij.gt.rc ) cycle
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         chgj = chg(j)
@@ -726,9 +726,9 @@ contains
         d0ij = dot(wd,pdij)
         rminij= dot(wrmin,pdij)
         alpij= dot(walp,pdij)
-        d0ij = max(d0ij, 0d0)
+        d0ij = max(d0ij, 0.0_rp)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
-        rminij= min(rminij,rc*0.9d0)
+        rminij= min(rminij,rc*0.9_rp)
         alpij= max(alpij, prefbeta/(rminij -rc))
         texp = exp(alpij*(rminij-dij))
 !.....force on charge
@@ -738,25 +738,25 @@ contains
         if( texp.gt.ecore ) then
           rcore = rminij -ln_ecore/alpij
           texp = -dij*dij +rcore*rcore +ecore
-          dedalp = 2d0*d0ij*(texp-1d0)*ecore*(rminij-rcore)
-          dedrmin = 2d0*d0ij*(texp-1d0)*ecore*alpij
+          dedalp = 2.0_rp*d0ij*(texp-1.0_rp)*ecore*(rminij-rcore)
+          dedrmin = 2.0_rp*d0ij*(texp-1.0_rp)*ecore*alpij
 !!$          print '(a,2i5,10es11.3)', 'i,j,alpij,d0ij,rminij,rcore,texp,dedalp,dedrmin=' &
 !!$               ,i,j,alpij,d0ij,rminij,rcore,texp,dedalp,dedrmin
 !!$          print '(a,3es12.4)', 'alpij,d0ij,rminij = ',alpij,d0ij,rminij
 !!$          print '(a,3es12.4)', 'rcore,texp = ',rcore,texp
 !!$          print '(a,3es12.4)', 'dedalp,dedrmin = ',dedalp,dedrmin
         else
-          dedalp = 2d0*d0ij*(texp-1d0)*texp*(rminij-dij)
-          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
+          dedalp = 2.0_rp*d0ij*(texp-1.0_rp)*texp*(rminij-dij)
+          dedrmin = 2.0_rp*d0ij*(texp-1.0_rp)*texp*alpij
         endif
-        dedd0 = (texp -1d0)**2 -1d0
+        dedd0 = (texp -1.0_rp)**2 -1.0_rp
         fq(i) = fq(i) +(dd0dq*dedd0 +dalpdq*dedalp +drmindq*dedrmin) &
-             *fcut1(dij,0d0,rc)
+             *fcut1(dij,0.0_rp,rc)
 !!$        print '(a,4i5,7es11.3)','i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fqi='&
 !!$             ,i,is,j,js,dd0dq,dedd0,dalpdq,dedalp,drmindq,dedrmin,fq(i)
 !.....potential
-        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = tmp *fcut1(dij,0d0,rc)
+        tmp= 0.5_rp * d0ij*((texp-1.0_rp)**2 -1.0_rp)
+        tmp2 = tmp *fcut1(dij,0.0_rp,rc)
         if( j.le.natm ) then
           epotl = epotl +tmp2 +tmp2
         else
@@ -767,7 +767,7 @@ contains
     enddo
     
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
@@ -790,9 +790,9 @@ contains
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:nspmax,1:nspmax) = .false.
-      d0(1:nspmax,1:nspmax)= 0d0
-      rmin(1:nspmax,1:nspmax)= 0d0
-      alp(1:nspmax,1:nspmax)= 0d0
+      d0(1:nspmax,1:nspmax)= 0.0_rp
+      rmin(1:nspmax,1:nspmax)= 0.0_rp
+      alp(1:nspmax,1:nspmax)= 0.0_rp
       rcs(1:nspmax,1:nspmax) = rc
       rc_fb(1:nspmax,1:nspmax) = -1.0
       lfixbond(1:nspmax,1:nspmax) = .false.
@@ -961,9 +961,9 @@ contains
 
     if( index(ctype,'BVS').ne.0 ) then
 
-      d0(:,:)= 0d0
-      alp(:,:)= 0d0
-      rmin(:,:)= -1d0
+      d0(:,:)= 0.0_rp
+      alp(:,:)= 0.0_rp
+      rmin(:,:)= -1.0_rp
     
 !.....In case of BVS3, only alpha and Rmin are to be optimized and
 !     and D0 is computed using alpha, Rmin, vid, npq.
@@ -992,12 +992,12 @@ contains
 !     Adams & Rao, Phys. Status Solidi A 208, No.8 (2011)
 !.....c value should be determined according to anion species,
 !     but in most cases c=1 (anion is s or p element)
-        c = 1d0
+        c = 1.0_rp
         do i=1,nspmax
           do j=1,nspmax
             if( .not.interact(i,j) ) cycle
-            d0(i,j) = c*acc*(abs(vid_bvs(i)*vid_bvs(j)))**(1d0/c)/rmin(i,j) &
-                 /sqrt(dble(npq_bvs(i)*npq_bvs(j))) /(2d0*alp(i,j)**2)
+            d0(i,j) = c*acc*(abs(vid_bvs(i)*vid_bvs(j)))**(1.0_rp/c)/rmin(i,j) &
+                 /sqrt(real(npq_bvs(i)*npq_bvs(j), rp)) /(2.0_rp*alp(i,j)**2)
             d0(j,i) = d0(i,j)
           enddo
         enddo
@@ -1173,9 +1173,9 @@ contains
 !!$    endif
       nspt = nprms/3 +1
 
-      d0(1:nspt,1:nspt)= 0d0
-      alp(1:nspt,1:nspt)= 0d0
-      rmin(1:nspt,1:nspt)= 0d0
+      d0(1:nspt,1:nspt)= 0.0_rp
+      alp(1:nspt,1:nspt)= 0.0_rp
+      rmin(1:nspt,1:nspt)= 0.0_rp
       interact(1:nspt,1:nspt) = .false.
 
       inc = 0
@@ -1221,9 +1221,9 @@ contains
         stop
       endif
 
-      d0(1:nspt,1:nspt)= 0d0
-      alp(1:nspt,1:nspt)= 0d0
-      rmin(1:nspt,1:nspt)= 0d0
+      d0(1:nspt,1:nspt)= 0.0_rp
+      alp(1:nspt,1:nspt)= 0.0_rp
+      rmin(1:nspt,1:nspt)= 0.0_rp
       interact(1:nspt,1:nspt) = .false.
 
       inc = 0
@@ -1380,7 +1380,7 @@ contains
     dj(6) = atdj%enpaul
     dj(7) = atdj%na
 
-    pdij(0) = 1d0  ! bias
+    pdij(0) = 1.0_rp  ! bias
     do i=1,ndesc
       pdij(2*i-1) = di(i)+dj(i)
       pdij(2*i)   = di(i)*dj(i)
@@ -1445,15 +1445,15 @@ contains
 
     rc2 = rc*rc
 
-    ge_alp(1:nspmax,1:nspmax) = 0d0
-    ge_d0(1:nspmax,1:nspmax) = 0d0
-    ge_rmin(1:nspmax,1:nspmax) = 0d0
-    gf_alp(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
-    gf_d0(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
-    gf_rmin(1:nspmax,1:nspmax,1:3,1:natm) = 0d0
-    gs_alp(1:nspmax,1:nspmax,1:6) = 0d0
-    gs_d0(1:nspmax,1:nspmax,1:6) = 0d0
-    gs_rmin(1:nspmax,1:nspmax,1:6) = 0d0
+    ge_alp(1:nspmax,1:nspmax) = 0.0_rp
+    ge_d0(1:nspmax,1:nspmax) = 0.0_rp
+    ge_rmin(1:nspmax,1:nspmax) = 0.0_rp
+    gf_alp(1:nspmax,1:nspmax,1:3,1:natm) = 0.0_rp
+    gf_d0(1:nspmax,1:nspmax,1:3,1:natm) = 0.0_rp
+    gf_rmin(1:nspmax,1:nspmax,1:3,1:natm) = 0.0_rp
+    gs_alp(1:nspmax,1:nspmax,1:6) = 0.0_rp
+    gs_d0(1:nspmax,1:nspmax,1:6) = 0.0_rp
+    gs_rmin(1:nspmax,1:nspmax,1:6) = 0.0_rp
     
 !.....Loop over resident atoms
     do i=1,natm
@@ -1472,7 +1472,7 @@ contains
         dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         d0ij = d0(is,js)
@@ -1481,13 +1481,13 @@ contains
         dr = rminij-dij
         texp = exp(alpij*dr)
 !.....Potential
-        fc1 = fcut1(dij,0d0,rc)
-        dfc1= dfcut1(dij,0d0,rc)
+        fc1 = fcut1(dij,0.0_rp,rc)
+        dfc1= dfcut1(dij,0.0_rp,rc)
 !!$        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
         if( j.le.natm ) then
-          factor = 1d0
+          factor = 1.0_rp
         else
-          factor = 0.5d0
+          factor = 0.5_rp
         endif
         if( lematch ) then
 !!$        tmp2 = tmp *fc1
@@ -1497,22 +1497,22 @@ contains
 !!$            epotl = epotl +tmp2
 !!$          endif
 !.....Derivative of potential energy w.r.t. {w}
-          dedd0 = ((texp -1d0)**2 -1d0) *fc1 *factor 
-          dedalp = 2d0*d0ij*(texp-1d0)*texp*dr *fc1*factor
-          dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij *fc1*factor
+          dedd0 = ((texp -1.0_rp)**2 -1.0_rp) *fc1 *factor 
+          dedalp = 2.0_rp*d0ij*(texp-1.0_rp)*texp*dr *fc1*factor
+          dedrmin = 2.0_rp*d0ij*(texp-1.0_rp)*texp*alpij *fc1*factor
           ge_d0(is,js) = ge_d0(is,js) +dedd0
           ge_alp(is,js) = ge_alp(is,js) +dedalp
           ge_rmin(is,js) = ge_rmin(is,js) +dedrmin
         endif
 !.....Pre-compute some factors required in force and stress derivatives
         if( lfmatch .or. lsmatch ) then
-          dedr= 2d0 *alpij *d0ij *texp *(1d0 -texp) *fc1 &
-               + dfc1 *d0ij*((texp-1d0)**2-1d0)
+          dedr= 2.0_rp *alpij *d0ij *texp *(1.0_rp -texp) *fc1 &
+               + dfc1 *d0ij*((texp-1.0_rp)**2-1.0_rp)
           dedrd0  = dedr/d0ij
-          dedralp = 2d0*d0ij*texp*((1d0-texp) +alpij*dr*(1d0-2d0*texp))*fc1 &
-               +dfc1*(2d0*d0ij*(texp-1d0)*texp*dr)
-          dedrrmin= 2d0*d0ij*texp*alpij*alpij*( 1d0 -2d0*texp)*fc1 &
-               +dfc1*(2d0*d0ij*(texp-1d0)*texp*alpij)
+          dedralp = 2.0_rp*d0ij*texp*((1.0_rp-texp) +alpij*dr*(1.0_rp-2.0_rp*texp))*fc1 &
+               +dfc1*(2.0_rp*d0ij*(texp-1.0_rp)*texp*dr)
+          dedrrmin= 2.0_rp*d0ij*texp*alpij*alpij*( 1.0_rp -2.0_rp*texp)*fc1 &
+               +dfc1*(2.0_rp*d0ij*(texp-1.0_rp)*texp*alpij)
         endif
         if( lfmatch ) then
 !.....Force
@@ -1659,11 +1659,11 @@ contains
     type(atdesc):: atdi,atdj
     real(rp),external:: fcut1,dfcut1
 
-    epotl= 0d0
+    epotl= 0.0_rp
 
-    gwalp(0:nprm) = 0d0
-    gwd(0:nprm) = 0d0
-    gwrmin(0:nprm) = 0d0
+    gwalp(0:nprm) = 0.0_rp
+    gwd(0:nprm) = 0.0_rp
+    gwrmin(0:nprm) = 0.0_rp
 
 !!$    write(6,'(a,30es16.8)') ' chg @pderiv = ',chg(1:natm)
     
@@ -1690,7 +1690,7 @@ contains
         d0ij = dot(wd,pdij)
         alpij= dot(walp,pdij)
         rminij= dot(wrmin,pdij)
-        d0ij = max(d0ij, 0d0)
+        d0ij = max(d0ij, 0.0_rp)
         rminij= max(rminij, (atdi%atrad +atdj%atrad)/2)
         alpij= max(alpij, prefbeta/(rminij -rc))
         dr = rminij-dij
@@ -1699,16 +1699,16 @@ contains
 !!$             i,is,j,js,d0ij,alpij,rminij,texp
 !!$        write(6,'(a,13f8.3)') 'pdij=',pdij(0:nprm)
 !.....Potential
-        tmp= 0.5d0 * d0ij*((texp-1d0)**2 -1d0)
-        tmp2 = tmp *fcut1(dij,0d0,rc)
+        tmp= 0.5_rp * d0ij*((texp-1.0_rp)**2 -1.0_rp)
+        tmp2 = tmp *fcut1(dij,0.0_rp,rc)
         epotl = epotl +tmp2
 !.....Derivative of potential energy w.r.t. {w}
-        dedd0 = ((texp -1d0)**2 -1d0)
-        dedalp = 2d0*d0ij*(texp-1d0)*texp*dr
-        dedrmin = 2d0*d0ij*(texp-1d0)*texp*alpij
-        gwd(0:nprm) = gwd(0:nprm) +0.5d0 *dedd0 *pdij(0:nprm)
-        gwalp(0:nprm) = gwalp(0:nprm) +0.5d0 *dedalp *pdij(0:nprm)
-        gwrmin(0:nprm) = gwrmin(0:nprm) +0.5d0 *dedrmin *pdij(0:nprm)
+        dedd0 = ((texp -1.0_rp)**2 -1.0_rp)
+        dedalp = 2.0_rp*d0ij*(texp-1.0_rp)*texp*dr
+        dedrmin = 2.0_rp*d0ij*(texp-1.0_rp)*texp*alpij
+        gwd(0:nprm) = gwd(0:nprm) +0.5_rp *dedd0 *pdij(0:nprm)
+        gwalp(0:nprm) = gwalp(0:nprm) +0.5_rp *dedalp *pdij(0:nprm)
+        gwrmin(0:nprm) = gwrmin(0:nprm) +0.5_rp *dedrmin *pdij(0:nprm)
 !!$        write(6,'(a,2i5,3es15.7)') 'i,j,gwalp(6),dedalp,pdij(6)=', &
 !!$             i,j,gwalp(6),dedalp,pdij(6)
       enddo

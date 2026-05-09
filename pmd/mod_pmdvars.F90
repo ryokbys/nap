@@ -69,26 +69,26 @@ module pmdvars
   logical:: loutforce = .false.
   logical:: lcomb_pos = .true.
   integer:: ifsort= 1
-  real(rp):: dt = 1d0
-  real(rp):: vardt_len = 0.1d0  ! Length criterion for variable time-step
-  real(rp):: rc = 5.0d0
-  real(rp):: rc1nn = 2.5d0
-  real(rp):: rbuf= 0d0
+  real(rp):: dt = 1.0_rp
+  real(rp):: vardt_len = 0.1_rp  ! Length criterion for variable time-step
+  real(rp):: rc = 5.0_rp
+  real(rp):: rc1nn = 2.5_rp
+  real(rp):: rbuf= 0.0_rp
   integer:: ifdmp= 0 ! 0:none, 1:damped-MD, 2:FIRE
   character(len=20):: cmin= ''
-  real(rp):: dmp  = 0.9d0
-  real(rp):: eps_conv = 1d-4
+  real(rp):: dmp  = 0.9_rp
+  real(rp):: eps_conv = 1e-4_rp
   integer:: n_conv = 1
 !.....Thermostat
   character(len=20):: ctctl='none'
   integer:: iftctl= 0
-  real(rp):: tinit= -1d0
-  real(rp):: tfin = -1d0
+  real(rp):: tinit= -1.0_rp
+  real(rp):: tfin = -1.0_rp
   real(rp):: ttgt(maxntemps)
-  data ttgt / 300d0, 300d0, 300d0, 300d0, 300d0, 300d0, &
-       300d0, 300d0, 300d0 /
-  real(rp):: trlx = 100d0
-  real(rp):: tlimit = 1.0d+5
+  data ttgt / 300.0_rp, 300.0_rp, 300.0_rp, 300.0_rp, 300.0_rp, 300.0_rp, &
+       300.0_rp, 300.0_rp, 300.0_rp /
+  real(rp):: trlx = 100.0_rp
+  real(rp):: tlimit = 1.0e+5_rp
 !.....Multiple temperatures
   logical:: lmultemps = .false.
   integer:: ntemps = 1
@@ -96,7 +96,7 @@ module pmdvars
 !.....Random seed
 !  If positve, use (RSEED+MYID) as the seed for each process
 !  If negative, use the same random seeds for all the parallel process
-  real(rp):: rseed = 12345d0
+  real(rp):: rseed = 12345.0_rp
 !.....Remove translational motion:
 !     N< 0: not to remove translation
 !     N==0: remove translation only at the beginning
@@ -106,20 +106,20 @@ module pmdvars
   logical:: ltdst= .false.
   integer:: ntdst= 1
 !.....shear stress
-  real(rp):: shrst = 0.0d0
+  real(rp):: shrst = 0.0_rp
 !.....factors on each moving direction
   real(rp):: fmv(3,0:9)
   data fmv &
-       / 0d0, 0d0, 0d0, & ! 0
-       1d0, 1d0, 1d0, & ! 1
-       1d0, 1d0, 1d0, & ! 2
-       1d0, 1d0, 1d0, & ! 3
-       1d0, 1d0, 1d0, & ! 4
-       1d0, 1d0, 1d0, & ! 5
-       1d0, 1d0, 1d0, & ! 6
-       1d0, 1d0, 1d0, & ! 7
-       1d0, 1d0, 1d0, & ! 8
-       1d0, 1d0, 1d0  & ! 9
+       / 0.0_rp, 0.0_rp, 0.0_rp, & ! 0
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 1
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 2
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 3
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 4
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 5
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 6
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 7
+       1.0_rp, 1.0_rp, 1.0_rp, & ! 8
+       1.0_rp, 1.0_rp, 1.0_rp  & ! 9
        /
 !.....Whether compute stress or not
   logical:: lstrs0 = .true.
@@ -128,13 +128,13 @@ module pmdvars
 !.....  vv --- variable volume
 !.....  vc --- variable cell
   character(len=20):: cpctl='none'
-  real(rp):: ptgt   = 0d0   ! target pressure [GPa]
-  real(rp):: pini   = 0d0
-  real(rp):: pfin   = 0d0
-  real(rp):: srlx   = 100d0  ! relaxation time [fs]
-  real(rp):: stbeta = 1d-2   ! 1/B where B is the bulk modulus [GPa]
-  real(rp):: strfin = 0.0d0
-  real(rp):: stgt(1:3,1:3)= 0d0  ! target stress tensor [GPa]
+  real(rp):: ptgt   = 0.0_rp   ! target pressure [GPa]
+  real(rp):: pini   = 0.0_rp
+  real(rp):: pfin   = 0.0_rp
+  real(rp):: srlx   = 100.0_rp  ! relaxation time [fs]
+  real(rp):: stbeta = 1e-2_rp   ! 1/B where B is the bulk modulus [GPa]
+  real(rp):: strfin = 0.0_rp
+  real(rp):: stgt(1:3,1:3)= 0.0_rp  ! target stress tensor [GPa]
   logical:: lcellfix(1:3,1:3)= .false.
   logical:: lhydrostatic = .false.  ! enforce only hydrostatic pressure
 !.....charge optimize or variable charge
@@ -161,9 +161,9 @@ module pmdvars
   integer:: iaux_chg,iaux_q,iaux_vq,iaux_tei,iaux_clr,iaux_edesc
 
 !.....mass
-  real(rp):: am(1:nspmax)= 12.0d0
+  real(rp):: am(1:nspmax)= 12.0_rp
 !.....charges
-  real(rp):: schg(1:nspmax)= 0d0
+  real(rp):: schg(1:nspmax)= 0.0_rp
 !.....species name
   character(len=3):: specorder(nspmax) = 'x'
   logical:: has_specorder = .false.
@@ -174,7 +174,7 @@ module pmdvars
   character(len=3):: boundary = 'ppp'
 
 !.....nnmax update ratio
-  real(rp):: ratio_nnmax_update = 1.1d0
+  real(rp):: ratio_nnmax_update = 1.1_rp
 
 !.....Virtual wall
   integer:: nvwall = 0
@@ -277,20 +277,20 @@ module pmdvars
 !.....zload type: zload or shear
   character(len=128):: czload_type= 'none'
 !.....top and bottom skin width in which atoms are fixed and/or controlled
-  real(rp):: zskin_width = 5.0d0
+  real(rp):: zskin_width = 5.0_rp
 !.....Shear angle from x in degree, shear direction is on xy-plane
-  real(rp):: zshear_angle = 0d0
+  real(rp):: zshear_angle = 0.0_rp
 
 !.....PKA for radiation damage
   integer:: iatom_pka = -1
-  real(rp):: pka_energy = -1.d0 ! in eV
-  real(rp):: pka_theta = 0.d0  ! in degree
-  real(rp):: pka_phi = 0.d0    ! in degree
+  real(rp):: pka_energy = -1._rp ! in eV
+  real(rp):: pka_theta = 0._rp  ! in degree
+  real(rp):: pka_phi = 0._rp    ! in degree
   
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1
-  real(rp):: rc_struct = 2.5d0
+  real(rp):: rc_struct = 2.5_rp
 
 contains
 !=======================================================================

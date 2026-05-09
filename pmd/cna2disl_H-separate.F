@@ -7,8 +7,8 @@ c.....$ ./cna2disl < cna000 > disl000
 c-----------------------------------------------------------------------
       use mod_precision
       implicit none
-      real(rp),parameter:: bohr = 0.5291772d-10
-      real(rp),parameter:: rcz  = 2.8553d-10 /bohr
+      real(rp),parameter:: bohr = 0.5291772e-10_rp
+      real(rp),parameter:: rcz  = 2.8553e-10_rp /bohr
 c.....real(rp),parameter:: rcx  = sqrt(3d0)/2 *rcz
       real(rp),parameter:: rcx  = rcz
       integer,parameter:: nnmax= 100
@@ -30,9 +30,9 @@ c-----read cna file from STDIN
       enddo
 
       nx= int(h(1,1)/rcx)+1
-      dx= 1d0/nx
+      dx= 1.0_rp/nx
       nz= int(h(3,3)/rcz)+1
-      dz= 1d0/nz
+      dz= 1.0_rp/nz
       allocate(lshd(nz),lscl(natm),lspr(0:nnmax,natm),igrp(natm)
      &     ,xav(ngmax),yav(ngmax))
 
@@ -41,14 +41,14 @@ c.....Make lshd and lscl
       lscl(1:natm)= 0
       do i=1,natm
 c.....Only dislocation core atoms
-        if( ra(2,i).gt.0.75d0 .or. ra(2,i).lt.0.25d0 )  cycle
+        if( ra(2,i).gt.0.75_rp .or. ra(2,i).lt.0.25_rp )  cycle
 c.....Assign PBC
-        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
-        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
-        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
-        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
-        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
-        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
+        if( ra(1,i).ge.1.0_rp ) ra(1,i)=ra(1,i) -1.0_rp
+        if( ra(1,i).lt.0.0_rp ) ra(1,i)=ra(1,i) +1.0_rp
+        if( ra(2,i).ge.1.0_rp ) ra(2,i)=ra(2,i) -1.0_rp
+        if( ra(2,i).lt.0.0_rp ) ra(2,i)=ra(2,i) +1.0_rp
+        if( ra(3,i).ge.1.0_rp ) ra(3,i)=ra(3,i) -1.0_rp
+        if( ra(3,i).lt.0.0_rp ) ra(3,i)=ra(3,i) +1.0_rp
 c.....Store atoms to the lists
         iz= ra(3,i)/dz +1
         lscl(i)= lshd(iz)
@@ -59,7 +59,7 @@ c.....Detect disl core clusters
       lspr(0:nnmax,1:natm)= 0
       do i=1,natm
 c.....Only dislocation core atoms
-        if( ra(2,i).gt.0.75d0 .or. ra(2,i).lt.0.25d0 )  cycle
+        if( ra(2,i).gt.0.75_rp .or. ra(2,i).lt.0.25_rp )  cycle
         iz= ra(3,i)/dz +1
         j= lshd(iz)
         do
@@ -97,12 +97,12 @@ c.....Check which cluster includes H atoms
 
         ng=ig
         if(ng.gt.ngmax) stop ' [Error] ng.gt.ngmax !!!'
-        xav(1:ngmax)= 0d0
-        yav(1:ngmax)= 0d0
+        xav(1:ngmax)= 0.0_rp
+        yav(1:ngmax)= 0.0_rp
         do ig=1,ng
           nc = 0
-          xav(ig)= 0d0
-          yav(ig)= 0d0
+          xav(ig)= 0.0_rp
+          yav(ig)= 0.0_rp
           i= lshd(iz)
           do
             if(i.eq.0) exit
@@ -133,14 +133,14 @@ c.....Check which cluster includes H atoms
         zi = dz*(iz-1) +dz/2
         if(ng.gt.1) then
           if(igh.eq.1) then
-            write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772d0,xav(1),yav(1)
+            write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772_rp,xav(1),yav(1)
      &           ,xav(2),yav(2)
           else
-            write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772d0,xav(2),yav(2)
+            write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772_rp,xav(2),yav(2)
      &           ,xav(1),yav(1)
           endif
         elseif(ng.eq.1) then
-          write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772d0,xav(1),yav(1)
+          write(6,'(10es15.7)') zi,zi*h(3,3)*0.5291772_rp,xav(1),yav(1)
      &         ,xav(1),yav(1)
         endif
       enddo
@@ -149,6 +149,7 @@ c.....Check which cluster includes H atoms
 c=======================================================================
       recursive subroutine make_bonded_cluster(i,lspr,igrp,ig
      &     ,natm,nnmax)
+      use mod_precision
       implicit none
       integer,intent(in):: i,nnmax,natm,lspr(0:nnmax,natm)
       integer,intent(inout):: igrp(natm),ig

@@ -27,8 +27,8 @@ c      real(rp),parameter:: abcc = 3.226d0
 cc.....W @0K = 3.171d-10
 c      real(rp),parameter:: abcc = 3.204d0
 c.....Cu @0K = 3.615d-10
-      real(rp),parameter:: abcc = 4.2d0
-      real(rp),parameter:: rc   = 0.5d0*(1d0+1.41421356d0)*abcc
+      real(rp),parameter:: abcc = 4.2_rp
+      real(rp),parameter:: rc   = 0.5_rp*(1.0_rp+1.41421356_rp)*abcc
 
       integer:: i,n,itmp,nauxdat,j,ix,iy,iz,m,ia,ib
       integer:: natm0,natm1,natm,nx,ny,nz,nlsa,ncpx,ncpy,ncpz
@@ -151,20 +151,20 @@ c-----------------------------------------------------------------------
       integer:: i,j,n,nr1,nr2,nr3
       real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(rp),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1.0_rp-1e-8_rp
 
       llist(1:nlist)=0
 
-      a1= 1d0/n1
-      a2= 1d0/n2
-      a3= 1d0/n3
+      a1= 1.0_rp/n1
+      a2= 1.0_rp/n2
+      a3= 1.0_rp/n3
       do i=1,natm
-        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
-        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
-        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
-        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
-        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
-        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
+        if( ra(1,i).ge.1.0_rp ) ra(1,i)=ra(1,i) -1.0_rp
+        if( ra(1,i).lt.0.0_rp ) ra(1,i)=ra(1,i) +1.0_rp
+        if( ra(2,i).ge.1.0_rp ) ra(2,i)=ra(2,i) -1.0_rp
+        if( ra(2,i).lt.0.0_rp ) ra(2,i)=ra(2,i) +1.0_rp
+        if( ra(3,i).ge.1.0_rp ) ra(3,i)=ra(3,i) -1.0_rp
+        if( ra(3,i).lt.0.0_rp ) ra(3,i)=ra(3,i) +1.0_rp
 c-------region index in order z,y,x
         nr3= int(ra(3,i)*small/a3)+1
         nr2= int(ra(2,i)*small/a2)
@@ -229,7 +229,7 @@ c---------region (jr)
                   dx=(ra(1,j)-ra(1,i)-anint(ra(1,j)-ra(1,i)))*al(1)
                   dy=(ra(2,j)-ra(2,i)-anint(ra(2,j)-ra(2,i)))*al(2)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*al(3)
-                  r= dsqrt(dx*dx +dy*dy +dz*dz)
+                  r= sqrt(dx*dx +dy*dy +dz*dz)
                   if(r.lt.rc .and. j.ne.i .and. is.eq.js) then
 c                  if(r.lt.rc .and. j.ne.i) then
 c                    if(r.lt.1d-5) then

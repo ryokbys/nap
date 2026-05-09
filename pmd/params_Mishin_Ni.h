@@ -7,7 +7,7 @@
 !      real(rp),parameter:: rc_eam= 6.2872d0
 !
 !      integer,parameter:: neamd = 25
-  real(rp),parameter:: rc_eam_Ni = real(5.8037d0, rp)
+  real(rp),parameter:: rc_eam_Ni = 5.8037_rp
   real(rp):: rtbl_Ni(1:neamd)=(/ &
        2.0000, &
        2.1585, &

@@ -55,16 +55,16 @@ contains
 
 !.....Number of local-flux regions in a node and global
     np = npx*npy*npz
-    dpx = 1d0 /npx
-    dpy = 1d0 /npy
-    dpz = 1d0 /npz
-    dpxi= 1d0 /dpx   ! for efficiency
-    dpyi= 1d0 /dpy
-    dpzi= 1d0 /dpz
+    dpx = 1.0_rp /npx
+    dpy = 1.0_rp /npy
+    dpz = 1.0_rp /npz
+    dpxi= 1.0_rp /dpx   ! for efficiency
+    dpyi= 1.0_rp /dpy
+    dpzi= 1.0_rp /dpz
 
 !.....Reset orig_pdens and hmat_pdens if hmat_pdens is not given
-    if( get_vol(hmat_pdens).lt.1d-8 ) then
-      orig_pdens(:) = 0d0
+    if( get_vol(hmat_pdens).lt.1e-8_rp ) then
+      orig_pdens(:) = 0.0_rp
       hmat_pdens(:,:) = hmat(:,:)
     endif
 !.....Sub lattice representation in original hmat
@@ -77,7 +77,7 @@ contains
 
     allocate(pds(npz,npy,npx))
     call accum_mem('pdens',8*size(pds))
-    pds(:,:,:) = 0d0
+    pds(:,:,:) = 0.0_rp
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
       print *,''
@@ -126,13 +126,13 @@ contains
       ri(1:3) = ra(1:3,i) +sorg(1:3) -sosub(1:3)
       sri(1:3) = matxvec3(shsubi,ri)
 !.....Get subsystem index
-      if(  sri(1).lt.0d0 .or. sri(1).ge.1d0 .or. &
-           sri(2).lt.0d0 .or. sri(2).ge.1d0 .or. &
-           sri(3).lt.0d0 .or. sri(3).ge.1d0 ) cycle
+      if(  sri(1).lt.0.0_rp .or. sri(1).ge.1.0_rp .or. &
+           sri(2).lt.0.0_rp .or. sri(2).ge.1.0_rp .or. &
+           sri(3).lt.0.0_rp .or. sri(3).ge.1.0_rp ) cycle
       ipx = int(sri(1)*dpxi) +1
       ipy = int(sri(2)*dpyi) +1
       ipz = int(sri(3)*dpzi) +1
-      pds(ipz,ipy,ipx) = pds(ipz,ipy,ipx) +1d0
+      pds(ipz,ipy,ipx) = pds(ipz,ipy,ipx) +1.0_rp
     enddo
     nacc = nacc +1
 
@@ -157,7 +157,7 @@ contains
     vol = get_vol(hmat)/np
     allocate(pdl(npz,npy,npx))
     call accum_mem('pdens',8*size(pdl))
-    pdl(:,:,:) = 0d0
+    pdl(:,:,:) = 0.0_rp
     call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0
     if( myid.eq.0 ) then
@@ -173,7 +173,7 @@ contains
 !.....Put a line for dummy atom, which is necessary to be loaded by Ovito.
       write(ionum,'(a)') '  1   1.000   0.000  0.000  0.000'
 !.....Volumetric data
-      fac = 1d0 /nacc /(vol*ang2bohr**3)
+      fac = 1.0_rp /nacc /(vol*ang2bohr**3)
       pdl(:,:,:) = pdl(:,:,:) *fac
       inc= 0
       do ix=1,npx

@@ -17,10 +17,10 @@ module LJ
   integer:: nsp
 
 !.....LJ parameters for Argon (default)
-  real(rp),parameter:: eps_Ar = 120d0 *fkb
-  real(rp),parameter:: sgm_Ar = 3.41d-10 /ang
-  real(rp),parameter:: am_Ar = 39.948d0
-  real(rp),parameter:: alc_Ar = 2d0**(1d0/6)*sgm_Ar *1.41421356d0*0.996d0
+  real(rp),parameter:: eps_Ar = 120.0_rp *fkb
+  real(rp),parameter:: sgm_Ar = 3.41e-10_rp /ang
+  real(rp),parameter:: am_Ar = 39.948_rp
+  real(rp),parameter:: alc_Ar = 2.0_rp**(1.0_rp/6)*sgm_Ar *1.41421356_rp*0.996_rp
 
 !.....Pair parameters to be read from param file
   real(rp):: epss(nspmax,nspmax), sgms(nspmax,nspmax), rcs(nspmax,nspmax)
@@ -73,8 +73,8 @@ contains
           epsij = epss(isp,jsp)
           sgmij = sgms(isp,jsp)
           rcij  = rcs(isp,jsp)
-          vrcs(isp,jsp) = 4d0 *epsij *((sgmij/rcij)**12 -(sgmij/rcij)**6)
-          dvdrcs(isp,jsp) = -24.d0 *epsij *( 2.d0*sgmij**12/(rcij**13) &
+          vrcs(isp,jsp) = 4.0_rp *epsij *((sgmij/rcij)**12 -(sgmij/rcij)**6)
+          dvdrcs(isp,jsp) = -24._rp *epsij *( 2._rp*sgmij**12/(rcij**13) &
                -sgmij**6/(rcij**7) )
           rc2s(isp,jsp) = rcij**2
         enddo
@@ -93,9 +93,9 @@ contains
       allocate(strsl(3,3,namax),aal(3,namax))
     endif
 
-    epotl= 0d0
-    aal(:,1:natm)= 0d0
-    strsl(:,:,1:natm)= 0d0
+    epotl= 0.0_rp
+    aal(:,1:natm)= 0.0_rp
+    strsl(:,:,1:natm)= 0.0_rp
 
 !$omp parallel
 !$omp do private(ia,isp,xi,ja,jsp,jj,x,y,z,xij,rij2,rij,riji,dxdi,dvdr, &
@@ -123,8 +123,8 @@ contains
         rcij2 = rc2s(isp,jsp)
         if( rij2 > rcij2 ) cycle
         rcij = rcs(isp,jsp)
-        rij= dsqrt(rij2)
-        riji= 1d0/rij
+        rij= sqrt(rij2)
+        riji= 1.0_rp/rij
         epsij = epss(isp,jsp)
         sgmij = sgms(isp,jsp)
         vrc = vrcs(isp,jsp)
@@ -135,14 +135,14 @@ contains
         sgm6 = sgmij**6
         sgm12 = sgm6*sgm6
         dxdi(1:3)= -xij(1:3)*riji
-        dvdr=(-24.d0*epsij)*(2.d0*(sgm12*riji12)*riji &
+        dvdr=(-24._rp*epsij)*(2._rp*(sgm12*riji12)*riji &
              -(sgm6*riji6)*riji) &
              -dvdrc
 !.....Forces
         aal(1:3,ia)=aal(1:3,ia) -dxdi(1:3)*dvdr
 !!$        aal(1:3,j)=aal(1:3,j) +dxdi(1:3)*dvdr
 !.....Potential
-        tmp= 0.5d0*( 4d0*epsij*((sgm12*riji12) &
+        tmp= 0.5_rp*( 4.0_rp*epsij*((sgm12*riji12) &
              -(sgm6*riji6)) -vrc -dvdrc*(rij-rcij) )
         epi(ia)= epi(ia) +tmp
 !!$        epi(j)= epi(j) +tmp
@@ -152,7 +152,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,ia)=strsl(jxyz,ixyz,ia) &
-                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp*dvdr*xij(ixyz)*(-dxdi(jxyz))
 !!$            strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
           enddo
@@ -169,7 +169,7 @@ contains
     strs(:,:,1:natm)= strs(:,:,1:natm) +strsl(:,:,1:natm)
 
 !-----gather epot
-    epott = 0d0
+    epott = 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum, &
          mpi_md_world,ierr)
     epot= epot +epott
@@ -209,7 +209,7 @@ contains
 !!$      call read_params_Morse(myid,mpi_md_world,iprint)
       if( allocated(strsl) ) deallocate(strsl)
       allocate(strsl(3,3,namax))
-      rcmax2 = 0d0
+      rcmax2 = 0.0_rp
       do is=1,msp
         do js=1,msp
           if( .not. interact(is,js) ) cycle
@@ -217,8 +217,8 @@ contains
           rcmax2 = max(rcmax2,rcij**2)
         enddo
       enddo
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,msp
         do js=1,msp
           if( .not.interact(is,js) ) cycle
@@ -241,8 +241,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    epotl = 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl = 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !$omp parallel
 !$omp do private(i,xi,is,jj,j,js,xij,rij,dij2,rcij,dij,cij, &
@@ -263,13 +263,13 @@ contains
         dij = sqrt(dij2)
         cij = rpl_c(is,js)
         nij = rpl_n(is,js)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3) = -xij(1:3)*diji
 !.....Potential
         vr = cij*diji**nij
         vrc = vrcs(is,js)
         dvdrc = dvdrcs(is,js)
-        tmp = 0.5d0 *(vr -vrc -(dij -rcij)*dvdrc)
+        tmp = 0.5_rp *(vr -vrc -(dij -rcij)*dvdrc)
         epi(i)= epi(i) +tmp
         epotl= epotl +tmp
 !.....Force
@@ -279,7 +279,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i) = strsl(jxyz,ixyz,i) &
-                 -0.5d0*dvdr*xij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp*dvdr*xij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -290,7 +290,7 @@ contains
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
     if( iprint.ge.ipl_info ) print *,'epot LJ_repl= ',epott
@@ -420,7 +420,7 @@ contains
           write(6,'(a)') '           Default parameters will be used.'
         endif
         interact(1,1) = .true.
-        rpl_c(1,1) = 4d0*eps_Ar*sgm_Ar**12
+        rpl_c(1,1) = 4.0_rp*eps_Ar*sgm_Ar**12
         return
       endif
 !.....Read file if exits

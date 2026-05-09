@@ -6,88 +6,88 @@
 !  This will be extended to Fe-H system
 !  See Ramasubramaniam et al. PRB 79, 174101 (2009), (Potential A)
 !=======================================================================
-      real(rp),parameter:: am_fe = real(55.847d0, rp)
-      real(rp),parameter:: am_h  =  real(1.008d0, rp)
+      real(rp),parameter:: am_fe = 55.847_rp
+      real(rp),parameter:: am_h  =  1.008_rp
 !      real(rp),parameter:: alcfe = 2.8665d0
-      real(rp),parameter:: alcfe = real(2.8553d0, rp)
-      real(rp),parameter:: z_fe  = real(26d0, rp)
-      real(rp),parameter:: z_h   = real(1d0, rp)
-      real(rp),parameter:: a0    = real(0.5291772d0, rp) ! Bohr radius
+      real(rp),parameter:: alcfe = 2.8553_rp
+      real(rp),parameter:: z_fe  = 26.0_rp
+      real(rp),parameter:: z_h   = 1.0_rp
+      real(rp),parameter:: a0    = 0.5291772_rp ! Bohr radius
 !.....prefactor for rs
-      real(rp),parameter:: a_rs  = real(0.88534d0, rp)
+      real(rp),parameter:: a_rs  = 0.88534_rp
 !.....prefactor for varphi r < r1
-      real(rp),parameter:: qe    = real(3.794701096299472d0, rp)
+      real(rp),parameter:: qe    = 3.794701096299472_rp
       real(rp),parameter:: z2q2  = 9.7342365892908E+03
       real(rp),parameter:: z2q2_feh= z_fe*z_h*qe*qe
 !.....Range in varphi
-      real(rp),parameter:: r1  = real(1.0d0, rp)
-      real(rp),parameter:: r2  = real(2.0d0, rp)
+      real(rp),parameter:: r1  = 1.0_rp
+      real(rp),parameter:: r2  = 2.0_rp
 !.....Bs for r1 < r <= r2
-      real(rp),parameter:: b0  = real(6.4265260576348d0, rp)
-      real(rp),parameter:: b1  = real(1.7900488524286d0, rp)
-      real(rp),parameter:: b2  =-real(4.5108316729807d0, rp)
-      real(rp),parameter:: b3  = real(1.0866199373306d0, rp)
+      real(rp),parameter:: b0  = 6.4265260576348_rp
+      real(rp),parameter:: b1  = 1.7900488524286_rp
+      real(rp),parameter:: b2  =-4.5108316729807_rp
+      real(rp),parameter:: b3  = 1.0866199373306_rp
 !.....varphi for r2 < r
       real(rp),parameter:: a_vphi(1:15)= &
-     &     (/  real(0.0d0, rp) &
-     &     , -real(24.028204854115d0, rp)   & ! 2
-     &     ,  real(11.300691696477d0, rp)   & ! 3
-     &     ,   real(5.3144495820462d0, rp)  & ! 4
-     &     ,  -real(4.6659532856049d0, rp)  & ! 5
-     &     ,   real(5.9637758529194d0, rp)  & 
-     &     ,  -real(1.7710262006061d0, rp)  & 
-     &     ,   real(0.85913830768731d0, rp) & 
-     &     ,  -real(2.1845362968261d0, rp)  & 
-     &     ,   real(2.6424377007466d0, rp)  & ! 10
-     &     ,  -real(1.0358345370208d0, rp)  & 
-     &     ,   real(0.33548264951582d0, rp) & 
-     &     ,  -real(4.6448582149334d-2, rp) & 
-     &     ,  -real(7.0294963048689d-3, rp) & ! 14
-     &     ,   real(0.0d0, rp) /)
+     &     (/  0.0_rp &
+     &     , -24.028204854115_rp   & ! 2
+     &     ,  11.300691696477_rp   & ! 3
+     &     ,   5.3144495820462_rp  & ! 4
+     &     ,  -4.6659532856049_rp  & ! 5
+     &     ,   5.9637758529194_rp  & 
+     &     ,  -1.7710262006061_rp  & 
+     &     ,   0.85913830768731_rp & 
+     &     ,  -2.1845362968261_rp  & 
+     &     ,   2.6424377007466_rp  & ! 10
+     &     ,  -1.0358345370208_rp  & 
+     &     ,   0.33548264951582_rp & 
+     &     ,  -4.6448582149334e-2_rp & 
+     &     ,  -7.0294963048689e-3_rp & ! 14
+     &     ,   0.0_rp /)
       real(rp),parameter:: r_vphi(1:15)= &
-     &     (/  real(0.0d0, rp) &
-     &     ,   real(2.2d0, rp) & ! 2
-     &     ,   real(2.3d0, rp) & 
-     &     ,   real(2.4d0, rp) & 
-     &     ,   real(2.5d0, rp) & ! 5
-     &     ,   real(2.6d0, rp) & 
-     &     ,   real(2.7d0, rp) & 
-     &     ,   real(2.8d0, rp) & 
-     &     ,   real(3.0d0, rp) & 
-     &     ,   real(3.3d0, rp) & ! 10
-     &     ,   real(3.7d0, rp) & 
-     &     ,   real(4.2d0, rp) & 
-     &     ,   real(4.7d0, rp) & 
-     &     ,   real(5.3d0, rp) & ! 14
-     &     ,   real(0.0d0, rp) /)
+     &     (/  0.0_rp &
+     &     ,   2.2_rp & ! 2
+     &     ,   2.3_rp & 
+     &     ,   2.4_rp & 
+     &     ,   2.5_rp & ! 5
+     &     ,   2.6_rp & 
+     &     ,   2.7_rp & 
+     &     ,   2.8_rp & 
+     &     ,   3.0_rp & 
+     &     ,   3.3_rp & ! 10
+     &     ,   3.7_rp & 
+     &     ,   4.2_rp & 
+     &     ,   4.7_rp & 
+     &     ,   5.3_rp & ! 14
+     &     ,   0.0_rp /)
 !.....psi for calculation of rho
       real(rp),parameter:: a_psi(1:3)= &
-     &     (/ real(11.686859407970d0, rp)    &
-     &     ,  -real(0.014710740098830d0, rp) &
-     &     ,   real(0.47193527075943d0, rp)   /)
+     &     (/ 11.686859407970_rp    &
+     &     ,  -0.014710740098830_rp &
+     &     ,   0.47193527075943_rp   /)
       real(rp),parameter:: r_psi(1:3)= &
-     &     (/  real(2.4d0, rp) &
-     &     ,   real(3.2d0, rp) &
-     &     ,   real(4.2d0, rp) /)
+     &     (/  2.4_rp &
+     &     ,   3.2_rp &
+     &     ,   4.2_rp /)
 !.....coeff for the embedded func
-      real(rp),parameter:: a_emb  = -real(3.5387096579929d-4, rp)
+      real(rp),parameter:: a_emb  = -3.5387096579929e-4_rp
 !.....cutoffs
-      real(rp),parameter:: rc_rho = real(4.2d0, rp)
-      real(rp),parameter:: rc_vphi= real(5.3d0, rp)
+      real(rp),parameter:: rc_rho = 4.2_rp
+      real(rp),parameter:: rc_vphi= 5.3_rp
 
 !-----------------------------------------------------------------------
 !  For Fe-H potential parameters
 !-----------------------------------------------------------------------
 !.....Range in phi_FeH
-      real(rp),parameter:: r1_feh =  real(0.6d0, rp)
-      real(rp),parameter:: r2_feh =  real(1.2d0, rp)
+      real(rp),parameter:: r1_feh =  0.6_rp
+      real(rp),parameter:: r2_feh =  1.2_rp
 !.....Bs for FeH
-      real(rp),parameter:: b0_feh = real(1242.1709168218642d0, rp)
-      real(rp),parameter:: b1_feh =-real(6013.566711223783d0, rp) 
-      real(rp),parameter:: b2_feh = real(12339.540893927151d0, rp)
-      real(rp),parameter:: b3_feh =-real(12959.66163724488d0, rp) 
-      real(rp),parameter:: b4_feh = real(6817.850021676971d0, rp) 
-      real(rp),parameter:: b5_feh =-real(1422.1723964897117d0, rp)
+      real(rp),parameter:: b0_feh = 1242.1709168218642_rp
+      real(rp),parameter:: b1_feh =-6013.566711223783_rp 
+      real(rp),parameter:: b2_feh = 12339.540893927151_rp
+      real(rp),parameter:: b3_feh =-12959.66163724488_rp 
+      real(rp),parameter:: b4_feh = 6817.850021676971_rp 
+      real(rp),parameter:: b5_feh =-1422.1723964897117_rp
 !      real(rp),parameter:: b0_feh = 853.4769964964161d0
 !      real(rp),parameter:: b1_feh =-4206.406420131467d0
 !      real(rp),parameter:: b2_feh = 8686.215689507188d0
@@ -96,88 +96,88 @@
 !      real(rp),parameter:: b5_feh =-1002.904058496011d0
 !.....a_phi_feh
       real(rp),parameter:: a_phi_feh(1:7)= &
-     &     (/ real(14.0786236789212005d0, rp)  & !1
-     &     ,  -real(4.4526835887173704d0, rp)  & 
-     &     ,   real(5.5025121262565992d0, rp)  & 
-     &     ,  -real(1.0687489808214079d0, rp)  & 
-     &     ,  -real(0.3461498208163201d0, rp)  & 
-     &     ,  -real(0.0064991947759021d0, rp)  & 
-     &     ,  -real(0.0357435602984102d0, rp)  & !7
+     &     (/ 14.0786236789212005_rp  & !1
+     &     ,  -4.4526835887173704_rp  & 
+     &     ,   5.5025121262565992_rp  & 
+     &     ,  -1.0687489808214079_rp  & 
+     &     ,  -0.3461498208163201_rp  & 
+     &     ,  -0.0064991947759021_rp  & 
+     &     ,  -0.0357435602984102_rp  & !7
      &     /)
 !.....r_phi_feh
       real(rp),parameter:: r_phi_feh(1:7)= &
-     &     (/ real(1.6d0, rp) & !1
-     &     ,  real(1.7d0, rp) & 
-     &     ,  real(1.8d0, rp) & 
-     &     ,  real(2.0d0, rp) & 
-     &     ,  real(2.5d0, rp) & 
-     &     ,  real(3.2d0, rp) & 
-     &     ,  real(4.2d0, rp) & !7
+     &     (/ 1.6_rp & !1
+     &     ,  1.7_rp & 
+     &     ,  1.8_rp & 
+     &     ,  2.0_rp & 
+     &     ,  2.5_rp & 
+     &     ,  3.2_rp & 
+     &     ,  4.2_rp & !7
      &     /)
 !.....Cut off for phi_HH
-      real(rp),parameter:: rc_phi_hh  = real(2.3d0, rp)
-      real(rp),parameter:: r0_hh      = real(0.74d0, rp)
+      real(rp),parameter:: rc_phi_hh  = 2.3_rp
+      real(rp),parameter:: r0_hh      = 0.74_rp
 !.....S(r) for phi_HH
-      real(rp),parameter:: r_tanh_hh  = real(0.9d0, rp)
-      real(rp),parameter:: a_tanh_hh  = real(25d0, rp)
+      real(rp),parameter:: r_tanh_hh  = 0.9_rp
+      real(rp),parameter:: a_tanh_hh  = 25.0_rp
 !.....Coeff for phi_HH
-      real(rp),parameter:: c1_phi_hh  = real(0.0d0, rp)
-      real(rp),parameter:: c2_phi_hh  = real(0.0d0, rp)
-      real(rp),parameter:: eb_hh      = real(2.37d0, rp)
-      real(rp),parameter:: almbd_hh   = real(0.4899d0, rp)
+      real(rp),parameter:: c1_phi_hh  = 0.0_rp
+      real(rp),parameter:: c2_phi_hh  = 0.0_rp
+      real(rp),parameter:: eb_hh      = 2.37_rp
+      real(rp),parameter:: almbd_hh   = 0.4899_rp
 !.....a^F parameters
       real(rp),parameter:: a_f(1:6)= &
-     &     (/ -real(0.0581256120818134d0, rp) & 
-     &     ,   real(0.0022854552833736d0, rp) &
-     &     ,  -real(0.0000314202805805d0, rp) &
-     &     ,   real(0.0000013764132084d0, rp) &
-     &     ,  -real(0.0000000253707731d0, rp) &
-     &     ,   real(0.0000000001483685d0, rp) &
+     &     (/ -0.0581256120818134_rp & 
+     &     ,   0.0022854552833736_rp &
+     &     ,  -0.0000314202805805_rp &
+     &     ,   0.0000013764132084_rp &
+     &     ,  -0.0000000253707731_rp &
+     &     ,   0.0000000001483685_rp &
      &     /)
 !.....Rho_FeH
       real(rp),parameter:: a_rho_feh(1:6)= &
-     &     (/ real(10.0073629216300581d0, rp) &
-     &     ,  real(32.4861983261490295d0, rp) &
-     &     ,  -real(0.9494226032063788d0, rp) &
-     &     ,  real(11.6659812262450338d0, rp) &
-     &     ,  -real(0.0147080251458273d0, rp) &
-     &     ,   real(0.4943383753319843d0, rp) &
+     &     (/ 10.0073629216300581_rp &
+     &     ,  32.4861983261490295_rp &
+     &     ,  -0.9494226032063788_rp &
+     &     ,  11.6659812262450338_rp &
+     &     ,  -0.0147080251458273_rp &
+     &     ,   0.4943383753319843_rp &
      &     /)
       real(rp),parameter:: r_rho_feh(1:6)= &
-     &     (/ real(1.6d0, rp) &
-     &     ,  real(1.8d0, rp) &
-     &     ,  real(2.0d0, rp) &
-     &     ,  real(2.4d0, rp) &
-     &     ,  real(3.2d0, rp) &
-     &     ,  real(4.2d0, rp) &
+     &     (/ 1.6_rp &
+     &     ,  1.8_rp &
+     &     ,  2.0_rp &
+     &     ,  2.4_rp &
+     &     ,  3.2_rp &
+     &     ,  4.2_rp &
      &     /)
 !.....Rho_HFe
       real(rp),parameter:: a_rho_hfe(1:5)= &
-     &     (/ real(11.1667357634216433d0, rp) &
-     &     ,  -real(3.0351307365078730d0, rp) &
-     &     ,   real(3.6096144794370653d0, rp) &
-     &     ,   real(0.0212509034775648d0, rp) &
-     &     ,   real(0.030391493994625d0, rp)  &
+     &     (/ 11.1667357634216433_rp &
+     &     ,  -3.0351307365078730_rp &
+     &     ,   3.6096144794370653_rp &
+     &     ,   0.0212509034775648_rp &
+     &     ,   0.030391493994625_rp  &
      &     /)
       real(rp),parameter:: r_rho_hfe(1:5)= &
-     &     (/ real(1.5d0, rp) &
-     &     ,  real(2.0d0, rp) &
-     &     ,  real(2.5d0, rp) &
-     &     ,  real(3.0d0, rp) &
-     &     ,  real(4.2d0, rp) &
+     &     (/ 1.5_rp &
+     &     ,  2.0_rp &
+     &     ,  2.5_rp &
+     &     ,  3.0_rp &
+     &     ,  4.2_rp &
      &     /)
 !.....Rho_HH
-      real(rp),parameter:: c_rho_hh = real(1800d0, rp)
+      real(rp),parameter:: c_rho_hh = 1800.0_rp
 
 !.....correction for H-H potential
 !.....see Song and Curtin, nature materials 3479
 !.....potential A
-      real(rp),parameter:: k_hh_corr  = real(1.5d0, rp)
-      real(rp),parameter:: r1_hh_corr  = real(3.0d0, rp)
-      real(rp),parameter:: r0_hh_corr  = real(0.9d0, rp)
-      real(rp),parameter:: lmbd_hh_corr= real(1d0, rp)
-      real(rp),parameter:: b0_hh_corr  = real(1.44d0, rp)
-      real(rp),parameter:: c0_hh_corr  = real(0.19d0, rp)
+      real(rp),parameter:: k_hh_corr  = 1.5_rp
+      real(rp),parameter:: r1_hh_corr  = 3.0_rp
+      real(rp),parameter:: r0_hh_corr  = 0.9_rp
+      real(rp),parameter:: lmbd_hh_corr= 1.0_rp
+      real(rp),parameter:: b0_hh_corr  = 1.44_rp
+      real(rp),parameter:: c0_hh_corr  = 0.19_rp
 !.....potential B
 !!$      real(rp),parameter:: k_hh_corr  = 1.5d0
 !!$      real(rp),parameter:: r1_hh_corr  = 2.5d0

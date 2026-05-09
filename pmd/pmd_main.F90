@@ -43,7 +43,7 @@ program pmd
 
 #ifdef __DISL__
 !.....Epot threshold for disl core extraction [Hartree]
-  real(rp),parameter:: epith = -0.1410d0
+  real(rp),parameter:: epith = -0.1410_rp
 #endif
 
   real(rp):: hunit,hmat(3,3,0:1)
@@ -68,7 +68,7 @@ program pmd
   call mpi_comm_rank(MPI_COMM_WORLD,myid_md,ierr)
   call mpi_comm_dup(MPI_COMM_WORLD,mpicomm,ierr)
   mpi_md_world = mpicomm
-  t0 = mpi_wtime()
+  t0 = real(mpi_wtime(),rp)
 
   call init_element()
   call init_group()
@@ -189,7 +189,7 @@ program pmd
     endif
     if( lflux .or. lpdens ) then
 !.....Set cutoff_buffer to zero, since it can affect local flux results
-      rbuf = 0d0
+      rbuf = 0.0_rp
       print *,''
       print *,'NOTICE: cutoff_buffer is reset to 0, since it can affect ' &
            //'the following:'
@@ -200,7 +200,7 @@ program pmd
 !.....Correct nnmax if the given nnmax is too small compared to
 !.....the estimated one
 !.....Now assume the minimum interatomic distance is about 2.0A
-    rmin = 2.0d0
+    rmin = 2.0_rp
     nnmax_est = (rc+rbuf)**3 /rmin**3 !*dsqrt(2d0)*pi/6
     if( nnmax.lt.nnmax_est ) then
       print *,'NNMAX is replaced since it is too small w.r.t. '// &
@@ -213,7 +213,7 @@ program pmd
   ntot = ntot0
   call bcast_params(nprocs)
 !.....Initialize random seeds in the function urnd
-  if( rseed.lt.0d0 ) then
+  if( rseed.lt.0.0_rp ) then
     call set_seed(rseed)
   else
     call set_seed(rseed+myid_md)
@@ -239,7 +239,7 @@ program pmd
       if( size(auxtot).ne.naux*ntot0 ) deallocate(auxtot)
       allocate(auxtot(naux,ntot0))
     endif
-    auxtot(:,:) = 0d0
+    auxtot(:,:) = 0.0_rp
 !.....Memory assessment
     mem = 8*naux*ntot0
     call accum_mem('main',mem)
@@ -310,24 +310,24 @@ program pmd
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,hmat,lclrchg &
        ,nstp,mpi_md_world,iprint)
   if( lpdens ) call init_pdens(myid_md,hmat,mpi_md_world,iprint)
-  if( use_force('fdesc') ) auxtot(iaux_edesc,:) = 0d0
+  if( use_force('fdesc') ) auxtot(iaux_edesc,:) = 0.0_rp
 #ifdef IMPULSE
   l_macro_impls = .true.
 #endif
   if( l_impls ) call init_impulse(myid_md,ntot0,rtot)
 
 !.....Add PKA velocity to some atom
-  if( pka_energy .gt. 0d0 ) then
+  if( pka_energy .gt. 0.0_rp ) then
     call add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
   endif
 
-  call accum_time('overhead',mpi_wtime()-t0)
+  call accum_time('overhead',real(mpi_wtime(),rp)-t0)
 !.....Call pmd_core to perform MD; all the arguments are in pmdvars module
   call pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot,epot,ekin,stnsr)
 
   if( myid_md.eq.0 ) then
-    tmp = mpi_wtime()
+    tmp = real(mpi_wtime(),rp)
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       call write_pmdtot_bin(20,cpmdfin,ntot,hunit,hmat, &
              tagtot,rtot,vtot)
@@ -335,7 +335,7 @@ program pmd
       call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,hmat, &
              tagtot,rtot,vtot,atot,epot,ekin,stnsr,.true.,min(nstp,istp))
     endif
-    call accum_time('write_xxx',mpi_wtime()-tmp)
+    call accum_time('write_xxx',real(mpi_wtime(),rp)-tmp)
   endif
 
   if( lflux ) call final_lflux(myid_md)
@@ -345,7 +345,7 @@ program pmd
 !.....write energy, forces and stresses only for fitpot
   if( myid_md.eq.0 ) then
 !!$    call write_force(21,'.pmd',hmat,epot,ntot,tagtot,atot,stnsr)
-    call accum_time('total',mpi_wtime()-t0)
+    call accum_time('total',real(mpi_wtime(),rp)-t0)
     call report_time(6,iprint)
     call report_mem(6,iprint)
     print *,''
@@ -442,7 +442,7 @@ subroutine write_initial_setting()
   write(6,'(2x,a,5x,f8.2)') 'initial_temperature',tinit
   if( index(ctctl,'beren').ne.0 .or. &
        index(ctctl,'lange').ne.0 )  then
-    if( tfin.ge.0d0 ) then
+    if( tfin.ge.0.0_rp ) then
       write(6,'(2x,a,5x,f8.2)') 'final_temperature  ',tfin
     else
       if( lmultemps ) then
@@ -943,11 +943,11 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
     if( iatom_pka.le.0 ) then
 !.....Find a center atom ICNTR
       icntr = 0
-      dmin = 1d+10
+      dmin = 1e+10_rp
       do i=1,ntot0
-        d = (rtot(1,i)-0.5d0)**2 &
-             +(rtot(2,i)-0.5d0)**2 &
-             +(rtot(3,i)-0.5d0)**2
+        d = (rtot(1,i)-0.5_rp)**2 &
+             +(rtot(2,i)-0.5_rp)**2 &
+             +(rtot(3,i)-0.5_rp)**2
         if( d .lt. dmin ) then
           icntr = i
           dmin = d
@@ -963,14 +963,14 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
 
 !.....Add PKA velocity at ICNTR atom
 !.....Get random theta and phi
-    theta = 90d0 *urnd() /180d0 *pi
-    phi = 90d0 *urnd() /180d0 *pi
+    theta = 90.0_rp *urnd() /180.0_rp *pi
+    phi = 90.0_rp *urnd() /180.0_rp *pi
     rx = sin(theta)*cos(phi)
     ry = sin(theta)*sin(phi)
     rz = cos(theta)
     is = int(tagtot(icntr))
 !.....[eV] to [Ang/fs]
-    vel = sqrt(pka_energy*ev2j *2d0 /(am(is)*ump2kg)) *m2ang /s2fs
+    vel = sqrt(pka_energy*ev2j *2.0_rp /(am(is)*ump2kg)) *m2ang /s2fs
     vx = rx*vel
     vy = ry*vel
     vz = rz*vel

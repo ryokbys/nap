@@ -28,7 +28,7 @@ module pmc
   character,allocatable:: csymbols(:)
   integer(1),allocatable:: i1sids(:)
 !.....lattice constant of unit cell
-  real(rp):: alat = 4.0448d0
+  real(rp):: alat = 4.0448_rp
 !.....number of solute atoms
   integer:: num_Mg = 10
   integer:: num_Si = 5
@@ -49,9 +49,9 @@ module pmc
 !.....frequency prefactors in 1/sec
 !.....values taken from Mantina et al., Acta Mater. 57 (2009)
   real(rp):: prefreq(1:3) = (/ &
-       16.6d+12, &
-       18.6d+12, &
-       15.7d+12 /)
+       16.6e+12_rp, &
+       18.6e+12_rp, &
+       15.7e+12_rp /)
 !.....average migration barriers in eV
 !.....also taken from Mantina et al.
 !!$  real(rp):: demig(1:3) = (/ &
@@ -60,9 +60,9 @@ module pmc
 !!$       0.55d0 /)
 !.....obtained by own DFT calculations
   real(rp):: demig(1:3) = (/ &
-       0.569d0, &
-       0.450d0, &
-       0.479d0 /)
+       0.569_rp, &
+       0.450_rp, &
+       0.479_rp /)
 !.....pair-list for MC only, not to conflict with pmd
   integer,parameter:: nnmaxmc = 20
   integer,allocatable:: lsprmc(:,:)
@@ -71,9 +71,9 @@ module pmc
   integer:: ny = 1
   integer:: nz = 1
 !.....temperature
-  real(rp):: temp = 300d0
+  real(rp):: temp = 300.0_rp
 !.....random seed
-  real(rp):: dseed0 = 12345d0
+  real(rp):: dseed0 = 12345.0_rp
   
 contains
 !=======================================================================
@@ -178,10 +178,10 @@ program prec_mc
        ,tagmc(natm),epimc(natm))
   call create_Al_fcc(ncx,ncy,ncz,natm,alat,pos0,csymbols,hmat)
   call symbols2sids(natm,csymbols,i1sids)
-  hmati(1:3,1:3) = 0d0
-  hmati(1,1) = 1d0/hmat(1,1)
-  hmati(2,2) = 1d0/hmat(2,2)
-  hmati(3,3) = 1d0/hmat(3,3)
+  hmati(1:3,1:3) = 0.0_rp
+  hmati(1,1) = 1.0_rp/hmat(1,1)
+  hmati(2,2) = 1.0_rp/hmat(2,2)
+  hmati(3,3) = 1.0_rp/hmat(3,3)
 
   if( myid_md.eq.0 ) then
     write(6,'(a,i8)') ' Number of total atoms = ',natm
@@ -318,7 +318,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
   integer,external:: cs2is,check_history
   real(rp),external:: epot2efrm
 
-  real(rp),parameter:: fkb = 8.61733035d-5  ! eV/K
+  real(rp),parameter:: fkb = 8.61733035e-5_rp  ! eV/K
   integer,parameter:: ioerg = 30
   integer,parameter:: iosym = 31
 
@@ -331,7 +331,7 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
     mem = 8*(natm +4 +maxhist +nnmaxmc +nnmaxmc) &
          +1*(natm +natm*maxhist +natm*nnmaxmc +nnmaxmc)
     write(6,'(a,f10.3,a)') ' allocated array in kinetic_mc = ', &
-         dble(mem)/1000/1000, ' MB'
+         real(mem, rp)/1000/1000, ' MB'
   else
     allocate(epimc(natm),ecpot(0:3),csymprev(natm), &
          csymhist(natm,1),erghist(1), &
@@ -468,14 +468,14 @@ subroutine kinetic_mc(mpi_md_world,nodes_md,myid_md,myx,myy,myz &
       enddo  ! loop over nearest neighbors, jj
 
 !.....Compute total probability
-      ptot = 0d0
+      ptot = 0.0_rp
       do jj=1,lsprmc(0,ic)
         ptot = ptot +probtmp(jj)
       enddo
 !.....pick one event from the event list
       rand = urnd()*ptot
       ievent = lsprmc(0,ic)
-      ptmp = 0d0
+      ptmp = 0.0_rp
       do jj=1,lsprmc(0,ic)
         ptmp = ptmp +probtmp(jj)
         if( rand.lt.ptmp ) then
@@ -564,16 +564,16 @@ subroutine create_Al_fcc(nx,ny,nz,natm,alat,pos,csymbols,hmat)
   real(rp):: upos(3,4)
 
 !.....set h-matrix
-  hmat(1:3,1:3) = 0d0
+  hmat(1:3,1:3) = 0.0_rp
   hmat(1,1) = alat*nx
   hmat(2,2) = alat*ny
   hmat(3,3) = alat*nz
 
 !.....positions of unit cell of FCC
-  upos(1:3,1) = (/ 0.0d0, 0.0d0, 0.0d0 /)
-  upos(1:3,2) = (/ 0.0d0, 0.5d0, 0.5d0 /)
-  upos(1:3,3) = (/ 0.5d0, 0.0d0, 0.5d0 /)
-  upos(1:3,4) = (/ 0.5d0, 0.5d0, 0.0d0 /)
+  upos(1:3,1) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)
+  upos(1:3,2) = (/ 0.0_rp, 0.5_rp, 0.5_rp /)
+  upos(1:3,3) = (/ 0.5_rp, 0.0_rp, 0.5_rp /)
+  upos(1:3,4) = (/ 0.5_rp, 0.5_rp, 0.0_rp /)
 
 !.....extend unit cell with nx,ny,nz
   inc = 0
@@ -586,9 +586,9 @@ subroutine create_Al_fcc(nx,ny,nz,natm,alat,pos,csymbols,hmat)
             print *, 'Error: inc.gt.natm'
             stop
           endif
-          pos(1,inc) = dble(upos(1,m) + ix)/nx
-          pos(2,inc) = dble(upos(2,m) + iy)/ny
-          pos(3,inc) = dble(upos(3,m) + iz)/nz
+          pos(1,inc) = real(upos(1,m) + ix, rp)/nx
+          pos(2,inc) = real(upos(2,m) + iy, rp)/ny
+          pos(3,inc) = real(upos(3,m) + iz, rp)/nz
           csymbols(inc) = 'A'
         enddo
       enddo
@@ -738,9 +738,9 @@ subroutine parallel_setting(nx,ny,nz,myid_md,myx,myy,myz &
   integer,intent(out):: myx,myy,myz
   real(rp),intent(out):: anxi,anyi,anzi,sorg(3)
 
-  anxi= 1d0/nx
-  anyi= 1d0/ny
-  anzi= 1d0/nz
+  anxi= 1.0_rp/nx
+  anyi= 1.0_rp/ny
+  anzi= 1.0_rp/nz
 !.....vector node indices: range [0:nx-1]
   myx=myid_md/(ny*nz)
   myy=mod(myid_md/nz,ny)
@@ -807,7 +807,7 @@ subroutine make_tag(natm,csymbols,tag)
 
   do i = 1,natm
     c = csymbols(i)
-    tag(i) = dble(symbol2sid(c)) +0.1d0 +1d-14*i
+    tag(i) = real(symbol2sid(c), rp) +0.1_rp +1e-14_rp*i
   end do
   return
   
@@ -874,9 +874,9 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   character,allocatable:: carr(:)
 
 !.....1st, pick one site close to the center
-  cntr(1:3) = (/ 0.5d0, 0.5d0, 0.5d0 /)
+  cntr(1:3) = (/ 0.5_rp, 0.5_rp, 0.5_rp /)
   icntr = -1
-  dmin = 1d+30
+  dmin = 1e+30_rp
   do i = 1,natm
     d = (cntr(1)-pos0(1,i))**2 &
          +(cntr(2)-pos0(2,i))**2 &
@@ -897,9 +897,9 @@ subroutine clustered_symbols(natm,pos0,csymbols &
   inc = 0
   do while(.true.)
     if( inc.eq.nsol ) exit
-    rMg = dble(num_Mg-nmg)/(nsol-inc)
-    rSi = dble(num_Mg-nmg +num_Si-nsi)/(nsol-inc)
-    rAl = dble(num_Mg-nmg +num_Si-nsi +num_Al_clst-nal)/(nsol-inc)
+    rMg = real(num_Mg-nmg, rp)/(nsol-inc)
+    rSi = real(num_Mg-nmg +num_Si-nsi, rp)/(nsol-inc)
+    rAl = real(num_Mg-nmg +num_Si-nsi +num_Al_clst-nal, rp)/(nsol-inc)
     r = urnd()
     if( r.lt.rMg ) then
       if( nmg.ge.num_Mg ) cycle
@@ -1184,7 +1184,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     endif
   endif
 
-  hunit = 1d0
+  hunit = 1.0_rp
   h(1:3,1:3,0) = hmat(1:3,1:3)
   lcellfix(1:3,1:3) = .false.
 
@@ -1194,57 +1194,57 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
       csi = csymbols(i)
       if( csi.eq.'V' ) cycle
       inc = inc + 1
-      tagtot(inc) = dble(symbol2sid(csi)) +0.1d0 +1d-14*inc
+      tagtot(inc) = real(symbol2sid(csi), rp) +0.1_rp +1e-14_rp*inc
       rtot(1:3,inc) = pos0(1:3,i)
-      vtot(1:3,inc) = 0d0
-      atot(1:3,inc) = 0d0
-      stot(1:3,1:3,inc) = 0d0
-      ekitot(1:3,1:3,inc) = 0d0
-      epitot(inc) = 0d0
+      vtot(1:3,inc) = 0.0_rp
+      atot(1:3,inc) = 0.0_rp
+      stot(1:3,1:3,inc) = 0.0_rp
+      ekitot(1:3,1:3,inc) = 0.0_rp
+      epitot(inc) = 0.0_rp
     enddo
   end if
   nerg = nstps_pmd
   npmd = 1
-  am(1:9) = 1d0
+  am(1:9) = 1.0_rp
   am(1) = 26.982  ! Al
   am(2) = 24.305  ! Mg
   am(3) = 28.085  ! Si
-  dt = 5d0
+  dt = 5.0_rp
   ciofmt = 'ascii'
   ifpmd = 1
   numff = 1
   cforce = 'NN'
   cffs(1) = 'NN'
-  rc = 5.8d0
-  rbuf = 0.2d0
+  rc = 5.8_rp
+  rbuf = 0.2_rp
   ifdmp = 2  ! FIRE
-  dmp = 0.99d0
+  dmp = 0.99_rp
   minstp = 3
-  tinit = 0d0
-  tfin = 1d0
+  tinit = 0.0_rp
+  tfin = 1.0_rp
   ctctl = 'none'
-  ttgt(1:9) = 300d0
-  trlx = 100d0
+  ttgt(1:9) = 300.0_rp
+  trlx = 100.0_rp
   ltdst = .false.
   ntdst = 1
   nrmtrans = 1
   lstrs = .false.
   cpctl = 'none'
-  stgt(1:3,1:3) = 0d0
-  ptgt = 0d0
-  pini = 0d0
-  pfin = 0d0
-  srlx = 100d0
-  stbeta = 1d-1
-  strfin = 0d0
-  fmv(1:3,0) = (/ 0d0, 0d0, 0d0 /)
-  fmv(1:3,1:9) = 1d0
-  ptnsr(1:3,1:3) = 0d0
-  epot = 0d0
-  ekin = 0d0
+  stgt(1:3,1:3) = 0.0_rp
+  ptgt = 0.0_rp
+  pini = 0.0_rp
+  pfin = 0.0_rp
+  srlx = 100.0_rp
+  stbeta = 1e-1_rp
+  strfin = 0.0_rp
+  fmv(1:3,0) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)
+  fmv(1:3,1:9) = 1.0_rp
+  ptnsr(1:3,1:3) = 0.0_rp
+  epot = 0.0_rp
+  ekin = 0.0_rp
   n_conv = 1
   czload_type = 'no'
-  eps_conv = 1d-3
+  eps_conv = 1e-3_rp
   ifsort = 1
   iprint = 0
   lvc = .false.
@@ -1266,7 +1266,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 !!$       ,nstps_pmd,minstp,nstps_done
   if( myid_md.eq.0 ) then
     inc = 0
-    epimc(1:natm) = 0d0
+    epimc(1:natm) = 0.0_rp
     do i = 1,natm
       csi = csymbols(i)
       if( csi.eq.'V' ) cycle

@@ -44,8 +44,8 @@ contains
       allocate(sqrho(namax))
     endif
 
-    epotl= 0d0
-    sqrho(1:natm)= 0d0
+    epotl= 0.0_rp
+    sqrho(1:natm)= 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -61,7 +61,7 @@ contains
         sqrho(i)= sqrho(i) +(sc_a/rij)**sc_m &
              -rhoc -(rij-rc)*drhoc
       enddo
-      sqrho(i)= dsqrt(sqrho(i))
+      sqrho(i)= sqrt(sqrho(i))
     enddo
 
 !.....copy rho of boundary atoms
@@ -77,7 +77,7 @@ contains
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      dfi= -0.5d0*sc_eps*sc_c/sqrho(i)
+      dfi= -0.5_rp*sc_eps*sc_c/sqrho(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -91,7 +91,7 @@ contains
 !          drdxj(1:3)=  xij(1:3)/rij
 !---------2-body term
         phi= sc_eps*(sc_a/rij)**sc_n
-        tmp= 0.5d0 *( phi -phic -(rij-rc)*dphic )
+        tmp= 0.5_rp *( phi -phic -(rij-rc)*dphic )
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -104,7 +104,7 @@ contains
         aa(1:3,j)=aa(1:3,j) +dphi*drdxi(1:3)
 !---------embedded term
         drhoij= -sc_m*(sc_a/rij)**sc_m /rij -drhoc
-        dfj= -0.5d0 *sc_eps*sc_c/sqrho(j)
+        dfj= -0.5_rp *sc_eps*sc_c/sqrho(j)
         aa(1:3,i)=aa(1:3,i) -(dfi+dfj)*drhoij*drdxi(1:3)
         aa(1:3,j)=aa(1:3,j) +(dfi+dfj)*drhoij*drdxi(1:3)
       enddo

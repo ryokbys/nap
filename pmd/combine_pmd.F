@@ -114,8 +114,8 @@ c=======================================================================
       real(rp):: tmp
       integer,external:: is_tag,ifmv_tag
 
-      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1d-1
-      itot_tag= nint(tmp*1d+14)
+      tmp= tag -is_tag(tag) -ifmv_tag(tag)*1e-1_rp
+      itot_tag= nint(tmp*1e+14_rp)
       return
       end function itot_tag
 c=======================================================================

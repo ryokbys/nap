@@ -44,8 +44,8 @@ contains
       allocate(sqrho(namax))
     endif
 
-    epotl= 0d0
-    sqrho(1:natm)= 0d0
+    epotl= 0.0_rp
+    sqrho(1:natm)= 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -62,7 +62,7 @@ contains
         rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
         sqrho(i)= sqrho(i) +phi_IWHe(rij,is,js)
       enddo
-      sqrho(i)= dsqrt(sqrho(i))
+      sqrho(i)= sqrt(sqrho(i))
     enddo
 
     call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
@@ -78,7 +78,7 @@ contains
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
-      dfi= -0.5d0*p_W_A/sqrho(i)
+      dfi= -0.5_rp*p_W_A/sqrho(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
@@ -92,7 +92,7 @@ contains
         if( rij.gt.rc ) cycle
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
-        v2= 0.5d0 *v2_IWHe(rij,is,js)
+        v2= 0.5_rp *v2_IWHe(rij,is,js)
         dv2= dv2_IWHe(rij,is,js)
         epi(i)= epi(i) +v2
         epi(j)= epi(j) +v2
@@ -107,13 +107,13 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dv2*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dv2*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
 !.....N-body term
-        dfj= -0.5d0*p_W_A/sqrho(j)
+        dfj= -0.5_rp*p_W_A/sqrho(j)
         dphi= dphi_IWHe(rij,is,js) !/2
         dphj= dphi_IWHe(rij,js,is) !/2
         tmp= (dfi*dphi+dfj*dphj)
@@ -123,9 +123,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
@@ -144,7 +144,7 @@ contains
 !!$    endif
 
 !-----gather epot
-    epot= 0d0
+    epot= 0.0_rp
     if( myid_md.ge.0 ) then
       call mpi_allreduce(epotl,epot,1,mpi_real_rp &
            ,MPI_SUM,mpi_md_world,ierr)
@@ -166,7 +166,7 @@ contains
     integer,intent(in):: is,js
     real(rp):: v2_IWHe,x
 
-    v2_IWHe= 0d0
+    v2_IWHe= 0.0_rp
 
 !.....W-W
     if( r.lt.p_WW_c) then
@@ -192,17 +192,17 @@ contains
     integer,intent(in):: is,js
     real(rp):: dv2_IWHe,ri,x,exar
 
-    dv2_IWHe= 0d0
+    dv2_IWHe= 0.0_rp
 
 !.....W-W
     if( r.lt.p_WW_c) then
-      dv2_IWHe= 2d0*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r +p_WW_c2*r*r) &
-           +(r-p_WW_c)**2*(p_WW_c1 +2d0*p_WW_c2*r)
+      dv2_IWHe= 2.0_rp*(r-p_WW_c)*(p_WW_c0 +p_WW_c1*r +p_WW_c2*r*r) &
+           +(r-p_WW_c)**2*(p_WW_c1 +2.0_rp*p_WW_c2*r)
     endif
     if( r.lt.p_WW_b0 ) then
       dv2_IWHe=dv2_IWHe &
            +p_WW_B*(p_WW_b0-r)**2 *exp(-p_WW_alpha*r) &
-           *(-3d0 -p_WW_alpha*(p_WW_b0-r))
+           *(-3.0_rp -p_WW_alpha*(p_WW_b0-r))
     endif
 
     return
@@ -219,7 +219,7 @@ contains
     integer,intent(in):: is,js
     real(rp):: phi_IWHe
 
-    phi_IWHe= 0d0
+    phi_IWHe= 0.0_rp
 
 !.....phi_W
     if( r.le.p_W_d ) then
@@ -237,11 +237,11 @@ contains
     integer,intent(in):: is,js
     real(rp):: dphi_IWHe
 
-    dphi_IWHe= 0d0
+    dphi_IWHe= 0.0_rp
 
 !.....phi_W
     if( r.le.p_W_d ) then
-      dphi_IWHe= 2d0*(r-p_w_d)
+      dphi_IWHe= 2.0_rp*(r-p_w_d)
     endif
 
     return

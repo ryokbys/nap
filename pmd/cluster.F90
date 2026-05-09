@@ -45,7 +45,7 @@ program cluster_analysis
   call get_hi(h,hi)
 
 !.....Read input
-  rcut = 3.0d0
+  rcut = 3.0_rp
   outthd = 10
   lrecur = .false.
   call read_in_cluster(11,trim(cfinput),maxpair,rcut,lpair,outthd,lrecur)
@@ -347,6 +347,7 @@ end subroutine clustering2
 !=======================================================================
 recursive subroutine neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,&
      lpair,ia,is,ic)
+  use mod_precision
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax,ia,is,ic
   logical,intent(in):: lpair(nspmax,nspmax)
   real(rp),intent(in):: tagtot(ntot)

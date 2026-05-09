@@ -65,8 +65,8 @@ contains
       allocate(strsl(3,3,namax))
       rcmax2 = rc*rc
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:)= 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:)= 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           if( .not. interact(is,js) ) cycle
@@ -89,8 +89,8 @@ contains
       allocate(strsl(3,3,namax))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
 
 !-----loop over resident atoms
     do i=1,natm
@@ -106,8 +106,8 @@ contains
         rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
         dij2= rij(1)**2+ rij(2)**2 +rij(3)**2
         if( dij2.gt.rcmax2 ) cycle
-        dij = dsqrt(dij2)
-        diji= 1d0/dij
+        dij = sqrt(dij2)
+        diji= 1.0_rp/dij
         drdi(1:3)= -rij(1:3)*diji
         drdj(1:3)=  rij(1:3)*diji
         vrc = vrcs(is,js)
@@ -118,9 +118,9 @@ contains
         betij = abl_betij(is,js)
 !.....Potential
 !!$        vs2b = vshort2b(dij,is,js)
-        vs2b = aij*dexp(-alpij*dij) -bij*dexp(-betij*dij)
+        vs2b = aij*exp(-alpij*dij) -bij*exp(-betij*dij)
         tmp = vs2b
-        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+        tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
 !!$        tmp2 = 0.5d0 *tmp
         if(j.le.natm) then
           epi(i)=epi(i) +tmp2
@@ -132,7 +132,7 @@ contains
         endif
 !.....Force
 !!$        dvs2b = dvshort2b(dij,is,js)
-        dvs2b = -alpij*aij*dexp(-alpij*dij) +betij*bij*dexp(-betij*dij)
+        dvs2b = -alpij*aij*exp(-alpij*dij) +betij*bij*exp(-betij*dij)
         dvdr = dvs2b -dvdrc
         aa(1:3,i)= aa(1:3,i) -drdi(1:3)*dvdr
         aa(1:3,j)= aa(1:3,j) -drdj(1:3)*dvdr
@@ -143,9 +143,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
             strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                 -0.5d0*dvdr*rij(ixyz)*(-drdi(jxyz))
+                 -0.5_rp*dvdr*rij(ixyz)*(-drdi(jxyz))
           enddo
         enddo
       enddo
@@ -157,7 +157,7 @@ contains
       strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
     endif
 
-    epott = 0d0
+    epott = 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
@@ -214,10 +214,10 @@ contains
       stop
     endif
 
-    abl_aij(:,:)= 0d0
-    abl_alpij(:,:)= 0d0
-    abl_bij(:,:)= 0d0
-    abl_betij(:,:)= 0d0
+    abl_aij(:,:)= 0.0_rp
+    abl_alpij(:,:)= 0.0_rp
+    abl_bij(:,:)= 0.0_rp
+    abl_betij(:,:)= 0.0_rp
 
     inc = 0
     do i=1,nspmax
@@ -254,10 +254,10 @@ contains
     character(len=128):: cline,fname
 
     if( myid_md.eq.0 ) then
-      abl_aij(:,:) = 0d0
-      abl_alpij(:,:)= 0d0
-      abl_bij(:,:) = 0d0
-      abl_betij(:,:)= 0d0
+      abl_aij(:,:) = 0.0_rp
+      abl_alpij(:,:)= 0.0_rp
+      abl_bij(:,:) = 0.0_rp
+      abl_betij(:,:)= 0.0_rp
       interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(cprmfname)
       open(ioprms,file=trim(fname),status='old')

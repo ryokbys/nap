@@ -24,8 +24,8 @@ module constraints
   real(rp),allocatable:: rijo(:,:)
   real(rp),allocatable:: dxyzi(:), dxyzf(:),dxyz(:)
   character(len=20),allocatable:: constype(:)
-  real(rp):: tol = 1d-2
-  real(rp):: vtol = 1d-8
+  real(rp):: tol = 1e-2_rp
+  real(rp):: vtol = 1e-8_rp
   
   
 contains
@@ -343,10 +343,10 @@ contains
         rijos = cart2abc(hi,rijo)
         if( constype(ic) == 'bond' ) then
           gmk = amij *(dd-dij2(ic)) /dot(rij,rijo(:,ic))
-          ris(1:3,ic) = ris(1:3,ic) +gmk/(2d0*ami)*rijos(1:3)
-          rjs(1:3,ic) = rjs(1:3,ic) -gmk/(2d0*amj)*rijos(1:3)
-          vis(1:3,ic) = vis(1:3,ic) +gmk/(2d0*ami)*rijo(1:3,ic) /dt
-          vjs(1:3,ic) = vjs(1:3,ic) -gmk/(2d0*amj)*rijo(1:3,ic) /dt
+          ris(1:3,ic) = ris(1:3,ic) +gmk/(2.0_rp*ami)*rijos(1:3)
+          rjs(1:3,ic) = rjs(1:3,ic) -gmk/(2.0_rp*amj)*rijos(1:3)
+          vis(1:3,ic) = vis(1:3,ic) +gmk/(2.0_rp*ami)*rijo(1:3,ic) /dt
+          vjs(1:3,ic) = vjs(1:3,ic) -gmk/(2.0_rp*amj)*rijo(1:3,ic) /dt
 !.....Check convergence
           rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
           rij(1:3) = rij(1:3) -anint(rij(1:3))
@@ -356,15 +356,15 @@ contains
           if( abs(dd-dij2(ic)).gt.dtol2(ic) ) not_conv = .true. 
         else if( constype(ic) == 'dxyz' ) then
           ixyz = idxyz(ic)
-          gmk = 2d0*amij *(rij(ixyz)-dxyz(ic))
-          dijtmp(:) = 0d0
+          gmk = 2.0_rp*amij *(rij(ixyz)-dxyz(ic))
+          dijtmp(:) = 0.0_rp
           do jxyz=1,3
             dijtmp(jxyz) = dijtmp(jxyz) +hi(jxyz,ixyz)*gmk
           enddo
-          ris(:,ic) = ris(:,ic) +dijtmp(:)/(2d0*ami)
-          rjs(:,ic) = rjs(:,ic) -dijtmp(:)/(2d0*amj)
-          vis(ixyz,ic) = vis(ixyz,ic) +gmk/(2d0*ami) /dt
-          vjs(ixyz,ic) = vjs(ixyz,ic) -gmk/(2d0*amj) /dt
+          ris(:,ic) = ris(:,ic) +dijtmp(:)/(2.0_rp*ami)
+          rjs(:,ic) = rjs(:,ic) -dijtmp(:)/(2.0_rp*amj)
+          vis(ixyz,ic) = vis(ixyz,ic) +gmk/(2.0_rp*ami) /dt
+          vjs(ixyz,ic) = vjs(ixyz,ic) -gmk/(2.0_rp*amj) /dt
 !.....Check convergence
           rij(1:3) = rjs(1:3,ic) -ris(1:3,ic)
           rij(1:3) = rij(1:3) -anint(rij(1:3))

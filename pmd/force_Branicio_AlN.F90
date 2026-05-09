@@ -42,7 +42,7 @@ contains
 !-------allocate 2-body force table at the 1st call (do not deallocate!)
       allocate(tblf2(nd2b,2,2),tbldf2(nd2b,2,2))
 !-------make 2-body (smoothed) force table
-      rmin= 0.5d0
+      rmin= 0.5_rp
       rmax= rc
       dr= (rmax-rmin)/(nd2b-1)
       do is=1,2
@@ -80,11 +80,11 @@ contains
       allocate(aa2(3,namax),aa3(3,namax))
     endif
 
-    epotl= 0d0
-    aa2(1:3,1:namax)= 0d0
-    aa3(1:3,1:namax)= 0d0
-    epotl2= 0d0
-    epotl3= 0d0
+    epotl= 0.0_rp
+    aa2(1:3,1:namax)= 0.0_rp
+    aa3(1:3,1:namax)= 0.0_rp
+    epotl2= 0.0_rp
+    epotl3= 0.0_rp
 
 !-----2-body term
     do i=1,natm
@@ -96,7 +96,7 @@ contains
         js= int(tag(j))
         xx(1:3)= ra(1:3,j) -xi(1:3)
         xij(1:3)= h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3)
-        rij= dsqrt(xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3))
+        rij= sqrt(xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3))
         ir= int( (rij-rmin)/dr +1 )
         d = (rij-rmin)/dr -(ir-1)
 !---------potential
@@ -127,8 +127,8 @@ contains
         js= int(tag(j))
         xx(1:3)= ra(1:3,j) -xi(1:3)
         xij(1:3)= h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3)
-        rij= dsqrt(xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3))
-        riji= 1d0/rij
+        rij= sqrt(xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3))
+        riji= 1.0_rp/rij
         drij(1:3)= -xij(1:3)*riji
         expij= exp(v_xi/(rij-v_r0))
         do n=1,lspr(0,i)
@@ -136,21 +136,21 @@ contains
           if( k.le.j ) cycle
           xx(1:3)= ra(1:3,k) -xi(1:3)
           xik(1:3)= h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3)
-          rik=dsqrt(xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3))
-          riki= 1d0/rik
+          rik=sqrt(xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3))
+          riki= 1.0_rp/rik
           drik(1:3)= -xik(1:3)*riki
           expik= exp(v_xi/(rik-v_r0))
 !-----------potential
           t1= v_b*expij*expik
           cs= (xij(1)*xik(1)+xij(2)*xik(2)+xij(3)*xik(3))*riji*riki
-          t2= (cs-cst)**2 /(1d0+v_c*(cs-cst)**2)
+          t2= (cs-cst)**2 /(1.0_rp+v_c*(cs-cst)**2)
           v3= t1*t2
           epi(i)= epi(i) +v3
           epotl3= epotl3 +v3
 !-----------force
           dt1j= v_b*expij*expik*(-v_xi/(rij-v_r0)**2)
           dt1k= v_b*expij*expik*(-v_xi/(rik-v_r0)**2)
-          dt2= 2d0*(cs-cst) /( 1d0 +v_c*(cs-cst)**2 )**2
+          dt2= 2.0_rp*(cs-cst) /( 1.0_rp +v_c*(cs-cst)**2 )**2
           dcsj(1:3)= xik(1:3)*riji*riki -xij(1:3)*cs*riji**2
           dcsk(1:3)= xij(1:3)*riji*riki -xik(1:3)*cs*riki**2
           dcsi(1:3)= -dcsj(1:3) -dcsk(1:3)
@@ -186,7 +186,7 @@ contains
 !-----gather epot
     epotl= epotl2 +epotl3
     if( myid.ge.0 ) then
-      epott = 0d0
+      epott = 0.0_rp
       call mpi_allreduce(epotl,epott,1,mpi_real_rp &
            ,MPI_SUM,mpi_world,ierr)
       epot= epot +epott
@@ -221,7 +221,7 @@ contains
 !-----value
     real(rp):: f2_r
 
-    dij= 0.5d0 *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
+    dij= 0.5_rp *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
     f2_r= &
          v_h(is,js)/r**v_n(is,js) &
          +v_z(is)*v_z(js)/r *exp(-r/v_r1s(is,js)) &
@@ -249,14 +249,14 @@ contains
 
     real(rp):: df2_r,dij
 
-    dij= 0.5d0 *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
+    dij= 0.5_rp *( v_alp(is)*v_z(is)**2 +v_alp(js)*v_z(js)**2 )
     df2_r= &
-         -v_n(is,js)*v_h(is,js)/r**(v_n(is,js)+1d0) &
+         -v_n(is,js)*v_h(is,js)/r**(v_n(is,js)+1.0_rp) &
          -v_z(is)*v_z(js)/r *exp(-r/v_r1s(is,js)) &
-         *(1d0/r +1d0/v_r1s(is,js)) &
+         *(1.0_rp/r +1.0_rp/v_r1s(is,js)) &
          +dij/r**4 *exp(-r/v_r4s(is,js)) &
-         *(4d0/r +1d0/v_r4s(is,js)) &
-         +6d0*v_w(is,js)/r**7d0
+         *(4.0_rp/r +1.0_rp/v_r4s(is,js)) &
+         +6.0_rp*v_w(is,js)/r**7.0_rp
 
     return
   end function df2_r

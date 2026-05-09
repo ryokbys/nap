@@ -23,7 +23,7 @@ module Coulomb
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.Coulomb'
   logical:: params_read = .false.
-  real(rp),parameter:: pi = 3.14159265398979d0
+  real(rp),parameter:: pi = 3.14159265398979_rp
 
   logical:: lprmset_Coulomb = .false.
 
@@ -35,9 +35,9 @@ module Coulomb
 
   integer,parameter:: ioprms = 20
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0) in eV *Ang /e^2
-  real(rp),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737_rp
 !.....permittivity of vacuum
-  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836_rp  ! e^2 /Ang /eV
 
 
 !!$  integer,parameter:: nspmax = 9
@@ -63,30 +63,30 @@ module Coulomb
   real(rp):: rho_scr(nspmax,nspmax)
 !  real(rp),allocatable:: rho_scr(:,:)
 !!$  real(rp):: fbvs = 0.74d0 +- 0.04
-  real(rp):: fbvs = 0.74d0
+  real(rp):: fbvs = 0.74_rp
 !.....Dielectric constant
-  real(rp):: dielec = 1d0
+  real(rp):: dielec = 1.0_rp
 !.....Scaling factor multiplied to E_Coulomb
-  real(rp):: fscale = 1d0
+  real(rp):: fscale = 1.0_rp
 
 !.....charge threshold for Coulomb interaction [default: 0.01]
-  real(rp),parameter:: qthd = 1d-12
+  real(rp),parameter:: qthd = 1e-12_rp
 
 !.....Gaussian width of Ewald sum
-  real(rp):: sgm_ew = 3.5355339d0
+  real(rp):: sgm_ew = 3.5355339_rp
   real(rp):: sgm(nspmax)
 !.....Rho value for screened_cut
 !     Default value = 5.0 (Ang), which corresponds to alpha = 0.2 A^{-1}
 !     See, C.J. Fennell and J.D. Gezelter, J. Chem. Phys. 124, 234104 (2006).
-  real(rp):: rho_screened_cut = 5.0d0
+  real(rp):: rho_screened_cut = 5.0_rp
   real(rp):: vrcs(nspmax,nspmax),dvdrcs(nspmax,nspmax)
-  real(rp):: rcut = -1d0
+  real(rp):: rcut = -1.0_rp
 
 !.....Accuracy controlling parameter for Ewald sum
 !.....See, http://www.jncasr.ac.in/ccms/sbs2007/lecturenotes/5day10nov/SBS_Ewald.pdf
 !.....Exp(-pacc) = 1e-7 when pacc= 18.0
 !  real(rp),parameter:: pacc   = 18d0
-  real(rp):: pacc = 9.21034d0  ! exp(-pacc) = 1e-4
+  real(rp):: pacc = 9.21034_rp  ! exp(-pacc) = 1e-4
 !.....real-space cell volume
   real(rp):: vol
 !.....k-space variables
@@ -98,43 +98,43 @@ module Coulomb
   integer:: kmax1,kmax2,kmax3,nk
   logical,allocatable:: lkuse(:,:,:)
 !.....kmax threshold
-  real(rp),parameter:: threshold_kmax = 1d-4
+  real(rp),parameter:: threshold_kmax = 1e-4_rp
 
 !.....Variable-charge optimization method: damping, cg, matinv
   character(len=20):: chgopt_method = 'damping'
 !.....Variable-charge potential variables
   real(rp):: vc_chi(nspmax),vc_jii(nspmax),vc_e0(nspmax),vcg_sgm(nspmax) &
        ,qtop(nspmax),qbot(nspmax)
-  real(rp),parameter:: vcg_lambda = 0.5d0
+  real(rp),parameter:: vcg_lambda = 0.5_rp
 !.....Convergence criterion for QEq in eV/atom
-  real(rp):: conv_eps_qeq = 1.0d-8
+  real(rp):: conv_eps_qeq = 1.0e-8_rp
 !.....chgopt-damping related parameters
   character(len=20):: codmp_method = 'damping' ! or FIRE or damping
   integer:: nstp_qeq = 100
-  real(rp):: dt_codmp = 0.005d0  ! fs
-  real(rp):: qmass = 0.002d0  ! atomic mass unit
-  real(rp):: qtot_qeq = 0d0
+  real(rp):: dt_codmp = 0.005_rp  ! fs
+  real(rp):: qmass = 0.002_rp  ! atomic mass unit
+  real(rp):: qtot_qeq = 0.0_rp
   integer:: minstp_qeq = 3
   integer:: minstp_conv_qeq = 3
 !.....Velocity-damping related parameters
-  real(rp):: fdamp_codmp = 0.7d0
-  real(rp):: dfdamp_codmp = 0.9d0
+  real(rp):: fdamp_codmp = 0.7_rp
+  real(rp):: dfdamp_codmp = 0.9_rp
 !.....FIRE-related parameters
-  real(rp):: finc_codmp = 1.1d0
-  real(rp):: fdec_codmp = 0.5d0
-  real(rp):: alpha0_codmp = 0.1d0
-  real(rp):: falpha_codmp = 0.99d0
+  real(rp):: finc_codmp = 1.1_rp
+  real(rp):: fdec_codmp = 0.5_rp
+  real(rp):: alpha0_codmp = 0.1_rp
+  real(rp):: falpha_codmp = 0.99_rp
 !.....Gradient descent parameters
-  real(rp):: dqmax_cogrd = 1d-1
-  real(rp):: dqeps_cogrd = 1d-4
+  real(rp):: dqmax_cogrd = 1e-1_rp
+  real(rp):: dqeps_cogrd = 1e-4_rp
 !.....2nd order potential coeff for bounding q inside [qbot,qtop]
-  real(rp):: bound_k2 = 1.0d+2
+  real(rp):: bound_k2 = 1.0e+2_rp
 !.....4-th order potential coeff for bounding q inside [qbot,qtop]
-  real(rp):: bound_k4 = 0d0
+  real(rp):: bound_k4 = 0.0_rp
 !.....Extended lagrangian
   real(rp),allocatable:: aauxq(:)
-  real(rp):: omg2dt2 = 1d0  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
-  real(rp):: auxomg2 = 32.d0
+  real(rp):: omg2dt2 = 1.0_rp  ! = omg^2*dt^2 = 2 is recommended by Nomura et al.
+  real(rp):: auxomg2 = 32._rp
 
   integer,parameter:: ivoigt(3,3)= &
        reshape((/ 1, 6, 5, 6, 2, 4, 5, 4, 3 /),shape(ivoigt))
@@ -151,7 +151,7 @@ contains
 
     integer:: i,is,ierr,nspl
 
-    rho_scr(1:nspmax,1:nspmax) = 0d0
+    rho_scr(1:nspmax,1:nspmax) = 0.0_rp
 
 !!$!.....Get umber of species
 !!$    nsp = nspin
@@ -195,9 +195,9 @@ contains
     integer:: i,ik,k1,k2,k3,isp
     real(rp):: bk1(3),bk2(3),bk3(3),bk(3),bb2
 
-    sgm_ew = rc/sqrt(2d0*pacc)
+    sgm_ew = rc/sqrt(2.0_rp*pacc)
     sgm(1:nspmax) = sgm_ew
-    bkmax  = 2d0*pacc /rc
+    bkmax  = 2.0_rp*pacc /rc
     if( myid.eq.0 .and. iprint.ge.ipl_basic .and. l1st ) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
@@ -249,7 +249,7 @@ contains
           bk(1:3) = bk1(1:3) +bk2(1:3) +bk3(1:3)
           bb2 = norm(bk)
           bb2 = bb2*bb2
-          pflr(ik,1:nspmax)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm_ew**2 *bb2)
+          pflr(ik,1:nspmax)= 4.0_rp *pi /bb2 *exp(-0.5_rp *sgm_ew**2 *bb2)
         enddo
       enddo
     enddo
@@ -278,18 +278,18 @@ contains
 !.....If long-range term exists, self interaction should be added to Jii.
     if( trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       do is=1,nspmax
-        vc_jii(is) = vc_jii(is) -acc*sqrt(2d0/pi) /vcg_sgm(is)
+        vc_jii(is) = vc_jii(is) -acc*sqrt(2.0_rp/pi) /vcg_sgm(is)
       enddo
     endif
 !.....Detect minimum sigma to determine k-max
     sgm_min = sgm_ew
-    bkmax  = sqrt(2d0*pacc) /sgm_min
+    bkmax  = sqrt(2.0_rp*pacc) /sgm_min
     if( myid.eq.0 .and. iprint.ne.0 .and. l1st) then
       write(6,'(/,a)') ' Ewald sum parameters:'
       write(6,'(a,f12.4)') '   1/(4*pi*eps0)        = ', acc
       write(6,'(a,f12.4)') '   Accuracy parameter p = ', pacc
       write(6,'(a,f12.4)') '   Gaussian simga       = ', sgm_ew
-      sgm_rcmd = rc/sqrt(2d0*pacc)
+      sgm_rcmd = rc/sqrt(2.0_rp*pacc)
       write(6,'(a,f12.4)') '   Recommended sigma    = ', sgm_rcmd
       write(6,'(a,f12.4)') '   real-space cutoff    = ', rc
       write(6,'(a,f12.4)') '   k-space cutoff       = ', bkmax
@@ -333,7 +333,7 @@ contains
           bb2 = norm(bk)
           bb2 = bb2*bb2
           do isp=1,nsp
-            pflr(ik,isp)= 4d0 *pi /bb2 *exp(-0.5d0 *sgm(isp)**2 *bb2)
+            pflr(ik,isp)= 4.0_rp *pi /bb2 *exp(-0.5_rp *sgm(isp)**2 *bb2)
           enddo
         enddo
       enddo
@@ -360,14 +360,14 @@ contains
 !.....Initialization
       interact(1:nspmax,1:nspmax) = .true.
       ispflag(1:nspmax) = .false.
-      vc_chi(1:nspmax) = 0d0
-      vc_jii(1:nspmax) = 0d0
-      vc_e0(1:nspmax) = 0d0
-      vcg_sgm(1:nspmax) = 0d0
-      qbot(1:nspmax) = 0d0
-      qtop(1:nspmax) = 0d0
-      rho_scr(:,:) = -1d0
-      rad_bvs(:) = -1d0
+      vc_chi(1:nspmax) = 0.0_rp
+      vc_jii(1:nspmax) = 0.0_rp
+      vc_e0(1:nspmax) = 0.0_rp
+      vcg_sgm(1:nspmax) = 0.0_rp
+      qbot(1:nspmax) = 0.0_rp
+      qtop(1:nspmax) = 0.0_rp
+      rho_scr(:,:) = -1.0_rp
+      rad_bvs(:) = -1.0_rp
       cmode = 'none'
 !.....File name
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -546,7 +546,7 @@ contains
           cycle
         else if( trim(c1st).eq.'rad_screened_cut' ) then
 !.....Set rho_screened_cut minus to show rad should be used to determine rho_screened_cut
-          rho_screened_cut = -1d0 *abs(rho_screened_cut)
+          rho_screened_cut = -1.0_rp *abs(rho_screened_cut)
           backspace(ioprms)
           read(ioprms,*) ctmp, csp, rad
           if( iprint.ge.ipl_info ) print '(a,3x,a,1x,f7.4)',trim(ctmp), trim(csp), rad
@@ -672,11 +672,11 @@ contains
       if( (trim(cchgs).eq.'variable' .or. trim(cchgs).eq.'qeq') &
            .and. .not. trim(cterms).ne.'screened_cut' &
            .and. .not. trim(cterms).ne.'direct_cut' ) then
-        vcgjiimin = 1d+30
+        vcgjiimin = 1e+30_rp
         do isp=1,nsp
           vcgjiimin = min(vcgjiimin,vc_jii(isp))
         enddo
-        sgmlim = acc*sqrt(2d0/pi)/vcgjiimin
+        sgmlim = acc*sqrt(2.0_rp/pi)/vcgjiimin
         if( sgm_ew.lt.sgmlim ) then
           if( iprint.ne.0 ) then
             print *,'  WARNING: Since sgm_ew is too small, sgm_ew is replaced by sgmlim'
@@ -694,11 +694,11 @@ contains
         rhoij_set = .true.
         rad_set = .true.
         do isp=1,nsp
-          if( rho_scr(isp,isp).lt.0d0 ) rhoii_set = .false.
-          if( rad_bvs(isp).lt.0d0 ) rad_set = .false.
+          if( rho_scr(isp,isp).lt.0.0_rp ) rhoii_set = .false.
+          if( rad_bvs(isp).lt.0.0_rp ) rad_set = .false.
           do jsp=1,nsp
             if( isp.eq.jsp ) cycle
-            if( rho_scr(isp,jsp).lt.0d0 ) rhoij_set = .false.
+            if( rho_scr(isp,jsp).lt.0.0_rp ) rhoij_set = .false.
           enddo
         enddo
 
@@ -731,7 +731,7 @@ contains
                  rho_screened_cut, ')'
             do isp=1,nsp
               do jsp=1,nsp
-                if( rho_scr(isp,jsp).lt.0d0 ) rho_scr(isp,jsp) = rho_screened_cut
+                if( rho_scr(isp,jsp).lt.0.0_rp ) rho_scr(isp,jsp) = rho_screened_cut
               enddo
             enddo
           endif
@@ -875,7 +875,7 @@ contains
         interact(:,:) = .false.
         do is=1,nsp
           do js=1,nsp
-            if( schg(is)*schg(js).gt.0d0 ) interact(is,js) = .true.
+            if( schg(is)*schg(js).gt.0.0_rp ) interact(is,js) = .true.
           enddo
         enddo
       endif
@@ -898,14 +898,14 @@ contains
       enddo
     endif
 
-    strsl(1:3,1:3,1:namax) = 0d0
-    aal(:,1:namax) = 0d0
-    elrl = 0d0
-    esrl = 0d0
-    eselfl = 0d0
-    elr = 0d0
-    esr = 0d0
-    eself = 0d0
+    strsl(1:3,1:3,1:namax) = 0.0_rp
+    aal(:,1:namax) = 0.0_rp
+    elrl = 0.0_rp
+    esrl = 0.0_rp
+    eselfl = 0.0_rp
+    elr = 0.0_rp
+    esr = 0.0_rp
+    eself = 0.0_rp
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
       call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
@@ -994,7 +994,7 @@ contains
 
 !.....Compute direct sum
     rc2 = rc*rc
-    esrl = 0d0
+    esrl = 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1011,11 +1011,11 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji /dielec
+        tmp = 0.5_rp *acc *qi*qj*diji /dielec
         if( j.le.natm ) then
           epi(i)= epi(i) +tmp
           epi(j)= epi(j) +tmp
@@ -1032,9 +1032,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *ftmp*rij(ixyz)*(-dxdi(jxyz))
             strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -1068,7 +1068,7 @@ contains
 
 !.....Compute direct sum
     rc2 = rc*rc
-    esrl = 0d0
+    esrl = 0.0_rp
 !$omp parallel
 !$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
 !$omp     dxdj,vrc,dvdrc,tmp,ftmp,ixyz,jxyz) &
@@ -1088,13 +1088,13 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         vrc = acc*qi*qj/rc
         dvdrc = -acc*qi*qj /rc**2
 !.....potential
-        tmp = 0.5d0 *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
+        tmp = 0.5_rp *(acc *qi*qj*diji -vrc -dvdrc*(dij-rc) )
         tmp = tmp /dielec
         epi(i)= epi(i) +tmp
         esrl= esrl +tmp
@@ -1106,7 +1106,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *ftmp*rij(ixyz)*(-dxdi(jxyz))
           enddo
         enddo
       enddo
@@ -1142,7 +1142,7 @@ contains
     real(rp),save:: sqpi,rc2
 
     if( l1st ) then
-      sqpi = 1d0/sqrt(pi)
+      sqpi = 1.0_rp/sqrt(pi)
       rc2 = rc*rc
       do is=1,nspmax
         do js=is,nspmax
@@ -1151,7 +1151,7 @@ contains
           terfcc = erfc(rc/rhoij)
           vrc = acc /rc *terfcc
           dvdrc = -acc /rc &
-               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+               *(terfcc/rc +2.0_rp/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc
@@ -1160,7 +1160,7 @@ contains
       enddo
     endif
 
-    esrl= 0d0
+    esrl= 0.0_rp
 !.....Loop over resident atoms
 !$omp parallel
 !$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
@@ -1183,7 +1183,7 @@ contains
         dij= rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_scr(is,js)
@@ -1191,8 +1191,8 @@ contains
         vrc = qi*qj*vrcs(is,js)
         dvdrc = qi*qj*dvdrcs(is,js)
         texp = exp(-(dij/rhoij)**2)
-        dedr= -acc *qi*qj*diji *(1d0*diji*terfc +2d0/rhoij *sqpi *texp) -dvdrc
-        tmp= 0.5d0 *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
+        dedr= -acc *qi*qj*diji *(1.0_rp*diji*terfc +2.0_rp/rhoij *sqpi *texp) -dvdrc
+        tmp= 0.5_rp *( acc *qi*qj*diji *terfc -vrc -dvdrc*(dij-rc) )
         tmp = tmp /dielec
 !.....potential
 !!$        if( j.le.natm ) then
@@ -1213,7 +1213,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
 !!$              strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                   -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
           enddo
@@ -1243,10 +1243,10 @@ contains
 
 !.....Compute direct sum
     rc2 = rc*rc
-    sgmsq2 = sqrt(2d0)*sgm_ew
-    ss2i = 1d0 /sgmsq2
-    sqpi = 1d0 /sqrt(pi)
-    esrl = 0d0
+    sgmsq2 = sqrt(2.0_rp)*sgm_ew
+    ss2i = 1.0_rp /sgmsq2
+    sqpi = 1.0_rp /sqrt(pi)
+    esrl = 0.0_rp
 !$omp parallel
 !$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,dxdi, &
 !$omp            dxdj,terfc,tmp,ftmp,ixyz,jxyz) &
@@ -1266,12 +1266,12 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.ge.rc2 ) cycle
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
 !!$        dxdj(1:3)=  rij(1:3)*diji
         terfc = erfc(dij*ss2i)
 !.....potential
-        tmp = 0.5d0 *acc *qi*qj*diji *terfc
+        tmp = 0.5_rp *acc *qi*qj*diji *terfc
         tmp = tmp /dielec
 !!$        if( j.le.natm ) then
 !!$          epi(i)= epi(i) +tmp
@@ -1286,7 +1286,7 @@ contains
         esrl= esrl +tmp
 !.....force
         ftmp = -acc *qj*qi*diji *( diji *terfc &
-             +2d0 *sqpi *ss2i *exp(-(dij*ss2i)**2) )
+             +2.0_rp *sqpi *ss2i *exp(-(dij*ss2i)**2) )
         ftmp = ftmp /dielec
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*ftmp
 !!$        do ixyz=1,3
@@ -1297,7 +1297,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *ftmp*rij(ixyz)*(-dxdi(jxyz))
 !!$!$omp atomic
 !!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0 *ftmp*rij(ixyz)*(-dxdi(jxyz))
@@ -1339,11 +1339,11 @@ contains
          ,myid,mpi_md_world,sorg)
 
 !.....Compute long-range contribution to potential energy
-    elrl = 0d0
+    elrl = 0.0_rp
 !.....Long-range contribution to forces and stress
-    emat(1:3,1) = (/ 1d0, 0d0, 0d0 /)
-    emat(1:3,2) = (/ 0d0, 1d0, 0d0 /)
-    emat(1:3,3) = (/ 0d0, 0d0, 1d0 /)
+    emat(1:3,1) = (/ 1.0_rp, 0.0_rp, 0.0_rp /)
+    emat(1:3,2) = (/ 0.0_rp, 1.0_rp, 0.0_rp /)
+    emat(1:3,3) = (/ 0.0_rp, 0.0_rp, 1.0_rp /)
 !$omp parallel
 !$omp do private(i,xi,is,itot,qi,ri,ik,bdk1,bdk2,bdk3,cs10,cs20,cs30, &
 !$omp            cs1m,cs1mm,sn1m,sn1mm,cs2m,cs2mm,sn2m,sn2mm,cs3m,cs3mm, &
@@ -1368,18 +1368,18 @@ contains
 !!$        print '(a,3i4,7es11.3)','myid,i,itot,xi,qi,cs10,cs20,cs30=' &
 !!$             ,myid,i,itot,xi(1:3),qi,cs10,cs20,cs30
 !!$      endif
-      cs1m = 0d0
-      cs1mm= 0d0
-      sn1m = 0d0
-      sn1mm= 0d0
-      cs2m = 0d0
-      cs2mm= 0d0
-      sn2m = 0d0
-      sn2mm= 0d0
-      cs3m = 0d0
-      cs3mm= 0d0
-      sn3m = 0d0
-      sn3mm= 0d0
+      cs1m = 0.0_rp
+      cs1mm= 0.0_rp
+      sn1m = 0.0_rp
+      sn1mm= 0.0_rp
+      cs2m = 0.0_rp
+      cs2mm= 0.0_rp
+      sn2m = 0.0_rp
+      sn2mm= 0.0_rp
+      cs3m = 0.0_rp
+      cs3mm= 0.0_rp
+      sn3m = 0.0_rp
+      sn3mm= 0.0_rp
       do k1= -kmax1,kmax1
         bk1(1:3) = k1 *b1(1:3)
         if( k1.lt.-kmax1+2 ) then
@@ -1393,8 +1393,8 @@ contains
             sn1m = sn1
           endif
         else
-          cs1 = 2d0*cs1m*cs10 -cs1mm
-          sn1 = 2d0*sn1m*cs10 -sn1mm
+          cs1 = 2.0_rp*cs1m*cs10 -cs1mm
+          sn1 = 2.0_rp*sn1m*cs10 -sn1mm
         endif
         do k2= -kmax2,kmax2
           bk2(1:3) = k2 *b2(1:3)
@@ -1409,8 +1409,8 @@ contains
               sn2m = sn2
             endif
           else
-            cs2 = 2d0*cs2m*cs20 -cs2mm
-            sn2 = 2d0*sn2m*cs20 -sn2mm
+            cs2 = 2.0_rp*cs2m*cs20 -cs2mm
+            sn2 = 2.0_rp*sn2m*cs20 -sn2mm
           endif
           do k3= -kmax3,kmax3
             bk3(1:3) = k3 *b3(1:3)
@@ -1425,8 +1425,8 @@ contains
                 sn3m = sn3
               endif
             else
-              cs3 = 2d0*cs3m*cs30 -cs3mm
-              sn3 = 2d0*sn3m*cs30 -sn3mm
+              cs3 = 2.0_rp*cs3m*cs30 -cs3mm
+              sn3 = 2.0_rp*sn3m*cs30 -sn3mm
             endif
             if( .not. lkuse(k3,k2,k1) ) goto 10
             ik= ik +1
@@ -1440,7 +1440,7 @@ contains
 !.....Potential energy per atom
 !!$            tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
 !!$                 *( cs*qcos(ik) +sn*qsin(ik) )
-            tmp = 0.5d0 *acc /vol *qi *pflr(ik,is) &
+            tmp = 0.5_rp *acc /vol *qi *pflr(ik,is) &
                  *( cs*qcos(ik) +sn*qsin(ik) )
             tmp = tmp /dielec
             epi(i) = epi(i) +tmp
@@ -1463,7 +1463,7 @@ contains
             do ixyz=1,3
               do jxyz=1,3
                 strsl(ixyz,jxyz,i) = strsl(ixyz,jxyz,i) +tmp &
-                     *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2d0/bk) &
+                     *( bb(ixyz)*bb(jxyz)/bk*(bk *sgm_ew**2 +2.0_rp/bk) &
                      -emat(ixyz,jxyz))
               enddo
             enddo
@@ -1508,23 +1508,23 @@ contains
 
 !.....Compute self term.
     if( lvc ) then  ! variable charge
-      eselfl = 0d0
+      eselfl = 0.0_rp
       do i=1,natm
         is = int(tag(i))
         qi = chg(i)
         q2 = qi*qi
-        tmp = (vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2)
+        tmp = (vc_e0(is) +vc_chi(is)*qi +0.5_rp*vc_jii(is)*q2)
         eselfl = eselfl +tmp
         epi(i) = epi(i) +tmp
       enddo
     else if( trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long') then ! fixed charge
 !....If charge per atom is fixed, it is constant, though.
-      eselfl = 0d0
+      eselfl = 0.0_rp
       do i=1,natm
         is = int(tag(i))
         q2 = chg(i)*chg(i)
-        tmp = -q2 /sgm_ew *acc/sqrt(2d0*pi)
+        tmp = -q2 /sgm_ew *acc/sqrt(2.0_rp*pi)
         eselfl = eselfl +tmp
         epi(i) = epi(i) +tmp
       enddo
@@ -1550,10 +1550,10 @@ contains
 
 !.....Compute direct sum
     rc2 = rc*rc
-    sgmsq2 = sqrt(2d0)*sgm_ew
-    ss2i = 1d0 /sgmsq2
-    sqpi = 1d0 /sqrt(pi)
-    esr = 0d0
+    sgmsq2 = sqrt(2.0_rp)*sgm_ew
+    ss2i = 1.0_rp /sgmsq2
+    sqpi = 1.0_rp /sqrt(pi)
+    esr = 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -1575,17 +1575,17 @@ contains
 !!$        sgmj = sgm(js)
 !!$        gmmij = 1d0 /sqrt(2d0*(sgmi**2+sgmj**2))
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         terfc = erfc(dij*ss2i)
 !!$        terfc = erfc(gmmij*dij)
 !.....potential
-        tmp = acc *diji *terfc *fcut1(dij,0d0,rc) /dielec
+        tmp = acc *diji *terfc *fcut1(dij,0.0_rp,rc) /dielec
         if( j.le.natm ) then
           esr = esr +tmp*qi*qj
         else
-          esr = esr +0.5d0*tmp*qi*qj
+          esr = esr +0.5_rp*tmp*qi*qj
         endif
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
@@ -1619,7 +1619,7 @@ contains
 
 !.....Compute direct sum
     rc2 = rc*rc
-    esr = 0d0
+    esr = 0.0_rp
 !$omp parallel
 !$omp do private(i,xi,xj,xij,rij,is,qi,jj,j,js,qj,dij,diji,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
@@ -1638,13 +1638,13 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         vrc = acc/rc
         dvdrc = -acc/rc2
 !.....potential
         tmp = acc*diji -vrc -dvdrc*(dij-rc)
         tmp = tmp /dielec
-        esr = esr +0.5d0*tmp*qi*qj
+        esr = esr +0.5_rp*tmp*qi*qj
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
       enddo
@@ -1678,7 +1678,7 @@ contains
 
     if( l1st ) then
       rc2 = rc*rc
-      sqpi = 1d0 /sqrt(pi)
+      sqpi = 1.0_rp /sqrt(pi)
       do is=1,nspmax
         do js=is,nspmax
           if( .not.interact(is,js) ) cycle
@@ -1686,7 +1686,7 @@ contains
           terfcc = erfc(rc/rhoij)
           vrc = acc /rc *terfcc
           dvdrc = -acc /rc &
-               *(terfcc/rc +2d0/rhoij *sqpi *exp(-(rc/rhoij)**2))
+               *(terfcc/rc +2.0_rp/rhoij *sqpi *exp(-(rc/rhoij)**2))
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrcs(is,js) = dvdrc
@@ -1696,9 +1696,9 @@ contains
     endif
 
 !.....Compute direct sum
-    sgmsq2 = sqrt(2d0)*sgm_ew
-    ss2i = 1d0 /sgmsq2
-    esr = 0d0
+    sgmsq2 = sqrt(2.0_rp)*sgm_ew
+    ss2i = 1.0_rp /sgmsq2
+    esr = 0.0_rp
 !$omp parallel
 !$omp do private(i,xi,is,qi,jj,j,js,qj,xj,xij,rij,dij,diji,rhoij,terfc,vrc,dvdrc,tmp) &
 !$omp    reduction(+:esr)
@@ -1719,7 +1719,7 @@ contains
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
         dij = sqrt(dij)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         rhoij = rho_scr(is,js)
         terfc = erfc(dij/rhoij)
         vrc = vrcs(is,js)
@@ -1732,7 +1732,7 @@ contains
 !!$        else
 !!$          esr = esr +0.5d0*tmp*qi*qj
 !!$        endif
-        esr = esr +0.5d0*tmp*qi*qj        
+        esr = esr +0.5_rp*tmp*qi*qj        
 !.....Force on charge
         fq(i) = fq(i) -tmp*qj
 !!$        fq(j) = fq(j) -tmp*qi
@@ -1760,13 +1760,13 @@ contains
 
 !.....Compute reciprocal vectors
     call get_recip_vectors(h)
-    prefac = 1d0 /(2d0*vol*eps0)
+    prefac = 1.0_rp /(2.0_rp*vol*eps0)
 !.....Compute structure factor
     call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
          ,myid,mpi_md_world,sorg)
 
     ik = 0
-    elr = 0d0
+    elr = 0.0_rp
     do k1= -kmax1,kmax1
       bk1(1:3) = k1 *b1(1:3)
       do k2= -kmax2,kmax2
@@ -1794,7 +1794,7 @@ contains
             tmp = tmp /dielec
             elr = elr +tmp
 !.....Force on charge
-            fq(i)= fq(i) -2d0 *prefac/bb2 *texp &
+            fq(i)= fq(i) -2.0_rp *prefac/bb2 *texp &
                  *(cs*qcos(ik) +sn*qsin(ik)) /dielec
 !!$            if( i.eq.1 .and. (ik.gt.5000.and.ik.le.6000) ) then
 !!$              print '(a,i6,3i4,10f10.4)','ik,qi,1/bb2,texp,cs,sn,qcos,qsin,fqikkk,fq(i)='&
@@ -1825,7 +1825,7 @@ contains
     integer:: i,is
     real(rp):: qi,q2,sgmi,tmp
 
-    eself = 0d0
+    eself = 0.0_rp
 !$omp parallel
 !$omp do private(i,is,qi,q2,sgmi,tmp) &
 !$omp    reduction(+:eself)
@@ -1834,7 +1834,7 @@ contains
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm_ew
-      tmp = vc_e0(is) +vc_chi(is)*qi +0.5d0*vc_jii(is)*q2
+      tmp = vc_e0(is) +vc_chi(is)*qi +0.5_rp*vc_jii(is)*q2
       eself = eself +tmp
       fq(i) = fq(i) -(vc_chi(is) +vc_jii(is)*qi)
     enddo
@@ -1857,7 +1857,7 @@ contains
     real(rp):: eclongl,eselfl,ecshortl
     real(rp):: eclong,eself,ecshort
 
-    fq(:) = 0d0
+    fq(:) = 0.0_rp
     call qforce_self(namax,natm,tag,chg,fq,eselfl)
     call mpi_allreduce(eselfl,eself,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
 
@@ -1919,24 +1919,24 @@ contains
     call mpi_allreduce(nbvsl,nbvs,nspmax,mpi_integer &
          ,mpi_sum,mpi_md_world,ierr)
 
-    sum_anion = 0d0
-    sum_cation = 0d0
+    sum_anion = 0.0_rp
+    sum_cation = 0.0_rp
     do is=1,nspmax
-      if( vid_bvs(is).lt.0d0 ) then  !anion
-        sum_anion = sum_anion +vid_bvs(is) *nbvs(is) /sqrt(dble(npq_bvs(is)))
-      else if( vid_bvs(is).gt.0d0 ) then !cation
-        sum_cation = sum_cation +vid_bvs(is)*nbvs(is)/sqrt(dble(npq_bvs(is)))
+      if( vid_bvs(is).lt.0.0_rp ) then  !anion
+        sum_anion = sum_anion +vid_bvs(is) *nbvs(is) /sqrt(real(npq_bvs(is), rp))
+      else if( vid_bvs(is).gt.0.0_rp ) then !cation
+        sum_cation = sum_cation +vid_bvs(is)*nbvs(is)/sqrt(real(npq_bvs(is), rp))
       endif
     enddo
     sum_anion = abs(sum_anion)
 
 !.....Compute valence charges of species
     do is=1,nspmax
-      if( vid_bvs(is).lt.0d0 ) then  ! anion
-        schg(is) = vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+      if( vid_bvs(is).lt.0.0_rp ) then  ! anion
+        schg(is) = vid_bvs(is)/sqrt(real(npq_bvs(is), rp)) &
              *sqrt(sum_cation/sum_anion)
-      else if( vid_bvs(is).gt.0d0 ) then ! cation
-        schg(is)= vid_bvs(is)/sqrt(dble(npq_bvs(is))) &
+      else if( vid_bvs(is).gt.0.0_rp ) then ! cation
+        schg(is)= vid_bvs(is)/sqrt(real(npq_bvs(is), rp)) &
              *sqrt(sum_anion/sum_cation)
       endif
     enddo
@@ -1948,7 +1948,7 @@ contains
       print *,''
       print *,'Charges fixed from ideal valences and composition:'
       do is=1,nspmax
-        if( vid_bvs(is).eq.0d0 ) cycle
+        if( vid_bvs(is).eq.0.0_rp ) cycle
         csp = specorder(is)
         write(6,'(a,a4,2f7.3)') '   csp, V_ideal, V_actual = '&
              ,trim(csp),vid_bvs(is),schg(is)
@@ -1983,7 +1983,7 @@ contains
     a31 = cross(a3,a1)
     a12 = cross(a1,a2)
     vol = abs(dot(a1,a23))
-    pi2 = 2d0 *pi
+    pi2 = 2.0_rp *pi
     b1(1:3) = pi2 /vol *a23(1:3)
     b2(1:3) = pi2 /vol *a31(1:3)
     b3(1:3) = pi2 /vol *a12(1:3)
@@ -2008,8 +2008,8 @@ contains
     real(rp):: qcmax,qsmax,qclmax,qslmax
 
 !.....Compute structure factor of the local processor
-    qcosl(1:nk) = 0d0
-    qsinl(1:nk) = 0d0
+    qcosl(1:nk) = 0.0_rp
+    qsinl(1:nk) = 0.0_rp
 !!$    ik = 0
 !!$    do k1= -kmax1,kmax1
 !!$      bk1(1:3) = k1 *b1(1:3)
@@ -2046,18 +2046,18 @@ contains
       cs10 = cos(bdk1)
       cs20 = cos(bdk2)
       cs30 = cos(bdk3)
-      cs1m = 0d0
-      cs1mm= 0d0
-      sn1m = 0d0
-      sn1mm= 0d0
-      cs2m = 0d0
-      cs2mm= 0d0
-      sn2m = 0d0
-      sn2mm= 0d0
-      cs3m = 0d0
-      cs3mm= 0d0
-      sn3m = 0d0
-      sn3mm= 0d0
+      cs1m = 0.0_rp
+      cs1mm= 0.0_rp
+      sn1m = 0.0_rp
+      sn1mm= 0.0_rp
+      cs2m = 0.0_rp
+      cs2mm= 0.0_rp
+      sn2m = 0.0_rp
+      sn2mm= 0.0_rp
+      cs3m = 0.0_rp
+      cs3mm= 0.0_rp
+      sn3m = 0.0_rp
+      sn3mm= 0.0_rp
       do k1= -kmax1,kmax1
 !!$        bk1(1:3) = k1 *b1(1:3)
         if( k1.lt.-kmax1+2 ) then
@@ -2071,8 +2071,8 @@ contains
             sn1m = sn1
           endif
         else
-          cs1 = 2d0*cs1m*cs10 -cs1mm
-          sn1 = 2d0*sn1m*cs10 -sn1mm
+          cs1 = 2.0_rp*cs1m*cs10 -cs1mm
+          sn1 = 2.0_rp*sn1m*cs10 -sn1mm
         endif
         do k2= -kmax2,kmax2
 !!$          bk2(1:3) = k2 *b2(1:3)
@@ -2087,8 +2087,8 @@ contains
               sn2m = sn2
             endif
           else
-            cs2 = 2d0*cs2m*cs20 -cs2mm
-            sn2 = 2d0*sn2m*cs20 -sn2mm
+            cs2 = 2.0_rp*cs2m*cs20 -cs2mm
+            sn2 = 2.0_rp*sn2m*cs20 -sn2mm
           endif
           do k3= -kmax3,kmax3
             if( k3.lt.-kmax3+2 ) then
@@ -2102,8 +2102,8 @@ contains
                 sn3m = sn3
               endif
             else
-              cs3 = 2d0*cs3m*cs30 -cs3mm
-              sn3 = 2d0*sn3m*cs30 -sn3mm
+              cs3 = 2.0_rp*cs3m*cs30 -cs3mm
+              sn3 = 2.0_rp*sn3m*cs30 -sn3mm
             endif
             if( .not. lkuse(k3,k2,k1) ) goto 10
             ik= ik +1
@@ -2138,8 +2138,8 @@ contains
       enddo ! k1
     enddo  ! ia
 !.....Allreduce qcos and qsin, which could be inefficient and time consuming
-    qcos(1:nk) = 0d0
-    qsin(1:nk) = 0d0
+    qcos(1:nk) = 0.0_rp
+    qsin(1:nk) = 0.0_rp
     call mpi_allreduce(qcosl,qcos,nk,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     call mpi_allreduce(qsinl,qsin,nk,mpi_real_rp &
@@ -2171,7 +2171,7 @@ contains
 
     allocate(bbs(-kmaxini:kmaxini,-kmaxini:kmaxini,-kmaxini:kmaxini))
 
-    bbmax = 0d0
+    bbmax = 0.0_rp
     do k1= -kmaxini,kmaxini
       bk1(1:3) = k1*b1(1:3)
       do k2= -kmaxini,kmaxini
@@ -2257,8 +2257,8 @@ contains
       call accum_mem('force_Coulomb',8*(2*size(amat)+size(qvec)+size(xvec)+size(fq)))
     endif
 
-    amat(1:natm+1,1:natm+1) = 0d0
-    qvec(natm+1) = 0d0
+    amat(1:natm+1,1:natm+1) = 0.0_rp
+    qvec(natm+1) = 0.0_rp
 
 !.....Make A-matrix and X-vector for linear equation, A*Q=X
     do i=1,natm
@@ -2278,8 +2278,8 @@ contains
 !!$        if( chg(i)
 !!$      enddo
 !!$    enddo
-    amat(1:natm,natm+1) = 1d0
-    xvec(natm+1) = 0d0  ! charge neutrality, qtot = 0.0
+    amat(1:natm,natm+1) = 1.0_rp
+    xvec(natm+1) = 0.0_rp  ! charge neutrality, qtot = 0.0
 
     if( iprint.ge.ipl_debug .and. myid.eq.0 .and. l1st ) then
       print *,'amat:'
@@ -2294,12 +2294,12 @@ contains
 
     if( trim(chgopt_method).eq.'cg' ) then
 !.....Perform CG optimization to equilibrate the system and get charges
-      call cg(natm+1,natm+2,1d-5,amat,xvec,qvec,ierr)
+      call cg(natm+1,natm+2,1e-5_rp,amat,xvec,qvec,ierr)
     else if( trim(chgopt_method).eq.'matinv' ) then
 !.....Get optimal qvec by matrix inversion
 !!$      call choldc_inv(natm+1,amat,amati)
       call ludc_inv(natm+1,amat,amati)
-      qvec(:) = 0d0
+      qvec(:) = 0.0_rp
       do i=1,natm+1
         do j=1,natm+1
           qvec(i) = amati(i,j)*xvec(j)
@@ -2413,9 +2413,9 @@ contains
 
 !.....Reset screening length
       do isp=1,nspmax
-        if( vid_bvs(isp).eq.0d0 ) cycle
+        if( vid_bvs(isp).eq.0.0_rp ) cycle
         do jsp=1,nspmax
-          if( vid_bvs(jsp).eq.0d0 ) cycle
+          if( vid_bvs(jsp).eq.0.0_rp ) cycle
           rho_scr(isp,jsp) = fbvs*(rad_bvs(isp)+rad_bvs(jsp))
         enddo
       enddo
@@ -2517,9 +2517,9 @@ contains
 
     rc2 = rc*rc
 
-    ge_rho(1:nspmax) = 0d0
-    gf_rho(1:nspmax,1:3,1:natm) = 0d0
-    gs_rho(1:nspmax,1:6) = 0d0
+    ge_rho(1:nspmax) = 0.0_rp
+    gf_rho(1:nspmax,1:3,1:natm) = 0.0_rp
+    gs_rho(1:nspmax,1:6) = 0.0_rp
 
 !.....Loop over resident atoms
     do i=1,natm
@@ -2540,7 +2540,7 @@ contains
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.gt.rc2 ) cycle
         dij= sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         dxdj(1:3)=  rij(1:3)*diji
         rhoij = rho_scr(isp,jsp)
@@ -2548,7 +2548,7 @@ contains
         terfcc = erfc(rc/rhoij)
         qj = chg(j)
         if( j.le.natm ) then
-          fac = 1d0
+          fac = 1.0_rp
         else
           fac = 0.5
         endif
@@ -2562,7 +2562,7 @@ contains
         endif
 !.....Pre-compute some factors required in force and stress derivatives
         if( lfmatch .or. lsmatch ) then
-          dedr = -acc *qi*qj*diji *(terfc*diji +2d0/rhoij *sqpi *exp(-(dij/rhoij)**2))
+          dedr = -acc *qi*qj*diji *(terfc*diji +2.0_rp/rhoij *sqpi *exp(-(dij/rhoij)**2))
           ddedrho = ddvdrho(dij,rhoij,qi,qj) -ddvdrho(rc,rhoij,qi,qj)
         endif
         if( lfmatch ) then
@@ -2626,7 +2626,7 @@ contains
     real(rp),intent(in):: r,rho,qi,qj
     real(rp):: dvdrho
 
-    dvdrho = acc *qi*qj*2d0 /rho**2 /sqrt(pi) *exp(-(r/rho)**2)
+    dvdrho = acc *qi*qj*2.0_rp /rho**2 /sqrt(pi) *exp(-(r/rho)**2)
     return
   end function dvdrho
 !=======================================================================
@@ -2638,7 +2638,7 @@ contains
     real(rp),intent(in):: r,rho,qi,qj
     real(rp):: ddvdrho
 
-    ddvdrho = -4d0*acc*qi*qj*r *exp(-(r/rho)**2) /sqrt(pi) /rho**4
+    ddvdrho = -4.0_rp*acc*qi*qj*r *exp(-(r/rho)**2) /sqrt(pi) /rho**4
     return
   end function ddvdrho
 !=======================================================================
@@ -2649,7 +2649,7 @@ contains
     use pmdvars,only: dt,namax,natm
     real(rp),intent(inout):: vauxq(namax)
 
-    vauxq(1:natm) = vauxq(1:natm) +0.5d0 *dt *aauxq(1:natm)
+    vauxq(1:natm) = vauxq(1:natm) +0.5_rp *dt *aauxq(1:natm)
     return
   end subroutine update_vauxq
 !=======================================================================
@@ -2700,11 +2700,11 @@ contains
     integer:: i,ierr
     real(rp):: ql,qg,dq,qdist
 
-    ql = 0d0
+    ql = 0.0_rp
     do i=1,natm
       ql = ql +chg(i)
     enddo
-    qg = 0d0
+    qg = 0.0_rp
     call mpi_allreduce(ql,qg,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     dq = qg -qtot_qeq
     qdist = dq /ntot

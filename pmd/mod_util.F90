@@ -53,7 +53,7 @@ contains
     read(str,*,iostat=e) x
 !    is_numeric = ( e == 0 .and. .not.isnan(x) )
 !    is_numeric = ( e == 0 .and. .not.ieee_is_nan(x) )
-    is_numeric = ( e == 0 .and. (x*0d0.eq.0d0) )
+    is_numeric = ( e == 0 .and. (x*0.0_rp.eq.0.0_rp) )
     return
   end function is_numeric
 !=======================================================================
@@ -69,7 +69,7 @@ contains
     implicit none
     real(rp),intent(in):: tag
     integer:: ifmvOf
-    ifmvOf= int(mod(tag*10,10d0))
+    ifmvOf= int(mod(tag*10,10.0_rp))
     return
   end function ifmvOf
 !=======================================================================
@@ -78,7 +78,7 @@ contains
     real(rp),intent(in):: tag
     integer,intent(in):: ith
     integer:: ithOf
-    ithOf= int(mod(tag*10d0**ith,10d0))
+    ithOf= int(mod(tag*10.0_rp**ith,10.0_rp))
     return
   end function ithOf
 !=======================================================================
@@ -99,9 +99,9 @@ contains
 
 !!$    tmp= tag -ispOf(tag) -ifmvOf(tag)*1d-1
 !!$    itotOf= nint(tmp*1d+14)
-    tmp = tag*1d+5
+    tmp = tag*1e+5_rp
     tmp = tmp -int(tmp)
-    itotOf = nint(tmp*1d+9)
+    itotOf = nint(tmp*1e+9_rp)
     return
   end function itotOf
 !=======================================================================
@@ -198,7 +198,7 @@ contains
     integer:: igvar0
     
     igvar0 = ithOf(tagi,gid+1)
-    tagi = tagi +(igvar -igvar0) *10d0**(-(gid+1))
+    tagi = tagi +(igvar -igvar0) *10.0_rp**(-(gid+1))
     return
   end subroutine replace_igvar
 !=======================================================================
@@ -209,7 +209,7 @@ contains
 
     integer:: i,j,jm,jp,im,ip
     real(rp):: a,b,c,alpha,beta,gamma,sgm(3,3),vol
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 
     write(6,*) ''
     write(6,'(a)') " Lattice vectors:"
@@ -217,12 +217,12 @@ contains
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3)
 
-    a = dsqrt(dot(h(1:3,1),h(1:3,1)))
-    b = dsqrt(dot(h(1:3,2),h(1:3,2)))
-    c = dsqrt(dot(h(1:3,3),h(1:3,3)))
-    alpha = acos(dot(h(1:3,2),h(1:3,3))/b/c) /pi *180d0
-    beta  = acos(dot(h(1:3,1),h(1:3,3))/a/c) /pi *180d0
-    gamma = acos(dot(h(1:3,1),h(1:3,2))/a/b) /pi *180d0
+    a = sqrt(dot(h(1:3,1),h(1:3,1)))
+    b = sqrt(dot(h(1:3,2),h(1:3,2)))
+    c = sqrt(dot(h(1:3,3),h(1:3,3)))
+    alpha = acos(dot(h(1:3,2),h(1:3,3))/b/c) /pi *180.0_rp
+    beta  = acos(dot(h(1:3,1),h(1:3,3))/a/c) /pi *180.0_rp
+    gamma = acos(dot(h(1:3,1),h(1:3,2))/a/b) /pi *180.0_rp
 
     write(6,'(a)') ' Lattice parameters:'
     write(6,'(a,f10.3,a,f7.2,a)') '   |a| = ',a,' Ang.,  alpha = ' &
@@ -462,7 +462,7 @@ contains
         real(rp),allocatable:: tmp(:)
         allocate(tmp(new_size(1)))
         tmp(1:size(darr)) = darr(1:size(darr))
-        tmp(size(darr)+1:) = 0d0
+        tmp(size(darr)+1:) = 0.0_rp
         call move_alloc(tmp, darr)
       end block
     endif
@@ -481,7 +481,7 @@ contains
         real(rp),allocatable:: tmp(:,:)
         allocate(tmp(new_size(1),new_size(2)))
         tmp(:,1:size(darr,2)) = darr(:,1:size(darr,2))
-        tmp(:,size(darr,2)+1:) = 0d0
+        tmp(:,size(darr,2)+1:) = 0.0_rp
         call move_alloc(tmp, darr)
       end block
     endif
@@ -500,7 +500,7 @@ contains
         real(rp),allocatable:: tmp(:,:,:)
         allocate(tmp(new_size(1),new_size(2),new_size(3)))
         tmp(:,:,1:size(darr,3)) = darr(:,:,1:size(darr,3))
-        tmp(:,:,size(darr,3)+1:) = 0d0
+        tmp(:,:,size(darr,3)+1:) = 0.0_rp
         call move_alloc(tmp, darr)
       end block
     endif
@@ -538,10 +538,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: expit
 
-    if( x.ge.0d0 ) then
-      expit = 1d0 / (1d0 + exp(-x))
+    if( x.ge.0.0_rp ) then
+      expit = 1.0_rp / (1.0_rp + exp(-x))
     else
-      expit = exp(x) / (1d0 + exp(x))
+      expit = exp(x) / (1.0_rp + exp(x))
     endif
     return
   end function expit
@@ -553,10 +553,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: dexpit
 
-    if( x.ge.0d0 ) then
-      dexpit = exp(-x) / (1d0 + exp(-x))**2
+    if( x.ge.0.0_rp ) then
+      dexpit = exp(-x) / (1.0_rp + exp(-x))**2
     else
-      dexpit = exp(x) / (1d0 + exp(x))**2
+      dexpit = exp(x) / (1.0_rp + exp(x))**2
     endif
     return
   end function dexpit
@@ -568,10 +568,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: log1p
 
-    if( abs(x) .le. 1d-8 ) then
-      log1p = x - 0.5d0*x*x
+    if( abs(x) .le. 1e-8_rp ) then
+      log1p = x - 0.5_rp*x*x
     else
-      log1p = log(1d0 + x)
+      log1p = log(1.0_rp + x)
     endif
     return
   end function log1p
@@ -590,7 +590,7 @@ contains
 !.....Assuming equi-partition
     dx = xs(2) -xs(1)
     dfs(1) = (fs(2)-fs(1))/dx
-    dx2 = 2d0*dx
+    dx2 = 2.0_rp*dx
     do i=2,n-1
       dfs(i) = (fs(i+1)-fs(i-1))/dx2
     enddo

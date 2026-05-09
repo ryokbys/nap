@@ -53,12 +53,12 @@ contains
       fname = trim(paramsdir)//'/'//trim(paramsfname)
       open(ioprms,file=trim(fname),status='old')
       interact(1:nspmax,1:nspmax) = .false.
-      Aij(:,:)= 0d0
-      rhoij(:,:)= 0d0
-      c6ij(:,:)= 0d0
-      c8ij(:,:)= 0d0
-      c10ij(:,:)= 0d0
-      rcij(:,:)= 0d0
+      Aij(:,:)= 0.0_rp
+      rhoij(:,:)= 0.0_rp
+      c6ij(:,:)= 0.0_rp
+      c8ij(:,:)= 0.0_rp
+      c10ij(:,:)= 0.0_rp
+      rcij(:,:)= 0.0_rp
       cprmtype = 'element'
       if( iprint.ne.0 ) write(6,'(/,a)') ' Pellenq parameters:'
       do while(.true.)
@@ -248,10 +248,10 @@ contains
       endif
       allocate(strsl(3,3,namax))
       call accum_mem('force_Pellenq',8*size(strsl))
-      rc2 = -1d0
+      rc2 = -1.0_rp
 !.....Initialize smooth cutoff
-      vrcs(:,:) = 0d0
-      dvdrcs(:,:) = 0d0
+      vrcs(:,:) = 0.0_rp
+      dvdrcs(:,:) = 0.0_rp
       do is=1,nspmax
         do js=is,nspmax
           if( .not.(interact(is,js).or.interact(js,is)) ) cycle
@@ -267,9 +267,9 @@ contains
           vrcs(is,js) = vrc
           vrcs(js,is) = vrc
           dvdrc= -Aij(is,js)*expbrc/rhoij(is,js) &
-               -c6ij(is,js)/rc**6 *(df6 -6d0*f6/rc) &
-               -c8ij(is,js)/rc**8 *(df8 -8d0*f8/rc) &
-               -c10ij(is,js)/rc**10 *(df10 -10d0*f10/rc)
+               -c6ij(is,js)/rc**6 *(df6 -6.0_rp*f6/rc) &
+               -c8ij(is,js)/rc**8 *(df8 -8.0_rp*f8/rc) &
+               -c10ij(is,js)/rc**10 *(df10 -10.0_rp*f10/rc)
 !!$          dvdrc= -Aij(is,js)*expbrc/rhoij(is,js)
           dvdrcs(is,js) = dvdrc
           dvdrcs(js,is) = dvdrc
@@ -292,8 +292,8 @@ contains
       call accum_mem('force_Pellenq',8*size(strsl))
     endif
 
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !.....Loop over resident atoms
 !$omp parallel
@@ -318,7 +318,7 @@ contains
         dij= sqrt(dij2)
         rc = rcij(is,js)
         if( dij.ge.rc ) cycle
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
         A = Aij(is,js)
         rho= rhoij(is,js)
@@ -330,13 +330,13 @@ contains
         call compute_f2n(dij,is,js,f6,f8,f10,df6,df8,df10)
         r2 = dij**2
         r10 = r2**5
-        r10i = 1d0/r10
+        r10i = 1.0_rp/r10
         r8i = r10i *r2
         r6i = r8i *r2
         expbr = exp(-dij/rho)
 !.....potential
         tmp= A*expbr -f6*c6*r6i -f8*c8*r8i -f10*c10*r10i
-        tmp2 = 0.5d0 *(tmp -vrc -dvdrc*(dij-rc))
+        tmp2 = 0.5_rp *(tmp -vrc -dvdrc*(dij-rc))
         epi(i)= epi(i) +tmp2
         epotl= epotl +tmp2
 !!$        if( j.le.natm ) then
@@ -350,9 +350,9 @@ contains
 !!$        endif
 !.....force
         dedr= -A*expbr/rho &
-             -c6*r6i*(df6 -6d0*f6/dij) &
-             -c8*r8i*(df8 -8d0*f8/dij) &
-             -c10*r10i*(df10 -10d0*f10/dij) &
+             -c6*r6i*(df6 -6.0_rp*f6/dij) &
+             -c8*r8i*(df8 -8.0_rp*f8/dij) &
+             -c10*r10i*(df10 -10.0_rp*f10/dij) &
              -dvdrc
         aa(1:3,i)= aa(1:3,i) -dxdi(1:3)*dedr
 !!$        do ixyz=1,3
@@ -363,7 +363,7 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strsl(jxyz,ixyz,i)= strsl(jxyz,ixyz,i) &
-                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
+                 -0.5_rp *dedr*rij(ixyz)*(-dxdi(jxyz))
 !!$!$omp atomic
 !!$            strsl(jxyz,ixyz,j)= strsl(jxyz,ixyz,j) &
 !!$                 -0.5d0 *dedr*rij(ixyz)*(-dxdi(jxyz))
@@ -377,7 +377,7 @@ contains
     strs(1:3,1:3,1:natm)= strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epott= 0d0
+    epott= 0.0_rp
     call mpi_allreduce(epotl,epott,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     epot= epot +epott
@@ -393,19 +393,19 @@ contains
     integer:: k
     real(rp):: br,expbr,fack,brk,ftmp,dftmp,rhoi,tmp
 
-    rhoi = 1d0/rhoij(is,js)
+    rhoi = 1.0_rp/rhoij(is,js)
     br = r *rhoi
     expbr = exp( -br)
-    fack = 1d0
-    brk = 1d0
-    ftmp = 1d0 -1d0*expbr
+    fack = 1.0_rp
+    brk = 1.0_rp
+    ftmp = 1.0_rp -1.0_rp*expbr
     dftmp = +expbr *rhoi
     do k=1,6
       fack = fack*k
       brk = brk*br
       tmp = brk/fack *expbr
       ftmp = ftmp -tmp
-      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
+      dftmp = dftmp -tmp *(real(k, rp)/r -rhoi)
     enddo
     f6 = ftmp
     df6 = dftmp
@@ -414,7 +414,7 @@ contains
       brk = brk*br
       tmp = brk/fack *expbr
       ftmp = ftmp -tmp
-      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
+      dftmp = dftmp -tmp *(real(k, rp)/r -rhoi)
     enddo
     f8 = ftmp
     df8= dftmp
@@ -423,7 +423,7 @@ contains
       brk = brk*br
       tmp = brk/fack *expbr
       ftmp = ftmp -tmp
-      dftmp = dftmp -tmp *(dble(k)/r -rhoi)
+      dftmp = dftmp -tmp *(real(k, rp)/r -rhoi)
     enddo
     f10 = ftmp
     df10= dftmp

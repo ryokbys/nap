@@ -10,7 +10,7 @@ module distfunc
 
   public:: calc_rdf, calc_adf
 
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
   
 contains
 !=======================================================================
@@ -37,7 +37,7 @@ contains
     enddo
     
     rc2 = rmax*rmax
-    rdfs(:,:,:) = 0d0
+    rdfs(:,:,:) = 0.0_rp
     do ia=1,natm
       is = int(tag(ia))
       xi(1:3) = ra(1:3,ia)
@@ -48,12 +48,12 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.ge.rc2 ) cycle
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
         rrdr = (dij-rmin)/dr
-        if( rrdr.lt.0d0 ) cycle
+        if( rrdr.lt.0.0_rp ) cycle
         ib = min(int(rrdr)+1,nbins)
-        rdfs(ib,js,is) = rdfs(ib,js,is) +1d0
-        rdfs(ib,0,0) = rdfs(ib,0,0) +1d0
+        rdfs(ib,js,is) = rdfs(ib,js,is) +1.0_rp
+        rdfs(ib,0,0) = rdfs(ib,0,0) +1.0_rp
 !!$      if( js.ne.is ) rdfs(js,is,ib) = rdfs(js,is,ib) + 1d0
       enddo
     enddo
@@ -73,7 +73,7 @@ contains
         is = int(tag(ia))
         natms(is) = natms(is) +1
       enddo
-      tmp = 4d0 *pi *natm *(natm -1)/vol *dr
+      tmp = 4.0_rp *pi *natm *(natm -1)/vol *dr
       do ib=1,nbins
         r = dists(ib)
         rdfs(ib,0,0) = rdfs(ib,0,0)/ (tmp*r*r)
@@ -84,7 +84,7 @@ contains
         do js=is,msp
           nj = natms(js)
           if( nj.eq.0 ) cycle
-          tmp = 4d0*pi*dr /vol
+          tmp = 4.0_rp*pi*dr /vol
           if( is.eq.js ) then
             if( ni.eq.1 ) cycle
             tmp = tmp *ni*(ni-1)
@@ -98,7 +98,7 @@ contains
         enddo
       enddo
     else
-      tmp = 4d0 *pi *natm*(natm-1) /vol *dr
+      tmp = 4.0_rp *pi *natm*(natm-1) /vol *dr
       do ib=1,nbins
         r = dists(ib)
         rdfs(ib,0,0) = rdfs(ib,0,0)/ (tmp*r*r)
@@ -131,7 +131,7 @@ contains
     enddo
     
     rc2 = rc*rc
-    adfs(:,:) = 0d0
+    adfs(:,:) = 0.0_rp
     do ia=1,natm
       is = int(tag(ia))
       iexist = .false.
@@ -172,9 +172,9 @@ contains
           dot = rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
           cs = dot/sqrt(dij2)/sqrt(dik2)
           rad = acos(cs)
-          deg = rad/pi *180d0
+          deg = rad/pi *180.0_rp
           iang = min(max(int(deg/dang)+1,1),nang)
-          adfs(iang,ijktrpl) = adfs(iang,ijktrpl) +1d0
+          adfs(iang,ijktrpl) = adfs(iang,ijktrpl) +1.0_rp
         enddo
       enddo
     enddo

@@ -121,16 +121,16 @@ contains
     character(len=4):: cout
 
     if( inmem.lt.1000 ) then
-      outmem = dble(inmem)
+      outmem = real(inmem, rp)
       cout = 'Byte'
     else if( inmem.lt.1000000 ) then
-      outmem = dble(inmem)/1000
+      outmem = real(inmem, rp)/1000
       cout = 'kB'
     else if( inmem.lt.1000000000 ) then
-      outmem = dble(inmem)/1000000
+      outmem = real(inmem, rp)/1000000
       cout = 'MB'
     else
-      outmem = dble(inmem)/1000000000
+      outmem = real(inmem, rp)/1000000000
       cout = 'GB'
     endif
     

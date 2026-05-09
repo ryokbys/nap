@@ -41,17 +41,17 @@ contains
     endif
 
 !.....Set z-fmv of 9th to 0d0, which means no motion along z
-    fmv(3,9) = 0d0
+    fmv(3,9) = 0.0_rp
     
 !.....Detect initial top and bottom positions
-    ztopl = 0d0
-    zbotl = 1d0
+    ztopl = 0.0_rp
+    zbotl = 1.0_rp
     do i=1,natm
       zbotl= min(zbotl,ra(3,i)+sorg(3))
       ztopl= max(ztopl,ra(3,i)+sorg(3))
     enddo
-    ztop0= 0d0
-    zbot0= 0d0
+    ztop0= 0.0_rp
+    zbot0= 0.0_rp
     call mpi_allreduce(ztopl,ztop0,1,mpi_real_rp,mpi_max &
          ,mpi_md_world,ierr)
     call mpi_allreduce(zbotl,zbot0,1,mpi_real_rp,mpi_min &
@@ -106,14 +106,14 @@ contains
     integer:: i,l,ierr,ifmv
 
     do i=1,natm
-      ifmv= int(mod(tag(i)*10,10d0))
-      if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then  !top
+      ifmv= int(mod(tag(i)*10,10.0_rp))
+      if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then  !top
         ra(3,i)= ra(3,i) +dzl
-      else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then  !bottom
+      else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5_rp ) then  !bottom
         ra(3,i)= ra(3,i) -dzl
       endif
     enddo
-    zlen= zlen +2d0*dzl
+    zlen= zlen +2.0_rp*dzl
     strnow= (zlen-zlen0)/zlen0
 !      write(6,'(a,2es12.3e3)') ' zl,strnow=',zl,strnow
 
@@ -135,7 +135,7 @@ contains
     integer:: ierr,i,nztopl,nzbotl
     real(rp):: ztopl,zbotl,dlfin,zskin,angle
     real(rp):: x1,y1,x2,y2,amati(2,2),det
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 
     if( myid_md.eq.0 .and. iprint.gt.0 ) then
       print *,''
@@ -143,7 +143,7 @@ contains
     endif
 
 !.....Set fmv of 9th to zero, which means no motion except z
-    fmv(1:2,9) = 0d0
+    fmv(1:2,9) = 0.0_rp
 
 !.....Unit vector along shear from zshear_angle
     angle = mod(zshear_angle,180.0)
@@ -152,14 +152,14 @@ contains
     uvy = sin(angle)
 
 !.....Detect initial top and bottom positions
-    ztopl = 0d0
-    zbotl = 1d0
+    ztopl = 0.0_rp
+    zbotl = 1.0_rp
     do i=1,natm
       zbotl= min(zbotl,ra(3,i)+sorg(3))
       ztopl= max(ztopl,ra(3,i)+sorg(3))
     enddo
-    ztop0= 0d0
-    zbot0= 0d0
+    ztop0= 0.0_rp
+    zbot0= 0.0_rp
     call mpi_allreduce(ztopl,ztop0,1,mpi_real_rp,mpi_max &
          ,mpi_md_world,ierr)
     call mpi_allreduce(zbotl,zbot0,1,mpi_real_rp,mpi_min &
@@ -180,7 +180,7 @@ contains
     d1 = amati(1,1) *uvx*dl +amati(1,2)*uvy*dl
     d2 = amati(2,1) *uvx*dl +amati(2,2)*uvy*dl
    
-    dlen0 = 0d0
+    dlen0 = 0.0_rp
     dlen = dlen0
     ztop = ztop0
     zbot = zbot0
@@ -229,16 +229,16 @@ contains
     integer:: i,l,ierr,ifmv
 
     do i=1,natm
-      ifmv= int(mod(tag(i)*10,10d0))
-      if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then  !top
+      ifmv= int(mod(tag(i)*10,10.0_rp))
+      if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then  !top
         ra(1,i)= ra(1,i) +d1
         ra(2,i)= ra(2,i) +d2
-      else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then  !bottom
+      else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5_rp ) then  !bottom
         ra(1,i)= ra(1,i) -d1
         ra(2,i)= ra(2,i) -d2
       endif
     enddo
-    dlen= dlen +2d0*dl
+    dlen= dlen +2.0_rp*dl
     strnow= (dlen-dlen0)/zlen0
 !!$    if( myid_md.eq.0 ) write(6,'(a,2es12.3e3)') ' xlen,strnow=',xlen,strnow
 
@@ -261,31 +261,31 @@ contains
     integer:: i,is,ifmv,ierr,ixyz
     real(rp):: ftopl,fbotl,xyarea,a(3),b(3),axb(3),fx,fy
 
-    ftopl= 0d0
-    fbotl= 0d0
+    ftopl= 0.0_rp
+    fbotl= 0.0_rp
     if( trim(czload_type).eq.'atoms' ) then
       do i=1,natm
-        ifmv= int(mod(tag(i)*10,10d0))
+        ifmv= int(mod(tag(i)*10,10.0_rp))
 !.....Scaled force to real force to get eV/Ang unit
-        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then !top layer
+        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then !top layer
           ftopl=ftopl +(h(3,1)*aa(1,i) +h(3,2)*aa(2,i) &
                +h(3,3)*aa(3,i) )
-        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then !bottom
+        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5_rp ) then !bottom
           fbotl=fbotl +(h(3,1)*aa(1,i) +h(3,2)*aa(2,i) &
                +h(3,3)*aa(3,i) )
         endif
       enddo
     else if( trim(czload_type).eq.'shear' ) then
       do i=1,natm
-        ifmv= int(mod(tag(i)*10,10d0))
+        ifmv= int(mod(tag(i)*10,10.0_rp))
 !.....Scaled force to real force to get eV/Ang unit
-        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5d0 ) then !top layer
+        if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then !top layer
           fx=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
                +h(1,3)*aa(3,i)
           fy=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
                +h(1,3)*aa(3,i)
           ftopl = ftopl +(fx*uvx +fy*uvy)
-        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5d0 ) then !bottom
+        else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5_rp ) then !bottom
           fx=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
                +h(1,3)*aa(3,i)
           fy=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &
@@ -295,8 +295,8 @@ contains
       enddo
     endif
 
-    ftop= 0d0
-    fbot= 0d0
+    ftop= 0.0_rp
+    fbot= 0.0_rp
     call mpi_allreduce(ftopl,ftop,1,mpi_real_rp &
          ,mpi_sum,mpi_md_world,ierr)
     call mpi_allreduce(fbotl,fbot,1,mpi_real_rp &
@@ -333,12 +333,12 @@ contains
         write(6,'(a)') ' z-loading parameters:'
         write(6,'(a,i5,3es12.4)') '   zv0= ',zv0(1:3)
         write(6,'(a,es12.4,a)') '   strain rate=' &
-             ,strfin/100/(nstp*dt*1d-15),' /s'
+             ,strfin/100/(nstp*dt*1e-15_rp),' /s'
       endif
       l1st=.false.
     endif
 
-    h(1:3,3,0)= zv0(1:3) *(1d0 +strfin/100/nstp*istp)
+    h(1:3,3,0)= zv0(1:3) *(1.0_rp +strfin/100/nstp*istp)
     strnow= strfin /nstp *istp
     return
   end subroutine zload_box

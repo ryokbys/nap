@@ -32,8 +32,8 @@ module UF3
 !!$  logical:: lprmset_uf3l = .false.
 !!$  logical:: lprmset_uf3d = .false.
 
-  real(rp),parameter:: huge = 1d+100
-  real(rp),parameter:: tiny = 1d-8
+  real(rp),parameter:: vhuge = huge(0.0_rp)
+  real(rp),parameter:: tiny = 1e-8_rp
 
 !.....uf2 parameters
   type prm2
@@ -101,9 +101,9 @@ module UF3
   type(prm3d),allocatable:: prm3ds(:)
   logical:: has_trios = .false.
   logical:: has_solo = .false.
-  real(rp):: rcmax = 0.0d0
-  real(rp):: rc3max = 0.0d0
-  real(rp):: rc3max2 = 0.0d0
+  real(rp):: rcmax = 0.0_rp
+  real(rp):: rc3max = 0.0_rp
+  real(rp):: rc3max2 = 0.0_rp
 !.....Common for angular softmax penalty
   integer,parameter:: npnts = 100
   integer:: nc2max = 0
@@ -183,7 +183,7 @@ contains
       n1b = 0
       n2b = 0
       n3b = 0
-      erg1s(:) = 0d0
+      erg1s(:) = 0.0_rp
       interact2(:,:) = -1
       interact3(:,:,:) = -1
       open(ioprms,file=trim(fname),status='old')
@@ -339,7 +339,7 @@ contains
       n1b = 0
       n2b = 0
       n3b = 0
-      erg1s(:) = 0d0
+      erg1s(:) = 0.0_rp
       interact2(:,:) = -1
       interact3(:,:,:) = -1
       open(ioprms,file=trim(fname),status='old')
@@ -500,7 +500,7 @@ contains
       n1b = 0
       n2b = 0
       n3b = 0
-      erg1s(:) = 0d0
+      erg1s(:) = 0.0_rp
       interact2(:,:) = -1
       interact3(:,:,:) = -1
       open(ioprms,file=trim(fname),status='old')
@@ -697,9 +697,9 @@ contains
     read(ioprms,*) ps%rcij, ps%rcik, ps%nknot, ps%gmj, ps%gmk
     ps%rcij2 = ps%rcij**2
     ps%rcik2 = ps%rcik**2
-    if( ps%csj.eq.ps%csk .and. abs(ps%gmj-ps%gmk).gt.1d-10 ) &
+    if( ps%csj.eq.ps%csk .and. abs(ps%gmj-ps%gmk).gt.1e-10_rp ) &
          stop 'ERROR@read_3bl: must be gmj==gmk for csj==csk in 3BL.'
-    if( ps%csj.eq.ps%csk .and. abs(ps%rcij-ps%rcik).gt.1d-10 ) &
+    if( ps%csj.eq.ps%csk .and. abs(ps%rcij-ps%rcik).gt.1e-10_rp ) &
          stop 'ERROR@read_3bl: must be rcij==rcik for csj==csk in 3BL.'
     if( allocated(ps%knots) ) deallocate(ps%knots)
     allocate(ps%knots(ps%nknot))
@@ -742,7 +742,7 @@ contains
     read(ioprms,*) ps%rcij, ps%rcik, ps%nknij, ps%nknik, ps%nkncs
     ps%rcij2 = ps%rcij**2
     ps%rcik2 = ps%rcik**2
-    if( ps%csj.eq.ps%csk .and. abs(ps%rcij-ps%rcik).gt.1d-10 ) &
+    if( ps%csj.eq.ps%csk .and. abs(ps%rcij-ps%rcik).gt.1e-10_rp ) &
          stop 'ERROR@read_3bd: must be rcij==rcik for csj==csk in 3BD.'
     if( ps%csj.eq.ps%csk .and. ps%nknij.ne.ps%nknik ) &
          stop 'ERROR@read_3bd: must be nknij==nknik for csj==csk in 3BD.'
@@ -1083,12 +1083,12 @@ contains
     real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
 
     type(prm2):: p2
     type(prm3):: p3
 
-    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
+    if( rcin2 < 0.0_rp ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
         if( myid == 0 ) then
           write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
@@ -1113,12 +1113,12 @@ contains
       allocate(ls3b(0:nnmax))
     endif
 
-    aal2(:,:) = 0d0
-    aal3(:,:) = 0d0
-    strsl(:,:,:) = 0d0
-    epotl1 = 0d0
-    epotl2 = 0d0
-    epotl3 = 0d0
+    aal2(:,:) = 0.0_rp
+    aal3(:,:) = 0.0_rp
+    strsl(:,:,:) = 0.0_rp
+    epotl1 = 0.0_rp
+    epotl2 = 0.0_rp
+    epotl3 = 0.0_rp
 !$omp parallel
 !$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij, &
 !$omp      drijj,nr2,n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
@@ -1132,7 +1132,7 @@ contains
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
@@ -1180,10 +1180,10 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
 !$omp atomic
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
             enddo
           enddo
         enddo  ! lij
@@ -1206,7 +1206,7 @@ contains
 !!$        ls3b(ls3b(0)) = ja
 !!$      enddo
 
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
 !!$      do jsp=1,nspmax
 !!$        do ksp=jsp,nspmax
 !!$          i3b = interact3(is,jsp,ksp)
@@ -1232,7 +1232,7 @@ contains
 !!$              if( ka == ja ) cycle
               ktot = itotOf(tag(ka))
 !.....Taking into account the double counting of symmetric terms
-              fac3b = 1d0
+              fac3b = 1.0_rp
 !!$              if( jsp == ksp ) fac3b = 0.5d0
               ks = int(tag(ka))
 !!$              if( ks /= ksp ) cycle
@@ -1294,15 +1294,15 @@ contains
                       do jxyz=1,3
 !$omp atomic
                         strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             -0.5_rp *(rij(ixyz)*tmpij(jxyz) &
                              +rik(ixyz)*tmpik(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             -0.5_rp *(rij(ixyz)*tmpij(jxyz) &
                              +rjk(ixyz)*tmpjk(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
-                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) &
+                             -0.5_rp *(rik(ixyz)*tmpik(jxyz) &
                              +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
@@ -1331,9 +1331,9 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epot1 = 0d0
-    epot2 = 0d0
-    epot3 = 0d0
+    epot1 = 0.0_rp
+    epot2 = 0.0_rp
+    epot3 = 0.0_rp
     call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
@@ -1378,12 +1378,12 @@ contains
     real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
 
     type(prm2):: p2
     type(prm3):: p3
 
-    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
+    if( rcin2 < 0.0_rp ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
         if( myid == 0 ) then
           write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
@@ -1408,12 +1408,12 @@ contains
       allocate(ls3b(0:nnmax))
     endif
 
-    aal2(:,:) = 0d0
-    aal3(:,:) = 0d0
-    strsl(:,:,:) = 0d0
-    epotl1 = 0d0
-    epotl2 = 0d0
-    epotl3 = 0d0
+    aal2(:,:) = 0.0_rp
+    aal3(:,:) = 0.0_rp
+    strsl(:,:,:) = 0.0_rp
+    epotl1 = 0.0_rp
+    epotl2 = 0.0_rp
+    epotl3 = 0.0_rp
 !$omp parallel
 !$omp do private(ia,is,xi,jj,ja,js,i2b,p2,xj,xij,rij,dij2,dij, &
 !$omp      drijj,nr2,n,bij,c2t,tmp,dbij,tmp2,ixyz,jxyz, &
@@ -1427,7 +1427,7 @@ contains
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
@@ -1475,10 +1475,10 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
 !$omp atomic
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
             enddo
           enddo
         enddo  ! lij
@@ -1501,7 +1501,7 @@ contains
 !!$        ls3b(ls3b(0)) = ja
 !!$      enddo
 
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
       do jsp=1,nspmax
         do ksp=jsp,nspmax
           i3b = interact3(is,jsp,ksp)
@@ -1526,8 +1526,8 @@ contains
               if( ka == ja ) cycle
               ktot = itotOf(tag(ka))
 !.....Taking into account the double counting of symmetric terms
-              fac3b = 1d0
-              if( jsp == ksp ) fac3b = 0.5d0
+              fac3b = 1.0_rp
+              if( jsp == ksp ) fac3b = 0.5_rp
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
               xk(1:3) = ra(1:3,ka)
@@ -1584,15 +1584,15 @@ contains
                       do jxyz=1,3
 !$omp atomic
                         strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             -0.5_rp *(rij(ixyz)*tmpij(jxyz) &
                              +rik(ixyz)*tmpik(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                             -0.5d0 *(rij(ixyz)*tmpij(jxyz) &
+                             -0.5_rp *(rij(ixyz)*tmpij(jxyz) &
                              +rjk(ixyz)*tmpjk(jxyz))
 !$omp atomic
                         strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
-                             -0.5d0 *(rik(ixyz)*tmpik(jxyz) &
+                             -0.5_rp *(rik(ixyz)*tmpik(jxyz) &
                              +rjk(ixyz)*tmpjk(jxyz))
                       enddo
                     enddo
@@ -1621,9 +1621,9 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epot1 = 0d0
-    epot2 = 0d0
-    epot3 = 0d0
+    epot1 = 0.0_rp
+    epot2 = 0.0_rp
+    epot3 = 0.0_rp
     call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
@@ -1668,7 +1668,7 @@ contains
          drjkk(3),diji,diki,drijc,drikc,dv3csn,dv3rij,dv3rik,sumcb,sumcdb
     real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),gmj,gmk,csn,vexp
     real(rp):: rcij, rcik, rcij2, rcik2
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
 
 #ifdef CONTRIB
     real(rp):: epot_LiLa, epot_NbO, epot_X, epot_Xp, epot_Xm, epot_elem, &
@@ -1678,7 +1678,7 @@ contains
     type(prm2):: p2
     type(prm3l):: p3
 
-    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
+    if( rcin2 < 0.0_rp ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
         if( myid == 0 ) then
           write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
@@ -1703,24 +1703,24 @@ contains
       allocate(ls3b(0:nnmax))
     endif
 
-    aal2(:,:) = 0d0
-    aal3(:,:) = 0d0
-    strsl(:,:,:) = 0d0
-    epotl1 = 0d0
-    epotl2 = 0d0
-    epotl3 = 0d0
+    aal2(:,:) = 0.0_rp
+    aal3(:,:) = 0.0_rp
+    strsl(:,:,:) = 0.0_rp
+    epotl1 = 0.0_rp
+    epotl2 = 0.0_rp
+    epotl3 = 0.0_rp
 #ifdef IMPULSE
-    ftaul(:) = 0d0
+    ftaul(:) = 0.0_rp
 #endif
 #ifdef CONTRIB
-    epot_LiLa = 0d0
-    epot_Li = 0d0
-    epot_La = 0d0
-    epot_NbO = 0d0
-    epot_X = 0d0
-    epot_Xp = 0d0
-    epot_Xm = 0d0
-    epot_elem = 0d0
+    epot_LiLa = 0.0_rp
+    epot_Li = 0.0_rp
+    epot_La = 0.0_rp
+    epot_NbO = 0.0_rp
+    epot_X = 0.0_rp
+    epot_Xp = 0.0_rp
+    epot_Xm = 0.0_rp
+    epot_elem = 0.0_rp
 #endif
     do ia=1,natm
       is = int(tag(ia))
@@ -1778,7 +1778,7 @@ contains
           else
             if( is==2 ) epi(ia) = epi(ia) +tmp
             epot_X = epot_X +tmp
-            if( tmp > 0d0 ) then
+            if( tmp > 0.0_rp ) then
               epot_Xp = epot_Xp +tmp
             else
               epot_Xm = epot_Xm +tmp
@@ -1812,9 +1812,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
             enddo
           enddo
         enddo  ! lij
@@ -1835,7 +1835,7 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2 > rc3max2 ) cycle
         dij = sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
@@ -1863,10 +1863,10 @@ contains
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2 > rcik2 ) cycle
           dik = sqrt(dik2)
-          diki = 1d0/dik
+          diki = 1.0_rp/dik
           drikk(1:3) = rik(1:3)*diki
-          drijc = 1d0/(dij-rcij)
-          drikc = 1d0/(dik-rcik)
+          drijc = 1.0_rp/(dij-rcij)
+          drikc = 1.0_rp/(dik-rcik)
 !.....parameters
           gmj = p3%gmj
           gmk = p3%gmk
@@ -1875,12 +1875,12 @@ contains
             gmk = gmj
           endif
 !.....common terms
-          vexp = dexp(gmj*drijc +gmk*drikc)
+          vexp = exp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
-          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
+          csn = max(min(csn, 1.0_rp-tiny), -1.0_rp+tiny)
           call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
-          sumcb = 0d0
-          sumcdb= 0d0
+          sumcb = 0.0_rp
+          sumcdb= 0.0_rp
           do lcs = -3,0
             n = ncs +lcs
             if( n < 1 .or. n > p3%ncoef ) cycle
@@ -1901,7 +1901,7 @@ contains
           else
             epot_X = epot_X +tmp
             if( is==2 ) epi(ia) = epi(ia) +tmp
-            if( tmp > 0d0 ) then
+            if( tmp > 0.0_rp ) then
               epot_Xp = epot_Xp +tmp
             else
               epot_Xm = epot_Xm +tmp
@@ -1949,12 +1949,12 @@ contains
           do jxyz=1,3
             do ixyz=1,3
               strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) + &
-                   (-0.5d0*rij(jxyz)*tmpj(ixyz) &
-                   -0.5d0*rik(jxyz)*tmpk(ixyz))
+                   (-0.5_rp*rij(jxyz)*tmpj(ixyz) &
+                   -0.5_rp*rik(jxyz)*tmpk(ixyz))
               strsl(ixyz,jxyz,ja)=strsl(ixyz,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(ixyz)
+                   -0.5_rp*rij(jxyz)*tmpj(ixyz)
               strsl(ixyz,jxyz,ka)=strsl(ixyz,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(ixyz)
+                   -0.5_rp*rik(jxyz)*tmpk(ixyz)
             enddo
           enddo ! jxyz
 
@@ -1975,9 +1975,9 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epot1 = 0d0
-    epot2 = 0d0
-    epot3 = 0d0
+    epot1 = 0.0_rp
+    epot2 = 0.0_rp
+    epot3 = 0.0_rp
     call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
@@ -2030,12 +2030,12 @@ contains
          c3ij,c3ik
     real(rp):: dcsnj(3),dcsnk(3),dcsni(3),tmpj(3),tmpk(3),csn
     real(rp):: rcij, rcik, rcij2, rcik2
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
 
     type(prm2):: p2
     type(prm3d):: p3
 
-    if( rcin2 < 0d0 ) then  ! Probably it is the 1st call...
+    if( rcin2 < 0.0_rp ) then  ! Probably it is the 1st call...
       if( rcin < rcmax ) then
         if( myid == 0 ) then
           write(6,'(1x,a)') "ERROR: Cutoff radius is not appropriate !!!"
@@ -2060,14 +2060,14 @@ contains
       allocate(ls3b(0:nnmax))
     endif
 
-    aal2(:,:) = 0d0
-    aal3(:,:) = 0d0
-    strsl(:,:,:) = 0d0
-    epotl1 = 0d0
-    epotl2 = 0d0
-    epotl3 = 0d0
+    aal2(:,:) = 0.0_rp
+    aal3(:,:) = 0.0_rp
+    strsl(:,:,:) = 0.0_rp
+    epotl1 = 0.0_rp
+    epotl2 = 0.0_rp
+    epotl3 = 0.0_rp
 #ifdef IMPULSE
-    ftaul(:) = 0d0
+    ftaul(:) = 0.0_rp
 #endif
     do ia=1,natm
       is = int(tag(ia))
@@ -2134,9 +2134,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *tmp2*rij(ixyz)*drijj(jxyz)
+                   -0.5_rp *tmp2*rij(ixyz)*drijj(jxyz)
             enddo
           enddo
         enddo  ! lij
@@ -2157,7 +2157,7 @@ contains
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2 > rc3max2 ) cycle
         dij = sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         drijj(1:3) = rij(1:3)*diji
         
         do kk=jj+1,lspr(0,ia)
@@ -2184,14 +2184,14 @@ contains
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2 > rcik2 ) cycle
           dik = sqrt(dik2)
-          diki = 1d0/dik
+          diki = 1.0_rp/dik
           drikk(1:3) = rik(1:3)*diki
-          drijc = 1d0/(dij-rcij)
-          drikc = 1d0/(dik-rcik)
+          drijc = 1.0_rp/(dij-rcij)
+          drikc = 1.0_rp/(dik-rcik)
 !.....r_ij term
           call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-          sumcbij = 0d0
-          sumcdbij= 0d0
+          sumcbij = 0.0_rp
+          sumcdbij= 0.0_rp
           do lij = -3,0
             nij = nij3 +lij
             if( nij < 1 .or. nij > p3%ncfij ) cycle
@@ -2201,8 +2201,8 @@ contains
           enddo
 !.....r_ik term
           call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
-          sumcbik = 0d0
-          sumcdbik= 0d0
+          sumcbik = 0.0_rp
+          sumcdbik= 0.0_rp
           do lik = -3,0
             nik = nik3 +lik
             if( nik < 1 .or. nik > p3%ncfik ) cycle
@@ -2212,10 +2212,10 @@ contains
           enddo
 !.....Cos term
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
-          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
+          csn = max(min(csn, 1.0_rp-tiny), -1.0_rp+tiny)
           call b_spl(-csn, p3%kncs, p3%nkncs, ncs, bcs, dbcs)
-          sumcb = 0d0
-          sumcdb= 0d0
+          sumcb = 0.0_rp
+          sumcdb= 0.0_rp
           do lcs = -3,0
             n = ncs +lcs
             if( n < 1 .or. n > p3%ncfcs ) cycle
@@ -2264,12 +2264,12 @@ contains
           do jxyz=1,3
             do ixyz=1,3
               strsl(ixyz,jxyz,ia)= strsl(ixyz,jxyz,ia) + &
-                   (-0.5d0*rij(jxyz)*tmpj(ixyz) &
-                   -0.5d0*rik(jxyz)*tmpk(ixyz))
+                   (-0.5_rp*rij(jxyz)*tmpj(ixyz) &
+                   -0.5_rp*rik(jxyz)*tmpk(ixyz))
               strsl(ixyz,jxyz,ja)=strsl(ixyz,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(ixyz)
+                   -0.5_rp*rij(jxyz)*tmpj(ixyz)
               strsl(ixyz,jxyz,ka)=strsl(ixyz,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(ixyz)
+                   -0.5_rp*rik(jxyz)*tmpk(ixyz)
             enddo
           enddo ! jxyz
 
@@ -2290,9 +2290,9 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !-----gather epot
-    epot1 = 0d0
-    epot2 = 0d0
-    epot3 = 0d0
+    epot1 = 0.0_rp
+    epot2 = 0.0_rp
+    epot3 = 0.0_rp
     call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     if( has_solo ) call mpi_allreduce(epotl1,epot1,1,mpi_real_rp, &
          mpi_sum,mpi_world,ierr)
@@ -2338,7 +2338,7 @@ contains
     real(rp):: xi(3),xj(3),xk(3),xij(3),xik(3),xjk(3),rij(3),rik(3),&
          rjk(3),dij2,dij,dik2,dik,djk2,djk,drijj(3),drikk(3),&
          drjkk(3),tmpij(3),tmpik(3),tmpjk(3)
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -2347,7 +2347,7 @@ contains
     if( lgrad_done ) goto 10
 
     if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
-    if( rcin2 < 0d0 ) then
+    if( rcin2 < 0.0_rp ) then
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -2357,23 +2357,23 @@ contains
 
     if( .not.allocated(prm2s(1)%gwe) &
          .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
-      tmp = 0d0
+      tmp = 0.0_rp
       do i2b=1,n2b
         p2 = prm2s(i2b)
         if( lematch ) then
           if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
           allocate(prm2s(i2b)%gwe(p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gwe)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
           allocate(prm2s(i2b)%gwf(3,p2%ncoef,nfcal))
-          tmp = tmp +size(prm2s(i2b)%gwf)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
           allocate(prm2s(i2b)%gws(6,p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gws)*8d0
+          tmp = tmp +size(prm2s(i2b)%gws)*8.0_rp
         endif
       enddo
       do i3b=1,n3b
@@ -2381,17 +2381,17 @@ contains
         if( lematch ) then
           if( allocated(prm3s(i3b)%gwe) ) deallocate(prm3s(i3b)%gwe)
           allocate(prm3s(i3b)%gwe(p3%ncfjk,p3%ncfik,p3%ncfij))
-          tmp = tmp +size(prm3s(i3b)%gwe)*8d0
+          tmp = tmp +size(prm3s(i3b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm3s(i3b)%gwf) ) deallocate(prm3s(i3b)%gwf)
           allocate(prm3s(i3b)%gwf(3,p3%ncfjk,p3%ncfik,p3%ncfij,nfcal))
-          tmp = tmp +size(prm3s(i3b)%gwf)*8d0
+          tmp = tmp +size(prm3s(i3b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm3s(i3b)%gws) ) deallocate(prm3s(i3b)%gws)
           allocate(prm3s(i3b)%gws(6,p3%ncfjk,p3%ncfik,p3%ncfij))
-          tmp = tmp +size(prm3s(i3b)%gws)*8d0
+          tmp = tmp +size(prm3s(i3b)%gws)*8.0_rp
         endif
       enddo
     endif
@@ -2414,16 +2414,16 @@ contains
       endif
     enddo
 
-    if( lematch ) gerg1s(:) = 0d0
+    if( lematch ) gerg1s(:) = 0.0_rp
     do i2b=1,n2b
-      if( lematch ) prm2s(i2b)%gwe(:) = 0d0
-      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0d0
-      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0d0
+      if( lematch ) prm2s(i2b)%gwe(:) = 0.0_rp
+      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0.0_rp
+      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0.0_rp
     enddo
     do i3b=1,n3b
-      if( lematch ) prm3s(i3b)%gwe(:,:,:) = 0d0
-      if( lfmatch ) prm3s(i3b)%gwf(:,:,:,:,:) = 0d0
-      if( lsmatch ) prm3s(i3b)%gws(:,:,:,:) = 0d0
+      if( lematch ) prm3s(i3b)%gwe(:,:,:) = 0.0_rp
+      if( lfmatch ) prm3s(i3b)%gwf(:,:,:,:,:) = 0.0_rp
+      if( lsmatch ) prm3s(i3b)%gws(:,:,:,:) = 0.0_rp
     enddo
 
     ttmp = mpi_wtime()
@@ -2432,7 +2432,7 @@ contains
       is = int(tag(ia))
 !!$      epi(ia) = epi(ia) +erg1s(is)
 !!$      epotl1 = epotl1 +erg1s(is)
-      gerg1s(is) = gerg1s(is) +1d0
+      gerg1s(is) = gerg1s(is) +1.0_rp
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -2518,8 +2518,8 @@ contains
               if( ka == ja ) cycle
               kra = itotOf(tag(ka))
 !.....Taking into account the double counting of symmetric terms
-              fac3b = 1d0
-              if( jsp == ksp ) fac3b = 0.5d0
+              fac3b = 1.0_rp
+              if( jsp == ksp ) fac3b = 0.5_rp
               ks = int(tag(ka))
               if( ks /= ksp ) cycle
               xk(1:3) = ra(1:3,ka)
@@ -2754,7 +2754,7 @@ contains
          dv3csndgj,dv3csndgk,dv3csnc, &
          dv3rijdcj,dv3rijdck,dv3rikdcj,dv3rikdck,dv3csndcj,dv3csndck
     real(rp):: rcij,rcik,rcij2,rcik2
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -2763,7 +2763,7 @@ contains
 !!$    if( lgrad_done ) goto 10
 
     if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
-    if( rcin2 < 0d0 ) then
+    if( rcin2 < 0.0_rp ) then
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -2773,23 +2773,23 @@ contains
 
     if( .not.allocated(prm2s(1)%gwe) &
          .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
-      tmp = 0d0
+      tmp = 0.0_rp
       do i2b=1,n2b
         p2 = prm2s(i2b)
         if( lematch ) then
           if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
           allocate(prm2s(i2b)%gwe(p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gwe)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
           allocate(prm2s(i2b)%gwf(3,p2%ncoef,nfcal))
-          tmp = tmp +size(prm2s(i2b)%gwf)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
           allocate(prm2s(i2b)%gws(6,p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gws)*8d0
+          tmp = tmp +size(prm2s(i2b)%gws)*8.0_rp
         endif
       enddo
       do i3b=1,n3b
@@ -2797,17 +2797,17 @@ contains
         if( lematch ) then
           if( allocated(prm3ls(i3b)%gwe) ) deallocate(prm3ls(i3b)%gwe)
           allocate(prm3ls(i3b)%gwe(p3%ncoef+4))  ! ncoef +4 (rcij,rik,gmj & gmk)
-          tmp = tmp +size(prm3ls(i3b)%gwe)*8d0
+          tmp = tmp +size(prm3ls(i3b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm3ls(i3b)%gwf) ) deallocate(prm3ls(i3b)%gwf)
           allocate(prm3ls(i3b)%gwf(3,p3%ncoef+4,nfcal))  ! ncoef +4
-          tmp = tmp +size(prm3ls(i3b)%gwf)*8d0
+          tmp = tmp +size(prm3ls(i3b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm3ls(i3b)%gws) ) deallocate(prm3ls(i3b)%gws)
           allocate(prm3ls(i3b)%gws(6,p3%ncoef+4))  ! ncoef +4
-          tmp = tmp +size(prm3ls(i3b)%gws)*8d0
+          tmp = tmp +size(prm3ls(i3b)%gws)*8.0_rp
         endif
       enddo
     endif
@@ -2830,21 +2830,21 @@ contains
       endif
     enddo
 
-    if( lematch ) gerg1s(:) = 0d0
+    if( lematch ) gerg1s(:) = 0.0_rp
     do i2b=1,n2b
-      if( lematch ) prm2s(i2b)%gwe(:) = 0d0
-      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0d0
-      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0d0
+      if( lematch ) prm2s(i2b)%gwe(:) = 0.0_rp
+      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0.0_rp
+      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0.0_rp
     enddo
     do i3b=1,n3b
-      if( lematch ) prm3ls(i3b)%gwe(:) = 0d0
-      if( lfmatch ) prm3ls(i3b)%gwf(:,:,:) = 0d0
-      if( lsmatch ) prm3ls(i3b)%gws(:,:) = 0d0
+      if( lematch ) prm3ls(i3b)%gwe(:) = 0.0_rp
+      if( lfmatch ) prm3ls(i3b)%gwf(:,:,:) = 0.0_rp
+      if( lsmatch ) prm3ls(i3b)%gws(:,:) = 0.0_rp
     enddo
 
     do ia=1,natm
       is = int(tag(ia))
-      gerg1s(is) = gerg1s(is) +1d0
+      gerg1s(is) = gerg1s(is) +1.0_rp
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -2894,7 +2894,7 @@ contains
 !.....which may be slower because of double computation of dij,
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
@@ -2904,7 +2904,7 @@ contains
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         dij = sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
@@ -2930,10 +2930,10 @@ contains
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2 > rcik2 ) cycle
           dik = sqrt(dik2)
-          diki = 1d0/dik
+          diki = 1.0_rp/dik
           drikk(1:3) = rik(1:3)*diki
-          drijc = 1d0/(dij-rcij)
-          drikc = 1d0/(dik-rcik)
+          drijc = 1.0_rp/(dij-rcij)
+          drikc = 1.0_rp/(dik-rcik)
 !.....parameters
           gmj = p3%gmj
           gmk = p3%gmk
@@ -2942,12 +2942,12 @@ contains
             gmk = gmj
           endif
 !.....common terms
-          vexp = dexp(gmj*drijc +gmk*drikc)
+          vexp = exp(gmj*drijc +gmk*drikc)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
-          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
+          csn = max(min(csn, 1.0_rp-tiny), -1.0_rp+tiny)
           call b_spl(-csn, p3%knots, p3%nknot, ncs, bcs, dbcs)
-          sumcb = 0d0
-          sumcdb= 0d0
+          sumcb = 0.0_rp
+          sumcdb= 0.0_rp
           do lcs = -3,0
             n = ncs +lcs
             if( n < 1 .or. n > p3%ncoef ) cycle
@@ -2978,15 +2978,15 @@ contains
           dcsnj(1:3)= (-rij(1:3)*csn*(diji*diji) +rik(1:3)*(diji*diki))
           dcsnk(1:3)= (-rik(1:3)*csn*(diki*diki) +rij(1:3)*(diji*diki))
 !!$          dcsni(1:3)= -dcsnj(1:3) -dcsnk(1:3)
-          dv3rijdcj = -drijc**3 *gmj *tmp *(2d0 + gmj*drijc)
+          dv3rijdcj = -drijc**3 *gmj *tmp *(2.0_rp + gmj*drijc)
           dv3rijdck = -gmj*drijc**2 *gmk*drikc**2 *tmp
-          dv3rijdgj= -drijc*drijc*(1d0+gmj*drijc)*tmp
+          dv3rijdgj= -drijc*drijc*(1.0_rp+gmj*drijc)*tmp
           dv3rijdgk= -drijc*drijc*(    gmk*drikc)*tmp
           dv3rijc = -drijc*drijc*gmj*vexp !*bcs(lcs)
-          dv3rikdck = -drikc**3 *gmk *tmp *(2d0 + gmk*drikc)
+          dv3rikdck = -drikc**3 *gmk *tmp *(2.0_rp + gmk*drikc)
           dv3rikdcj = -gmk*drikc**2 *gmj*drijc**2 *tmp
           dv3rikdgj= -drikc*drikc*(    gmj*drijc)*tmp
-          dv3rikdgk= -drikc*drikc*(1d0+gmk*drikc)*tmp
+          dv3rikdgk= -drikc*drikc*(1.0_rp+gmk*drikc)*tmp
           dv3rikc = -drikc*drikc*gmk*vexp !*bcs(lcs)
           dv3csndcj = dv3csn *drijc**2 *gmj
           dv3csndck = dv3csn *drikc**2 *gmk
@@ -3238,7 +3238,7 @@ contains
          dv3rikdcij,dv3rikdcik,dv3rikdccs, &
          dv3csndcij,dv3csndcik,dv3csndccs
     real(rp):: rcij,rcik,rcij2,rcik2
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
     integer,save,allocatable:: ia2ifcal(:)
 
     type(prm2):: p2
@@ -3247,7 +3247,7 @@ contains
 !!$    if( lgrad_done ) goto 10
 
     if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
-    if( rcin2 < 0d0 ) then
+    if( rcin2 < 0.0_rp ) then
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -3257,23 +3257,23 @@ contains
 
     if( .not.allocated(prm2s(1)%gwe) &
          .or. size(prm2s(1)%gwf).lt.prm2s(1)%ncoef*3*nfcal) then
-      tmp = 0d0
+      tmp = 0.0_rp
       do i2b=1,n2b
         p2 = prm2s(i2b)
         if( lematch ) then
           if( allocated(prm2s(i2b)%gwe) ) deallocate(prm2s(i2b)%gwe)
           allocate(prm2s(i2b)%gwe(p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gwe)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm2s(i2b)%gwf) ) deallocate(prm2s(i2b)%gwf)
           allocate(prm2s(i2b)%gwf(3,p2%ncoef,nfcal))
-          tmp = tmp +size(prm2s(i2b)%gwf)*8d0
+          tmp = tmp +size(prm2s(i2b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm2s(i2b)%gws) ) deallocate(prm2s(i2b)%gws)
           allocate(prm2s(i2b)%gws(6,p2%ncoef))
-          tmp = tmp +size(prm2s(i2b)%gws)*8d0
+          tmp = tmp +size(prm2s(i2b)%gws)*8.0_rp
         endif
       enddo
       do i3b=1,n3b
@@ -3281,17 +3281,17 @@ contains
         if( lematch ) then
           if( allocated(prm3ds(i3b)%gwe) ) deallocate(prm3ds(i3b)%gwe)
           allocate(prm3ds(i3b)%gwe(p3%ncfij+p3%ncfik+p3%ncfcs))
-          tmp = tmp +size(prm3ds(i3b)%gwe)*8d0
+          tmp = tmp +size(prm3ds(i3b)%gwe)*8.0_rp
         endif
         if( lfmatch ) then
           if( allocated(prm3ds(i3b)%gwf) ) deallocate(prm3ds(i3b)%gwf)
           allocate(prm3ds(i3b)%gwf(3,p3%ncfij+p3%ncfik+p3%ncfcs,nfcal))  ! ncoef +4
-          tmp = tmp +size(prm3ds(i3b)%gwf)*8d0
+          tmp = tmp +size(prm3ds(i3b)%gwf)*8.0_rp
         endif
         if( lsmatch ) then
           if( allocated(prm3ds(i3b)%gws) ) deallocate(prm3ds(i3b)%gws)
           allocate(prm3ds(i3b)%gws(6,p3%ncfij+p3%ncfik+p3%ncfcs))  ! ncoef +4
-          tmp = tmp +size(prm3ds(i3b)%gws)*8d0
+          tmp = tmp +size(prm3ds(i3b)%gws)*8.0_rp
         endif
       enddo
     endif
@@ -3314,21 +3314,21 @@ contains
       endif
     enddo
 
-    if( lematch ) gerg1s(:) = 0d0
+    if( lematch ) gerg1s(:) = 0.0_rp
     do i2b=1,n2b
-      if( lematch ) prm2s(i2b)%gwe(:) = 0d0
-      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0d0
-      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0d0
+      if( lematch ) prm2s(i2b)%gwe(:) = 0.0_rp
+      if( lfmatch ) prm2s(i2b)%gwf(:,:,:) = 0.0_rp
+      if( lsmatch ) prm2s(i2b)%gws(:,:) = 0.0_rp
     enddo
     do i3b=1,n3b
-      if( lematch ) prm3ds(i3b)%gwe(:) = 0d0
-      if( lfmatch ) prm3ds(i3b)%gwf(:,:,:) = 0d0
-      if( lsmatch ) prm3ds(i3b)%gws(:,:) = 0d0
+      if( lematch ) prm3ds(i3b)%gwe(:) = 0.0_rp
+      if( lfmatch ) prm3ds(i3b)%gwf(:,:,:) = 0.0_rp
+      if( lsmatch ) prm3ds(i3b)%gws(:,:) = 0.0_rp
     enddo
 
     do ia=1,natm
       is = int(tag(ia))
-      gerg1s(is) = gerg1s(is) +1d0
+      gerg1s(is) = gerg1s(is) +1.0_rp
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -3378,7 +3378,7 @@ contains
 !.....which may be slower because of double computation of dij,
 !.....but this code is a bit simpler.
       if( .not.has_trios ) cycle
-      tmp3 = 0d0
+      tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         js = int(tag(ja))
@@ -3388,7 +3388,7 @@ contains
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         dij = sqrt(dij2)
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
@@ -3414,14 +3414,14 @@ contains
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2 > rcik2 ) cycle
           dik = sqrt(dik2)
-          diki = 1d0/dik
+          diki = 1.0_rp/dik
           drikk(1:3) = rik(1:3)*diki
-          drijc = 1d0/(dij-rcij)
-          drikc = 1d0/(dik-rcik)
+          drijc = 1.0_rp/(dij-rcij)
+          drikc = 1.0_rp/(dik-rcik)
 !.....r_ij term
           call b_spl(dij, p3%knij, p3%nknij, nij3, bij3, dbij3)
-          sumcbij = 0d0
-          sumcdbij= 0d0
+          sumcbij = 0.0_rp
+          sumcdbij= 0.0_rp
           do lij = -3,0
             nij = nij3 +lij
             if( nij < 1 .or. nij > p3%ncfij ) cycle
@@ -3431,8 +3431,8 @@ contains
           enddo
 !.....r_ik term
           call b_spl(dik, p3%knik, p3%nknik, nik3, bik3, dbik3)
-          sumcbik = 0d0
-          sumcdbik= 0d0
+          sumcbik = 0.0_rp
+          sumcdbik= 0.0_rp
           do lik = -3,0
             nik = nik3 +lik
             if( nik < 1 .or. nik > p3%ncfik ) cycle
@@ -3442,10 +3442,10 @@ contains
           enddo
 !.....cos terms
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)) *(diji*diki)
-          csn = max(min(csn, 1d0-tiny), -1d0+tiny)
+          csn = max(min(csn, 1.0_rp-tiny), -1.0_rp+tiny)
           call b_spl(-csn, p3%kncs, p3%nkncs, ncs, bcs, dbcs)
-          sumcb = 0d0
-          sumcdb= 0d0
+          sumcb = 0.0_rp
+          sumcdb= 0.0_rp
           do lcs = -3,0
             n = ncs +lcs
             if( n < 1 .or. n > p3%ncfcs ) cycle
@@ -3652,7 +3652,7 @@ contains
           n0 = n0 +p3%ncfij
           do i=1,nc  ! ik part
             ip = ip +1
-            gwe(ip) = 0d0
+            gwe(ip) = 0.0_rp
           enddo
         else
           do i=1,p3%ncfij
@@ -3699,7 +3699,7 @@ contains
             n0 = n0 + nc
             do i=1,nc
               ip = ip +1
-              gwf(1:3,ip,ifcal) = 0d0
+              gwf(1:3,ip,ifcal) = 0.0_rp
             enddo
           else
             do i=1,p3%ncfij
@@ -3742,7 +3742,7 @@ contains
           n0 = n0 +p3%ncfij
           do i=1,p3%ncfik
             ip = ip +1
-            gws(1:6,ip) = 0d0
+            gws(1:6,ip) = 0.0_rp
           enddo
         else
           do i=1,p3%ncfij
@@ -3797,8 +3797,8 @@ contains
     nr = knot_index(r,nmax,ts)
 
 !.....Compute B(n,d)
-    btmp(:,:) = 0d0
-    btmp(0,0) = 1d0
+    btmp(:,:) = 0.0_rp
+    btmp(0,0) = 1.0_rp
     do id = 1,3
       do l = -id,1
         n = nr +l
@@ -3808,8 +3808,8 @@ contains
         tn3 = ts(n+id+1)
         dt1 = tn1 -tn0
         dt2 = tn3 -tn2
-        tmp1 = 0d0
-        tmp2 = 0d0
+        tmp1 = 0.0_rp
+        tmp2 = 0.0_rp
         if( abs(dt1) > tiny ) tmp1 = (r-tn0)/dt1 *btmp(l,id-1)
         if( abs(dt2) > tiny ) tmp2 = (tn3-r)/dt2 *btmp(l+1,id-1)
         btmp(l,id) = tmp1 + tmp2
@@ -3817,18 +3817,18 @@ contains
     enddo
 
 !.....Compute dB(n) where d=3 is fixed
-    dbtmp(:) = 0d0
+    dbtmp(:) = 0.0_rp
     do l = -3,0
       n = nr +l
       tn0 = ts(n)
       tn1 = ts(n+1)
       tn3 = ts(n+3)
       tn4 = ts(n+1+3)
-      tmp1 = 0d0
-      tmp2 = 0d0
+      tmp1 = 0.0_rp
+      tmp2 = 0.0_rp
       if( abs(tn3-tn0) > tiny ) tmp1 = btmp(l,2)/(tn3 -tn0)
       if( abs(tn4-tn1) > tiny ) tmp2 = btmp(l+1,2)/(tn4 -tn1)
-      dbtmp(l) = 3d0 *(tmp1 -tmp2)
+      dbtmp(l) = 3.0_rp *(tmp1 -tmp2)
     enddo
 
     b(-3:0) = btmp(-3:0,3)
@@ -3836,7 +3836,7 @@ contains
 
     if( .not.present(ddb) ) return
 !.....Optional: 2nd derivative
-    dbtmp(:) = 0d0
+    dbtmp(:) = 0.0_rp
 !.....Compute dB_{n,d-1} and dB_{n+1,d-1} first
     do l= -3,1
       n = nr +l
@@ -3844,25 +3844,25 @@ contains
       tn1 = ts(n+1)
       tn2 = ts(n+2)
       tn3 = ts(n+3)
-      tmp1 = 0d0
-      tmp2 = 0d0
+      tmp1 = 0.0_rp
+      tmp2 = 0.0_rp
       if( abs(tn2-tn0) > tiny ) tmp1 = btmp(l,1)/(tn2 -tn0)
       if( abs(tn3-tn1) > tiny ) tmp2 = btmp(l+1,1)/(tn3 -tn1)
-      dbtmp(l) = (3d0-1d0) *(tmp1 -tmp2)
+      dbtmp(l) = (3.0_rp-1.0_rp) *(tmp1 -tmp2)
     enddo
 !.....Then, compute ddB_{n,d} using dBs
-    ddbtmp(:) = 0d0
+    ddbtmp(:) = 0.0_rp
     do l= -3,0
       n = nr +l
       tn0 = ts(n)
       tn1 = ts(n+1)
       tn3 = ts(n+3)
       tn4 = ts(n+1+3)
-      tmp1 = 0d0
-      tmp2 = 0d0
+      tmp1 = 0.0_rp
+      tmp2 = 0.0_rp
       if( abs(tn3-tn0) > tiny ) tmp1 = dbtmp(l)/(tn3 -tn0)
       if( abs(tn4-tn1) > tiny ) tmp2 = dbtmp(l+1)/(tn4 -tn1)
-      ddbtmp(l) = 3d0 *(tmp1 -tmp2)
+      ddbtmp(l) = 3.0_rp *(tmp1 -tmp2)
     enddo
     ddb(-3:0) = ddbtmp(-3:0)
 
@@ -4029,7 +4029,7 @@ contains
         prm2s(i2b)%coefs(ic) = params(inc)
       enddo
     enddo
-    rc3max = 0d0
+    rc3max = 0.0_rp
     do i3b=1,n3b
       inc = inc +1
       rcij = params(inc)
@@ -4285,7 +4285,7 @@ contains
     type(prm2):: p2
     integer:: inc,i1b
 
-    penalty = 0d0
+    penalty = 0.0_rp
 
     inc = 0
     do i1b=1,n1b
@@ -4313,13 +4313,13 @@ contains
     type(prm2):: p2
     integer:: inc,i1b
 
-    grad(:) = 0d0
+    grad(:) = 0.0_rp
 
     inc = 0
     do i1b=1,n1b
       inc = inc +1
       erg1s(i1b) = params_in(inc)
-      grad(inc) = grad(inc) +2d0 *erg1s(i1b) *pwgt1b
+      grad(inc) = grad(inc) +2.0_rp *erg1s(i1b) *pwgt1b
     enddo
 
     return
@@ -4349,9 +4349,9 @@ contains
       erg1s(i1b) = params_in(inc)
     enddo
 !.....2-body
-    p2b = 0d0
-    p2bd= 0d0
-    p2bs= 0d0
+    p2b = 0.0_rp
+    p2bd= 0.0_rp
+    p2bs= 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
 !.....variables only for short-distance penalty
@@ -4363,22 +4363,22 @@ contains
       do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
-        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
+        if( .not.(abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
       enddo
-      if( abs(pwgt2bs)>1d-14 ) then
+      if( abs(pwgt2bs)>1e-14_rp ) then
         do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
-          if( dc1 < 0d0 ) p2bs = p2bs +dc1**2
+          if( dc1 < 0.0_rp ) p2bs = p2bs +dc1**2
           if( ic-2 < 1 ) cycle
-          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
-               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
-          if( dc2 < 0d0 ) p2bs = p2bs +dc2**2
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3.0_rp*prm2s(i2b)%coefs(ic-1) &
+               +3.0_rp*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0.0_rp ) p2bs = p2bs +dc2**2
         enddo
       endif
-      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      if( abs(pwgt2bd).lt.1e-14_rp ) cycle
       do ic=2,p2%ncoef-1
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
-        tmp = 0d0
+        if( abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2 ) cycle
+        tmp = 0.0_rp
         do k=-1,1,2
           tmp = tmp +(prm2s(i2b)%coefs(ic+k) -prm2s(i2b)%coefs(ic))
         enddo
@@ -4391,9 +4391,9 @@ contains
     p2bs = p2bs*pwgt2bs
 
 !.....3-body
-    p3b = 0d0
-    p3bd= 0d0
-    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+    p3b = 0.0_rp
+    p3bd= 0.0_rp
+    if( abs(pwgt3b).gt.1e-14_rp .or. abs(pwgt3bd).gt.1e-14_rp ) then
       do i3b=1,n3b
         do icfij=1,prm3s(i3b)%ncfij
           do icfik=1,prm3s(i3b)%ncfik
@@ -4404,7 +4404,7 @@ contains
             enddo
           enddo
         enddo
-        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        if( abs(pwgt3bd).lt.1e-14_rp ) cycle
         p3 = prm3s(i3b)
         do icfij=1,p3%ncfij
           do icfik=1,p3%ncfik
@@ -4412,17 +4412,17 @@ contains
 !.....ij
               if( icfij-1 > 0 .and. icfij+1 <= p3%ncfij ) p3bd = p3bd + &
                    (p3%coefs(icfjk,icfik,icfij-1) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij) &
                    +p3%coefs(icfjk,icfik,icfij+1))**2
 !.....ik
               if( icfik-1 > 0 .and. icfik+1 <= p3%ncfik ) p3bd = p3bd + &
                    (p3%coefs(icfjk,icfik-1,icfij) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij) &
                    +p3%coefs(icfjk,icfik+1,icfij))**2
 !.....jk
               if( icfjk-1 > 0 .and. icfjk+1 <= p3%ncfjk ) p3bd = p3bd + &
                    (p3%coefs(icfjk-1,icfik,icfij) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij) &
                    +p3%coefs(icfjk+1,icfik,icfij))**2
             enddo
           enddo
@@ -4483,9 +4483,9 @@ contains
       erg1s(i1b) = params_in(inc)
     enddo
 !.....2-body
-    gp2b(:) = 0d0
-    gp2bd(:)= 0d0
-    gp2bs(:)= 0d0
+    gp2b(:) = 0.0_rp
+    gp2bd(:)= 0.0_rp
+    gp2bs(:)= 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
 !.....variables only for short-distance penalty
@@ -4499,52 +4499,52 @@ contains
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)
         ic2ip(ic) = inc
-        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) gp2b(inc) = &
-             gp2b(inc) +2d0*pwgt2b*prm2s(i2b)%coefs(ic)
+        if( .not. (abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2) ) gp2b(inc) = &
+             gp2b(inc) +2.0_rp*pwgt2b*prm2s(i2b)%coefs(ic)
       enddo
-      if( abs(pwgt2bs)>1d-14 ) then
+      if( abs(pwgt2bs)>1e-14_rp ) then
         do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
           ip = ic2ip(ic)
-          if( dc1 < 0d0 ) then
-            gp2bs(ip  )= gp2bs(ip  ) +2d0*dc1 *pwgt2bs
-            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc1 *pwgt2bs
+          if( dc1 < 0.0_rp ) then
+            gp2bs(ip  )= gp2bs(ip  ) +2.0_rp*dc1 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2.0_rp*dc1 *pwgt2bs
           endif
           if( ic-2 < 1 ) cycle
-          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
-               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
-          if( dc2 < 0d0 ) then
-            gp2bs(ip-2)= gp2bs(ip-2) +2d0*dc2 *pwgt2bs
-            gp2bs(ip-1)= gp2bs(ip-1) -6d0*dc2 *pwgt2bs
-            gp2bs(ip  )= gp2bs(ip  ) +6d0*dc2 *pwgt2bs
-            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc2 *pwgt2bs
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3.0_rp*prm2s(i2b)%coefs(ic-1) &
+               +3.0_rp*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0.0_rp ) then
+            gp2bs(ip-2)= gp2bs(ip-2) +2.0_rp*dc2 *pwgt2bs
+            gp2bs(ip-1)= gp2bs(ip-1) -6.0_rp*dc2 *pwgt2bs
+            gp2bs(ip  )= gp2bs(ip  ) +6.0_rp*dc2 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2.0_rp*dc2 *pwgt2bs
           endif
         enddo
       endif
-      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      if( abs(pwgt2bd).lt.1e-14_rp ) cycle
       do ic=1,p2%ncoef
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
+        if( abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2 ) cycle
         ip = ic2ip(ic)
-        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd &
              *(p2%coefs(ic-2) &
-             -2d0*p2%coefs(ic-1) &
+             -2.0_rp*p2%coefs(ic-1) &
              +p2%coefs(ic))
         if( ic-1 > 0 .and. ic+1 <= p2%ncoef ) &
-             gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd*(-2d0) &
+             gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd*(-2.0_rp) &
              *(p2%coefs(ic-1) &
-             -2d0*p2%coefs(ic) &
+             -2.0_rp*p2%coefs(ic) &
              +p2%coefs(ic+1))
-        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd &
              *(p2%coefs(ic) &
-             -2d0*p2%coefs(ic+1) &
+             -2.0_rp*p2%coefs(ic+1) &
              +p2%coefs(ic+2))
         enddo
       enddo
 
 !.....3-body
-    gp3b(:) = 0d0
-    gp3bd(:)= 0d0
-    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+    gp3b(:) = 0.0_rp
+    gp3bd(:)= 0.0_rp
+    if( abs(pwgt3b).gt.1e-14_rp .or. abs(pwgt3bd).gt.1e-14_rp ) then
       do i3b=1,n3b
         ic3ip(:,:,:) = 0
         do icfij=1,prm3s(i3b)%ncfij
@@ -4552,58 +4552,58 @@ contains
             do icfjk=1,prm3s(i3b)%ncfjk
               inc = inc +1
               prm3s(i3b)%coefs(icfjk,icfik,icfij) = params_in(inc)
-              gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3s(i3b)%coefs(icfjk,icfik,icfij)
+              gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3s(i3b)%coefs(icfjk,icfik,icfij)
               ic3ip(icfjk,icfik,icfij) = inc
             enddo
           enddo
         enddo
-        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        if( abs(pwgt3bd).lt.1e-14_rp ) cycle
         p3 = prm3s(i3b)
         do icfij=1,p3%ncfij
           do icfik=1,p3%ncfik
             do icfjk=1,p3%ncfjk
               ip = ic3ip(icfjk,icfik,icfij)
 !.....ij
-              if( icfij-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfij-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk,icfik,icfij-2) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij-1) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij-1) &
                    +    p3%coefs(icfjk,icfik,icfij))
               if( icfij-1 > 0 .and. icfij+1 <= p3%ncfij ) &
-                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd*(-2.0_rp) &
                    *(   p3%coefs(icfjk,icfik,icfij-1) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij) &
                    +    p3%coefs(icfjk,icfik,icfij+1))
-              if( icfij+2 <= p3%ncfij ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfij+2 <= p3%ncfij ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk,icfik,icfij) &
-                   -2d0*p3%coefs(icfjk,icfik,icfij+1) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,icfij+1) &
                    +    p3%coefs(icfjk,icfik,icfij+2))
 !.....ik
-              if( icfik-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfik-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk,icfik-2,icfij) &
-                   -2d0*p3%coefs(icfjk,icfik-1,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik-1,icfij) &
                    +    p3%coefs(icfjk,icfik,  icfij))
               if( icfik-1 > 0 .and. icfik+1 <= p3%ncfik ) &
-                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd*(-2.0_rp) &
                    *(   p3%coefs(icfjk,icfik-1,icfij) &
-                   -2d0*p3%coefs(icfjk,icfik,  icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik,  icfij) &
                    +    p3%coefs(icfjk,icfik+1,icfij))
-              if( icfik+2 <= p3%ncfik ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfik+2 <= p3%ncfik ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk,icfik,  icfij) &
-                   -2d0*p3%coefs(icfjk,icfik+1,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,icfik+1,icfij) &
                    +    p3%coefs(icfjk,icfik+2,icfij))
 !.....jk
-              if( icfjk-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfjk-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk-2,icfik,icfij) &
-                   -2d0*p3%coefs(icfjk-1,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk-1,icfik,icfij) &
                    +    p3%coefs(icfjk,  icfik,icfij))
               if( icfjk-1 > 0 .and. icfjk+1 <= p3%ncfjk ) &
-                   gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+                   gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd*(-2.0_rp) &
                    *(   p3%coefs(icfjk-1,icfik,icfij) &
-                   -2d0*p3%coefs(icfjk,  icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk,  icfik,icfij) &
                    +    p3%coefs(icfjk+1,icfik,icfij))
-              if( icfjk+2 <= p3%ncfjk ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+              if( icfjk+2 <= p3%ncfjk ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                    *(   p3%coefs(icfjk,  icfik,icfij) &
-                   -2d0*p3%coefs(icfjk+1,icfik,icfij) &
+                   -2.0_rp*p3%coefs(icfjk+1,icfik,icfij) &
                    +    p3%coefs(icfjk+2,icfik,icfij))
             enddo  ! icfjk
           enddo  ! icfik
@@ -4642,9 +4642,9 @@ contains
       erg1s(i1b) = params_in(inc)
     enddo
 !.....2-body
-    p2b = 0d0
-    p2bd= 0d0
-    p2bs= 0d0
+    p2b = 0.0_rp
+    p2bd= 0.0_rp
+    p2bs= 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
 !.....variables only for short-distance penalty
@@ -4658,22 +4658,22 @@ contains
       do ic=1,p2%ncoef
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)  ! replace coefs (p2 cannot be used here)
-        if( .not.(abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
+        if( .not.(abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2) ) p2b = p2b +prm2s(i2b)%coefs(ic)**2
       enddo
-      if( abs(pwgt2bs)>1d-14 ) then
+      if( abs(pwgt2bs)>1e-14_rp ) then
         do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
-          if( dc1 < 0d0 ) p2bs = p2bs +dc1**2
+          if( dc1 < 0.0_rp ) p2bs = p2bs +dc1**2
           if( ic-2 < 1 ) cycle
-          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
-               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
-          if( dc2 < 0d0 ) p2bs = p2bs +dc2**2
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3.0_rp*prm2s(i2b)%coefs(ic-1) &
+               +3.0_rp*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0.0_rp ) p2bs = p2bs +dc2**2
         enddo
       endif
-      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      if( abs(pwgt2bd).lt.1e-14_rp ) cycle
       do ic=2,p2%ncoef-1
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
-        tmp = 0d0
+        if( abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2 ) cycle
+        tmp = 0.0_rp
         do k=-1,1,2
           tmp = tmp +(prm2s(i2b)%coefs(ic+k) -prm2s(i2b)%coefs(ic))
         enddo
@@ -4686,9 +4686,9 @@ contains
     p2bs = p2bs*pwgt2bs
 
 !.....3-body
-    p3b = 0d0
-    p3bd= 0d0
-    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+    p3b = 0.0_rp
+    p3bd= 0.0_rp
+    if( abs(pwgt3b).gt.1e-14_rp .or. abs(pwgt3bd).gt.1e-14_rp ) then
       do i3b=1,n3b
         p3 = prm3ls(i3b)
         inc = inc +1
@@ -4710,10 +4710,10 @@ contains
         enddo
 
 !.....penalty to derivative
-        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        if( abs(pwgt3bd).lt.1e-14_rp ) cycle
         do ic=1,p3%ncoef
           if( ic-1 > 0 .and. ic+1 <= p3%ncoef ) p3bd = p3bd + &
-               (prm3ls(i3b)%coefs(ic-1) -2d0*prm3ls(i3b)%coefs(ic) &
+               (prm3ls(i3b)%coefs(ic-1) -2.0_rp*prm3ls(i3b)%coefs(ic) &
                +prm3ls(i3b)%coefs(ic+1))**2
         enddo
       enddo
@@ -4767,9 +4767,9 @@ contains
       erg1s(i1b) = params_in(inc)
     enddo
 !.....2-body
-    gp2b(:) = 0d0
-    gp2bd(:)= 0d0
-    gp2bs(:)= 0d0
+    gp2b(:) = 0.0_rp
+    gp2bd(:)= 0.0_rp
+    gp2bs(:)= 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
 !.....variables only for short-distance penalty
@@ -4783,91 +4783,91 @@ contains
         inc = inc +1
         prm2s(i2b)%coefs(ic) = params_in(inc)
         ic2ip(ic) = inc
-        if( .not. (abs(pwgt2bs)>1d-14 .and. ic<=nr2-2) ) gp2b(inc) = &
-             gp2b(inc) +2d0*pwgt2b*prm2s(i2b)%coefs(ic)
+        if( .not. (abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2) ) gp2b(inc) = &
+             gp2b(inc) +2.0_rp*pwgt2b*prm2s(i2b)%coefs(ic)
       enddo
-      if( abs(pwgt2bs)>1d-14 ) then
+      if( abs(pwgt2bs)>1e-14_rp ) then
         do ic=1,nr2-3
           dc1 = prm2s(i2b)%coefs(ic)-prm2s(i2b)%coefs(ic+1)
           ip = ic2ip(ic)
-          if( dc1 < 0d0 ) then
-            gp2bs(ip  )= gp2bs(ip  ) +2d0*dc1 *pwgt2bs
-            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc1 *pwgt2bs
+          if( dc1 < 0.0_rp ) then
+            gp2bs(ip  )= gp2bs(ip  ) +2.0_rp*dc1 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2.0_rp*dc1 *pwgt2bs
           endif
           if( ic-2 < 1 ) cycle
-          dc2 = (prm2s(i2b)%coefs(ic-2) -3d0*prm2s(i2b)%coefs(ic-1) &
-               +3d0*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
-          if( dc2 < 0d0 ) then
-            gp2bs(ip-2)= gp2bs(ip-2) +2d0*dc2 *pwgt2bs
-            gp2bs(ip-1)= gp2bs(ip-1) -6d0*dc2 *pwgt2bs
-            gp2bs(ip  )= gp2bs(ip  ) +6d0*dc2 *pwgt2bs
-            gp2bs(ip+1)= gp2bs(ip+1) -2d0*dc2 *pwgt2bs
+          dc2 = (prm2s(i2b)%coefs(ic-2) -3.0_rp*prm2s(i2b)%coefs(ic-1) &
+               +3.0_rp*prm2s(i2b)%coefs(ic) -prm2s(i2b)%coefs(ic+1))
+          if( dc2 < 0.0_rp ) then
+            gp2bs(ip-2)= gp2bs(ip-2) +2.0_rp*dc2 *pwgt2bs
+            gp2bs(ip-1)= gp2bs(ip-1) -6.0_rp*dc2 *pwgt2bs
+            gp2bs(ip  )= gp2bs(ip  ) +6.0_rp*dc2 *pwgt2bs
+            gp2bs(ip+1)= gp2bs(ip+1) -2.0_rp*dc2 *pwgt2bs
           endif
         enddo
       endif
-      if( abs(pwgt2bd).lt.1d-14 ) cycle
+      if( abs(pwgt2bd).lt.1e-14_rp ) cycle
       do ic=1,p2%ncoef
-        if( abs(pwgt2bs)>1d-14 .and. ic<=nr2-2 ) cycle
+        if( abs(pwgt2bs)>1e-14_rp .and. ic<=nr2-2 ) cycle
         ip = ic2ip(ic)
-        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+        if( ic-2 > 0 ) gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd &
              *(p2%coefs(ic-2) &
-             -2d0*p2%coefs(ic-1) &
+             -2.0_rp*p2%coefs(ic-1) &
              +p2%coefs(ic))
         if( ic-1 > 0 .and. ic+1 <= p2%ncoef ) &
-             gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd*(-2d0) &
+             gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd*(-2.0_rp) &
              *(p2%coefs(ic-1) &
-             -2d0*p2%coefs(ic) &
+             -2.0_rp*p2%coefs(ic) &
              +p2%coefs(ic+1))
-        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2d0*pwgt2bd &
+        if( ic+2 <= p2%ncoef ) gp2bd(ip) = gp2bd(ip) +2.0_rp*pwgt2bd &
              *(p2%coefs(ic) &
-             -2d0*p2%coefs(ic+1) &
+             -2.0_rp*p2%coefs(ic+1) &
              +p2%coefs(ic+2))
       enddo
     enddo
 
 !.....3-body
-    gp3b(:) = 0d0
-    gp3bd(:)= 0d0
-    if( abs(pwgt3b).gt.1d-14 .or. abs(pwgt3bd).gt.1d-14 ) then
+    gp3b(:) = 0.0_rp
+    gp3bd(:)= 0.0_rp
+    if( abs(pwgt3b).gt.1e-14_rp .or. abs(pwgt3bd).gt.1e-14_rp ) then
       do i3b=1,n3b
         ncoef = prm3ls(i3b)%ncoef
         ic3ip(:) = 0
         inc = inc +1
         prm3ls(i3b)%gmj = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%rcij
+        gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3ls(i3b)%rcij
         inc = inc +1
         prm3ls(i3b)%gmk = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%rcik
+        gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3ls(i3b)%rcik
         inc = inc +1
         prm3ls(i3b)%gmj = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%gmj
+        gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3ls(i3b)%gmj
         inc = inc +1
         prm3ls(i3b)%gmk = params_in(inc)
-        gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%gmk
+        gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3ls(i3b)%gmk
         do ic=1, ncoef
           inc = inc +1
           prm3ls(i3b)%coefs(ic) = params_in(inc)
-          gp3b(inc) = gp3b(inc) +2d0*pwgt3b*prm3ls(i3b)%coefs(ic)
+          gp3b(inc) = gp3b(inc) +2.0_rp*pwgt3b*prm3ls(i3b)%coefs(ic)
           ic3ip(ic) = inc
         enddo
 
-        if( abs(pwgt3bd).lt.1d-14 ) cycle
+        if( abs(pwgt3bd).lt.1e-14_rp ) cycle
         p3 = prm3ls(i3b)
         do ic=1,ncoef
           ip = ic3ip(ic)
 !.....ij
-          if( ic-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+          if( ic-2 > 0 ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                *(   p3%coefs(ic-2) &
-               -2d0*p3%coefs(ic-1) &
+               -2.0_rp*p3%coefs(ic-1) &
                +    p3%coefs(ic))
           if( ic-1 > 0 .and. ic+1 <= p3%ncoef ) &
-               gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd*(-2d0) &
+               gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd*(-2.0_rp) &
                *(   p3%coefs(ic-1) &
-               -2d0*p3%coefs(ic) &
+               -2.0_rp*p3%coefs(ic) &
                +    p3%coefs(ic+1))
-          if( ic+2 <= p3%ncoef ) gp3bd(ip) = gp3bd(ip) +2d0*pwgt3bd &
+          if( ic+2 <= p3%ncoef ) gp3bd(ip) = gp3bd(ip) +2.0_rp*pwgt3bd &
                *(   p3%coefs(ic) &
-               -2d0*p3%coefs(ic+1) &
+               -2.0_rp*p3%coefs(ic+1) &
                +    p3%coefs(ic+2))
         enddo  ! ic
       enddo  ! i3b
@@ -4921,12 +4921,12 @@ contains
     enddo
 
 !.....This penalty works on only 3-body.
-    x(1) = -1d0+tiny
-    dx = (1d0-tiny -(-1d0+tiny))/npnts
+    x(1) = -1.0_rp+tiny
+    dx = (1.0_rp-tiny -(-1.0_rp+tiny))/npnts
     do ix=2,npnts
       x(ix) = x(ix-1) +dx
     enddo
-    p3b = 0d0
+    p3b = 0.0_rp
     do i3b=1,n3b
       inc = inc +1
       prm3ls(i3b)%rcij = params_in(inc)
@@ -4942,8 +4942,8 @@ contains
       enddo
       p3 = prm3ls(i3b)
 !.....Compute f(x_i) and B_j(x_i)
-      fs(:) = 0d0
-      bspl(:,:) = 0d0
+      fs(:) = 0.0_rp
+      bspl(:,:) = 0.0_rp
       do ix=1,npnts
         call b_spl(x(ix), p3%knots, p3%nknot, ncs, bcs, dbcs)
         do lcs=-3,0
@@ -4956,8 +4956,8 @@ contains
 !.....Use fmin to stabilize exp() calculation (possible over/under-flow)
       fmin = minval(fs)
 !.....Compute each exp(-beta*f(x_i)), Bj(xi)*exp(-)
-      sumexp(i3b) = 0d0
-      sumbexp(:,i3b) = 0d0
+      sumexp(i3b) = 0.0_rp
+      sumbexp(:,i3b) = 0.0_rp
       do ix=1,npnts
         expbf(ix) = exp(-beta*(fs(ix)-fmin))
 !!$        if( i3b.eq.1 ) print '(i4,2es12.2)',ix,fi,expbf(ix)
@@ -5011,12 +5011,12 @@ contains
     enddo
 
 !.....This penalty works on only 3-body.
-    x(1) = -1d0+tiny
-    dx = (1d0-tiny -(-1d0+tiny))/npnts
+    x(1) = -1.0_rp+tiny
+    dx = (1.0_rp-tiny -(-1.0_rp+tiny))/npnts
     do ix=2,npnts
       x(ix) = x(ix-1) +dx
     enddo
-    grad(:) = 0d0
+    grad(:) = 0.0_rp
     do i3b=1,n3b
       p3 = prm3ls(i3b)
       inc = inc +1
@@ -5062,11 +5062,11 @@ contains
          rmin,pl,pr,sgml,sgmr,cr,exp1,rdl,rdr
     real(rp):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
-    real(rp),parameter:: sgmin = 1d-2
+    real(rp),parameter:: sgmin = 1e-2_rp
 
-    penalty = 0d0
-    rdl = abs(sl2b *4.6d0)
-    rdr = abs(sr2b *4.6d0)
+    penalty = 0.0_rp
+    rdl = abs(sl2b *4.6_rp)
+    rdr = abs(sr2b *4.6_rp)
 
     inc = 0
     do i1b=1,n1b
@@ -5093,12 +5093,12 @@ contains
         rs(ir) = rs(ir-1) + dr
       enddo
 
-      ws(:) = 0d0
-      expsum = 0d0
-      fs(:) = 0d0
-      dfs(:) = 0d0
-      ddfs(:) = 0d0
-      rmin = 0d0
+      ws(:) = 0.0_rp
+      expsum = 0.0_rp
+      fs(:) = 0.0_rp
+      dfs(:) = 0.0_rp
+      ddfs(:) = 0.0_rp
+      rmin = 0.0_rp
       do ir=1,npnts
         call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
 !!$        fi = 0d0
@@ -5111,30 +5111,30 @@ contains
           dfs(ir) = dfs(ir) + cr *dbr(lr)
           ddfs(ir)= ddfs(ir) + cr *ddbr(lr)
         enddo
-        ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
+        ws(ir) = max(min(exp(-fs(ir)/eps2b),vhuge),tiny)
         expsum = expsum + ws(ir)
         rmin = rmin +ws(ir)*rs(ir)
       enddo
       rmin = rmin / expsum
-      pl = 0d0  ! left penalty
-      pr = 0d0  ! right penalty
+      pl = 0.0_rp  ! left penalty
+      pr = 0.0_rp  ! right penalty
       do ir=1,npnts
 !!$        sgml = expit((rmin -rdl -rs(ir))/sl2b)
 !!$        if( sgml < sgmin ) sgml = 0d0
-        if( rs(ir) > rmin .or. sl2b <= 0d0 ) then
-          sgml = 0d0
+        if( rs(ir) > rmin .or. sl2b <= 0.0_rp ) then
+          sgml = 0.0_rp
         else
           sgml = expit((rmin -rdl -rs(ir))/sl2b)
         endif
-        pl = pl +sgml *max(0d0, -ddfs(ir))**2
+        pl = pl +sgml *max(0.0_rp, -ddfs(ir))**2
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgml,pli,ddfs=',&
 !!$             i2b,ir,rs(ir),sgml,sgml*max(0d0, -ddfs(ir))**2,ddfs(ir)
       enddo
       do ir=1,npnts
 !!$        sgmr = expit((rs(ir) -rmin -sr2b)/sr2b)
 !!$        if( sgmr < sgmin ) sgmr = 0d0
-        if( rs(ir) < rmin .or. sr2b <= 0d0 ) then
-          sgmr = 0d0
+        if( rs(ir) < rmin .or. sr2b <= 0.0_rp ) then
+          sgmr = 0.0_rp
         else
           sgmr = expit((rs(ir) -rmin -rdr)/sr2b)
         endif
@@ -5142,8 +5142,8 @@ contains
 !!$        if( i2b==6 ) print '(a,2i5,5es12.2e3)','i2b,ir,ri,sgmr,pri=',&
 !!$             i2b,ir,rs(ir),sgmr,sgmr*ddfs(ir)**2
       enddo
-      if( sl2b > 0d0 ) penalty = penalty +pwgt2b *pl/npnts
-      if( sr2b > 0d0 ) penalty = penalty +pwgt2b *pr/npnts
+      if( sl2b > 0.0_rp ) penalty = penalty +pwgt2b *pl/npnts
+      if( sr2b > 0.0_rp ) penalty = penalty +pwgt2b *pr/npnts
 !!$      penalty = penalty +pwgt2b *pl /npnts !*(pl+pr)
     enddo
 
@@ -5176,11 +5176,11 @@ contains
          xl,xr,rdl,rdr
     real(rp):: br(-3:0),dbr(-3:0),ddbr(-3:0)
 
-    real(rp),parameter:: sgmin = 1d-2
+    real(rp),parameter:: sgmin = 1e-2_rp
 
-    grad(:) = 0d0
-    rdl = abs(sl2b *4.6d0)
-    rdr = abs(sr2b *4.6d0)
+    grad(:) = 0.0_rp
+    rdl = abs(sl2b *4.6_rp)
+    rdr = abs(sr2b *4.6_rp)
 
     inc = 0
     do i1b=1,n1b
@@ -5208,15 +5208,15 @@ contains
         rs(ir) = rs(ir-1) + dr
       enddo
 
-      expsum = 0d0
-      ws(:) = 0d0
-      fs(:) = 0d0
-      dfs(:) = 0d0
-      ddfs(:) = 0d0
-      rmin = 0d0
-      blj(:,:) = 0d0
-      dblj(:,:) = 0d0
-      ddblj(:,:) = 0d0
+      expsum = 0.0_rp
+      ws(:) = 0.0_rp
+      fs(:) = 0.0_rp
+      dfs(:) = 0.0_rp
+      ddfs(:) = 0.0_rp
+      rmin = 0.0_rp
+      blj(:,:) = 0.0_rp
+      dblj(:,:) = 0.0_rp
+      ddblj(:,:) = 0.0_rp
       do ir=1,npnts
         call b_spl(rs(ir),p2%knots, nk, nr, br, dbr, ddbr)
         do l = -3,0
@@ -5230,48 +5230,48 @@ contains
           dblj(ic,ir) = dbr(l)
           ddblj(ic,ir) = ddbr(l)
         enddo
-        ws(ir) = max(min(exp(-fs(ir)/eps2b),huge),tiny)
+        ws(ir) = max(min(exp(-fs(ir)/eps2b),vhuge),tiny)
         expsum = expsum + ws(ir)
         rmin = rmin +ws(ir)*rs(ir)
       enddo  ! ir
       rmin = rmin / expsum
 !!$      print '(a,2i5,es12.3)','i2b,ibase,rmin=',i2b,ibase,rmin
       ws(:) = ws(:) /expsum
-      sgmls(:) = 0d0
-      sgmrs(:) = 0d0
+      sgmls(:) = 0.0_rp
+      sgmrs(:) = 0.0_rp
       do j=1,npnts
 !!$        sgmls(j) = expit((rmin -del2b -rs(j))/scl2b)
 !!$        sgmrs(j) = expit((rs(j) -rmin -del2b)/scl2b)
 !!$        if( sgmls(j) < sgmin ) sgmls(j) = 0d0
 !!$        if( sgmrs(j) < sgmin ) sgmrs(j) = 0d0
-        if( rs(j) > rmin .or. sl2b <= 0d0 ) then
-          sgmls(j) = 0d0
+        if( rs(j) > rmin .or. sl2b <= 0.0_rp ) then
+          sgmls(j) = 0.0_rp
         else
           sgmls(j) = expit((rmin -rdl -rs(j))/sl2b)
         endif
-        if( rs(j) < rmin .or. sr2b <= 0d0 ) then
-          sgmrs(j) = 0d0
+        if( rs(j) < rmin .or. sr2b <= 0.0_rp ) then
+          sgmrs(j) = 0.0_rp
         else
           sgmrs(j) = expit((rs(j) -rmin -rdr)/sr2b)
         endif
         rels(j) = max(0.0, -ddfs(j))
         drmdf(j) = ws(j) /eps2b *(rmin - rs(j))
       enddo
-      dpldf(:) = 0d0
-      dprdf(:) = 0d0
-      dpldc(:) = 0d0
-      dprdc(:) = 0d0
+      dpldf(:) = 0.0_rp
+      dprdf(:) = 0.0_rp
+      dpldc(:) = 0.0_rp
+      dprdc(:) = 0.0_rp
       do j=1,npnts
         do l=1,npnts
-          dsgldrm =  sgmls(l) * (1d0 - sgmls(l)) / sl2b
-          dsgrdrm = -sgmrs(l) * (1d0 - sgmrs(l)) / sr2b
+          dsgldrm =  sgmls(l) * (1.0_rp - sgmls(l)) / sl2b
+          dsgrdrm = -sgmrs(l) * (1.0_rp - sgmrs(l)) / sr2b
           dpldf(j) = dpldf(j) +dsgldrm*rels(l)**2
           dprdf(j) = dprdf(j) +dsgrdrm*ddfs(l)**2
         enddo
         dpldf(j) = dpldf(j) *drmdf(j)
         dprdf(j) = dprdf(j) *drmdf(j)
-        dplddf = sgmls(j) *2d0 *(-rels(j))
-        dprddf = sgmrs(j) *2d0 *ddfs(j)
+        dplddf = sgmls(j) *2.0_rp *(-rels(j))
+        dprddf = sgmrs(j) *2.0_rp *ddfs(j)
 !!$        if( i2b==6 ) print '(a,2i5,10es12.2)','i2b,j,sgmls(j),rels(j),dplddf,ddfs=',&
 !!$             i2b,j,sgmls(j),rels(j),dplddf,ddfs(j)
         do ic=1,nc
@@ -5283,9 +5283,9 @@ contains
       enddo
 
       do ic=1,nc
-        if( sl2b > 0d0 ) grad(ibase+ic) = grad(ibase+ic) &
+        if( sl2b > 0.0_rp ) grad(ibase+ic) = grad(ibase+ic) &
              +pwgt2b *dpldc(ic) /npnts
-        if( sr2b > 0d0 ) grad(ibase+ic) = grad(ibase+ic) &
+        if( sr2b > 0.0_rp ) grad(ibase+ic) = grad(ibase+ic) &
              +pwgt2b *dprdc(ic) /npnts
 !!$        if( i2b==6 ) print '(a,3i5,5es12.2)','i2b,ic,ibase+ic,dpldc,grad=',&
 !!$             i2b,ic,ibase+ic,dpldc(ic),grad(ibase+ic)
@@ -5308,17 +5308,17 @@ contains
     real(rp):: fli,ri,tmp,c2t,bij(-3:0),dbij(-3:0)
     type(prm2):: p2
 
-    floss = 0d0
+    floss = 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
       isp = csp2isp(p2%csi)
       jsp = csp2isp(p2%csj)
-      fli = 0d0
+      fli = 0.0_rp
       do ir=1,np
 !.....r-point to be evaluated as mid-point of the section
-        ri = radii(isp,jsp)/np *(dble(ir)-0.5d0)
+        ri = radii(isp,jsp)/np *(real(ir, rp)-0.5_rp)
         call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
-        tmp = 0d0
+        tmp = 0.0_rp
         do lij = -3,0
           n = nr2 +lij
           if( n < 1 .or. n > p2%nknot-4 ) cycle
@@ -5329,7 +5329,7 @@ contains
       enddo
       floss = floss +fli/np
     enddo
-    floss = floss/n2b *0.5d0
+    floss = floss/n2b *0.5_rp
     return
   end subroutine calc_short_lossfunc
 !=======================================================================
@@ -5360,7 +5360,7 @@ contains
       inc = inc +1
     enddo
 
-    gloss(:) = 0d0
+    gloss(:) = 0.0_rp
     do i2b=1,n2b
       p2 = prm2s(i2b)
       isp = csp2isp(p2%csi)
@@ -5373,9 +5373,9 @@ contains
 
       do ir=1,np
 !.....r-point to be evaluated as mid-point of the section
-        ri = radii(isp,jsp)/np *(dble(ir)-0.5d0)
+        ri = radii(isp,jsp)/np *(real(ir, rp)-0.5_rp)
         call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij)
-        tmp = 0d0
+        tmp = 0.0_rp
         do lij = -3,0
           n = nr2 +lij
           if( n < 1 .or. n > p2%nknot-4 ) cycle
@@ -5450,9 +5450,9 @@ contains
       if( ri < p2%knots(min_ic_data) ) ri = (p2%knots(min_ic_data)+p2%knots(min_ic_data+1))/2
       nr2 = knot_index(ri, p2%nknot, p2%knots)
       call b_spl(ri,p2%knots,p2%nknot,nr2,bij,dbij,ddbij)
-      val  = 0d0
-      dval = 0d0
-      ddval= 0d0
+      val  = 0.0_rp
+      dval = 0.0_rp
+      ddval= 0.0_rp
       do l= -3,0
         n = nr2 +l
         c = p2%coefs(n)
@@ -5462,17 +5462,17 @@ contains
       enddo
 !.....There must be some condition to dval and/or ddval
 !     to achieve decent repulsion to the pair...
-      dval = min(dval, 0d0)
-      ddval= max(ddval, 1d0)
+      dval = min(dval, 0.0_rp)
+      ddval= max(ddval, 1.0_rp)
 !!$      print '(a,3i3,f6.3,i3,3es12.3)','i2b,isp,jsp,ri,nr2,v,dv,ddv=', &
 !!$           i2b,isp,jsp,ri,nr2,val,dval,ddval
 !.....Correct coefs using above information
       do ic= min_ic_data-1,1,-1
         rc = p2%knots(ic+2)  ! peak position of B_{ic,3} as t_{ic+2}
         dr = rc -ri
-        tgt = val +dval*dr +0.5d0*ddval*dr**2
+        tgt = val +dval*dr +0.5_rp*ddval*dr**2
         ip = ic2ip(ic)
-        params(ip) = max(tgt,0d0)
+        params(ip) = max(tgt,0.0_rp)
 !!$        print '(a,i3,4es12.3)','  ic,ri,rc,dr,tgt=',ic,ri,rc,dr,tgt
       enddo
 
@@ -5585,25 +5585,25 @@ contains
     type(prm2):: p2
     type(prm3):: p3
 
-    dmem = 0d0
+    dmem = 0.0_rp
 
-    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+    dmem = dmem +8.0_rp*(size(aal2) +size(aal3) +size(strsl))
 !!$    dmem = dmem +4d0*size(ls3b)
 
     do i2b=1,n2b
       p2 = prm2s(i2b)
-      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
-      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
-      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
-      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
+      dmem = dmem +8.0_rp*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8.0_rp*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8.0_rp*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8.0_rp*size(p2%gws)
     enddo
     do i3b=1,n3b
       p3 = prm3s(i3b)
-      dmem = dmem +8d0*( size(p3%knij) +size(p3%knik) +size(p3%knjk) &
+      dmem = dmem +8.0_rp*( size(p3%knij) +size(p3%knik) +size(p3%knjk) &
            +size(p3%coefs) )
-      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
-      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
-      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
+      if( allocated(p3%gwe) ) dmem = dmem +8.0_rp*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8.0_rp*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8.0_rp*size(p3%gws)
     enddo
     return
   end function get_mem_uf3
@@ -5617,24 +5617,24 @@ contains
     type(prm2):: p2
     type(prm3l):: p3
 
-    dmem = 0d0
+    dmem = 0.0_rp
 
-    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+    dmem = dmem +8.0_rp*(size(aal2) +size(aal3) +size(strsl))
 !!$    dmem = dmem +4d0*size(ls3b)
 
     do i2b=1,n2b
       p2 = prm2s(i2b)
-      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
-      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
-      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
-      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
+      dmem = dmem +8.0_rp*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8.0_rp*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8.0_rp*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8.0_rp*size(p2%gws)
     enddo
     do i3b=1,n3b
       p3 = prm3ls(i3b)
-      dmem = dmem +8d0*( size(p3%knots) +size(p3%coefs) )
-      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
-      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
-      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
+      dmem = dmem +8.0_rp*( size(p3%knots) +size(p3%coefs) )
+      if( allocated(p3%gwe) ) dmem = dmem +8.0_rp*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8.0_rp*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8.0_rp*size(p3%gws)
     enddo
     return
   end function get_mem_uf3l
@@ -5648,26 +5648,26 @@ contains
     type(prm2):: p2
     type(prm3d):: p3
 
-    dmem = 0d0
+    dmem = 0.0_rp
 
-    dmem = dmem +8d0*(size(aal2) +size(aal3) +size(strsl))
+    dmem = dmem +8.0_rp*(size(aal2) +size(aal3) +size(strsl))
 !!$    dmem = dmem +4d0*size(ls3b)
 
     do i2b=1,n2b
       p2 = prm2s(i2b)
-      dmem = dmem +8d0*(size(p2%knots) +size(p2%coefs))
-      if( allocated(p2%gwe) ) dmem = dmem +8d0*size(p2%gwe)
-      if( allocated(p2%gwf) ) dmem = dmem +8d0*size(p2%gwf)
-      if( allocated(p2%gws) ) dmem = dmem +8d0*size(p2%gws)
+      dmem = dmem +8.0_rp*(size(p2%knots) +size(p2%coefs))
+      if( allocated(p2%gwe) ) dmem = dmem +8.0_rp*size(p2%gwe)
+      if( allocated(p2%gwf) ) dmem = dmem +8.0_rp*size(p2%gwf)
+      if( allocated(p2%gws) ) dmem = dmem +8.0_rp*size(p2%gws)
     enddo
     do i3b=1,n3b
       p3 = prm3ds(i3b)
-      dmem = dmem +8d0*( size(p3%knij) +size(p3%cfij) &
+      dmem = dmem +8.0_rp*( size(p3%knij) +size(p3%cfij) &
            +size(p3%knik) +size(p3%cfik) &
            +size(p3%kncs) +size(p3%cfcs) )
-      if( allocated(p3%gwe) ) dmem = dmem +8d0*size(p3%gwe)
-      if( allocated(p3%gwf) ) dmem = dmem +8d0*size(p3%gwf)
-      if( allocated(p3%gws) ) dmem = dmem +8d0*size(p3%gws)
+      if( allocated(p3%gwe) ) dmem = dmem +8.0_rp*size(p3%gwe)
+      if( allocated(p3%gwf) ) dmem = dmem +8.0_rp*size(p3%gwf)
+      if( allocated(p3%gws) ) dmem = dmem +8.0_rp*size(p3%gws)
     enddo
     return
   end function get_mem_uf3d

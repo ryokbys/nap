@@ -1,11 +1,11 @@
 !-----EAM Sutton-Chen model for Fe (iron)
-      real(rp),parameter:: am_fe = real(55.847d0, rp)
+      real(rp),parameter:: am_fe = 55.847_rp
 !      real(rp),parameter:: alcfe = 2.8665d-10 /ang
-      real(rp),parameter:: alcfe = real(2.9782935d-10, rp) /ang
+      real(rp),parameter:: alcfe = 2.9782935e-10_rp /ang
 !-----Sutton-Chen model parameters for Fe (in eV,Ang)
-      real(rp),parameter:: sc_eps= real(0.017306d0, rp)
-      real(rp),parameter:: sc_a  = real(3.471392d-10, rp) /ang
-      real(rp),parameter:: sc_n  = real(8.137381d0, rp)
-      real(rp),parameter:: sc_m  = real(4.7877d0, rp)
-      real(rp),parameter:: sc_c  = real(24.9390d0, rp)
+      real(rp),parameter:: sc_eps= 0.017306_rp
+      real(rp),parameter:: sc_a  = 3.471392e-10_rp /ang
+      real(rp),parameter:: sc_n  = 8.137381_rp
+      real(rp),parameter:: sc_m  = 4.7877_rp
+      real(rp),parameter:: sc_c  = 24.9390_rp
 !      real(rp),parameter:: sc_rc = 6d-10 /ang

@@ -24,7 +24,7 @@ module DNN
 !.....parameter file name
   character(128),parameter:: cpfname = 'in.params.DNN'
 
-  real(rp),parameter:: pi= 3.14159265358979d0
+  real(rp),parameter:: pi= 3.14159265358979_rp
 
   integer:: mem
   real(rp):: time
@@ -53,7 +53,7 @@ module DNN
 !     2) 1/(1+exp(-x)) +asig*x
   integer:: itypesig = 2
 !.....Coefficient of additional term in sigmoid2
-  real(rp):: asig = 0.01d0
+  real(rp):: asig = 0.01_rp
 
 !.....Whether or not called from fitpot [default: .false.]
   logical:: lfitpot = .false.
@@ -143,7 +143,7 @@ contains
         print '(a,i0)','   Max num of nodes in a layer = ',maxnnode
         print '(a,i0)','   Total num of weights = ',nwtot
         print '(a,f10.3,a)','   Memory in force_DNN = ', &
-             dble(mem)/1000/1000, ' MB'
+             real(mem, rp)/1000/1000, ' MB'
       endif ! myid.eq.0
 
 !!$      call prepare_desci(myid,iprint,rcin)
@@ -175,9 +175,9 @@ contains
     time0 = mpi_wtime()
 
 !.....Eenergies, forces and stresses of atoms
-    epotl= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
-    aal(1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
+    aal(1:3,1:namax) = 0.0_rp
     do ia=1,natm
       call calc_desci(ia,namax,natm,nnmax,h &
            ,tag,ra,lspr,rcin,iprint)
@@ -188,7 +188,7 @@ contains
       epotl = epotl +epi(ia)
 !.....Pre-compute series of gl*Wl
       do ml0=0,nhl(0)
-        gw(ml0) = 0d0
+        gw(ml0) = 0.0_rp
         do ml1=1,nhl(1)
           gw(ml0)= gw(ml0) +gls(ml1,1)*wgts(ml0,ml1,1)
         enddo
@@ -202,7 +202,7 @@ contains
         rij(1:3)= -rji(1:3)
         dji2= rji(1)**2 +rji(2)**2 +rji(3)**2
         if( dji2.ge.rcmax2 ) cycle
-        dji = dsqrt(dji2)
+        dji = sqrt(dji2)
         js = int(tag(ja))
         do ml0=1,nhl(0)  ! no bias contribution to force
           aal(1:3,ja) = aal(1:3,ja) -gw(ml0)*dgsfi(1:3,ml0,jj)
@@ -230,7 +230,7 @@ contains
 !.....Send back stresses on immigrant atoms
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,strsl,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5_rp
 
 !.....Gather epot
     call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
@@ -279,13 +279,13 @@ contains
       if( iprint.ne.0 ) then
         memg = 8*size(fls) +8*size(gw) +8*size(wfgw) +8*size(wsgm1) &
              +8*size(gmm) +4*size(ivstart) +8*size(fftmp)
-        print '(a,f10.3,a)',' Memory in gradw_DNN = ',dble(memg)/1000/1000,' MB'
+        print '(a,f10.3,a)',' Memory in gradw_DNN = ',real(memg, rp)/1000/1000,' MB'
       endif
 !!$      print *,'nlayer,natm,nal,nnl,nnmax=',nlayer,natm,nal,nnl,nnmax
 !!$      print *,'shape(nhl)=',shape(nhl)
 !!$      print *,'nhl(:)=',nhl(:)
 
-      tgrads(:) = 0d0
+      tgrads(:) = 0.0_rp
 
 !.....ivstart(:) values are constant
       ivstart(:) = 0
@@ -322,7 +322,7 @@ contains
 !.....required in force and stress matching
         nni = lspr(0,ia)
 !.....NOTE: fls of bias is 0; fls(:,:,0,:) = 0d0
-        fls(:,:,:,:) = 0d0
+        fls(:,:,:,:) = 0.0_rp
         do jj=0,nni
           do ml0=1,nhl(0)
             fls(1:3,jj,ml0,0) = -dgsfi(1:3,ml0,jj)
@@ -338,18 +338,18 @@ contains
             fls(1:3,0:nni,ml1,il) = fls(1:3,0:nni,ml1,il)*sgm1(ml1,il)
           enddo
         enddo ! il=...
-        wfgw(:,:,:,:) = 0d0
+        wfgw(:,:,:,:) = 0.0_rp
         do il=1,nlayer
 !!$          print *,'gw: il=',il
           do ml1=0,nhl(il)
-            gw(ml1) = 0d0
+            gw(ml1) = 0.0_rp
             do ml2=1,nhl(il+1)
               gw(ml1)= gw(ml1) +gls(ml2,il+1)*wgts(ml1,ml2,il+1)
             enddo
           enddo
 !!$          print *,'wfgw: il=',il
           do ml1=1,nhl(il)
-            wfgw(1:3,ml1,0:nni,il) = 0d0
+            wfgw(1:3,ml1,0:nni,il) = 0.0_rp
             do ml0=0,nhl(il-1)
               wfgw(1:3,ml1,0:nni,il) = wfgw(1:3,ml1,0:nni,il) &
                    +wgts(ml0,ml1,il)*fls(1:3,0:nni,ml0,il-1)
@@ -455,7 +455,7 @@ contains
             do n=1,nlayer
               do l=n,nlayer ! This should be inside the loop over n
                 iv = ivstart(n)
-                fftmp(1:3,iv+1:nwtot) = 0d0
+                fftmp(1:3,iv+1:nwtot) = 0.0_rp
                 do ml=1,nhl(l)
                   do jv=iv+1,nwtot
                     fftmp(1:3,jv) = fftmp(1:3,jv) &
@@ -551,19 +551,19 @@ contains
     real(rp):: z,sgmz,y
 
 !.....Initialize
-    hls(:,:) = 0d0
-    zls(:,:) = 0d0
+    hls(:,:) = 0.0_rp
+    zls(:,:) = 0.0_rp
     hls(1:nhl(0),0) = gsfi(1:nhl(0))
 !.....NOTE: 0-th node in layer is the bias.
-    hls(0,0:nlayer) = 1d0
-    sgm1(0,nlayer) = 0d0
-    sgm2(0,nlayer) = 0d0
+    hls(0,0:nlayer) = 1.0_rp
+    sgm1(0,nlayer) = 0.0_rp
+    sgm2(0,nlayer) = 0.0_rp
 
 !.....Compute the node values by forward propagation.
     do il=1,nlayer
       itype = iactf(il)
       do ml1=1,nhl(il)
-        z = 0d0
+        z = 0.0_rp
         do ml0=0,nhl(il-1)
           z = z +wgts(ml0,ml1,il)*hls(ml0,il-1)
         enddo
@@ -576,11 +576,11 @@ contains
     enddo ! il=...
 !.....Compute gls by back propagation.
 !.....NOTE: gls = prod(W*G) in RK's memo.
-    gls(:,:) = 0d0
-    gls(:,nlayer:nlayer+1) = 1d0
+    gls(:,:) = 0.0_rp
+    gls(:,nlayer:nlayer+1) = 1.0_rp
     do il=nlayer-1,1,-1
       do ml1=1,nhl(il) ! Since sgm1(0,:,:)=0d0, no need to take ml1=0
-        z = 0d0
+        z = 0.0_rp
         do ml2=1,nhl(il+1)
           z = z + gls(ml2,il+1)*wgts(ml1,ml2,il+1)
         enddo
@@ -602,9 +602,9 @@ contains
     integer:: i,k,ml,ml0,ml1
     real(rp):: ymat(0:maxnnode,maxnnode),tmp(maxnnode,maxnnode)
 
-    wxs(:,:) = 0d0
+    wxs(:,:) = 0.0_rp
     do i=1,maxnnode
-      wxs(i,i) = 1d0
+      wxs(i,i) = 1.0_rp
     enddo
     do k=1,l-n
       do ml1=1,nhl(l-k+1)
@@ -614,7 +614,7 @@ contains
       enddo
       do ml1=1,nhl(l)
         do ml0=1,nhl(l-k)
-          tmp(ml0,ml1) = 0d0
+          tmp(ml0,ml1) = 0.0_rp
           do ml=1,nhl(l-k+1)
             tmp(ml0,ml1) = tmp(ml0,ml1) +wxs(ml,ml1)*ymat(ml0,ml)
           end do
@@ -649,13 +649,13 @@ contains
     case(0)
       actf = x
     case(1)
-      actf = 1d0/(1d0 +exp(-x))
+      actf = 1.0_rp/(1.0_rp +exp(-x))
     case(2)
-      actf = 1d0/(1d0 +exp(-x)) +asig*x
+      actf = 1.0_rp/(1.0_rp +exp(-x)) +asig*x
     case(3)
-      actf = 1d0/(1d0 +exp(-x)) +asig*x*x*0.5d0
+      actf = 1.0_rp/(1.0_rp +exp(-x)) +asig*x*x*0.5_rp
     case default
-      actf = 0d0
+      actf = 0.0_rp
     end select
     return
   end function actf
@@ -668,17 +668,17 @@ contains
     
     select case(itype)
     case(0)
-      dactf = 1d0
+      dactf = 1.0_rp
     case(1)
-      dactf = sx*(1d0-sx)
+      dactf = sx*(1.0_rp-sx)
     case(2)
-      sxt = 1d0/(1d0 +exp(-x))
-      dactf = sxt *(1d0-sxt) +asig
+      sxt = 1.0_rp/(1.0_rp +exp(-x))
+      dactf = sxt *(1.0_rp-sxt) +asig
     case(3)
-      sxt = 1d0/(1d0 +exp(-x))
-      dactf = sxt *(1d0-sxt) +asig*x
+      sxt = 1.0_rp/(1.0_rp +exp(-x))
+      dactf = sxt *(1.0_rp-sxt) +asig*x
     case default
-      dactf = 0d0
+      dactf = 0.0_rp
     end select
     return
   end function dactf
@@ -691,17 +691,17 @@ contains
     
     select case(itype)
     case(0)
-      ddactf = 0d0
+      ddactf = 0.0_rp
     case(1)
-      ddactf = sx*(1d0-sx)*(1d0-2d0*sx)
+      ddactf = sx*(1.0_rp-sx)*(1.0_rp-2.0_rp*sx)
     case(2)
-      sxt = 1d0 /(1d0 +exp(-x))
-      ddactf = sxt *(1d0 -sxt) *(1d0 -2d0*sxt)
+      sxt = 1.0_rp /(1.0_rp +exp(-x))
+      ddactf = sxt *(1.0_rp -sxt) *(1.0_rp -2.0_rp*sxt)
     case(3)
-      sxt = 1d0 /(1d0 +exp(-x))
-      ddactf = sxt *(1d0 -sxt) *(1d0 -2d0*sxt) +asig
+      sxt = 1.0_rp /(1.0_rp +exp(-x))
+      ddactf = sxt *(1.0_rp -sxt) *(1.0_rp -2.0_rp*sxt) +asig
     case default
-      ddactf = 0d0
+      ddactf = 0.0_rp
     end select
     return
   end function ddactf
@@ -817,8 +817,8 @@ contains
     allocate(wgts(0:maxnnode,maxnnode,nlayer+1))
     call accum_mem('force_DNN',8*size(wgts))
     if( myid.eq.0 ) then
-      wgts(:,:,:) = 0d0
-      wgts(:,:,nlayer+1) = 1d0
+      wgts(:,:,:) = 0.0_rp
+      wgts(:,:,nlayer+1) = 1.0_rp
       istart = 0
       if( .not. lbias ) istart = 1
       do il=1,nlayer
@@ -885,8 +885,8 @@ contains
 
     if( .not.allocated(wgts) ) stop 'ERROR@set_params_DNN:' &
          //' wgts not allocated, which should not happen.'
-    wgts(:,:,:) = 0d0
-    wgts(:,:,nlayer+1) = 1d0
+    wgts(:,:,:) = 0.0_rp
+    wgts(:,:,nlayer+1) = 1.0_rp
 
     inc = 0
     istart = 0
@@ -943,8 +943,8 @@ contains
     endif
 
     if( .not.allocated(wgts) ) allocate(wgts(0:maxnnode,maxnnode,nlayer+1))
-    wgts(:,:,:) = 0d0
-    wgts(:,:,nlayer+1) = 1d0
+    wgts(:,:,:) = 0.0_rp
+    wgts(:,:,nlayer+1) = 1.0_rp
 
     inc = 0
     istart = 0

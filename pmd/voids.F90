@@ -68,11 +68,11 @@ program voids
   imesh(:,:,:) = 0
   n = 0
   do ix=1,nx
-    x = (dble(ix)-0.5)/nx
+    x = (real(ix, rp)-0.5)/nx
     do iy=1,ny
-      y = (dble(iy)-0.5)/ny
+      y = (real(iy, rp)-0.5)/ny
       do iz=1,nz
-        z = (dble(iz)-0.5)/nz
+        z = (real(iz, rp)-0.5)/nz
         n= n+1
         pmesh(1,n) = x
         pmesh(2,n) = y
@@ -82,9 +82,9 @@ program voids
   enddo
 
 !.....Make cell list
-  lcx= 1d0/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
-  lcy= 1d0/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
-  lcz= 1d0/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
+  lcx= 1.0_rp/sqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
+  lcy= 1.0_rp/sqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
+  lcz= 1.0_rp/sqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
   if( lcx.lt.2 .or. lcy.lt.2 .or. lcz.lt.2 ) then
     write(6,'(a)') ' Error: Cannot handle' &
          //' too small system !!!'
@@ -93,12 +93,12 @@ program voids
   lcyz= lcy*lcx
   lcxyz= lcx*lcyz
   print *,'lcx,lcy,lcz,lcxyz = ',lcx,lcy,lcz,lcxyz
-  rcx= 1d0/lcx
-  rcy= 1d0/lcy
-  rcz= 1d0/lcz
-  rcxi=1d0/rcx
-  rcyi=1d0/rcy
-  rczi=1d0/rcz
+  rcx= 1.0_rp/lcx
+  rcy= 1.0_rp/lcy
+  rcz= 1.0_rp/lcz
+  rcxi=1.0_rp/rcx
+  rcyi=1.0_rp/rcy
+  rczi=1.0_rp/rcz
 !-----allocate LSCL & LSHD after obtaining lcxyz
   allocate(lscl(ntot),lshd(lcxyz))
   lshd(1:lcxyz) = 0

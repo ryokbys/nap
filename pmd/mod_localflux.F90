@@ -4,7 +4,7 @@ module localflux
 !
   use mod_precision
   use pmdvars,only: nspmax
-  use pmdmpi,only: nid2xyz
+  use pmdmpi,only: nid2xyz,mpi_real_rp,mpi_status_size,mpi_integer
   use memory,only: accum_mem
   implicit none
   include "./const.h"
@@ -54,13 +54,13 @@ contains
     evflux(1:3) = clrfield(1:3)/fext
 
 !.....Parallel setting
-    anxi= 1d0/nx
-    anyi= 1d0/ny
-    anzi= 1d0/nz
+    anxi= 1.0_rp/nx
+    anyi= 1.0_rp/ny
+    anzi= 1.0_rp/nz
     nxyz = nx*ny*nz
-    alx = dsqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2) *anxi
-    aly = dsqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2) *anyi
-    alz = dsqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2) *anzi
+    alx = sqrt(h(1,1)**2 +h(2,1)**2 +h(3,1)**2) *anxi
+    aly = sqrt(h(1,2)**2 +h(2,2)**2 +h(3,2)**2) *anyi
+    alz = sqrt(h(1,3)**2 +h(2,3)**2 +h(3,3)**2) *anzi
 
 !.....Number of local-flux regions in a node and global
     nl = nlx*nly*nlz
@@ -72,9 +72,9 @@ contains
     dlx = anxi /nlx
     dly = anyi /nly
     dlz = anzi /nlz
-    dlxi = 1d0/dlx
-    dlyi = 1d0/dly
-    dlzi = 1d0/dlz
+    dlxi = 1.0_rp/dlx
+    dlyi = 1.0_rp/dly
+    dlzi = 1.0_rp/dlz
     alx = alx /nlx
     aly = aly /nly
     alz = alz /nlz
@@ -83,12 +83,12 @@ contains
     allocate(idxl2gt(nl))
     mem = 8*(size(fluxl)+size(fluxt)) +4*(size(idxl2g)+size(nargn))
     call accum_mem('localflux',mem)
-    fluxl(:,:) = 0d0
+    fluxl(:,:) = 0.0_rp
     nargn(:) = 0
     if( myid.eq.0 ) then
       allocate(fluxg(3,ng))
       call accum_mem('localflux',8*size(fluxg))
-      fluxg(:,:) = 0d0
+      fluxg(:,:) = 0.0_rp
     endif
 
 !.....Index conversion from local to global
@@ -173,7 +173,7 @@ contains
     integer:: istat(mpi_status_size),itag,ierr
 
     nargn(:) = 0
-    fluxt(:,:) = 0d0
+    fluxt(:,:) = 0.0_rp
     do i=1,natm
       if( abs(clr(i)).lt.0.9 ) cycle
 !.....Get local region index
@@ -203,7 +203,7 @@ contains
         enddo
         do ixyz=1,nxyz-1
           itag = ixyz*nmpi -nmpi
-          fluxl(:,:) = 0d0
+          fluxl(:,:) = 0.0_rp
           call mpi_recv(fluxl,3*nl,mpi_real_rp,ixyz,itag+1,mpi_world &
                ,istat,ierr)
           do idxl=1,nl
@@ -225,7 +225,7 @@ contains
         call mpi_send(fluxl,3*nl,mpi_real_rp,0,itag+1,mpi_world,ierr)
       endif
 !.....Refresh fluxl
-      fluxl(:,:) = 0d0
+      fluxl(:,:) = 0.0_rp
     endif
     
   end subroutine accum_lflux

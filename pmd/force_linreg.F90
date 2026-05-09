@@ -104,13 +104,13 @@ contains
       allocate(fat(3,namax),dbna(3,nelem,namax))
     endif
 
-    epotl= 0d0
+    epotl= 0.0_rp
 
-    dbna(1:3,1:nelem,1:natm+nb)= 0d0
+    dbna(1:3,1:nelem,1:natm+nb)= 0.0_rp
     do ia=1,natm
       iwgt= 0
 #ifdef __3BODY__
-      apot= 0d0
+      apot= 0.0_rp
 #endif
       do ielem=1,nelem
         iwgt= iwgt +1
@@ -209,9 +209,9 @@ contains
       allocate(aal(3,namax),strsl(3,3,namax))
     endif
 
-    aal(1:3,1:namax) = 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
-    epotl= 0d0
+    aal(1:3,1:namax) = 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
+    epotl= 0.0_rp
 
 !.....Energy
     do ia=1,natm
@@ -273,7 +273,7 @@ contains
     if( lstrs ) then
       call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
            ,nn,mpi_world,strsl,9)
-      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5d0
+      strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)*0.5_rp
     endif
 
 !-----gather epot
@@ -288,9 +288,9 @@ contains
     implicit none
     real(rp),intent(in):: r,rc
     real(rp):: fc
-    real(rp),parameter:: pi= 3.14159265358979d0
+    real(rp),parameter:: pi= 3.14159265358979_rp
 
-    fc= 0.5d0 *(cos(r/rc*pi)+1d0)
+    fc= 0.5_rp *(cos(r/rc*pi)+1.0_rp)
     return
   end function fc
 !=======================================================================
@@ -298,7 +298,7 @@ contains
     implicit none
     real(rp),intent(in):: r,rc
     real(rp):: dfc
-    real(rp),parameter:: pi= 3.14159265358979d0
+    real(rp),parameter:: pi= 3.14159265358979_rp
 
     dfc= -pi/2/rc *sin(r/rc*pi)
     return
@@ -320,7 +320,7 @@ contains
          ,fcij,xk(3),xik(3),rik(3),rj,rk,fcik,dkrik(3),dirik(3) &
          ,f3,dfcj,dfck,tmp2,cs,acnst,dcosi(3),dcosj(3),dcosk(3)
 
-    bnai= 0d0
+    bnai= 0.0_rp
     xi(1:3)= ra(1:3,ia)
     is= int(tag(ia))
     if( itype(ielem).eq.3 ) then ! angular (3-body) basis
@@ -405,7 +405,7 @@ contains
             dcosj(1:3)= rik(1:3)/rj/rk -rij(1:3)/rj*cs/rj
             dcosk(1:3)= rij(1:3)/rj/rk -rik(1:3)/rk*cs/rk
             dcosi(1:3)= -dcosj(1:3) -dcosk(1:3)
-            tmp2= 2d0*(acnst+cs)/(abs(acnst)+1d0)**2
+            tmp2= 2.0_rp*(acnst+cs)/(abs(acnst)+1.0_rp)**2
             dbna(1:3,ielem,ia)= dbna(1:3,ielem,ia) &
                  +dcosi(1:3)*tmp2*fcij*fcik *tmp
             dbna(1:3,ielem,ja)= dbna(1:3,ielem,ja) &
@@ -482,14 +482,14 @@ contains
     real(rp):: func2
     real(rp):: a(max_ncnst),r2i,r4i
 
-    func2= 0d0
+    func2= 0.0_rp
     if( itype(ielem).eq.1 ) then ! Gaussian-type
       a(1:3)= cnst(1:3,ielem)
       func2= rij**a(1) *exp(-a(2)*(rij-a(3))**2)
 
     elseif( itype(ielem).eq.2 ) then ! cosine-type
       a(1:2)= cnst(1:2,ielem)
-      func2= (1d0+cos(rij*a(1))) *rij**nint(a(2))
+      func2= (1.0_rp+cos(rij*a(1))) *rij**nint(a(2))
 
     elseif( itype(ielem).eq.4 ) then ! poly-1
       a(1)= cnst(1,ielem)
@@ -499,25 +499,25 @@ contains
       func2= a(1) /rij**2
     elseif( itype(ielem).eq.6 ) then ! poly-4
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij**2
+      r2i= 1.0_rp/rij**2
       func2= a(1) *r2i*r2i
     elseif( itype(ielem).eq.7 ) then ! poly-6
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij**2
+      r2i= 1.0_rp/rij**2
       func2= a(1) *r2i*r2i*r2i
     elseif( itype(ielem).eq.8 ) then ! poly-8
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij**2
+      r2i= 1.0_rp/rij**2
       r4i= r2i*r2i
       func2= a(1) *r4i*r4i
     elseif( itype(ielem).eq.9 ) then ! poly-10
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij**2
+      r2i= 1.0_rp/rij**2
       r4i= r2i*r2i
       func2= a(1) *r4i*r4i*r2i
     elseif( itype(ielem).eq.10 ) then ! poly-12
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij**2
+      r2i= 1.0_rp/rij**2
       r4i= r2i*r2i
       func2= a(1) *r4i*r4i*r4i
 
@@ -532,10 +532,10 @@ contains
     real(rp):: dfunc2,tmp,a(max_ncnst),ri,r2i,r4i
     integer:: ia2
 
-    dfunc2= 0d0
+    dfunc2= 0.0_rp
     if( itype(ielem).eq.1 ) then ! Gaussian-type
       a(1:3)= cnst(1:3,ielem)
-      dfunc2= (a(1)*rij**(a(1)-1d0) -2d0*a(2)*(rij-a(3))*rij**a(1) ) &
+      dfunc2= (a(1)*rij**(a(1)-1.0_rp) -2.0_rp*a(2)*(rij-a(3))*rij**a(1) ) &
            *exp(-a(2)*(rij-a(3))**2)
 !!$      dfunc2= (a(1) -2d0*a(2)*(rij-a(3))*rij) *rij**(a(1)-1d0) &
 !!$           *exp(-a(2)*(rij-a(3))**2)
@@ -544,37 +544,37 @@ contains
       a(1:2)= cnst(1:2,ielem)
       ia2= nint(a(2))
       dfunc2= -a(1)*sin(rij*a(1)) *rij**ia2 &
-           +ia2*rij**(ia2-1) *(1d0+cos(rij*a(1)))
+           +ia2*rij**(ia2-1) *(1.0_rp+cos(rij*a(1)))
 
     elseif( itype(ielem).eq.4 ) then ! poly-1
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       dfunc2= -a(1) *r2i
     elseif( itype(ielem).eq.5 ) then ! poly-2
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       dfunc2= -a(1) *2.0*r2i/rij
     elseif( itype(ielem).eq.6 ) then ! poly-4
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       dfunc2= -a(1) *4.0*r2i*r2i/rij
     elseif( itype(ielem).eq.7 ) then ! poly-6
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       dfunc2= -a(1) *6.0*r2i*r2i*r2i/rij
     elseif( itype(ielem).eq.8 ) then ! poly-8
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       r4i= r2i*r2i
       dfunc2= -a(1) *8.0*r4i*r4i/rij
     elseif( itype(ielem).eq.9 ) then ! poly-10
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       r4i= r2i*r2i
       dfunc2= -a(1) *10.0*r4i*r4i*r2i/rij
     elseif( itype(ielem).eq.10 ) then ! poly-12
       a(1)= cnst(1,ielem)
-      r2i= 1d0/rij/rij
+      r2i= 1.0_rp/rij/rij
       r4i= r2i*r2i
       dfunc2= -a(1) *10.0*r4i*r4i*r4i/rij
     endif
@@ -587,11 +587,11 @@ contains
     real(rp),intent(in):: rij(3),rj,rik(3),rk
     real(rp):: func3,cs,a(max_ncnst)
 
-    func3= 0d0
+    func3= 0.0_rp
     if( itype(ielem).eq.3 ) then ! angular
       a(1)= cnst(1,ielem)
       cs= dot(rij,rik)/rj/rk
-      func3= (a(1)+cs)**2/(abs(a(1))+1d0)**2
+      func3= (a(1)+cs)**2/(abs(a(1))+1.0_rp)**2
     endif
 
   end function func3

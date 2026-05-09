@@ -64,9 +64,13 @@ def find_scoping_units(lines):
             continue
 
         # Detect start of a scoping unit
+        # Strip leading keywords: recursive, pure, elemental, impure
+        bare = re.sub(
+            r'^(recursive|pure|impure|elemental)\s+', '', stripped_nocomment
+        )
         m = re.match(
             r'(module|program|subroutine|function|block\s*data)\s+(\w)',
-            stripped_nocomment
+            bare
         )
         if m:
             kind = m.group(1).replace(' ', '')

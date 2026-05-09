@@ -22,7 +22,7 @@ module tersoff
 
 !.....global variables
   integer:: mem = 0
-  real(rp):: time = 0d0
+  real(rp):: time = 0.0_rp
   real(rp):: ts_epot
 
 !.....Tersoff type: (default) Kumagai's modified Tersoff, (Te-dependent) Te-dependent[5]
@@ -124,7 +124,7 @@ contains
 
 !.....only at 1st call
     if ( l1st ) then
-      rcmax = 0d0
+      rcmax = 0.0_rp
       do is=1,nsp
         do js=is,nsp
           rcmax = max(rcmax,ts_rc(is,js))
@@ -148,7 +148,7 @@ contains
       endif
       
       allocate(aa1(3,namax),aa2(3,namax),strsl(3,3,namax))
-      time = 0d0
+      time = 0.0_rp
       l1st = .false.
     endif
 
@@ -158,13 +158,13 @@ contains
     endif
 
 !.....initialize
-    epotl = 0d0
-    epi(1:natm+nb) = 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    epotl = 0.0_rp
+    epi(1:natm+nb) = 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
 
 !.....Repulsive term which contains only 2-body
-    epotl1 = 0d0
-    aa1(:,1:natm+nb) = 0d0
+    epotl1 = 0.0_rp
+    aa1(:,1:natm+nb) = 0.0_rp
 !$omp parallel copyin(ts_a,ts_b,ts_lmbd1,ts_lmbd2,ts_eta,ts_delta,ts_alpha,ts_beta,ts_c1, &
 !$omp                 ts_c2,ts_c3,ts_c4,ts_c5,ts_h,ts_rc2in,ts_rc2out,ts_f0,&
 !$omp                 ts_rc3in,ts_rc3out,ts_r,ts_d,ts_rc,ts_rc2)
@@ -185,12 +185,12 @@ contains
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.ge.ts_rc2(is,js) ) cycle
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
 !.....Potential
         fc = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         dfc = df_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         texp = exp(-ts_lmbd1(is,js)*dij)
-        tmp = 0.5d0 *fc *ts_a(is,js) *texp
+        tmp = 0.5_rp *fc *ts_a(is,js) *texp
 !omp atomic
         epi(ia)= epi(ia) +tmp
         epotl1 = epotl1 +tmp
@@ -200,7 +200,7 @@ contains
           epotl1 = epotl1 +tmp
         endif
 !.....Force
-        diji = 1d0/dij
+        diji = 1.0_rp/dij
         dirij(1:3)= -rij(1:3)*diji
         djrij(1:3)= -dirij(1:3)
         dvdr= ts_a(is,js)*texp *(dfc -ts_lmbd1(is,js)*fc)
@@ -216,10 +216,10 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+                   -0.5_rp *rij(ixyz) *dvdr *djrij(jxyz)
 !$omp atomic
               strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+                   -0.5_rp *rij(ixyz) *dvdr *djrij(jxyz)
             enddo
           enddo
         else
@@ -227,7 +227,7 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *rij(ixyz) *dvdr *djrij(jxyz)
+                   -0.5_rp *rij(ixyz) *dvdr *djrij(jxyz)
             enddo
           enddo
         endif
@@ -240,8 +240,8 @@ contains
 
 !.....Attractive term which contains 3-body as well
 !$omp single
-    epotl2 = 0d0
-    aa2(:,1:natm+nb) = 0d0
+    epotl2 = 0.0_rp
+    aa2(:,1:natm+nb) = 0.0_rp
 !$omp end single
     
 !$omp do private(ia,is,xi,jj,ja,js,xij,rij,dij2,dij,diji,dirij,djrij,fcij, &
@@ -263,15 +263,15 @@ contains
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.gt.ts_rc2(is,js) ) cycle
-        dij = dsqrt(dij2)
-        diji = 1d0/dij
+        dij = sqrt(dij2)
+        diji = 1.0_rp/dij
         dirij(1:3)= -rij(1:3)*diji
         djrij(1:3)= -dirij(1:3)
         fcij = f_c(dij,ts_rc2in(is,js),ts_rc2out(is,js))
         texp2ij = exp(-ts_lmbd2(is,js)*dij)
         faij = -ts_b(is,js) *texp2ij
 !.....Precompute zeta which is necessary for derivative calculation
-        zeta = 0d0
+        zeta = 0.0_rp
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
           ks = int(tag(ka))
@@ -282,7 +282,7 @@ contains
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2.gt.ts_rc2(is,ks) ) cycle
-          dik = dsqrt(dik2)
+          dik = sqrt(dik2)
           fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           texp3 = exp(ts_alpha(is,ks)*(dij-dik)**ts_beta(is,ks))
           cs = dot(rij,rik) /dik *diji
@@ -291,8 +291,8 @@ contains
           zeta = zeta +fcik*gzijk*texp3
         enddo
 !.....Potential
-        bij = (1d0 +zeta**ts_eta(is,js))**(-ts_delta(is,js))
-        tmp = 0.25d0 *fcij*bij*faij
+        bij = (1.0_rp +zeta**ts_eta(is,js))**(-ts_delta(is,js))
+        tmp = 0.25_rp *fcij*bij*faij
 !$omp atomic
         epi(ia)= epi(ia) +tmp
 !$omp atomic
@@ -301,7 +301,7 @@ contains
 !.....Force except derivative of bij
         dfcij = df_c(dij,ts_rc2in(is,js),ts_rc3in(is,js))
         dfaij = ts_b(is,js) *ts_lmbd2(is,js) *texp2ij
-        dvdij = 0.5d0 *bij*(dfcij*faij +dfaij*fcij)
+        dvdij = 0.5_rp *bij*(dfcij*faij +dfaij*fcij)
 !.....Since bij contains the angle around atom-i that is not symmetric to ia and ja,
 !     the contribution to ja should be considered as well, even if the summations
 !     of ia and ja are taken fully.
@@ -316,17 +316,17 @@ contains
           do jxyz=1,3
 !$omp atomic
             strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                 -0.5d0 *rij(ixyz) *dvdij *djrij(jxyz)
+                 -0.5_rp *rij(ixyz) *dvdij *djrij(jxyz)
 !$omp atomic
             strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                 -0.5d0 *rij(ixyz) *dvdij *djrij(jxyz)
+                 -0.5_rp *rij(ixyz) *dvdij *djrij(jxyz)
           enddo
         enddo
 !.....Force w.r.t. derivative of bij
-        dbijpref = (-ts_delta(is,js))*(1d0 +zeta**ts_eta(is,js))**(-(ts_delta(is,js)+1d0))  &
-             *ts_eta(is,js) *zeta**(ts_eta(is,js)-1d0)
-        pref = 0.5d0 *dbijpref *fcij*faij
-        sumj(1:3) = 0d0
+        dbijpref = (-ts_delta(is,js))*(1.0_rp +zeta**ts_eta(is,js))**(-(ts_delta(is,js)+1.0_rp))  &
+             *ts_eta(is,js) *zeta**(ts_eta(is,js)-1.0_rp)
+        pref = 0.5_rp *dbijpref *fcij*faij
+        sumj(1:3) = 0.0_rp
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
           if( ka.eq.ja ) cycle
@@ -337,18 +337,18 @@ contains
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
           if( dik2.ge.ts_rc2(is,ks) ) cycle
-          dik = dsqrt(dik2)
-          diki= 1d0/dik
+          dik = sqrt(dik2)
+          diki= 1.0_rp/dik
           dirik(1:3)= -rik(1:3)*diki
           dkrik(1:3)= -dirik(1:3)
           fcik = f_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           dfcik = df_c(dik,ts_rc3in(is,ks),ts_rc3out(is,ks))
           texp3 = exp(ts_alpha(is,js)*(dij-dik)**ts_beta(is,js))
-          dexp3ij = ts_alpha(is,js) *(dij-dik)**(ts_beta(is,js) -1d0) *texp3
+          dexp3ij = ts_alpha(is,js) *(dij-dik)**(ts_beta(is,js) -1.0_rp) *texp3
           dexp3ik = -dexp3ij
           cs = dot(rij,rik) *diji *diki
           zijk = (ts_h(is,ks) -cs)*(ts_h(is,ks) -cs)
-          dzdcs = -2d0*(ts_h(is,ks) -cs)
+          dzdcs = -2.0_rp*(ts_h(is,ks) -cs)
           gzijk = gz(zijk,is,js,ks)
           dgzijk = dgz(zijk,is,js,ks)
           djcs(1:3)= diji*diki*rik(1:3) -cs*djrij(1:3)*diji
@@ -372,10 +372,10 @@ contains
             do jxyz=1,3
 !$omp atomic
               strsl(jxyz,ixyz,ka)= strsl(jxyz,ixyz,ka) &
-                   -0.5d0 *rik(ixyz) *pref *tmpk(jxyz)
+                   -0.5_rp *rik(ixyz) *pref *tmpk(jxyz)
 !$omp atomic
               strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                   -0.5d0 *rik(ixyz) *pref *tmpk(jxyz)
+                   -0.5_rp *rik(ixyz) *pref *tmpk(jxyz)
             enddo
           enddo
         enddo
@@ -390,10 +390,10 @@ contains
           do jxyz=1,3
 !$omp atomic
             strsl(jxyz,ixyz,ja)= strsl(jxyz,ixyz,ja) &
-                 -0.5d0 *rij(ixyz) *pref *sumj(jxyz)
+                 -0.5_rp *rij(ixyz) *pref *sumj(jxyz)
 !$omp atomic
             strsl(jxyz,ixyz,ia)= strsl(jxyz,ixyz,ia) &
-                 -0.5d0 *rij(ixyz) *pref *sumj(jxyz)
+                 -0.5_rp *rij(ixyz) *pref *sumj(jxyz)
           enddo
         enddo
       enddo  ! jj=...
@@ -442,7 +442,7 @@ contains
     real(rp),intent(in):: r,rcin,rcout
     real(rp):: df_c
 
-    df_c = 0d0
+    df_c = 0.0_rp
     if( ts_fc_type.eq.1 ) then
       df_c = df_c1(r,rcin,rcout)
 !!$      continue
@@ -462,11 +462,11 @@ contains
 
     
     if( r.lt.rcin ) then
-      f_c1 = 1d0
+      f_c1 = 1.0_rp
     else if( r.ge.rcin .and. r.lt.rcout ) then
-      f_c1 =  0.5d0 *(1d0 +cos(pi*(r -rcin)/(rcout-rcin)))
+      f_c1 =  0.5_rp *(1.0_rp +cos(pi*(r -rcin)/(rcout-rcin)))
     else
-      f_c1 = 0d0
+      f_c1 = 0.0_rp
     endif
     return
   end function f_c1
@@ -478,12 +478,12 @@ contains
     real(rp):: p
 
     if( r.lt.rcin ) then
-      df_c1 = 0d0
+      df_c1 = 0.0_rp
     else if( r.ge.rcin .and. r.lt.rcout ) then
       p = pi /(rcout-rcin)
-      df_c1 = -0.5d0 *p *sin(p*(r -rcin))
+      df_c1 = -0.5_rp *p *sin(p*(r -rcin))
     else
-      df_c1 = 0d0
+      df_c1 = 0.0_rp
     endif
     return
   end function df_c1
@@ -495,12 +495,12 @@ contains
     real(rp):: p
     
     if( r.lt.rcin ) then
-      f_c3 = 1d0
+      f_c3 = 1.0_rp
     else if( r.ge.rcin .and. r.lt.rcout ) then
       p = pi *(r-rcin)/(rcout-rcin)
-      f_c3 =  0.5d0 +9d0/16d0 *cos(p) -1d0/16d0*cos(3d0*p)
+      f_c3 =  0.5_rp +9.0_rp/16.0_rp *cos(p) -1.0_rp/16.0_rp*cos(3.0_rp*p)
     else
-      f_c3 = 0d0
+      f_c3 = 0.0_rp
     endif
     return
   end function f_c3
@@ -512,12 +512,12 @@ contains
     real(rp):: p
 
     if( r.lt.rcin ) then
-      df_c3 = 0d0
+      df_c3 = 0.0_rp
     else if( r.ge.rcin .and. r.lt.rcout ) then
       p = pi/(rcout-rcin)
-      df_c3 = -9d0/16d0*p *sin(p*(r-rcin)) +1d0/16d0*3d0*p*sin(3d0*p*(r-rcin))
+      df_c3 = -9.0_rp/16.0_rp*p *sin(p*(r-rcin)) +1.0_rp/16.0_rp*3.0_rp*p*sin(3.0_rp*p*(r-rcin))
     else
-      df_c3 = 0d0
+      df_c3 = 0.0_rp
     endif
     return
   end function df_c3
@@ -529,7 +529,7 @@ contains
     real(rp):: go,ga
     
     go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
-    ga = 1d0 +ts_c4(is,js)*exp(-ts_c5(is,js)*z)
+    ga = 1.0_rp +ts_c4(is,js)*exp(-ts_c5(is,js)*z)
     gz = ts_c1(is,js) +go*ga
     return
   end function gz
@@ -543,7 +543,7 @@ contains
     go = ts_c2(is,js)*z /(ts_c3(is,js) +z)
     dgo = ts_c2(is,js)*ts_c3(is,js)/(ts_c3(is,js) +z)**2
     texp = exp(-ts_c5(is,js)*z)
-    ga = 1d0 +ts_c4(is,js)*texp
+    ga = 1.0_rp +ts_c4(is,js)*texp
     dga = -ts_c4(is,js)*ts_c5(is,js)*texp
 
     dgz = dgo*ga +go*dga
@@ -562,7 +562,7 @@ contains
     dgo = ts_c2(is,js)*ts_c3(is,js)/(ts_c3(is,js) +z)**2
 !.....ga term
     texp = exp(-ts_c5(is,js)*z)
-    ga = 1d0 +ts_c4(is,js)*texp
+    ga = 1.0_rp +ts_c4(is,js)*texp
     dga = -ts_c4(is,js)*ts_c5(is,js)*texp
 
     g = ts_c1(is,js) +go*ga
@@ -664,7 +664,7 @@ contains
             cycle
           endif
           ted_te(ite) = te
-          if( ite.eq.1 ) ted_te(ite) = 0d0  ! 1st temperature should be 0
+          if( ite.eq.1 ) ted_te(ite) = 0.0_rp  ! 1st temperature should be 0
           ted_a(ite) = a
           ted_b(ite) = b
           ted_lmbd1(ite) = lmbd1
@@ -863,7 +863,7 @@ contains
         if( ite.eq.ntemp ) then
           ite0 = ite-1
           ite1 = ite
-          x = 1d0
+          x = 1.0_rp
         else
           ite0 = ite
           ite1 = ite +1
@@ -909,26 +909,26 @@ contains
     ts_fc_type = 3
     
 !.....Original parameters from [2]
-    ts_a(:,:) = 3281.5905d0
-    ts_b(:,:) = 121.00047d0
-    ts_lmbd1(:,:) = 3.2300135d0
-    ts_lmbd2(:,:) = 1.345797d0
-    ts_eta(:,:) = 1.0d0
-    ts_delta(:,:) = 0.53298909d0
-    ts_alpha(:,:) = 2.3890327d0
-    ts_beta(:,:) = 1d0
+    ts_a(:,:) = 3281.5905_rp
+    ts_b(:,:) = 121.00047_rp
+    ts_lmbd1(:,:) = 3.2300135_rp
+    ts_lmbd2(:,:) = 1.345797_rp
+    ts_eta(:,:) = 1.0_rp
+    ts_delta(:,:) = 0.53298909_rp
+    ts_alpha(:,:) = 2.3890327_rp
+    ts_beta(:,:) = 1.0_rp
 !!$    ts_beta_ters = 1d0  ! beta of original Tersoff [1], must be 1.0 for [2]
-    ts_c1(:,:) = 0.20173476d0
-    ts_c2(:,:) = 730418.72d0
-    ts_c3(:,:) = 1000000d0
-    ts_c4(:,:) = 1.0d0
-    ts_c5(:,:) = 26.0d0
+    ts_c1(:,:) = 0.20173476_rp
+    ts_c2(:,:) = 730418.72_rp
+    ts_c3(:,:) = 1000000.0_rp
+    ts_c4(:,:) = 1.0_rp
+    ts_c5(:,:) = 26.0_rp
     ts_h(:,:) = -0.365
-    ts_rc2in(:,:) = 2.7d0
-    ts_rc2out(:,:) = 3.3d0
+    ts_rc2in(:,:) = 2.7_rp
+    ts_rc2out(:,:) = 3.3_rp
     ts_rc3in(:,:) = ts_rc2in(:,:)
     ts_rc3out(:,:) = ts_rc2out(:,:)
-    ts_f0(:,:) = 0d0
+    ts_f0(:,:) = 0.0_rp
     interact(:,:) = .true.
     return
   end subroutine set_orig_params

@@ -8,14 +8,14 @@ module rdcfrc
   character(len=128),parameter:: cfparams = 'in.rdcfrc'
   integer,parameter:: ioprms = 67
 
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
 
 !.....Type of selection of atoms whose forces are to be reduced.
 !.....Available types: species, ID, neigh_XXXXX, cna
   character(len=128):: ctype_fmod = 'species' ! default
   
 !.....alpha: factor to be multiplied to forces
-  real(rp):: alpha = 0.5d0
+  real(rp):: alpha = 0.5_rp
 
 !.....Species whose forces are to be reduced.
   integer:: is_rdcfrc = -1 ! default
@@ -25,16 +25,16 @@ module rdcfrc
 !.....Number of neighbors per atom
   real(rp),allocatable:: ann(:)
 !.....Distance where neighbor counting starts to decrease
-  real(rp):: rin = -1d0
+  real(rp):: rin = -1.0_rp
 !.....Cutoff distance of neighbor counting
-  real(rp):: rout = -1d0
+  real(rp):: rout = -1.0_rp
   real(rp):: rout2
 !.....Forces of atoms having this num of neighbors are not modified
   integer:: nn_intact = 8
 !.....Threshold of difference in num of neighbors
-  real(rp):: dth_nn = 0.5d0
+  real(rp):: dth_nn = 0.5_rp
 !.....Boundary in num of neighbors
-  real(rp):: nn_boundary = -1d0
+  real(rp):: nn_boundary = -1.0_rp
 
 !.....For the calculation of histogram of num of neighbors
   logical:: lhist = .false.
@@ -77,11 +77,11 @@ contains
       print *,'ERROR: IDs should be specified.'
       stop
     else if( ctype_fmod(1:5).eq.'neigh' ) then
-      if( rin.lt.0d0 .or. rout.lt.0d0 .or. rout.lt.rin ) then
+      if( rin.lt.0.0_rp .or. rout.lt.0.0_rp .or. rout.lt.rin ) then
         print *,'ERROR: rin and/or rout are wrong, rin,rout=',rin,rout
         stop
       endif
-      if( ctype_fmod(7:11).eq.'under' .and. nn_boundary.lt.0d0 ) then
+      if( ctype_fmod(7:11).eq.'under' .and. nn_boundary.lt.0.0_rp ) then
         print *,'ERROR: nn_boundary should be specified, nn_boundary = ',nn_boundary
         stop
       endif
@@ -97,8 +97,8 @@ contains
         stop
       endif
       allocate(hist_nn(nbins))
-      hist_nn(:) = 0d0
-      dhist = 13d0 /nbins
+      hist_nn(:) = 0.0_rp
+      dhist = 13.0_rp /nbins
     endif
 
     if( myid.eq.0 ) then
@@ -221,11 +221,11 @@ contains
       endif
       if( ctype_fmod(7:11).eq.'under' ) then
         do ia=1,natm
-          beta = 1d0
+          beta = 1.0_rp
           if( ann(ia).lt. nn_boundary-dth_nn ) then
             beta = alpha
           else if( ann(ia).lt. nn_boundary+dth_nn ) then
-            beta = alpha +(1d0-alpha)*0.5d0*(1d0 &
+            beta = alpha +(1.0_rp-alpha)*0.5_rp*(1.0_rp &
                  -cos(pi *(ann(ia)-(nn_boundary-dth_nn)) /(2*dth_nn)))
           endif
 !!$        print *,'ia,ann(ia),alpha,beta=',ia,ann(ia),alpha,beta
@@ -282,7 +282,7 @@ contains
     integer:: ia,jj,ja
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij2,dij
 
-    ann(1:natm) = 0d0
+    ann(1:natm) = 0.0_rp
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
@@ -292,7 +292,7 @@ contains
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.gt.rout2 ) cycle
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
         ann(ia) = ann(ia) +fnn(dij)
       enddo
     enddo
@@ -303,11 +303,11 @@ contains
     real(rp),intent(in):: rij
     real(rp):: fnn
 
-    fnn = 0d0
+    fnn = 0.0_rp
     if( rij.le.rin ) then
-      fnn = 1d0
+      fnn = 1.0_rp
     else if( rin.lt.rij .and. rij.le.rout ) then
-      fnn = 0.5d0 *(1d0 +cos(pi*(rij-rin)/(rout-rin)))
+      fnn = 0.5_rp *(1.0_rp +cos(pi*(rij-rin)/(rout-rin)))
     endif
     return
   end function fnn
@@ -319,7 +319,7 @@ contains
 !.....Output histogram
       open(90,file='out.hist_rdcfrc',status='replace')
       do i=1,nbins
-        write(90,'(i5,2es15.7)') i,dhist*(dble(i)-0.5),hist_nn(i)
+        write(90,'(i5,2es15.7)') i,dhist*(real(i, rp)-0.5),hist_nn(i)
       enddo
       close(90)
     endif

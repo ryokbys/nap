@@ -21,128 +21,128 @@ module Bonny_WRe
   logical:: interact(msp,msp)
 
 !.....Coulomb's constant, acc = 1.0/(4*pi*epsilon0)
-  real(rp),parameter:: acc  = 14.3998554737d0
+  real(rp),parameter:: acc  = 14.3998554737_rp
 !.....permittivity of vacuum
-  real(rp),parameter:: eps0 = 0.00552634939836d0  ! e^2 /Ang /eV
+  real(rp),parameter:: eps0 = 0.00552634939836_rp  ! e^2 /Ang /eV
 
   real(rp):: qnucl(1:2) = (/ &
-       74.0d0, & ! 1, W
-       75.0d0  & ! 2, Re
+       74.0_rp, & ! 1, W
+       75.0_rp  & ! 2, Re
        /)
 
-  real(rp):: r_inner(1:2,1:2) = reshape( (/ 1d0, 1d0, 1d0, 1d0 /), &
+  real(rp):: r_inner(1:2,1:2) = reshape( (/ 1.0_rp, 1.0_rp, 1.0_rp, 1.0_rp /), &
        shape(r_inner) )
-  real(rp):: r_outer(1:2,1:2) = reshape( (/ 2d0, 2d0, 2d0, 2d0 /), &
+  real(rp):: r_outer(1:2,1:2) = reshape( (/ 2.0_rp, 2.0_rp, 2.0_rp, 2.0_rp /), &
        shape(r_outer) )
 
   real(rp),parameter:: bonny_rc(1:2,1:2) = reshape( &
-       (/ 5.460d0, 3.825d0 , &  ! 1-1 W-W, 1-2 W-Re
-          3.825d0, 5.460d0 /) &  ! 2-1 Re-W, 2-2 Re-Re
+       (/ 5.460_rp, 3.825_rp , &  ! 1-1 W-W, 1-2 W-Re
+          3.825_rp, 5.460_rp /) &  ! 2-1 Re-W, 2-2 Re-Re
           , shape(bonny_rc) )
 
 !.....Pure W parameters
-  real(rp),parameter:: gauge_C = 1.848055990d0
-  real(rp),parameter:: gauge_S = 0.2232322602d0
+  real(rp),parameter:: gauge_C = 1.848055990_rp
+  real(rp),parameter:: gauge_S = 0.2232322602_rp
 
-  real(rp),parameter:: A0_W  = -5.524855802d0
-  real(rp),parameter:: A1_W  =  2.317313103d-1
-  real(rp),parameter:: A2_W  = -3.665345949d-2
-  real(rp),parameter:: A3_W  =  8.989367404d-3
-  real(rp),parameter:: rhoi_W = 1.359141225d0
+  real(rp),parameter:: A0_W  = -5.524855802_rp
+  real(rp),parameter:: A1_W  =  2.317313103e-1_rp
+  real(rp),parameter:: A2_W  = -3.665345949e-2_rp
+  real(rp),parameter:: A3_W  =  8.989367404e-3_rp
+  real(rp),parameter:: rhoi_W = 1.359141225_rp
   
-  real(rp),parameter:: rhospln_rc = 2.002970124727d0
+  real(rp),parameter:: rhospln_rc = 2.002970124727_rp
   integer,parameter:: n_rhospln = 4
   real(rp),parameter:: rhospln_a(1:4) = (/&
-       -0.420429107805055d+1, &
-        0.518217702261442d0,  &
-        0.562720834534370d-1, &
-        0.344164178842340d-1 &
+       -0.420429107805055e+1_rp, &
+        0.518217702261442_rp,  &
+        0.562720834534370e-1_rp, &
+        0.344164178842340e-1_rp &
         /)
   real(rp),parameter:: rhospln_r(1:4) = (/&
-       2.5d0, &
-       3.1d0, &
-       3.5d0, &
-       4.9d0 &
+       2.5_rp, &
+       3.1_rp, &
+       3.5_rp, &
+       4.9_rp &
        /)
-  real(rp),parameter:: fspln_a1 = -5.946454472402710d0
-  real(rp),parameter:: fspln_a2 = -0.049477376935239d0
+  real(rp),parameter:: fspln_a1 = -5.946454472402710_rp
+  real(rp),parameter:: fspln_a2 = -0.049477376935239_rp
   integer,parameter:: n_vspln = 15
   real(rp),parameter:: vspln_a(1:15) = (/ &
-        0.960851701343041d+2, &
-       -0.184410923895214d+3, &
-        0.935784079613550d+2, &
-       -0.798358265041677d+1, &
-        0.747034092936229d+1, &
-       -0.152756043708453d+1, &
-        0.125205932634393d+1, &
-        0.163082162159425d+1, &
-       -0.141854775352260d+1, &
-       -0.819936046256149d0,  &
-        0.198013514305908d1,  &
-       -0.696430179520267d0,  &
-        0.304546909722160d-1, &
-       -0.163131143161660d+1, &
-        0.138409896486177d+1  &
+        0.960851701343041e+2_rp, &
+       -0.184410923895214e+3_rp, &
+        0.935784079613550e+2_rp, &
+       -0.798358265041677e+1_rp, &
+        0.747034092936229e+1_rp, &
+       -0.152756043708453e+1_rp, &
+        0.125205932634393e+1_rp, &
+        0.163082162159425e+1_rp, &
+       -0.141854775352260e+1_rp, &
+       -0.819936046256149_rp,  &
+        0.198013514305908e1_rp,  &
+       -0.696430179520267_rp,  &
+        0.304546909722160e-1_rp, &
+       -0.163131143161660e+1_rp, &
+        0.138409896486177e+1_rp  &
         /)
   real(rp),parameter:: vspln_r(1:15) = (/ &
-       2.5648975d0, &
-       2.6297950d0, &
-       2.6946925d0, &
-       2.8663175d0, &
-       2.9730450d0, &
-       3.0797725d0, &
-       3.5164725d0, &
-       3.8464450d0, &
-       4.1764175d0, &
-       4.7008450d0, &
-       4.8953000d0, &
-       5.0897550d0, &
-       5.3429525d0, &
-       5.4016950d0, &
-       5.4600000d0  &  ! shortened from original value 5.4604375
+       2.5648975_rp, &
+       2.6297950_rp, &
+       2.6946925_rp, &
+       2.8663175_rp, &
+       2.9730450_rp, &
+       3.0797725_rp, &
+       3.5164725_rp, &
+       3.8464450_rp, &
+       4.1764175_rp, &
+       4.7008450_rp, &
+       4.8953000_rp, &
+       5.0897550_rp, &
+       5.3429525_rp, &
+       5.4016950_rp, &
+       5.4600000_rp  &  ! shortened from original value 5.4604375
        /)
   
 !.....Pure Re parameters
-  real(rp),parameter:: A_Re = -7.046791948d0
-  real(rp),parameter:: B_Re =  1.236584720d0
-  real(rp),parameter:: C_Re =  1.143405627d0
-  real(rp),parameter:: C0_Re=  3.704045964d-3
+  real(rp),parameter:: A_Re = -7.046791948_rp
+  real(rp),parameter:: B_Re =  1.236584720_rp
+  real(rp),parameter:: C_Re =  1.143405627_rp
+  real(rp),parameter:: C0_Re=  3.704045964e-3_rp
 
   integer,parameter:: n_veq_ReRe = 6
   real(rp),parameter:: veq_ReRe_a(1:6) = (/ &
-        6.726805309d0, &
-        3.217593889d0, &
-       -6.545857587d-1, &
-        1.453229484d-1, &
-       -2.063629464d-1, &
-        6.114909116d-2  &
+        6.726805309_rp, &
+        3.217593889_rp, &
+       -6.545857587e-1_rp, &
+        1.453229484e-1_rp, &
+       -2.063629464e-1_rp, &
+        6.114909116e-2_rp  &
         /)
   real(rp),parameter:: veq_ReRe_r(1:6) = (/ &
-        2.700d0, &
-        3.252d0, &
-        3.804d0, &
-        4.356d0, &
-        4.908d0, &
-        5.460d0  &
+        2.700_rp, &
+        3.252_rp, &
+        3.804_rp, &
+        4.356_rp, &
+        4.908_rp, &
+        5.460_rp  &
         /)
 
 !.....W-Re parameters
   integer,parameter:: n_veq_WRe = 6
   real(rp),parameter:: veq_WRe_a(1:6) = (/ &
-       -2.335000000d+1,  &
-        2.456959229d+1,  &
-       -2.585878138d0,   &
-        3.457586051d0,   &
-       -7.013105493d-1,  &
-       -0.25133241d0     &
+       -2.335000000e+1_rp,  &
+        2.456959229e+1_rp,  &
+       -2.585878138_rp,   &
+        3.457586051_rp,   &
+       -7.013105493e-1_rp,  &
+       -0.25133241_rp     &
        /)
   real(rp),parameter:: veq_WRe_r(1:6) = (/ &
-       2.650d0, &
-       2.700d0, &
-       3.075d0, &
-       3.450d0, &
-       3.825d0, &
-       4.200d0  &
+       2.650_rp, &
+       2.700_rp, &
+       3.075_rp, &
+       3.450_rp, &
+       3.825_rp, &
+       4.200_rp  &
        /)
   
 contains
@@ -181,7 +181,7 @@ contains
       endif
       interact(1:msp,1:msp) = .false.
       interact(1:2,1:2) = .true.
-      rcmax = 0d0
+      rcmax = 0.0_rp
       do is=1,2
         do js=1,2
           rcmax = max(rcmax, bonny_rc(is,js))
@@ -207,9 +207,9 @@ contains
       allocate(rho(namax))
     endif
     
-    epotl= 0d0
-    rho(1:namax)= 0d0
-    strsl(1:3,1:3,1:namax) = 0d0
+    epotl= 0.0_rp
+    rho(1:namax)= 0.0_rp
+    strsl(1:3,1:3,1:namax) = 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -227,7 +227,7 @@ contains
         dij2=rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
 !!$        rij = dlspr(0,k,i)
         if( dij2.gt.rcmax2 ) cycle
-        dij= dsqrt(dij2)
+        dij= sqrt(dij2)
         rho(i) = rho(i) +rhoij(js,dij)
       enddo
     enddo
@@ -253,14 +253,14 @@ contains
         rij(1:3)= h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)
         dij2=rij(1)*rij(1)+ rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.gt.rcmax2 ) cycle
-        dij= dsqrt(dij2)
+        dij= sqrt(dij2)
 !!$        rij=dsqrt(xij(1)**2+ xij(2)**2 +xij(3)**2)
 !!$        rij = dlspr(0,k,i)
 !!$        if( rij.gt.rcmax ) cycle
 !!$        xij(1:3) = dlspr(1:3,k,i)
         drdxi(1:3)= -rij(1:3)/dij
 !.....2-body term
-        tmp = 0.5d0 *vij(is,js,dij)
+        tmp = 0.5_rp *vij(is,js,dij)
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -276,14 +276,14 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dtmp*rij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*rij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dtmp*rij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
 !.....Embedded term
-        if( rho(i).lt.1d-10 .or. rho(j).lt.1d-10 ) cycle
+        if( rho(i).lt.1e-10_rp .or. rho(j).lt.1e-10_rp ) cycle
         drhoi = drhoij(is,dij)
         drhoj = drhoij(js,dij)
         dfj = dfrho(js,rho(j))
@@ -295,9 +295,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*rij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*tmp*rij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*rij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
@@ -328,7 +328,7 @@ contains
     integer,intent(in):: js
     real(rp):: rhoij
 
-    rhoij = 0d0
+    rhoij = 0.0_rp
     if( js.eq.1 ) then  ! Only in case of W, scaling with S
       rhoij = gauge_S *rhospln(rij)
     else if( js.eq.2 ) then
@@ -343,11 +343,11 @@ contains
     integer,intent(in):: js
     real(rp):: drhoij
 
-    drhoij = 0d0
+    drhoij = 0.0_rp
     if( js.eq.1 ) then
       drhoij = gauge_S *drhospln(rij)
     else if( js.eq.2 ) then
-      drhoij = -3d0 *C0_Re *(bonny_rc(2,2) -rij)**2 *hvsd(bonny_rc(2,2) -rij)
+      drhoij = -3.0_rp *C0_Re *(bonny_rc(2,2) -rij)**2 *hvsd(bonny_rc(2,2) -rij)
     endif
     return
   end function drhoij
@@ -361,7 +361,7 @@ contains
     real(rp):: rhospln,ri
     integer:: i
 
-    rhospln = 0d0
+    rhospln = 0.0_rp
     if( rij.le.rhospln_rc ) then
       do i=1,n_rhospln
         ri = rhospln_r(i)
@@ -387,16 +387,16 @@ contains
     real(rp):: drhospln,ri
     integer:: i
 
-    drhospln = 0d0
+    drhospln = 0.0_rp
     if( rij.le.rhospln_rc ) then
-      drhospln = 0d0
+      drhospln = 0.0_rp
     else
       do i=1,n_rhospln
         ri = rhospln_r(i)
         drhospln = drhospln -rhospln_a(i)*(ri -rij)**2 &
              *hvsd(ri -rij)
       enddo
-      drhospln = drhospln*3d0
+      drhospln = drhospln*3.0_rp
     endif
     return
   end function drhospln
@@ -415,7 +415,7 @@ contains
              +A2_W*rho*rho +A3_W*rho*rho*rho
       endif
     else if( is.eq.2 ) then  ! Re
-      frho = A_Re*dsqrt(rho) +B_Re*rho +C_Re*rho*rho
+      frho = A_Re*sqrt(rho) +B_Re*rho +C_Re*rho*rho
     endif
     
   end function frho
@@ -430,10 +430,10 @@ contains
       if( rho.le.rhoi_W ) then
         dfrho = dfeff(rho)
       else
-        dfrho = A1_W +2d0*A2_W*rho +3d0*A3_W*rho*rho
+        dfrho = A1_W +2.0_rp*A2_W*rho +3.0_rp*A3_W*rho*rho
       endif
     else if( is.eq.2 ) then  ! Re
-      dfrho = 0.5d0*A_Re/dsqrt(rho) +B_Re +2d0*C_Re*rho
+      dfrho = 0.5_rp*A_Re/sqrt(rho) +B_Re +2.0_rp*C_Re*rho
     endif
     
   end function dfrho
@@ -470,7 +470,7 @@ contains
     real(rp),intent(in):: rho
     real(rp):: fspln
 
-    fspln = fspln_a1*dsqrt(rho) +fspln_a2*rho*rho
+    fspln = fspln_a1*sqrt(rho) +fspln_a2*rho*rho
     return
   end function fspln
 !=======================================================================
@@ -482,7 +482,7 @@ contains
     real(rp),intent(in):: rho
     real(rp):: dfspln
 
-    dfspln = 0.5d0*fspln_a1/dsqrt(rho) +2d0*fspln_a2*rho
+    dfspln = 0.5_rp*fspln_a1/sqrt(rho) +2.0_rp*fspln_a2*rho
     return
   end function dfspln
 !=======================================================================
@@ -502,7 +502,7 @@ contains
       vij = vnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
       veqt = veq(is,js,rij)
-      vij = veqt +zeta((ro+ri-2d0*rij)/(ro-ri)) &
+      vij = veqt +zeta((ro+ri-2.0_rp*rij)/(ro-ri)) &
            *(vnucl(is,js,rij) -veqt)
     else if( rij.ge.ro ) then
       vij = veq(is,js,rij)
@@ -525,9 +525,9 @@ contains
     if( rij.lt.ri ) then
       dvij = dvnucl(is,js,rij)
     else if( rij.ge.ri .and. rij.lt.ro ) then
-      dvij = dveq(is,js,rij) +dzeta((ro+ri-2d0*rij)/(ro-ri))*(-2d0/(ro-ri)) &
+      dvij = dveq(is,js,rij) +dzeta((ro+ri-2.0_rp*rij)/(ro-ri))*(-2.0_rp/(ro-ri)) &
            *(vnucl(is,js,rij) -veq(is,js,rij)) &
-           +zeta((ro+ri-2d0*rij)/(ro-ri))*(dvnucl(is,js,rij) -dveq(is,js,rij))
+           +zeta((ro+ri-2.0_rp*rij)/(ro-ri))*(dvnucl(is,js,rij) -dveq(is,js,rij))
     else if( rij.ge.ro ) then
       dvij = dveq(is,js,rij)
     endif
@@ -548,7 +548,7 @@ contains
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
 !!$    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
-    rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
+    rs = 0.4683766_rp  /(qi**(0.23_rp) +qj**(0.23_rp))
     vnucl = acc *qi*qj/rij *xi(rij/rs)
     return
   end function vnucl
@@ -567,8 +567,8 @@ contains
     qj = qnucl(js)
 !!$    rs = 0.4683766d0  /sqrt(qi**(2d0/3) +qj**(2d0/3))
 !!$    rs = 0.4683766d0  /(qi**(2d0/3) +qj**(2d0/3))
-    rs = 0.4683766d0  /(qi**(0.23d0) +qj**(0.23d0))
-    dvnucl = acc* qi*qj/rij* ( -1d0/rij*xi(rij/rs) &
+    rs = 0.4683766_rp  /(qi**(0.23_rp) +qj**(0.23_rp))
+    dvnucl = acc* qi*qj/rij* ( -1.0_rp/rij*xi(rij/rs) &
          +dxi(rij/rs)/rs )
     return
   end function dvnucl
@@ -581,10 +581,10 @@ contains
     real(rp):: rk
     integer:: i
 
-    veq = 0d0
+    veq = 0.0_rp
     if( rij.gt.bonny_rc(is,js) ) return
     if( is.eq.1 .and. js.eq.1 ) then  ! W-W
-      veq = vspln(rij) -2d0*gauge_C*rhospln(rij)
+      veq = vspln(rij) -2.0_rp*gauge_C*rhospln(rij)
     else if( (is.eq.1 .and. js.eq.2) .or.&
          (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
       do i=1,n_veq_WRe
@@ -610,10 +610,10 @@ contains
     real(rp):: rk
     integer:: i
 
-    dveq = 0d0
+    dveq = 0.0_rp
     if( rij.gt.bonny_rc(is,js) ) return
     if( is.eq.1 .and. js.eq.1 ) then  ! W-W
-      dveq = dvspln(rij) -2d0*gauge_C*drhospln(rij)
+      dveq = dvspln(rij) -2.0_rp*gauge_C*drhospln(rij)
     else if( (is.eq.1 .and. js.eq.2) .or. &
          (is.eq.2 .and. js.eq.1) ) then  ! W-Re, Re-W
       do i=1,n_veq_WRe
@@ -621,14 +621,14 @@ contains
         dveq = dveq -veq_WRe_a(i)*(rk -rij)**2 &
              *hvsd(rk -rij)
       enddo
-      dveq = dveq *3d0
+      dveq = dveq *3.0_rp
     else if (is.eq.2 .and. js.eq.2 ) then ! Re-Re
       do i=1,n_veq_ReRe
         rk = veq_ReRe_r(i)
         dveq = dveq -veq_ReRe_a(i)*(rk -rij)**2 &
              *hvsd(rk -rij)
       enddo
-      dveq = dveq *3d0
+      dveq = dveq *3.0_rp
     endif
     return
   end function dveq
@@ -639,7 +639,7 @@ contains
     real(rp):: vspln,ri
     integer:: i
 
-    vspln = 0d0
+    vspln = 0.0_rp
     do i=1,n_vspln
       ri = vspln_r(i)
       vspln = vspln +vspln_a(i)*(ri -rij)**3 &
@@ -654,13 +654,13 @@ contains
     real(rp):: dvspln,ri
     integer:: i
 
-    dvspln = 0d0
+    dvspln = 0.0_rp
     do i=1,n_vspln
       ri = vspln_r(i)
       dvspln = dvspln -vspln_a(i)*(ri -rij)**2 &
            *hvsd(ri -rij)
     enddo
-    dvspln = dvspln*3d0
+    dvspln = dvspln*3.0_rp
     return
   end function dvspln
 !=======================================================================
@@ -669,10 +669,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: xi
 
-    xi= 0.1818d0*exp(-3.2d0*x) &
-         +0.5099d0*exp(-0.9423d0*x) &
-         +0.2802d0*exp(-0.4029d0*x) &
-         +0.02817d0*exp(-0.2016d0*x)
+    xi= 0.1818_rp*exp(-3.2_rp*x) &
+         +0.5099_rp*exp(-0.9423_rp*x) &
+         +0.2802_rp*exp(-0.4029_rp*x) &
+         +0.02817_rp*exp(-0.2016_rp*x)
     return
   end function xi
 !=======================================================================
@@ -681,10 +681,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: dxi
 
-    dxi= -0.58176d0*exp(-3.2d0*x) &
-         -0.48047877d0*exp(-0.9423d0*x) &
-         -0.11289258d0*exp(-0.4029d0*x) &
-         -0.005679072d0*exp(-0.2016d0*x)
+    dxi= -0.58176_rp*exp(-3.2_rp*x) &
+         -0.48047877_rp*exp(-0.9423_rp*x) &
+         -0.11289258_rp*exp(-0.4029_rp*x) &
+         -0.005679072_rp*exp(-0.2016_rp*x)
     return
   end function dxi
 !=======================================================================
@@ -693,7 +693,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: zeta
 
-    zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
+    zeta = (3.0_rp*x**5 -10.0_rp*x**3 +15.0_rp*x +8.0_rp)/16.0_rp
     return
   end function zeta
 !=======================================================================
@@ -702,7 +702,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: dzeta
 
-    dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
+    dzeta = (15.0_rp*x**4 -30.0_rp*x**2 +15.0_rp)/16.0_rp
     return
   end function dzeta
 !=======================================================================

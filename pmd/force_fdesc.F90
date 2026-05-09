@@ -25,9 +25,9 @@ module fdesc
 
   integer:: ndim_desc = -1
   integer:: giddesc = -1
-  real(rp):: scnst = 1.0d0
-  real(rp):: gcoef = 0.1d0
-  real(rp):: gsgm  = 1.0d0
+  real(rp):: scnst = 1.0_rp
+  real(rp):: gcoef = 0.1_rp
+  real(rp):: gsgm  = 1.0_rp
   real(rp),allocatable:: desctgt(:), descov(:,:), descacc(:,:), &
        descpca(:), descfrc(:,:),descstrs(:,:,:)
   real(rp):: edesc
@@ -210,10 +210,10 @@ contains
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr,myid,mpi_world,iprint)
 
-    edesc = 0d0
-    edesci(:) = 0d0
-    descfrc(:,:) = 0d0
-    descstrs(:,:,:) = 0d0
+    edesc = 0.0_rp
+    edesci(:) = 0.0_rp
+    descfrc(:,:) = 0.0_rp
+    descstrs(:,:,:) = 0.0_rp
     do ia=1,natm
       igv = igvarOf(tag(ia),giddesc)
       if( igv.eq.0 ) cycle  ! fdesc works only on atoms of igv > 0 
@@ -223,8 +223,8 @@ contains
       xi(1:3) = ra(1:3,ia)
 !!$      dpca1 = 0d0
 !!$      pca1 = 0d0
-      dsq = 0d0
-      dxmah(:) = 0d0
+      dsq = 0.0_rp
+      dxmah(:) = 0.0_rp
       do isf=1,nsf
 !!$        dpca1 = dpca1 + (gsfi(isf)-desctgt(isf)) * descpca(isf)
 !!$        pca1 = pca1 + gsfi(isf) * descpca(isf)
@@ -235,7 +235,7 @@ contains
       enddo
 !!$      dsq = dpca1**2
 !!$      aexp = -gcoef * exp(-dsq /2 /gsgm**2)
-      esp = 0.5d0 *scnst *dsq
+      esp = 0.5_rp *scnst *dsq
       do isf=1,nsf
 !!$        tmp = scnst*dpca1 * descpca(isf)
 !!$        tmp = -aexp *dpca1 /gsgm**2 *descpca(isf)
@@ -293,7 +293,7 @@ contains
 !.....Send back stresses
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,descstrs,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5d0
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5_rp
 
     return
   end subroutine force_fdesc
@@ -310,7 +310,7 @@ contains
     
     call copy_dba_bk(namax,natm,nbmax,nb,lsb,nex,lsrc,myparity &
          ,nn,mpi_world,descstrs,9)
-    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5d0
+    strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +descstrs(1:3,1:3,1:natm)*0.5_rp
     return
   end subroutine add_fdesc_strs
 !=======================================================================

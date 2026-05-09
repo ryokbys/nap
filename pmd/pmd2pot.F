@@ -27,7 +27,7 @@ c-----max. num. of neighbors
 c-----max. num. of buffer data
       integer,parameter:: maxbuf= 100000
 c-----criteria or threshold for potential energy per atom
-      real(rp),parameter:: epic  = -6.8d10
+      real(rp),parameter:: epic  = -6.8e10_rp
 
       integer:: i,j,k,l,m,n,ia,ib
       integer:: nstp,nouterg,noutpmd,iout_count,istp,nerg,ifpmd,npmd
@@ -86,9 +86,9 @@ c  npmd:   num. of pmd outputs
       close(10)
 c-----parallel configuration
       nxyz= nx*ny*nz
-      anxi= 1d0/nx
-      anyi= 1d0/ny
-      anzi= 1d0/nz
+      anxi= 1.0_rp/nx
+      anyi= 1.0_rp/ny
+      anzi= 1.0_rp/nz
 c-----error trap
       if(nodes_md.ne.nxyz) then
         write(6,'(a)') " error: nodes_md .ne. nxyz!!"
@@ -219,12 +219,12 @@ c      am(1:nismax)= am_ar
 
 c-----prefactors for normalized accelerration
       do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
+        acon(i)= 0.5_rp*dt**2/am(i)
       enddo
 
 c-----prefactors for kinetic energy, FACK
       do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
+        fack(i)= 0.5_rp*am(i)/dt**2
       enddo
 
       end subroutine setup

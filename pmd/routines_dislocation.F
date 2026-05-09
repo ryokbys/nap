@@ -14,9 +14,9 @@
       n=0
       m=0
       do i=1,natm
-        l= int(mod(tag(i)*10,10d0))
+        l= int(mod(tag(i)*10,10.0_rp))
         if( l.eq.2 ) then
-          if( ra(2,i)+sorg(2).gt.0.5d0 ) then
+          if( ra(2,i)+sorg(2).gt.0.5_rp ) then
             n=n+1
           else
             m=m+1
@@ -34,12 +34,12 @@
 
 c.....Change unit of shear stress (GPa ---> a.u.)
 c.....Shear stress to shear force on each atom
-      shrfx= shrst/2.94d+4 *area /nt
+      shrfx= shrst/2.94e+4_rp *area /nt
 
       if( myid_md.eq.0 ) then
         write(6,'(a,2i8)') " Num of atoms to be shifted=",nt,mt
         write(6,'(a,es12.4)') " Top & bottom area [Bohr^2]=",area
-        write(6,'(a,es12.4)') " Shear stress [a.u.]=",shrst/2.94d+4
+        write(6,'(a,es12.4)') " Shear stress [a.u.]=",shrst/2.94e+4_rp
         write(6,'(a,es12.4)') " Shear force  [a.u.]=",shrfx
       endif
 
@@ -60,9 +60,9 @@ c=======================================================================
       
 c.....Shear stress on top and bottom edge
       do i=1,natm
-        l= int(mod(tag(i)*10,10d0))
+        l= int(mod(tag(i)*10,10.0_rp))
         if( l.eq.2 ) then
-          if( ra(2,i)+sorg(2).gt.0.5d0 ) then
+          if( ra(2,i)+sorg(2).gt.0.5_rp ) then
             aa(1,i)= aa(1,i) +shrfx
           else
             aa(1,i)= aa(1,i) -shrfx
@@ -86,7 +86,7 @@ c-----------------------------------------------------------------------
       real(rp),intent(in):: ra(3,natm),h(3,3,0:1),rcore(3),strs(3,3,natm)
 
 c.....Cut off distance for average calculation
-      real(rp),parameter:: rcutave= 20.0d0
+      real(rp),parameter:: rcutave= 20.0_rp
       real(rp),parameter:: rcutave2= rcutave**2
 
       integer:: ia,ierr,n1,nr1,n2,nr2
@@ -99,9 +99,9 @@ c.....Assuming orthogonal 2D system
 
 c.....Find atoms within a certain distance from the disl core
       n1= 0
-      strs1(1:2,1:2)= 0d0
+      strs1(1:2,1:2)= 0.0_rp
       n2= 0
-      strs2(1:2,1:2)= 0d0
+      strs2(1:2,1:2)= 0.0_rp
       do ia=1,natm
         xic(1:2)= (ra(1:2,ia)-rcore(1:2))*al(1:2)
         ric2= xic(1)**2 +xic(2)**2
@@ -158,7 +158,7 @@ c.....Arguments
       integer,intent(inout):: ndpbc
 c.....Constants
       integer,parameter:: ncmax = 100
-      real(rp),parameter:: rcnn  = 1.5d0*sgmlj
+      real(rp),parameter:: rcnn  = 1.5_rp*sgmlj
 c.....Variables
       integer:: i,j,k,l,m,n,nc,ierr
       integer,allocatable,save:: lnc(:),nrecvs(:),idisps(:),lsnn(:,:)
@@ -169,7 +169,7 @@ c.....Variables
         allocate(lnc(0:nodes_md-1),nrecvs(0:nodes_md-1)
      &       ,idisps(0:nodes_md-1)
      &       ,rci(3,ncmax),rcis(3,ncmax),add(ncmax))
-        rcpre= 0.5d0
+        rcpre= 0.5_rp
 c.....Nearest neighbor search
         allocate(lsnn(0:nnmax,namax))
         l1st=.false.
@@ -186,7 +186,7 @@ c.....Extract disl-core atoms according to num of nearest neighbors
       nc=0
       do i=1,natm
 c.....Exclude top and bottom surface atoms
-        l= int(mod(tag(i)*10,10d0))
+        l= int(mod(tag(i)*10,10.0_rp))
         if( l.eq.2 ) cycle
         if( lsnn(0,i).lt.6 ) then
           nc=nc+1
@@ -242,19 +242,19 @@ c.....Count num of core atoms
      &     ,0,mpi_md_world,ierr)
       if( myid_md.eq.0 ) then
 c.....Check pbc
-        add(1:n)=0d0
+        add(1:n)=0.0_rp
         do i=1,n
-          if( rcpre-rcis(1,i).gt.0.5d0 ) add(i)=1d0
-          if( rcpre-rcis(1,i).lt.-0.5d0 ) add(i)=-1d0
+          if( rcpre-rcis(1,i).gt.0.5_rp ) add(i)=1.0_rp
+          if( rcpre-rcis(1,i).lt.-0.5_rp ) add(i)=-1.0_rp
         enddo
 c.....Determine disl core as center of core atoms
-        rcore(1:3)= 0d0
+        rcore(1:3)= 0.0_rp
         do i=1,n
           rcore(1:3)= rcore(1:3) +rcis(1:3,i) +add(i)
         enddo
         rcore(1:3)= rcore(1:3)/n
-        if( rcore(1).gt.1d0 ) rcore(1)=rcore(1)-1d0
-        if( rcpre-rcore(1).gt.0.5d0 ) then
+        if( rcore(1).gt.1.0_rp ) rcore(1)=rcore(1)-1.0_rp
+        if( rcpre-rcore(1).gt.0.5_rp ) then
           ndpbc=ndpbc+1
         endif
         rcpre=rcore(1)
@@ -291,7 +291,7 @@ c.....Max num of core groups
       character:: cfname*9
 
 c.....Cutoff radius
-      real(rp),parameter:: rc   = 10.0d0
+      real(rp),parameter:: rc   = 10.0_rp
       real(rp),parameter:: rcz  = rc_vphi
 c.....Num of disl cores to be assumed
       integer,parameter:: ncrs = 2
@@ -311,8 +311,8 @@ c.....Search and list up disl core atoms
       nc=0
       do i=1,natm
         if( epi(i).gt.epith .and.
-     &       ra(2,i)+sorg(2).lt.0.75d0 .and.
-     &       ra(2,i)+sorg(2).gt.0.25d0 ) then
+     &       ra(2,i)+sorg(2).lt.0.75_rp .and.
+     &       ra(2,i)+sorg(2).gt.0.25_rp ) then
           nc=nc+1
           rci(1:3,nc)= ra(1:3,i)+sorg(1:3)
         endif
@@ -347,9 +347,9 @@ c.....  two groups using linked-list-cell technique
         ndx= al(1)/rc
         ndy= al(2)/rc
         ndz= al(3)/rc
-        dx = 1d0/ndx
-        dy = 1d0/ndy
-        dz = 1d0/ndz
+        dx = 1.0_rp/ndx
+        dy = 1.0_rp/ndy
+        dz = 1.0_rp/ndz
         ndxy= ndx*ndy
         allocate(lscl(nc),lshd(ndxy))
 c.....Register atoms to cells
@@ -420,10 +420,10 @@ c.....Get disl pos at each y-slice
         write(cfname(5:9),'(i5.5)') iocnt
         open(ionum,file=cfname,status='replace')
         ndz= al(3)/rcz
-        dz = 1d0/ndz
+        dz = 1.0_rp/ndz
         do mz=1,ndz
           do ig=1,ng
-            avx=0d0
+            avx=0.0_rp
             n=0
             do i=1,ngc(ig)
               j= igc(i,ig)
@@ -434,7 +434,7 @@ c.....Get disl pos at each y-slice
               endif
             enddo
             avx=avx/n
-            write(ionum,'(2es12.4,$)') (mz-1d0+0.5d0)*dz,avx
+            write(ionum,'(2es12.4,$)') (mz-1.0_rp+0.5_rp)*dz,avx
           enddo
           write(ionum,'(a)') ''
         enddo
@@ -482,7 +482,7 @@ c.....Cutoff radius
         allocate(lnc(0:nodes-1),idisps(0:nodes-1)
      &       ,rci(3,mnc),rcis(3,mnc,0:nodes-1))
         ndz= h(3,3,0)/rcz
-        dz= 1d0/ndz
+        dz= 1.0_rp/ndz
         l1st=.false.
       endif
 
@@ -490,8 +490,8 @@ c.....Search and list up disl core atoms
       nc=0
       do i=1,natm
         if( epi(i).gt.epith .and.
-     &       ra(2,i)+sorg(2).lt.0.75d0 .and.
-     &       ra(2,i)+sorg(2).gt.0.25d0 ) then
+     &       ra(2,i)+sorg(2).lt.0.75_rp .and.
+     &       ra(2,i)+sorg(2).gt.0.25_rp ) then
           nc=nc+1
           rci(1:3,nc)= ra(1:3,i)+sorg(1:3)
         endif
@@ -531,7 +531,7 @@ c.....Gather lsdc from all nodes to node-0
             endif
           enddo
           xav=xav/n
-          write(ionum,'(2es12.4)') (mz-1d0+0.5d0)*dz, xav
+          write(ionum,'(2es12.4)') (mz-1.0_rp+0.5_rp)*dz, xav
         enddo
         close(ionum)
       endif

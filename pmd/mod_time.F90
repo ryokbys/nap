@@ -55,7 +55,7 @@ contains
     if( get_time_id.eq.0 ) then
       ntimes = ntimes +1
       ctnames(ntimes) = trim(cname)
-      etimes(ntimes) = 0d0
+      etimes(ntimes) = 0.0_rp
       ncalls(ntimes) = 0
       get_time_id = ntimes
     endif
@@ -86,7 +86,7 @@ contains
     real(rp):: time_tot
 
 !.....Total time
-    time_tot = -1d0
+    time_tot = -1.0_rp
     do i=1,ntimes
       if( trim(ctnames(i)).eq.'total' ) then
         time_tot = etimes(i)
@@ -110,7 +110,7 @@ contains
       do i=1,ntimes
         ctn = trim(ctnames(i))
         if( trim(ctn).ne.'' .and. trim(ctn).ne.'total' ) then
-          if( time_tot.ge.0d0 ) then
+          if( time_tot.ge.0.0_rp ) then
             write(ionum,'('//trim(cspace)//'x,a,a'//trim(clen)//',a,f10.3,a,f7.1,a,i0)') &
                  'Time ',trim(ctnames(i)),' = ', etimes(i), &
                  ' sec, ',etimes(i)/time_tot*100, &

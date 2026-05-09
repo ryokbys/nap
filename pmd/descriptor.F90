@@ -112,7 +112,7 @@ contains
     ncomb_type(1:100) = 2    ! pair
     ncomb_type(101:200) = 3  ! triplet
 
-    time = 0d0
+    time = 0.0_rp
     mem = 0
 
   end subroutine init_desc
@@ -197,11 +197,11 @@ contains
           write(6,'(a,2i0)') '   Max num of (local atoms *1.1) = ',nag
           write(6,'(a,2i0)') '   Max num of (neighbors *1.1)   = ',nng
           write(6,'(a,f10.3,a)') '   gsf size  = ', &
-               dble(nsf*nag*8)/1000/1000,' MB'
+               real(nsf*nag*8, rp)/1000/1000,' MB'
           write(6,'(a,f10.3,a)') '   dgsf size = ', &
-               dble(3*nsf*(nng+1)*nag*8)/1000/1000,' MB'
+               real(3*nsf*(nng+1)*nag*8, rp)/1000/1000,' MB'
           write(6,'(a,f10.3,a)') '   igsf size = ', &
-               dble(nsf*(nng+1)*nag*2)/1000/1000,' MB'
+               real(nsf*(nng+1)*nag*2, rp)/1000/1000,' MB'
         endif
         if( allocated(gsf) ) then
           ns_gsf = shape(gsf)
@@ -223,7 +223,7 @@ contains
         call accum_mem('descriptor',8*(size(gsfi)+size(dgsfi)+size(gscli)) &
              +2*size(igsfi))
 !!$        mem = mem +8*size(gsfi) +8*size(dgsfi) +2*size(igsfi) +8*size(gscli)
-        gscli(:) = 1d0
+        gscli(:) = 1.0_rp
       endif
     endif
 
@@ -324,8 +324,8 @@ contains
 
     integer:: isf
 
-    gsfi(:)= 0d0
-    dgsfi(:,:,:)= 0d0
+    gsfi(:)= 0.0_rp
+    dgsfi(:,:,:)= 0.0_rp
     igsfi(:,:) = 0
 
     if( lupdate_gsf ) then
@@ -431,8 +431,8 @@ contains
       endif
     endif
 
-    gsf(1:nsf,1:nal)= 0d0
-    dgsf(1:3,1:nsf,0:nnl,1:nal)= 0d0
+    gsf(1:nsf,1:nal)= 0.0_rp
+    dgsf(1:3,1:nsf,0:nnl,1:nal)= 0.0_rp
     igsf(1:nsf,0:nnl,1:nal) = 0
     itypp = -1
     do ia=1,natm
@@ -446,7 +446,7 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.ge.rcmax2 ) cycle
-        dij = dsqrt(dij2)
+        dij = sqrt(dij2)
         js= int(tag(ja))
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
@@ -465,7 +465,7 @@ contains
             rs = desci%prms(2)
 !.....function value
             texp= exp(-eta*(dij-rs)**2)
-            dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
+            dgdr= -2.0_rp*eta*(dij-rs)*texp*fcij +texp*dfcij
             tmp = texp*fcij
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
@@ -479,8 +479,8 @@ contains
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1 = desci%prms(1)
 !.....func value
-            tcos= 0.5d0*(1d0+cos(dij*a1))
-            dgdr= -0.5d0*a1*sin(dij*a1)*fcij +tcos*dfcij
+            tcos= 0.5_rp*(1.0_rp+cos(dij*a1))
+            dgdr= -0.5_rp*a1*sin(dij*a1)*fcij +tcos*dfcij
             tmp = tcos*fcij
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
@@ -492,8 +492,8 @@ contains
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             a1= desci%prms(1)
 !.....func value
-            tpoly= 1d0*dij**(-a1)
-            dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfcij
+            tpoly= 1.0_rp*dij**(-a1)
+            dgdr= -a1*dij**(-a1-1.0_rp)*fcij +tpoly*dfcij
             tmp = tpoly*fcij
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
@@ -507,8 +507,8 @@ contains
             a2= desci%prms(2)
 !.....func value
             texp= exp(-a1*(dij-a2))
-            tmorse= ((1d0-texp)**2 -1d0)
-            dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
+            tmorse= ((1.0_rp-texp)**2 -1.0_rp)
+            dgdr= 2.0_rp*a1*(1.0_rp-texp)*texp*fcij +tmorse*dfcij
             tmp = tmorse*fcij
             gsf(isf,ia)= gsf(isf,ia) +tmp
 !.....derivative
@@ -531,14 +531,14 @@ contains
           xik(1:3)= xk(1:3) -xi(1:3)
           rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
           dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-          dik= dsqrt(dik2)
+          dik= sqrt(dik2)
 !.....Cosine is common for all the angular SFs
           spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
           cs= spijk/dij/dik
           dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij2
           dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik2
           dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-          gijk = 0d0
+          gijk = 0.0_rp
           is1 = min(js,ks)
           is2 = max(js,ks)
           do ksf=1,ilsf3(0,is,is1,is2)
@@ -553,26 +553,26 @@ contains
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               almbd= desci%prms(1)
-              t2= (abs(almbd)+1d0)**2
+              t2= (abs(almbd)+1.0_rp)**2
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
 !.....function value
               t1= (almbd +cs)**2
-              eta3 = 0.5d0 /rcut**2
+              eta3 = 0.5_rp /rcut**2
               texp = exp(-eta3*(dij2+dik2))
               tmp = t1/t2 *texp
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik
               gijk = gijk +tmp*fcij*fcik
 !.....derivative
               dgdij= dfcij *fcik *tmp &
-                   +tmp *(-2d0*eta3*dij) *fcij*fcik 
+                   +tmp *(-2.0_rp*eta3*dij) *fcij*fcik 
               dgdik= fcij *dfcik *tmp &
-                   +tmp *(-2d0*eta3*dik) *fcij*fcik 
+                   +tmp *(-2.0_rp*eta3*dik) *fcij*fcik 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texp 
+              dgcs= 2.0_rp*(almbd+cs)/t2 *fcij*fcik *texp 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
@@ -597,27 +597,27 @@ contains
               drjkj(1:3)= -rjk(1:3)/djk
               drjkk(1:3)= -drjkj(1:3)
 !.....function value
-              twozeta = 2d0**(-zang)
+              twozeta = 2.0_rp**(-zang)
               t1= (almbd +cs)**zang *twozeta
-              eta3 = 0.5d0 /rcut**2
+              eta3 = 0.5_rp /rcut**2
               texp = exp(-eta3*(dij2+dik2+djk2))
               tmp = t1 *texp
 !.....This part is different from itype(isf)==101 by the factor fcjk
               gsf(isf,ia)= gsf(isf,ia) +tmp*fcij*fcik *fcjk
 !.....derivative
               dgdij= dfcij *fcik*fcjk *tmp &
-                   +tmp *(-2d0*eta3*dij) *fcij*fcik*fcjk
+                   +tmp *(-2.0_rp*eta3*dij) *fcij*fcik*fcjk
               dgdik= fcij *dfcik*fcjk *tmp &
-                   +tmp *(-2d0*eta3*dik) *fcij*fcik*fcjk 
+                   +tmp *(-2.0_rp*eta3*dik) *fcij*fcik*fcjk 
               dgdjk= fcij *fcik *dfcjk *tmp &
-                   +tmp *(-2d0*eta3*djk) *fcij*fcik*fcjk 
+                   +tmp *(-2.0_rp*eta3*djk) *fcij*fcik*fcjk 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) &
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) &
                     +dgdij*drijj(1:3)+dgdjk*drjkj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) &
                     +dgdik*drikk(1:3)+dgdjk*drjkk(1:3)
-              dgcs= zang*(almbd +cs)**(zang-1d0) *twozeta *fcij*fcik*fcjk *texp
+              dgcs= zang*(almbd +cs)**(zang-1.0_rp) *twozeta *fcij*fcik*fcjk *texp
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
@@ -690,7 +690,7 @@ contains
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-              dgcs= -2d0*eta*(cs-rs)*tmp *fcij*fcik
+              dgcs= -2.0_rp*eta*(cs-rs)*tmp *fcij*fcik
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
@@ -705,7 +705,7 @@ contains
               call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
               call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
               almbd= desci%prms(1)
-              t2= (abs(almbd)+1d0)**2
+              t2= (abs(almbd)+1.0_rp)**2
               driki(1:3)= -rik(1:3)/dik
               drikk(1:3)= -driki(1:3)
 !.....function value
@@ -726,7 +726,7 @@ contains
                    +dgdij*driji(1:3) +dgdik*driki(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgdij*drijj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgdik*drikk(1:3)
-              dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik !*texp 
+              dgcs= 2.0_rp*(almbd+cs)/t2 *fcij*fcik !*texp 
               dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +dgcs*dcsdi(1:3)
               dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +dgcs*dcsdj(1:3)
               dgsf(1:3,isf,kk,ia)= dgsf(1:3,isf,kk,ia) +dgcs*dcsdk(1:3)
@@ -779,7 +779,7 @@ contains
       rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
       dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
       if( dij2.ge.rcmax2 ) cycle
-      dij = dsqrt(dij2)
+      dij = sqrt(dij2)
       js= int(tag(ja))
       driji(1:3)= -rij(1:3)/dij
       drijj(1:3)= -driji(1:3)
@@ -797,7 +797,7 @@ contains
           rs = desci%prms(2)
 !.....function value
           texp= exp(-eta*(dij-rs)**2)
-          dgdr= -2d0*eta*(dij-rs)*texp*fcij +texp*dfcij
+          dgdr= -2.0_rp*eta*(dij-rs)*texp*fcij +texp*dfcij
           tmp = texp*fcij
           gsfi(isf)= gsfi(isf) +tmp
 !.....derivative
@@ -811,8 +811,8 @@ contains
           call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
           a1 = desci%prms(1)
 !.....func value
-          tcos= 0.5d0*(1d0+cos(dij*a1))
-          dgdr= -0.5d0*a1*sin(dij*a1)*fcij +tcos*dfcij
+          tcos= 0.5_rp*(1.0_rp+cos(dij*a1))
+          dgdr= -0.5_rp*a1*sin(dij*a1)*fcij +tcos*dfcij
           tmp = tcos*fcij
           gsfi(isf)= gsfi(isf) +tmp
 !.....derivative
@@ -824,8 +824,8 @@ contains
           call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
           a1= desci%prms(1)
 !.....func value
-          tpoly= 1d0*dij**(-a1)
-          dgdr= -a1*dij**(-a1-1d0)*fcij +tpoly*dfcij
+          tpoly= 1.0_rp*dij**(-a1)
+          dgdr= -a1*dij**(-a1-1.0_rp)*fcij +tpoly*dfcij
           tmp = tpoly*fcij
           gsfi(isf)= gsfi(isf) +tmp
 !.....derivative
@@ -839,8 +839,8 @@ contains
           a2= desci%prms(2)
 !.....func value
           texp= exp(-a1*(dij-a2))
-          tmorse= ((1d0-texp)**2 -1d0)
-          dgdr= 2d0*a1*(1d0-texp)*texp*fcij +tmorse*dfcij
+          tmorse= ((1.0_rp-texp)**2 -1.0_rp)
+          dgdr= 2.0_rp*a1*(1.0_rp-texp)*texp*fcij +tmorse*dfcij
           tmp = tmorse*fcij
           gsfi(isf)= gsfi(isf) +tmp
 !.....derivative
@@ -861,14 +861,14 @@ contains
         xik(1:3)= xk(1:3) -xi(1:3)
         rik(1:3)= h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
         dik2 = rik(1)*rik(1) +rik(2)*rik(2) +rik(3)*rik(3)
-        dik= dsqrt(dik2)
+        dik= sqrt(dik2)
 !.....Cosine is common for all the angular SFs
         spijk= rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3)
         cs= spijk/dij/dik
         dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*cs/dij2
         dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*cs/dik2
         dcsdi(1:3)= -dcsdj(1:3) -dcsdk(1:3)
-        gijk = 0d0
+        gijk = 0.0_rp
         is1 = min(js,ks)
         is2 = max(js,ks)
         do ksf=1,ilsf3(0,is,is1,is2)
@@ -883,26 +883,26 @@ contains
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
             almbd= desci%prms(1)
-            t2= (abs(almbd)+1d0)**2
+            t2= (abs(almbd)+1.0_rp)**2
             driki(1:3)= -rik(1:3)/dik
             drikk(1:3)= -driki(1:3)
 !.....function value
             t1= (almbd +cs)**2
-            eta3 = 0.5d0 /rcut**2
+            eta3 = 0.5_rp /rcut**2
             texp = exp(-eta3*(dij2+dik2))
             tmp = t1/t2 *texp
             gsfi(isf)= gsfi(isf) +tmp*fcij*fcik
             gijk = gijk +tmp*fcij*fcik
 !.....derivative
             dgdij= dfcij *fcik *tmp &
-                 +tmp *(-2d0*eta3*dij) *fcij*fcik 
+                 +tmp *(-2.0_rp*eta3*dij) *fcij*fcik 
             dgdik= fcij *dfcik *tmp &
-                 +tmp *(-2d0*eta3*dik) *fcij*fcik 
+                 +tmp *(-2.0_rp*eta3*dik) *fcij*fcik 
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) &
                  +dgdij*driji(1:3) +dgdik*driki(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgdij*drijj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgdik*drikk(1:3)
-            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik *texp 
+            dgcs= 2.0_rp*(almbd+cs)/t2 *fcij*fcik *texp 
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)
@@ -927,27 +927,27 @@ contains
             drjkj(1:3)= -rjk(1:3)/djk
             drjkk(1:3)= -drjkj(1:3)
 !.....function value
-            twozeta = 2d0**(-zang)
+            twozeta = 2.0_rp**(-zang)
             t1= (almbd +cs)**zang *twozeta
-            eta3 = 0.5d0 /rcut**2
+            eta3 = 0.5_rp /rcut**2
             texp = exp(-eta3*(dij2+dik2+djk2))
             tmp = t1 *texp
 !.....This part is different from itype(isf)==101 by the factor fcjk
             gsfi(isf)= gsfi(isf) +tmp*fcij*fcik *fcjk
 !.....derivative
             dgdij= dfcij *fcik*fcjk *tmp &
-                 +tmp *(-2d0*eta3*dij) *fcij*fcik*fcjk
+                 +tmp *(-2.0_rp*eta3*dij) *fcij*fcik*fcjk
             dgdik= fcij *dfcik*fcjk *tmp &
-                 +tmp *(-2d0*eta3*dik) *fcij*fcik*fcjk 
+                 +tmp *(-2.0_rp*eta3*dik) *fcij*fcik*fcjk 
             dgdjk= fcij *fcik *dfcjk *tmp &
-                 +tmp *(-2d0*eta3*djk) *fcij*fcik*fcjk 
+                 +tmp *(-2.0_rp*eta3*djk) *fcij*fcik*fcjk 
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) &
                  +dgdij*driji(1:3) +dgdik*driki(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) &
                  +dgdij*drijj(1:3)+dgdjk*drjkj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) &
                  +dgdik*drikk(1:3)+dgdjk*drjkk(1:3)
-            dgcs= zang*(almbd +cs)**(zang-1d0) *twozeta *fcij*fcik*fcjk *texp
+            dgcs= zang*(almbd +cs)**(zang-1.0_rp) *twozeta *fcij*fcik*fcjk *texp
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)
@@ -1020,7 +1020,7 @@ contains
                  +dgdij*driji(1:3) +dgdik*driki(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgdij*drijj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgdik*drikk(1:3)
-            dgcs= -2d0*eta*(cs-rs)*tmp *fcij*fcik
+            dgcs= -2.0_rp*eta*(cs-rs)*tmp *fcij*fcik
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)
@@ -1035,7 +1035,7 @@ contains
             call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
             call get_fc_dfc(dik,is,ks,rcut,fcik,dfcik)
             almbd= desci%prms(1)
-            t2= (abs(almbd)+1d0)**2
+            t2= (abs(almbd)+1.0_rp)**2
             driki(1:3)= -rik(1:3)/dik
             drikk(1:3)= -driki(1:3)
 !.....function value
@@ -1056,7 +1056,7 @@ contains
                  +dgdij*driji(1:3) +dgdik*driki(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgdij*drijj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgdik*drikk(1:3)
-            dgcs= 2d0*(almbd+cs)/t2 *fcij*fcik !*texp 
+            dgcs= 2.0_rp*(almbd+cs)/t2 *fcij*fcik !*texp 
             dgsfi(1:3,isf,0)= dgsfi(1:3,isf,0) +dgcs*dcsdi(1:3)
             dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +dgcs*dcsdj(1:3)
             dgsfi(1:3,isf,kk)= dgsfi(1:3,isf,kk) +dgcs*dcsdk(1:3)
@@ -1110,8 +1110,8 @@ contains
       endif
     endif
 
-    gsf(1:nsf,1:nal)= 0d0
-    dgsf(1:3,1:nsf,:,1:nal)= 0d0
+    gsf(1:nsf,1:nal)= 0.0_rp
+    dgsf(1:3,1:nsf,:,1:nal)= 0.0_rp
     igsf(1:nsf,0:nnl,1:nal) = 0
 
     do ia=1,natm
@@ -1131,9 +1131,9 @@ contains
         drijj(1:3)= -driji(1:3)
 !.....Rcut for 2-body common for all 2-body
         rcut2 = descs(1)%rcut
-        x = 2d0*dij/rcut2 -1d0
+        x = 2.0_rp*dij/rcut2 -1.0_rp
         do isf = 1, nsf2*nsff
-          wgt = 1d0
+          wgt = 1.0_rp
           if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)
           wgts(isf) = wgt
         enddo
@@ -1150,7 +1150,7 @@ contains
 !     dgsf(ixyz,isf,jj,ia): derivative of isf-th basis of atom-ia
 !     by ixyz coordinate of atom-jj.
 !     jj=0 means derivative by atom-ia.
-          dgdr = (2d0/rcut2*dts_cheby(n)*fcij +ts_cheby(n)*dfcij) *wgt
+          dgdr = (2.0_rp/rcut2*dts_cheby(n)*fcij +ts_cheby(n)*dfcij) *wgt
           dgsf(1:3,isf,0,ia)= dgsf(1:3,isf,0,ia) +driji(1:3)*dgdr
           dgsf(1:3,isf,jj,ia)= dgsf(1:3,isf,jj,ia) +drijj(1:3)*dgdr
           igsf(isf,0,ia) = 1
@@ -1185,7 +1185,7 @@ contains
           driki(1:3)= -rik(1:3)/dik
           drikk(1:3)= -driki(1:3)
           do isf = isf0+1, isf0+nsf3*nsff
-            wgt = 1d0
+            wgt = 1.0_rp
             if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)*wgtsp(ks)            
             wgts(isf) = wgt
           enddo
@@ -1249,9 +1249,9 @@ contains
       drijj(1:3)= -driji(1:3)
 !.....Rcut for 2-body common for all 2-body
       rcut2 = descs(1)%rcut
-      x = 2d0*dij/rcut2 -1d0
+      x = 2.0_rp*dij/rcut2 -1.0_rp
       do isf = 1, nsf2*nsff
-        wgt = 1d0
+        wgt = 1.0_rp
         if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)
         wgts(isf) = wgt
       enddo
@@ -1267,7 +1267,7 @@ contains
 !     dgsfi(ixyz,isf,jj): derivative of isf-th basis of atom-ia
 !     by ixyz coordinate of atom-jj.
 !     jj=0 means derivative by atom-ia.
-        dgdr = (2d0/rcut2*dts_cheby(n)*fcij +ts_cheby(n)*dfcij) *wgt
+        dgdr = (2.0_rp/rcut2*dts_cheby(n)*fcij +ts_cheby(n)*dfcij) *wgt
         dgsfi(1:3,isf,0) = dgsfi(1:3,isf,0)  +driji(1:3)*dgdr
         dgsfi(1:3,isf,jj)= dgsfi(1:3,isf,jj) +drijj(1:3)*dgdr
         igsfi(isf,0) = 1
@@ -1301,7 +1301,7 @@ contains
         driki(1:3)= -rik(1:3)/dik
         drikk(1:3)= -driki(1:3)
         do isf = isf0+1, isf0+nsf3*nsff
-          wgt = 1d0
+          wgt = 1.0_rp
           if( mod(isf-1,nsff).eq.1 ) wgt = wgtsp(js)*wgtsp(ks)            
           wgts(isf) = wgt
         enddo
@@ -1336,11 +1336,11 @@ contains
     real(rp):: fc1
 
     if( r.le.rin ) then
-      fc1= 1d0
+      fc1= 1.0_rp
     else if( r.gt.rin .and. r.le.rout ) then
-      fc1= 0.5d0 *(cos((r-rin)/(rout-rin)*pi)+1d0)
+      fc1= 0.5_rp *(cos((r-rin)/(rout-rin)*pi)+1.0_rp)
     else
-      fc1= 0d0
+      fc1= 0.0_rp
     endif
     return
   end function fc1
@@ -1351,11 +1351,11 @@ contains
     real(rp):: dfc1
 
     if( r.le.rin ) then
-      dfc1= 0d0
+      dfc1= 0.0_rp
     else if( r.gt.rin .and. r.le.rout ) then
-      dfc1= -0.5d0*pi/(rout-rin) *sin((r-rin)/(rout-rin)*pi)
+      dfc1= -0.5_rp*pi/(rout-rin) *sin((r-rin)/(rout-rin)*pi)
     else
-      dfc1= 0d0
+      dfc1= 0.0_rp
     endif
     return
   end function dfc1
@@ -1370,8 +1370,8 @@ contains
 
     real(rp):: rin,rout
     
-    fc= fc1(r,0d0,rcut)
-    dfc= dfc1(r,0d0,rcut)
+    fc= fc1(r,0.0_rp,rcut)
+    dfc= dfc1(r,0.0_rp,rcut)
     
     return
   end subroutine get_fc_dfc
@@ -1437,12 +1437,12 @@ contains
       allocate(mskgfs(ngl),msktmp(ngl),glval(0:ngl))
       call accum_mem('descriptor',4*(size(mskgfs)+size(msktmp))+8*size(glval))
 !!$      mem = mem +8*ngl +8*ngl +8*(ngl+1)
-      mskgfs(1:ngl) = 0d0
+      mskgfs(1:ngl) = 0.0_rp
     endif
     if( lcheby ) then
       if( .not. allocated(wgtsp) ) allocate(wgtsp(nspmax))
       do i=1,nsp
-        wgtsp(i)= dble(i)
+        wgtsp(i)= real(i, rp)
       enddo
       mem = mem + 8*size(wgtsp)
     endif
@@ -1572,8 +1572,8 @@ contains
     endif
 
 !.....Compute maximum rcut in all descriptors
-    rcmax = 0d0
-    rc3max = 0d0
+    rcmax = 0.0_rp
+    rc3max = 0.0_rp
     do isf=1,nsf
       rcut = descs(isf)%rcut
       rcmax = max(rcmax,rcut)
@@ -1718,8 +1718,8 @@ contains
     if( present(wgtsp_in) ) wgtsp(:) = wgtsp_in(:)
 
 !.....Compute maximum rcut in all descriptors
-    rcmax = 0d0
-    rc3max = 0d0
+    rcmax = 0.0_rp
+    rc3max = 0.0_rp
     do i=1,nsf
       rcut = descs(i)%rcut
       rcmax = max(rcmax,rcut)
@@ -1789,8 +1789,8 @@ contains
     if( present(wgtsp_in) ) wgtsp(:) = wgtsp_in(:)
 
 !.....Compute maximum rcut in all descriptors
-    rcmax = 0d0
-    rc3max = 0d0
+    rcmax = 0.0_rp
+    rc3max = 0.0_rp
     do i=1,nsf
       rcut = descs(i)%rcut
       rcmax = max(rcmax,rcut)
@@ -1826,7 +1826,7 @@ contains
 
     allocate(dgsfo(3,natm,nsf,natm),igsfo(nsf,natm,natm))
 !.....reduce d(i)gsf data of buffer atoms to those of resident atoms
-    dgsfo(1:3,1:natm,1:nsf,1:natm)= 0d0
+    dgsfo(1:3,1:natm,1:nsf,1:natm)= 0.0_rp
     igsfo(1:nsf,1:natm,1:natm)= 0
     do ia=1,natm
       do jj=0,lspr(0,ia)
@@ -1995,7 +1995,7 @@ contains
       allocate(dgsfa(3,nsf,namax))
     endif
 
-    dgsfa(1:3,1:nsf,1:namax) = 0d0
+    dgsfa(1:3,1:nsf,1:namax) = 0.0_rp
     do ia=1,natm
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
@@ -2024,13 +2024,13 @@ contains
 
     integer:: n
 
-    ts(0) = 1d0
+    ts(0) = 1.0_rp
     ts(1) = x
-    dts(0)= 0d0
-    dts(1)= 1d0
+    dts(0)= 0.0_rp
+    dts(1)= 1.0_rp
     do n=2,nmax
-      ts(n) = 2d0*x*ts(n-1) -ts(n-2)
-      dts(n)= 2d0*(ts(n-1) +x*dts(n-1)) -dts(n-2)
+      ts(n) = 2.0_rp*x*ts(n-1) -ts(n-2)
+      dts(n)= 2.0_rp*(ts(n-1) +x*dts(n-1)) -dts(n-2)
     enddo
     return
   end subroutine chebyshev

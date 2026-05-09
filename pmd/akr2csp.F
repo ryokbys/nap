@@ -13,8 +13,8 @@ cc.....Cutoff radius for LJ-Ar FCC, halfway between 1st and 2nd N.N.
 cc      real(rp),parameter:: rc    = 3.36d0
 c      real(rp),parameter:: rc    = 3.5d0
 c.....Cutoff radius for BCC Fe, halfway between 1st and 2nd N.N.
-      real(rp),parameter:: abcc = 2.8533d0
-      real(rp),parameter:: rc   = 0.5d0*(1d0+0.866025d0)*abcc
+      real(rp),parameter:: abcc = 2.8533_rp
+      real(rp),parameter:: rc   = 0.5_rp*(1.0_rp+0.866025_rp)*abcc
 
       integer:: i,n,itmp,nauxdat,j
       integer:: natm0,natm,nx,ny,nz,nlsa
@@ -94,20 +94,20 @@ c-----------------------------------------------------------------------
       integer:: i,j,n,nr1,nr2,nr3
       real(rp):: a1,a2,a3
 c.....To avoid nr?==n?, ra(?,i) has to be under 1.0d0
-      real(rp),parameter:: small=1d0-1d-8
+      real(rp),parameter:: small=1.0_rp-1e-8_rp
 
       llist(1:nlist)=0
 
-      a1= 1d0/n1
-      a2= 1d0/n2
-      a3= 1d0/n3
+      a1= 1.0_rp/n1
+      a2= 1.0_rp/n2
+      a3= 1.0_rp/n3
       do i=1,natm
-        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
-        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
-        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
-        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
-        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
-        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
+        if( ra(1,i).ge.1.0_rp ) ra(1,i)=ra(1,i) -1.0_rp
+        if( ra(1,i).lt.0.0_rp ) ra(1,i)=ra(1,i) +1.0_rp
+        if( ra(2,i).ge.1.0_rp ) ra(2,i)=ra(2,i) -1.0_rp
+        if( ra(2,i).lt.0.0_rp ) ra(2,i)=ra(2,i) +1.0_rp
+        if( ra(3,i).ge.1.0_rp ) ra(3,i)=ra(3,i) -1.0_rp
+        if( ra(3,i).lt.0.0_rp ) ra(3,i)=ra(3,i) +1.0_rp
 c-------region index in order z,y,x
         nr3= int(ra(3,i)*small/a3)+1
         nr2= int(ra(2,i)*small/a2)
@@ -168,7 +168,7 @@ c---------region (jr)
                   dx=(ra(1,j)-ra(1,i)-anint(ra(1,j)-ra(1,i)))*h(1,1)
                   dy=(ra(2,j)-ra(2,i)-anint(ra(2,j)-ra(2,i)))*h(2,2)
                   dz=(ra(3,j)-ra(3,i)-anint(ra(3,j)-ra(3,i)))*h(3,3)
-                  r= dsqrt(dx*dx +dy*dy +dz*dz)
+                  r= sqrt(dx*dx +dy*dy +dz*dz)
 c                  if(i.eq.1) write(6,'(a,4i4,2es11.3)')
 c     &                 "ir,i,jr,j,r,rc=",ir,i,jr,j,r,rc*1.3d0
                   if(r.lt.rc .and. j.ne.i) then
@@ -243,14 +243,14 @@ c-----------------------------------------------------------------------
       natm= 0
       do i=1,natm0
         xi(1:3)= ra0(1:3,i)
-        val= 0d0
+        val= 0.0_rp
         do l=1,lspr(0,i)
           j=lspr(l,i)
           
           xj(1:3)= ra0(1:3,j)-xi(1:3) -anint(ra0(1:3,j)-xi(1:3))
           xij(1:3)= h(1:3,1)*xj(1) +h(1:3,2)*xj(2) +h(1:3,3)*xj(3)
 
-          vmin=1d10
+          vmin=1e10_rp
           do m=1,lspr(0,i) 
             k=lspr(m,i)
             
@@ -269,7 +269,7 @@ c-----------------------------------------------------------------------
         enddo
 c.....Adopt half of val, because of double counting
         val= val/2
-        if( val.gt.40.0d0 ) then
+        if( val.gt.40.0_rp ) then
           natm=natm +1
           cspi(natm)= val
           ra(1:3,natm)= ra0(1:3,i)

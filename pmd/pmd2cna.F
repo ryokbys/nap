@@ -29,8 +29,8 @@ c-----max. num. of neighbors
 c-----max. num. of buffer data
       integer,parameter:: maxbuf= 100000
 c-----cutoff radius
-      real(rp),parameter:: rc1   = 8.d-10  /0.5291772d-10
-      real(rp),parameter:: rc    = 3.5d-10 /0.5291772d-10
+      real(rp),parameter:: rc1   = 8.e-10_rp  /0.5291772e-10_rp
+      real(rp),parameter:: rc    = 3.5e-10_rp /0.5291772e-10_rp
 
       integer:: i,j,k,l,m,n,ia,ib
       integer:: nstp,nouterg,noutpmd,iout_count,istp,nerg,ifpmd,npmd
@@ -89,9 +89,9 @@ c      read(10,*) nx,ny,nz
       close(10)
 c-----parallel configuration
       nxyz= nx*ny*nz
-      anxi= 1d0/nx
-      anyi= 1d0/ny
-      anzi= 1d0/nz
+      anxi= 1.0_rp/nx
+      anyi= 1.0_rp/ny
+      anzi= 1.0_rp/nz
 c-----error trap
       if(nodes_md.ne.nxyz) then
         write(6,'(a)') " error: nodes_md .ne. nxyz!!"
@@ -228,12 +228,12 @@ c      am(1:nismax)= am_ar
 
 c-----prefactors for normalized accelerration
       do i=1,nismax
-        acon(i)= 0.5d0*dt**2/am(i)
+        acon(i)= 0.5_rp*dt**2/am(i)
       enddo
 
 c-----prefactors for kinetic energy, FACK
       do i=1,nismax
-        fack(i)= 0.5d0*am(i)/dt**2
+        fack(i)= 0.5_rp*am(i)/dt**2
       enddo
 
       end subroutine setup
@@ -361,9 +361,9 @@ c-----reset the num of "received" boundary atoms
       nbnew=0
 
 c-----calculate the cut-off lengths
-      vala=dsqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/volume
-      valb=dsqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/volume
-      valc=dsqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/volume
+      vala=sqrt(sgm(1,1)**2+sgm(2,1)**2+sgm(3,1)**2)/volume
+      valb=sqrt(sgm(1,2)**2+sgm(2,2)**2+sgm(3,2)**2)/volume
+      valc=sqrt(sgm(1,3)**2+sgm(2,3)**2+sgm(3,3)**2)/volume
       rca=rc*vala
       rcb=rc*valb
       rcc=rc*valc
@@ -512,15 +512,15 @@ c------------------------------------------------------------------------
       logical bmv
 
       if (ku.eq.1) then
-        bmv = xv.lt.0d0
+        bmv = xv.lt.0.0_rp
       else if (ku.eq.2) then
         bmv = anxi.lt.xv
       else if (ku.eq.3) then
-        bmv = yv.lt.0d0
+        bmv = yv.lt.0.0_rp
       else if (ku.eq.4) then
         bmv = anyi.lt.yv
       else if (ku.eq.5) then
-        bmv = zv.lt.0d0
+        bmv = zv.lt.0.0_rp
       else if (ku.eq.6) then
         bmv = anzi.lt.zv
       else
@@ -547,9 +547,9 @@ c-----reset pair list, LSPR
       lspr(0,1:natm+nb)= 0
 
 c-----make a linked cell list, LSCL
-      lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
-      lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
-      lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
+      lcx=anxi/sqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
+      lcy=anyi/sqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
+      lcz=anzi/sqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
       lcx2= lcx +2
       lcy2= lcy +2
       lcz2= lcz +2
@@ -558,9 +558,9 @@ c-----make a linked cell list, LSCL
       rcx= anxi/lcx
       rcy= anyi/lcy
       rcz= anzi/lcz
-      rcxi=1d0/rcx
-      rcyi=1d0/rcy
-      rczi=1d0/rcz
+      rcxi=1.0_rp/rcx
+      rcyi=1.0_rp/rcy
+      rczi=1.0_rp/rcz
 c-----allocate LSCL & LSHD after obtaining lcxyz2
       allocate(lscl(natm+nb),lshd(lcxyz2))
 
@@ -874,12 +874,12 @@ c-------if not FCC
         lscna(ncna)= i
 c-------if HCP structure, itype(i)= 2
         if(n421.eq.6 .and. n422.eq.6) then
-          tag(i)= (tag(i)-int(tag(i))) +2d0
+          tag(i)= (tag(i)-int(tag(i))) +2.0_rp
 c          itype(i)= 2
 c          itype(ncna)= 2
 c-------otherwise, itype(i)= 1
         else
-          tag(i)= (tag(i)-int(tag(i))) +1d0
+          tag(i)= (tag(i)-int(tag(i))) +1.0_rp
 c          itype(i)= 1
 c          itype(ncna)= 1
         endif
@@ -904,7 +904,7 @@ c-----------------------------------------------------------------------
 
       n=0
       do i=1,natm
-        if(ra(1,i).gt.0.05d0 .and. ra(1,i).lt.0.2d0) then
+        if(ra(1,i).gt.0.05_rp .and. ra(1,i).lt.0.2_rp) then
           n=n+1
           lscna(n)= i
         endif

@@ -15,7 +15,7 @@ module angular
   character(len=128),parameter:: paramsfname = 'in.params.angular'
 
 !.....Small enough value for some criterion
-  real(rp),parameter:: eps = 1d-10
+  real(rp),parameter:: eps = 1e-10_rp
   integer,parameter:: msp = nspmax
 
   real(rp):: rc3s(nspmax,nspmax,nspmax)
@@ -76,7 +76,7 @@ contains
       allocate(aa3(3,namax),strsl(3,3,namax))
       call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
 !-------check rc
-      rcmax = 0d0
+      rcmax = 0.0_rp
       do is=1,nspmax
         do js=1,nspmax
           do ks=1,nspmax
@@ -110,9 +110,9 @@ contains
       call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
     endif
 
-    strsl(1:3,1:3,1:namax)= 0d0
-    epotl3= 0d0
-    aa3(1:3,1:namax)= 0d0
+    strsl(1:3,1:3,1:namax)= 0.0_rp
+    epotl3= 0.0_rp
+    aa3(1:3,1:namax)= 0.0_rp
 !.....Loop over i
 !$omp parallel
 !$omp do reduction(+:epotl3) &
@@ -134,8 +134,8 @@ contains
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         if( rij2.gt.rcmax2 ) cycle
-        rij = dsqrt(rij2)
-        riji= 1d0/rij
+        rij = sqrt(rij2)
+        riji= 1.0_rp/rij
         drijj(1:3)= xij(1:3)*riji
 !.....Loop over k
         do m=n+1,lspr(0,i)
@@ -151,10 +151,10 @@ contains
           xik(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)
           rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
           if( rik2.ge.rc3*rc3 ) cycle
-          rik = dsqrt(rik2)
-          riki= 1d0/rik
-          drijc= 1d0/(rij-rc3)
-          drikc= 1d0/(rik-rc3)
+          rik = sqrt(rik2)
+          riki= 1.0_rp/rik
+          drijc= 1.0_rp/(rij-rc3)
+          drikc= 1.0_rp/(rik-rc3)
 !.....Parameters
           alp = alps(is,js,ks)
           bet = bets(is,js,ks)
@@ -165,7 +165,7 @@ contains
           tcsn = csn -gmm
 !!$          tcsn2= (tcsn*tcsn +shft)
           tcsn2 = tcsn*tcsn
-          vexp= dexp(bet*drijc +bet*drikc)
+          vexp= exp(bet*drijc +bet*drikc)
 !.....Potential
           tmp= vexp * (alp*tcsn2 + shft)
           epi(i)= epi(i) +tmp
@@ -173,7 +173,7 @@ contains
 !.....Force
           dhrij= -drijc*drijc *bet *tmp
           dhrik= -drikc*drikc *bet *tmp
-          dhcsn= 2d0 *alp *vexp *tcsn 
+          dhcsn= 2.0_rp *alp *vexp *tcsn 
           drikk(1:3)= xik(1:3)*riki
           dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki))
           dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki))
@@ -194,14 +194,14 @@ contains
             do ixyz=1,3
 !$omp atomic
               strsl(ixyz,jxyz,i)= strsl(ixyz,jxyz,i) + &
-                   (-0.5d0*xij(jxyz)*tmpj(ixyz) &
-                   -0.5d0*xik(jxyz)*tmpk(ixyz))
+                   (-0.5_rp*xij(jxyz)*tmpj(ixyz) &
+                   -0.5_rp*xik(jxyz)*tmpk(ixyz))
 !$omp atomic
               strsl(ixyz,jxyz,j)=strsl(ixyz,jxyz,j) &
-                   -0.5d0*xij(jxyz)*tmpj(ixyz) !*volj
+                   -0.5_rp*xij(jxyz)*tmpj(ixyz) !*volj
 !$omp atomic
               strsl(ixyz,jxyz,k)=strsl(ixyz,jxyz,k) &
-                   -0.5d0*xik(jxyz)*tmpk(ixyz) !*volk
+                   -0.5_rp*xik(jxyz)*tmpk(ixyz) !*volk
             enddo
           enddo ! jxyz
 
@@ -220,7 +220,7 @@ contains
     strs(1:3,1:3,1:natm) = strs(1:3,1:3,1:natm) +strsl(1:3,1:3,1:natm)
 
 !.....Gather epot
-    epott= 0d0
+    epott= 0.0_rp
     epotl= epotl3
     call mpi_allreduce(epotl,epott,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     epot= epot +epott
@@ -245,11 +245,11 @@ contains
     if( myid.eq.0 ) then
       interact3(:,:,:) = .false.
 !.....Initialize parameters
-      rc3s(:,:,:) = 0d0
-      gmms(:,:,:) = -1d0/3
-      alps(:,:,:) = 1d0
-      bets(:,:,:) = 1d0
-      shfts(:,:,:) = 0d0
+      rc3s(:,:,:) = 0.0_rp
+      gmms(:,:,:) = -1.0_rp/3
+      alps(:,:,:) = 1.0_rp
+      bets(:,:,:) = 1.0_rp
+      shfts(:,:,:) = 0.0_rp
 !.....Check whether the file exists      
       cfname = trim(paramsdir)//'/'//trim(paramsfname)
       inquire(file=cfname,exist=lexist)
@@ -389,10 +389,10 @@ contains
     params(1:nprms) = params_in(1:ndimp)
     lprmset_angular = .true.
 
-    alps(:,:,:) = 0d0
-    bets(:,:,:) = 0d0
-    gmms(:,:,:) = 0d0
-    rc3s(:,:,:) = 0d0
+    alps(:,:,:) = 0.0_rp
+    bets(:,:,:) = 0.0_rp
+    gmms(:,:,:) = 0.0_rp
+    rc3s(:,:,:) = 0.0_rp
     interact3(:,:,:) = interact3_in(:,:,:)
     nint = 0
     do i=1,nspmax
@@ -482,11 +482,11 @@ contains
     real(rp):: drikk(3),dcsni(3),dcsnj(3),dcsnk(3),drijc,drikc,x,y,z,bl &
          ,xi(3),xj(3),xk(3),xij(3),xik(3),at(3)
     real(rp):: tmpja(3),tmpjb(3),tmpjg(3),tmpka(3),tmpkb(3),tmpkg(3)
-    real(rp),save:: rcin2 = -1d0
+    real(rp),save:: rcin2 = -1.0_rp
     integer,save,allocatable:: ia2ifcal(:)
 
     if( .not.allocated(ia2ifcal) ) allocate(ia2ifcal(namax))
-    if( rcin2 < 0d0 ) then
+    if( rcin2 < 0.0_rp ) then
       if( rcin < rcmax ) then
         call mpi_finalize(ierr)
         stop
@@ -531,19 +531,19 @@ contains
     enddo
 
     if( lematch ) then
-      ge_alp(:,:,:) = 0d0
-      ge_bet(:,:,:) = 0d0
-      ge_gmm(:,:,:) = 0d0
+      ge_alp(:,:,:) = 0.0_rp
+      ge_bet(:,:,:) = 0.0_rp
+      ge_gmm(:,:,:) = 0.0_rp
     endif
     if( lfmatch ) then
-      gf_alp(:,:,:,:,:) = 0d0
-      gf_bet(:,:,:,:,:) = 0d0
-      gf_gmm(:,:,:,:,:) = 0d0
+      gf_alp(:,:,:,:,:) = 0.0_rp
+      gf_bet(:,:,:,:,:) = 0.0_rp
+      gf_gmm(:,:,:,:,:) = 0.0_rp
     endif
     if( lsmatch ) then
-      gs_alp(:,:,:,:) = 0d0
-      gs_bet(:,:,:,:) = 0d0
-      gs_gmm(:,:,:,:) = 0d0
+      gs_alp(:,:,:,:) = 0.0_rp
+      gs_bet(:,:,:,:) = 0.0_rp
+      gs_gmm(:,:,:,:) = 0.0_rp
     endif
 
 !.....gradw_uf3 hereafter.....
@@ -577,8 +577,8 @@ contains
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         if( rij2.gt.rcmax2 ) cycle
         jra = itotOf(tag(j))
-        rij = dsqrt(rij2)
-        riji= 1d0/rij
+        rij = sqrt(rij2)
+        riji= 1.0_rp/rij
         drijj(1:3)= xij(1:3)*riji
 !.....Loop over k
         do m=n+1,lspr(0,i)
@@ -595,10 +595,10 @@ contains
           rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
           if( rik2.ge.rc3*rc3 ) cycle
           kra = itotOf(tag(k))
-          rik = dsqrt(rik2)
-          riki= 1d0/rik
-          drijc= 1d0/(rij-rc3)
-          drikc= 1d0/(rik-rc3)
+          rik = sqrt(rik2)
+          riki= 1.0_rp/rik
+          drijc= 1.0_rp/(rij-rc3)
+          drikc= 1.0_rp/(rik-rc3)
 !.....Parameters
           alp = alps(is,js,ks)
           bet = bets(is,js,ks)
@@ -608,7 +608,7 @@ contains
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) *(riji*riki)
           tcsn = csn -gmm
           tcsn2= (tcsn*tcsn +shft)
-          vexp= dexp(bet*drijc +bet*drikc)
+          vexp= exp(bet*drijc +bet*drikc)
 !.....Potential
           tmp= alp *vexp *tcsn2
 !!$          epi(i)= epi(i) +tmp
@@ -616,13 +616,13 @@ contains
           if( lematch ) then
             ge_alp(is,js,ks)= ge_alp(is,js,ks) +vexp*tcsn2
             ge_bet(is,js,ks)= ge_bet(is,js,ks) +(drijc+drikc)*tmp
-            ge_gmm(is,js,ks)= ge_gmm(is,js,ks) -2d0*alp*vexp*tcsn
+            ge_gmm(is,js,ks)= ge_gmm(is,js,ks) -2.0_rp*alp*vexp*tcsn
           endif
 !.....Force
           if( .not.lfmatch .and. .not.lsmatch ) cycle
           dhrij= -drijc*drijc *bet *tmp
           dhrik= -drikc*drikc *bet *tmp
-          dhcsn= 2d0 *alp *vexp *tcsn 
+          dhcsn= 2.0_rp *alp *vexp *tcsn 
           drikk(1:3)= xik(1:3)*riki
           dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki))
           dcsnk(1:3)= (-xik(1:3)*csn*(riki*riki) +xij(1:3)*(riji*riki))
@@ -630,16 +630,16 @@ contains
 !!$          tmpj(1:3)= dhcsn*dcsnj(1:3) +dhrij*drijj(1:3)
 !!$          tmpk(1:3)= dhcsn*dcsnk(1:3) +dhrik*drikk(1:3)
 !.....w.r.t. alp
-          tmpja(:)= drijj(:)*(-bet)*drijc**2*vexp*tcsn2 +dcsnj(:)*2d0*vexp*tcsn
-          tmpka(:)= drikk(:)*(-bet)*drikc**2*vexp*tcsn2 +dcsnk(:)*2d0*vexp*tcsn
+          tmpja(:)= drijj(:)*(-bet)*drijc**2*vexp*tcsn2 +dcsnj(:)*2.0_rp*vexp*tcsn
+          tmpka(:)= drikk(:)*(-bet)*drikc**2*vexp*tcsn2 +dcsnk(:)*2.0_rp*vexp*tcsn
 !.....w.r.t. bet
-          tmpjb(:)= drijj(:)*(-alp)*drijc**2*vexp*tcsn2*(1d0+bet*drijc+bet*drikc) &
-               +dcsnj(:)*2d0*alp*(drijc+drikc)*vexp*tcsn
-          tmpkb(:)= drikk(:)*(-alp)*drikc**2*vexp*tcsn2*(1d0+bet*drijc+bet*drikc) &
-               +dcsnk(:)*2d0*alp*(drijc+drikc)*vexp*tcsn
+          tmpjb(:)= drijj(:)*(-alp)*drijc**2*vexp*tcsn2*(1.0_rp+bet*drijc+bet*drikc) &
+               +dcsnj(:)*2.0_rp*alp*(drijc+drikc)*vexp*tcsn
+          tmpkb(:)= drikk(:)*(-alp)*drikc**2*vexp*tcsn2*(1.0_rp+bet*drijc+bet*drikc) &
+               +dcsnk(:)*2.0_rp*alp*(drijc+drikc)*vexp*tcsn
 !.....w.r.t. gmm
-          tmpjg(:)= drijj(:)*2d0*alp*bet*drijc**2*vexp*tcsn -dcsnj(:)*2d0*alp*vexp
-          tmpkg(:)= drikk(:)*2d0*alp*bet*drikc**2*vexp*tcsn -dcsnk(:)*2d0*alp*vexp
+          tmpjg(:)= drijj(:)*2.0_rp*alp*bet*drijc**2*vexp*tcsn -dcsnj(:)*2.0_rp*alp*vexp
+          tmpkg(:)= drikk(:)*2.0_rp*alp*bet*drikc**2*vexp*tcsn -dcsnk(:)*2.0_rp*alp*vexp
           if( lfmatch ) then
             ifcal = ia2ifcal(ia)
             jfcal = ia2ifcal(jra)

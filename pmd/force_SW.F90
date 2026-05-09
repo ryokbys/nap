@@ -11,31 +11,31 @@ module SW
   character(len=128):: paramsdir = '.'
   character(len=128),parameter:: paramsfname = 'in.params.SW'
 !-----Si mass (to be multiplied by umass)
-  real(rp),parameter:: am_si = 28.0855d0
+  real(rp),parameter:: am_si = 28.0855_rp
 !.....length scaling factor for matching this potential to VASP
 !  real(rp),parameter:: sfac  = 1.0062662d0
-  real(rp),parameter:: sfac  = 1d0
+  real(rp),parameter:: sfac  = 1.0_rp
 !.....number of parameters
   integer,parameter:: nprms = 10
 !.....Small enough value for some criterion
-  real(rp),parameter:: eps = 1d-10
+  real(rp),parameter:: eps = 1e-10_rp
 
 !-----SW unit energy in eV
-  real(rp):: swe   = 2.1678d0
+  real(rp):: swe   = 2.1678_rp
 !-----SW unit length in Ang
-  real(rp):: swl   = 2.0951d0*sfac
+  real(rp):: swl   = 2.0951_rp*sfac
 !.....Si element energy if needed
-  real(rp):: swei  = 0.d0
+  real(rp):: swei  = 0._rp
 !-----si-si
-  real(rp):: swa   = 7.049556277d0
-  real(rp):: swb   = 0.6022245584d0
-  real(rp):: swp   = 4.d0
-  real(rp):: swq   = 0.d0
-  real(rp):: swc   = 1.d0
-  real(rp):: swrc  = 1.8d0
+  real(rp):: swa   = 7.049556277_rp
+  real(rp):: swb   = 0.6022245584_rp
+  real(rp):: swp   = 4._rp
+  real(rp):: swq   = 0._rp
+  real(rp):: swc   = 1._rp
+  real(rp):: swrc  = 1.8_rp
 !-----si-si-si
-  real(rp):: sws   = 21.d0
-  real(rp):: swt   = 1.2d0
+  real(rp):: sws   = 21._rp
+  real(rp):: swt   = 1.2_rp
 
   integer,parameter:: msp = nspmax
   integer:: nsp
@@ -95,7 +95,7 @@ contains
       call read_params_SW(myid,mpi_world,iprint,specorder)
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
 !-------check rc
-      rcmax = 0d0
+      rcmax = 0.0_rp
       do is=1,msp
         do js=1,msp
           rcmax = max(rcmax,aswrc(is,js)*aswl)
@@ -116,7 +116,7 @@ contains
         call mpi_finalize(ierr)
         stop
       endif
-      swli= 1d0/aswl
+      swli= 1.0_rp/aswl
 !!$      a8d3r3= 8d0/(3d0*sqrt(3d0))
 !!$      avol= 5.427d0**3/8
 !-------finally set l1st
@@ -128,14 +128,14 @@ contains
       allocate(aa2(3,namax),aa3(3,namax),strsl(3,3,namax))
     endif
 
-    epotl= 0d0
-    epi(1:natm+nb)= 0d0
-    strsl(1:3,1:3,1:natm+nb)= 0d0
+    epotl= 0.0_rp
+    epi(1:natm+nb)= 0.0_rp
+    strsl(1:3,1:3,1:natm+nb)= 0.0_rp
 
 !-----2 body term
-    epotl1 = 0d0
-    epotl2 = 0d0
-    aa2(1:3,1:natm+nb)=0d0
+    epotl1 = 0.0_rp
+    epotl2 = 0.0_rp
+    aa2(1:3,1:natm+nb)=0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
@@ -155,16 +155,16 @@ contains
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         if( rij2.ge.src*src ) cycle
-        rij = dsqrt(rij2)
+        rij = sqrt(rij2)
         if( rij.ge.src ) cycle
 !!$        rij = dlspr(0,k,i) /aswl
 !!$        if( rij.ge.src ) cycle
 !!$        xij(1:3) = dlspr(1:3,k,i) /aswl
-        riji= 1d0/rij
-        drijc= 1d0/(rij-src)
+        riji= 1.0_rp/rij
+        drijc= 1.0_rp/(rij-src)
         vexp=exp(aswc(is,js)*drijc)
 !---------potential
-        tmp= 0.5d0 *aswe *aswa(is,js) *vexp &
+        tmp= 0.5_rp *aswe *aswa(is,js) *vexp &
              *(aswb(is,js)*riji**aswp(is,js) -riji**aswq(is,js))
         epi(i)= epi(i) +tmp
         epotl2= epotl2 +tmp
@@ -174,8 +174,8 @@ contains
         endif
 !---------force
         df2= -aswe*aswa(is,js)*vexp*(aswp(is,js)*aswb(is,js) &
-             *(riji**(aswp(is,js)+1d0)) &
-             -aswq(is,js)*(riji**(aswq(is,js)+1d0)) &
+             *(riji**(aswp(is,js)+1.0_rp)) &
+             -aswq(is,js)*(riji**(aswq(is,js)+1.0_rp)) &
              +(aswb(is,js)*(riji**aswp(is,js))&
              -riji**aswq(is,js))*aswc(is,js)*drijc*drijc)
         drij(1:3) = -xij(1:3)*riji /aswl
@@ -186,14 +186,14 @@ contains
         if( j.le.natm ) then
           do jxyz=1,3
             strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
+                 -0.5_rp*xij(jxyz)*aswl*(-df2*drij(1:3))
             strsl(1:3,jxyz,j)= strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
+                 -0.5_rp*xij(jxyz)*aswl*(-df2*drij(1:3))
           enddo
         else
           do jxyz=1,3
             strsl(1:3,jxyz,i)= strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*aswl*(-df2*drij(1:3))
+                 -0.5_rp*xij(jxyz)*aswl*(-df2*drij(1:3))
           enddo
         endif
 
@@ -201,8 +201,8 @@ contains
     enddo
 
 !-----3 body term
-    epotl3= 0d0
-    aa3(1:3,1:natm+nb)=0d0
+    epotl3= 0.0_rp
+    aa3(1:3,1:natm+nb)=0.0_rp
 !-----atom (i)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
@@ -221,13 +221,13 @@ contains
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         if( rij2.ge.srcij*srcij ) cycle
-        rij = dsqrt(rij2)
+        rij = sqrt(rij2)
 !!$        if( rij.ge.srcij ) cycle
 !!$        rij= dsqrt(rij2)
 !!$        rij = dlspr(0,n,i) /aswl
 !!$        xij(1:3) = dlspr(1:3,n,i) /aswl
-        riji= 1d0/rij
-        drijc= 1d0/(rij-srcij)
+        riji= 1.0_rp/rij
+        drijc= 1.0_rp/(rij-srcij)
 !---------atom (k)
         do m=1,lspr(0,i)
           k=lspr(m,i)
@@ -243,19 +243,19 @@ contains
           xik(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)/aswl
           rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
           if( rik2.ge.srcik**2 ) cycle
-          rik = dsqrt(rik2)
+          rik = sqrt(rik2)
 !!$          if( rik.ge.srcik ) cycle
 !!$          rik = dlspr(0,m,i) /aswl
 !!$          if( rik.ge.srcik ) cycle
 !!$          xik(1:3) = dlspr(1:3,m,i) /aswl
-          riki= 1d0/rik
-          drikc= 1d0/(rik-srcik)
+          riki= 1.0_rp/rik
+          drikc= 1.0_rp/(rik-srcik)
 !-----------common term
           csn=(xij(1)*xik(1) +xij(2)*xik(2) +xij(3)*xik(3)) &
                * (riji*riki)
-          tcsn = csn +1d0/3d0
+          tcsn = csn +1.0_rp/3.0_rp
           tcsn2= tcsn*tcsn
-          vexp= dexp(aswt(is,js,ks)*drijc +aswt(is,js,ks)*drikc)
+          vexp= exp(aswt(is,js,ks)*drijc +aswt(is,js,ks)*drikc)
 !-----------potential
           tmp= aswe *asws(is,js,ks) *vexp *tcsn2
           epi(i)= epi(i) +tmp
@@ -263,7 +263,7 @@ contains
 !-----------force
           dhrij= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drijc*drijc
           dhrik= -asws(is,js,ks) *aswt(is,js,ks) *vexp *tcsn2 *drikc*drikc
-          dhcsn= 2d0 *asws(is,js,ks) *vexp *tcsn 
+          dhcsn= 2.0_rp *asws(is,js,ks) *vexp *tcsn 
           drij(1:3)= -xij(1:3)*riji /aswl
           drik(1:3)= -xik(1:3)*riki /aswl
           dcsnj(1:3)= (-xij(1:3)*csn*(riji*riji) +xik(1:3)*(riji*riki)) /aswl
@@ -278,12 +278,12 @@ contains
           if( .not. lstrs ) cycle
           do jxyz=1,3
             strsl(1:3,jxyz,i)=strsl(1:3,jxyz,i) &
-                 -0.5d0*xij(jxyz)*aswl*tmpj(1:3) & !*volj &
-                 -0.5d0*xik(jxyz)*aswl*tmpk(1:3) !*volk
+                 -0.5_rp*xij(jxyz)*aswl*tmpj(1:3) & !*volj &
+                 -0.5_rp*xik(jxyz)*aswl*tmpk(1:3) !*volk
             strsl(1:3,jxyz,j)=strsl(1:3,jxyz,j) &
-                 -0.5d0*xij(jxyz)*aswl*tmpj(1:3) !*volj
+                 -0.5_rp*xij(jxyz)*aswl*tmpj(1:3) !*volj
             strsl(1:3,jxyz,k)=strsl(1:3,jxyz,k) &
-                 -0.5d0*xik(jxyz)*aswl*tmpk(1:3) !*volk
+                 -0.5_rp*xik(jxyz)*aswl*tmpk(1:3) !*volk
           enddo
 
         enddo
@@ -304,9 +304,9 @@ contains
 
 !-----gather epot
 !!$    epotl= epotl2 +epotl3
-    epot1 = 0d0
-    epot2 = 0d0
-    epot3 = 0d0
+    epot1 = 0.0_rp
+    epot2 = 0.0_rp
+    epot3 = 0.0_rp
     call mpi_allreduce(epotl1,epot1,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(epotl2,epot2,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
     call mpi_allreduce(epotl3,epot3,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
@@ -344,15 +344,15 @@ contains
         interact3(isp,isp,isp) = .true.
       enddo
 !.....Initialize parameters
-      aswei(:) = 0d0
-      aswa(:,:) = 0d0
-      aswb(:,:) = 0d0
-      aswp(:,:) = 0d0
-      aswq(:,:) = 0d0
-      aswc(:,:) = 0d0
-      aswrc(:,:) = 0d0
-      asws(:,:,:) = 0d0
-      aswt(:,:,:) = 0d0
+      aswei(:) = 0.0_rp
+      aswa(:,:) = 0.0_rp
+      aswb(:,:) = 0.0_rp
+      aswp(:,:) = 0.0_rp
+      aswq(:,:) = 0.0_rp
+      aswc(:,:) = 0.0_rp
+      aswrc(:,:) = 0.0_rp
+      asws(:,:,:) = 0.0_rp
+      aswt(:,:,:) = 0.0_rp
       aswe = swe
       aswl = swl
       aswei(1) = swei

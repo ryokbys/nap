@@ -20,7 +20,7 @@ program rdf
   use pairlist,only: mk_lspr_sngl
   implicit none
   include 'mpif.h'
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
   character(len=128),parameter:: cpmdini='pmdini'
   character(len=128),parameter:: cfinput='in.rdf'
   character(len=128),parameter:: cfoutrdf='out.rdf'
@@ -53,8 +53,8 @@ program rdf
   print *,'Num of atoms = ',ntot
 
 !.....Default values
-  rcut = 5.0d0
-  qcut = 25.0d0
+  rcut = 5.0_rp
+  qcut = 25.0_rp
   nbins = 100
   call read_in_rdf(11,trim(cfinput),rcut,qcut,nbins,lpair)
   dr = rcut/nbins
@@ -112,17 +112,17 @@ program rdf
 !!$  enddo
 
 !.....Normalization factors
-  denoms(0,0) = 4d0*pi*ntot*(ntot-1)*dr/vol
+  denoms(0,0) = 4.0_rp*pi*ntot*(ntot-1)*dr/vol
   do is=1,msp
-    denoms(is,is) = 4d0*pi*dr/vol *nspc(is)*(nspc(is)-1)
+    denoms(is,is) = 4.0_rp*pi*dr/vol *nspc(is)*(nspc(is)-1)
     do js=is+1,msp
-      denoms(is,js) = 4d0*pi*dr/vol *nspc(is)*nspc(js)
+      denoms(is,js) = 4.0_rp*pi*dr/vol *nspc(is)*nspc(js)
     enddo
   enddo
 
 !.....Normalize
   do ib=1,nbins
-    r = (ib-0.5d0)*dr
+    r = (ib-0.5_rp)*dr
     rdfs(0,0,ib) = rdfs(0,0,ib) /(denoms(0,0)*r*r)
     do is=1,msp
       do js=is,msp
@@ -148,7 +148,7 @@ program rdf
   enddo
   write(20,*) ''
   do ib=1,nbins
-    write(20,'(2es14.4)',advance='no') (ib-0.5d0)*dr, rdfs(0,0,ib)
+    write(20,'(2es14.4)',advance='no') (ib-0.5_rp)*dr, rdfs(0,0,ib)
     do is=1,msp
       do js=is,msp
         if( .not.lpair(is,js) ) cycle
@@ -161,27 +161,27 @@ program rdf
 
 !.....S(q)
   allocate(sqs(nbins))
-  sqs(:) = 0d0
-  rho = dble(ntot)/vol
+  sqs(:) = 0.0_rp
+  rho = real(ntot, rp)/vol
   print *,'ntot,vol,rho=',ntot,vol,rho
   do ib=1,nbins
-    q = (ib-0.5d0)*dq
-    tmp = 0d0
+    q = (ib-0.5_rp)*dq
+    tmp = 0.0_rp
     do jb=2,nbins
-      r = (jb-0.5d0)*dr
+      r = (jb-0.5_rp)*dr
       jbm = jb-1
-      rm = (jbm-0.5d0)*dr
-      tmp1= (rdfs(0,0,jbm)-1d0)*sin(q*rm)/(q*rm)*rm*rm
-      tmp2= (rdfs(0,0,jb)-1d0)*sin(q*r)/(q*r)*r*r
-      tmp = tmp + 0.5d0*dr *(tmp1+tmp2)
+      rm = (jbm-0.5_rp)*dr
+      tmp1= (rdfs(0,0,jbm)-1.0_rp)*sin(q*rm)/(q*rm)*rm*rm
+      tmp2= (rdfs(0,0,jb)-1.0_rp)*sin(q*r)/(q*r)*r*r
+      tmp = tmp + 0.5_rp*dr *(tmp1+tmp2)
     enddo
-    sqs(ib)= 1d0 +4*pi*rho*tmp
+    sqs(ib)= 1.0_rp +4*pi*rho*tmp
   enddo
 !.....Output S(Q)
   open(21,file=trim(cfoutsq),status='replace')
   write(21,'(a)') '#  1:wave number, 2:S(Q) '
   do ib=1,nbins
-    q = (ib-0.5d0)*dq
+    q = (ib-0.5_rp)*dq
     write(21,'(2es14.4)') q, sqs(ib)
   enddo
   close(21)
@@ -319,7 +319,7 @@ subroutine comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
 
   dr = rcut/nbins
   rc2 = rcut*rcut
-  rdfs(:,:,:) = 0d0
+  rdfs(:,:,:) = 0.0_rp
   do ia=1,ntot
     is = int(tagtot(ia))
     xi(1:3) = rtot(1:3,ia)
@@ -331,10 +331,10 @@ subroutine comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
       rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
       dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
       if( dij2.gt.rc2 ) cycle
-      dij = dsqrt(dij2)
+      dij = sqrt(dij2)
       ib = min(int(dij/dr)+1,nbins)
-      rdfs(0,0,ib) = rdfs(0,0,ib) + 1d0
-      rdfs(is,js,ib) = rdfs(is,js,ib) + 1d0
+      rdfs(0,0,ib) = rdfs(0,0,ib) + 1.0_rp
+      rdfs(is,js,ib) = rdfs(is,js,ib) + 1.0_rp
 !!$      if( js.ne.is ) rdfs(js,is,ib) = rdfs(js,is,ib) + 1d0
     enddo
   enddo

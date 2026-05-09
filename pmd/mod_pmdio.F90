@@ -284,7 +284,7 @@ contains
     character(len=3),save:: cndlmp
     character(len=3):: csp
     character(len=6):: caux
-    real(rp),parameter:: tiny = 1d-14
+    real(rp),parameter:: tiny = 1e-14_rp
     logical,save:: l1st = .true.
 
     if( l1st ) then
@@ -310,10 +310,10 @@ contains
 
     call pmd2lammps(h,ntot,rtot,dlmp(1:3,:),vtot,dlmp(4:6,:) &
          ,xlo,xhi,ylo,yhi,zlo,zhi,xy,xz,yz)
-    xlo_bound = xlo +min(0d0, xy, xz, xy+xz)
-    xhi_bound = xhi +max(0d0, xy, xz, xy+xz)
-    ylo_bound = ylo +min(0d0, yz)
-    yhi_bound = yhi +max(0d0, yz)
+    xlo_bound = xlo +min(0.0_rp, xy, xz, xy+xz)
+    xhi_bound = xhi +max(0.0_rp, xy, xz, xy+xz)
+    ylo_bound = ylo +min(0.0_rp, yz)
+    yhi_bound = yhi +max(0.0_rp, yz)
     zlo_bound = zlo
     zhi_bound = zhi
 !.....Make a data array to be written out
@@ -506,9 +506,9 @@ contains
          ,x,y,z,a23(3),a31(3),a12(3),vol,xyp
     real(rp):: a,b,c,alpha,beta,gamma
 
-    xlo = 0d0
-    ylo = 0d0
-    zlo = 0d0
+    xlo = 0.0_rp
+    ylo = 0.0_rp
+    zlo = 0.0_rp
     a0(1:3) = h(1:3,1)
     b0(1:3) = h(1:3,2)
     c0(1:3) = h(1:3,3)
@@ -559,20 +559,20 @@ contains
     a31 = cross(a3,a1)
     a12 = cross(a1,a2)
     vol = abs(dot(a1,a23))
-    amat(1:3,1:3) = 0d0
+    amat(1:3,1:3) = 0.0_rp
     amat(1,1:3) = a23(1:3)
     amat(2,1:3) = a31(1:3)
     amat(3,1:3) = a12(1:3)
-    b1(1:3) = (/ x, 0d0, 0d0 /)
-    b2(1:3) = (/ xy,  y, 0d0 /)
+    b1(1:3) = (/ x, 0.0_rp, 0.0_rp /)
+    b2(1:3) = (/ xy,  y, 0.0_rp /)
     b3(1:3) = (/ xz, yz,   z /)
-    bmat(1:3,1:3) = 0d0
+    bmat(1:3,1:3) = 0.0_rp
     bmat(1:3,1) = b1(1:3)
     bmat(1:3,2) = b2(1:3)
     bmat(1:3,3) = b3(1:3)
     xyp = xy -lxy*x
     do i=1,ntot
-      rlmp(1:3,i) = 0d0
+      rlmp(1:3,i) = 0.0_rp
 !!$      call shift_pos_for_lammps(rtot(1,i),rlmp(1,i),lxy,lxz,lyz &
 !!$           ,x,y,z,yz,xz,xy)
 !.....Shift positions
@@ -620,9 +620,9 @@ contains
     real(rp),intent(in):: x
     real(rp):: pbc
 
-    if( x.lt.0d0 ) then
-      pbc = x -int(x) +1d0
-    else if( x.ge.1d0 ) then
+    if( x.lt.0.0_rp ) then
+      pbc = x -int(x) +1.0_rp
+    else if( x.ge.1.0_rp ) then
       pbc = x -int(x)
     else
       pbc = x
@@ -648,9 +648,9 @@ contains
     real(rp):: a0(3),b0(3),c0(3)
     real(rp):: a,b,c,alpha,beta,gamma
 
-    xlo = 0d0
-    ylo = 0d0
-    zlo = 0d0
+    xlo = 0.0_rp
+    ylo = 0.0_rp
+    zlo = 0.0_rp
     a0(1:3) = hmat(1:3,1)
     b0(1:3) = hmat(1:3,2)
     c0(1:3) = hmat(1:3,3)

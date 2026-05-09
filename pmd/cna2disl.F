@@ -7,8 +7,8 @@ c    $ ./cna2disl < cna000 > disl000
 c-----------------------------------------------------------------------
       use mod_precision
       implicit none
-      real(rp),parameter:: bohr = 0.5291772d-10
-      real(rp),parameter:: rcz  = 2.8553d-10 /bohr
+      real(rp),parameter:: bohr = 0.5291772e-10_rp
+      real(rp),parameter:: rcz  = 2.8553e-10_rp /bohr
 
       integer:: i,iz,natm,naux,nz,nc
       real(rp):: h(3,3),dz,xav,yav,xref,yref,xi,yi,zi
@@ -26,7 +26,7 @@ c-----read cna file from STDIN
       enddo
 
       nz= int(h(3,3)/rcz)+1
-      dz= 1d0/nz
+      dz= 1.0_rp/nz
       allocate(lshd(nz),lscl(natm))
 
 c.....Make lshd and lscl
@@ -34,14 +34,14 @@ c.....Make lshd and lscl
       lscl(1:natm)= 0
       do i=1,natm
 c.....Only dislocation core atoms
-        if( ra(2,i).gt.0.75d0 .or. ra(2,i).lt.0.25d0 )  cycle
+        if( ra(2,i).gt.0.75_rp .or. ra(2,i).lt.0.25_rp )  cycle
 c.....Assign PBC
-        if( ra(1,i).ge.1d0 ) ra(1,i)=ra(1,i) -1d0
-        if( ra(1,i).lt.0d0 ) ra(1,i)=ra(1,i) +1d0
-        if( ra(2,i).ge.1d0 ) ra(2,i)=ra(2,i) -1d0
-        if( ra(2,i).lt.0d0 ) ra(2,i)=ra(2,i) +1d0
-        if( ra(3,i).ge.1d0 ) ra(3,i)=ra(3,i) -1d0
-        if( ra(3,i).lt.0d0 ) ra(3,i)=ra(3,i) +1d0
+        if( ra(1,i).ge.1.0_rp ) ra(1,i)=ra(1,i) -1.0_rp
+        if( ra(1,i).lt.0.0_rp ) ra(1,i)=ra(1,i) +1.0_rp
+        if( ra(2,i).ge.1.0_rp ) ra(2,i)=ra(2,i) -1.0_rp
+        if( ra(2,i).lt.0.0_rp ) ra(2,i)=ra(2,i) +1.0_rp
+        if( ra(3,i).ge.1.0_rp ) ra(3,i)=ra(3,i) -1.0_rp
+        if( ra(3,i).lt.0.0_rp ) ra(3,i)=ra(3,i) +1.0_rp
 c.....Store atoms to the lists
         iz= ra(3,i)/dz +1
         lscl(i)= lshd(iz)
@@ -51,8 +51,8 @@ c.....Store atoms to the lists
 c.....Search and list up dislocation core atoms
       do iz=1,nz
         nc = 0
-        xav= 0d0
-        yav= 0d0
+        xav= 0.0_rp
+        yav= 0.0_rp
         i= lshd(iz)
         if( iz.eq.1 ) then
           xref= ra(1,i)
@@ -73,7 +73,7 @@ c.....Search and list up dislocation core atoms
         xav= xav/nc
         yav= yav/nc
         zi = dz*(iz-1) +dz/2
-        write(6,'(4es15.7)') zi,zi*h(3,3)*0.5291772d0,xav,yav
+        write(6,'(4es15.7)') zi,zi*h(3,3)*0.5291772_rp,xav,yav
       enddo
 
       end program cna2disl

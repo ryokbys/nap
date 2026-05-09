@@ -9,7 +9,7 @@ module structure
   save
 
   integer:: mem = 0
-  real(rp):: time = 0d0
+  real(rp):: time = 0.0_rp
 
 !.....CNA
   integer,parameter:: idfcc = 1
@@ -285,23 +285,23 @@ contains
       enddo ! kk
 
 !.....Local cutoff for fcc (use only up to 12 neighbors)
-      dsum = 0d0
+      dsum = 0.0_rp
       do jj=1,12
         dsum = dsum +sqrt(d2lspr(jj,i))
       enddo
-      rcfccs(i) = (1d0+sqrt(2d0))/2 *dsum/12
+      rcfccs(i) = (1.0_rp+sqrt(2.0_rp))/2 *dsum/12
 
 !.....Local cutoff for bcc (use up to 14 neighbors)
-      dsum1 = 0d0
+      dsum1 = 0.0_rp
       do jj=1,8
         dsum1 = dsum1 +sqrt(d2lspr(jj,i))
       enddo
-      dsum2 = 0d0
+      dsum2 = 0.0_rp
       do jj=9,14
         dsum2 = dsum2 +sqrt(d2lspr(jj,i))
       enddo
 !.....NOTE: rcbcc is different from the definition in Ref [1]
-      rcbccs(i) = (1d0+sqrt(2d0))/4 *( 2d0/sqrt(3d0)*dsum1/8 +dsum2/6)
+      rcbccs(i) = (1.0_rp+sqrt(2.0_rp))/4 *( 2.0_rp/sqrt(3.0_rp)*dsum1/8 +dsum2/6)
     enddo
 
 !.....Use ~12 neighbors to identify FCC and HCP

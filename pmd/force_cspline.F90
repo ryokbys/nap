@@ -9,7 +9,7 @@ module cspline
   implicit none
   save
 
-  real(rp),parameter:: pi = 3.14159265358979d0
+  real(rp),parameter:: pi = 3.14159265358979_rp
 
   character(len=128):: paramsdir = '.'
 !.....parameter file name
@@ -72,8 +72,8 @@ contains
         call write_cspline_curves()
       endif
 !.....Check rc
-      rcmax = 0d0
-      rctmax = 0d0
+      rcmax = 0.0_rp
+      rctmax = 0.0_rp
       do ispl=1,nspl
         spl = spls(ispl)
         rcmax = max(rcmax,spl%rcut)
@@ -127,13 +127,13 @@ contains
       allocate(strsl(3,3,namax),aa2(3,namax),aa3(3,namax))
     endif
 
-    epotl= 0d0
-    epi(1:natm+nb)= 0d0
-    strsl(1:3,1:3,1:natm+nb) = 0d0
+    epotl= 0.0_rp
+    epi(1:natm+nb)= 0.0_rp
+    strsl(1:3,1:3,1:natm+nb) = 0.0_rp
 
 !.....2-body term
-    epotl2 = 0d0
-    aa2(1:3,1:natm+nb) = 0d0
+    epotl2 = 0.0_rp
+    aa2(1:3,1:natm+nb) = 0.0_rp
     if( .not. l2b ) goto 20
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
@@ -153,14 +153,14 @@ contains
         dij2= rij(1)*rij(1) +rij(2)*rij(2) +rij(3)*rij(3)
         if( dij2.gt.rc2*rc2 ) cycle
         dij = sqrt(dij2)
-        diji= 1d0/dij
+        diji= 1.0_rp/dij
         call eval_spline(dij,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
 !.....Potential
-        epi(ia)= epi(ia) +phi*0.5d0
-        epotl2 = epotl2 +phi*0.5d0
+        epi(ia)= epi(ia) +phi*0.5_rp
+        epotl2 = epotl2 +phi*0.5_rp
         if( ja.le.natm ) then
-          epi(ja)= epi(ja) +phi*0.5d0
-          epotl2 = epotl2 +phi*0.5d0
+          epi(ja)= epi(ja) +phi*0.5_rp
+          epotl2 = epotl2 +phi*0.5_rp
         endif
 !.....Force
         drij(1:3)= -rij(1:3)*diji
@@ -170,12 +170,12 @@ contains
         if( .not.lstrs ) cycle
         do jxyz=1,3
           strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-               -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
+               -0.5_rp*rij(jxyz)*(-dphi*drij(1:3))
         enddo
         if( ja.le.natm ) then
           do jxyz=1,3
             strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                 -0.5d0*rij(jxyz)*(-dphi*drij(1:3))
+                 -0.5_rp*rij(jxyz)*(-dphi*drij(1:3))
           enddo
         endif
       enddo
@@ -183,8 +183,8 @@ contains
 20  continue
 
 !.....3-body term
-    epotl3 = 0d0
-    aa3(1:3,1:natm+nb) = 0d0
+    epotl3 = 0.0_rp
+    aa3(1:3,1:natm+nb) = 0.0_rp
     if( .not. l3b ) goto 21
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
@@ -223,14 +223,14 @@ contains
           dik = sqrt(dik2)
           csn = (rij(1)*rik(1) +rij(2)*rik(2) +rij(3)*rik(3))/(dij*dik)
           call eval_spline(csn,spl%npnts,spl%pnts,spl%vals,spl%coefs,phi,dphi)
-          fcij = fc1(dij,0d0,rct)
-          dfcij = dfc1(dij,0d0,rct)
-          fcik = fc1(dik,0d0,rct)
-          dfcik = dfc1(dik,0d0,rct)
+          fcij = fc1(dij,0.0_rp,rct)
+          dfcij = dfc1(dij,0.0_rp,rct)
+          fcik = fc1(dik,0.0_rp,rct)
+          dfcik = dfc1(dik,0.0_rp,rct)
           ctype = spl%ctype
           if( trim(ctype).eq.'angular'&
                .or. trim(ctype).eq.'angular1' ) then
-            eta3 = 0.5d0 /rct**2
+            eta3 = 0.5_rp /rct**2
             texp = exp( -eta3 *(dij2+dik2))
 !!$            texpij = exp(-eta3 *dij2)
 !!$            texpik = exp(-eta3 *dik2)
@@ -243,8 +243,8 @@ contains
 !.....Force
             drij(1:3) = -rij(1:3)/dij
             drik(1:3) = -rik(1:3)/dik
-            dgdij = dfcij*fcik*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik
-            dgdik = dfcik*fcij*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik
+            dgdij = dfcij*fcik*tmp +tmp*(-2.0_rp*eta3*dij)*fcij*fcik
+            dgdik = dfcik*fcij*tmp +tmp*(-2.0_rp*eta3*dik)*fcij*fcik
             dgcs = dphi *texp *fcij*fcik
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
             dcsdk(1:3)= rij(1:3)/dij/dik -rik(1:3)*csn/dik**2
@@ -257,12 +257,12 @@ contains
             if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3) &
-                   -0.5d0*rik(jxyz)*tmpk(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3) &
+                   -0.5_rp*rik(jxyz)*tmpk(1:3)
               strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3)
               strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(1:3)
+                   -0.5_rp*rik(jxyz)*tmpk(1:3)
             enddo
           else if( trim(ctype).eq.'angular2' ) then
             xjk(1:3)= xk(1:3)-xj(1:3)
@@ -270,9 +270,9 @@ contains
             djk2= rjk(1)*rjk(1) +rjk(2)*rjk(2) +rjk(3)*rjk(3)
             if( djk2.gt.rct2 ) cycle
             djk= sqrt(djk2)
-            fcjk = fc1(djk,0d0,rct)
-            dfcjk = dfc1(djk,0d0,rct)
-            eta3 = 0.5d0 /rct**2
+            fcjk = fc1(djk,0.0_rp,rct)
+            dfcjk = dfc1(djk,0.0_rp,rct)
+            eta3 = 0.5_rp /rct**2
             texp = exp( -eta3 *(dij2+dik2+djk2))
 !!$            texpij = exp(-eta3 *dij2)
 !!$            texpik = exp(-eta3 *dik2)
@@ -287,9 +287,9 @@ contains
             drij(1:3) = -rij(1:3)/dij
             drik(1:3) = -rik(1:3)/dik
             drjk(1:3) = -rjk(1:3)/djk
-            dgdij = dfcij*fcik*fcjk*tmp +tmp*(-2d0*eta3*dij)*fcij*fcik*fcjk
-            dgdik = dfcik*fcij*fcjk*tmp +tmp*(-2d0*eta3*dik)*fcij*fcik*fcjk
-            dgdjk = dfcjk*fcij*fcik*tmp +tmp*(-2d0*eta3*djk)*fcij*fcik*fcjk
+            dgdij = dfcij*fcik*fcjk*tmp +tmp*(-2.0_rp*eta3*dij)*fcij*fcik*fcjk
+            dgdik = dfcik*fcij*fcjk*tmp +tmp*(-2.0_rp*eta3*dik)*fcij*fcik*fcjk
+            dgdjk = dfcjk*fcij*fcik*tmp +tmp*(-2.0_rp*eta3*djk)*fcij*fcik*fcjk
 !!$            dgcs = dphi *texpij*texpik*texpjk *fcij*fcik*fcjk
             dgcs = dphi *texp *fcij*fcik*fcjk
             dcsdj(1:3)= rik(1:3)/dij/dik -rij(1:3)*csn/dij**2
@@ -305,11 +305,11 @@ contains
             if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3) -0.5_rp*rik(jxyz)*tmpk(1:3)
               strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3) -0.5_rp*rjk(jxyz)*tmpjk(1:3)
               strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(1:3) -0.5d0*rjk(jxyz)*tmpjk(1:3)
+                   -0.5_rp*rik(jxyz)*tmpk(1:3) -0.5_rp*rjk(jxyz)*tmpjk(1:3)
             enddo
           else if( trim(ctype).eq.'angular3' &
                .or. trim(ctype).eq.'angular4' ) then
@@ -334,11 +334,11 @@ contains
             if( .not.lstrs ) cycle
             do jxyz=1,3
               strsl(1:3,jxyz,ia)= strsl(1:3,jxyz,ia) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3) -0.5d0*rik(jxyz)*tmpk(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3) -0.5_rp*rik(jxyz)*tmpk(1:3)
               strsl(1:3,jxyz,ja)= strsl(1:3,jxyz,ja) &
-                   -0.5d0*rij(jxyz)*tmpj(1:3)
+                   -0.5_rp*rij(jxyz)*tmpj(1:3)
               strsl(1:3,jxyz,ka)= strsl(1:3,jxyz,ka) &
-                   -0.5d0*rik(jxyz)*tmpk(1:3)
+                   -0.5_rp*rik(jxyz)*tmpk(1:3)
             enddo
 
           endif
@@ -380,13 +380,13 @@ contains
       a(:) = coefs(:,npnts-1)
       rt = pnts(npnts) ! right-most data point
       r2 = rt*rt
-      dspl = a(2) +2d0*a(3)*rt +3d0*a(4)*r2 ! gradient of the right-most data point
+      dspl = a(2) +2.0_rp*a(3)*rt +3.0_rp*a(4)*r2 ! gradient of the right-most data point
       spl = vals(npnts) +dspl*(r -rt) ! extrapolation
     else if( r.lt.pnts(1) ) then ! outside left edge of the range
       a(:) = coefs(:,1)
       rt = pnts(1)  ! left-most data point
       r2 = rt*rt
-      dspl = a(2) +2d0*a(3)*rt +3d0*a(4)*r2
+      dspl = a(2) +2.0_rp*a(3)*rt +3.0_rp*a(4)*r2
       spl = vals(1) +dspl*(r -rt)
     else
       do i=2,npnts
@@ -395,7 +395,7 @@ contains
       a(:) = coefs(:,i-1)
       r2 = r*r
       spl = a(1) +a(2)*r +a(3)*r2 +a(4)*r*r2
-      dspl = a(2) +2d0*a(3)*r +3d0*a(4)*r2
+      dspl = a(2) +2.0_rp*a(3)*r +3.0_rp*a(4)*r2
     endif
     return
   end subroutine eval_spline
@@ -416,7 +416,7 @@ contains
     a(:) = coefs(:,ip)
     rij2 = rij*rij
     spl = a(1) +a(2)*rij +a(3)*rij2 +a(4)*rij*rij2
-    dspl = a(2) +2d0*a(3)*rij +3d0*a(4)*rij2
+    dspl = a(2) +2.0_rp*a(3)*rij +3.0_rp*a(4)*rij2
     return
   end subroutine spl2d
 !=======================================================================
@@ -436,7 +436,7 @@ contains
     a(:) = coefs(:,ip)
     csn2 = csn*csn
     spl = a(1) +a(2)*csn +a(3)*csn2 +a(4)*csn*csn2
-    dspl = a(2) +2d0*a(3)*csn +3d0*a(4)*csn2
+    dspl = a(2) +2.0_rp*a(3)*csn +3.0_rp*a(4)*csn2
     return
   end subroutine spl3d
 !=======================================================================
@@ -446,11 +446,11 @@ contains
     real(rp):: fc1
 
     if( r.le.rin ) then
-      fc1= 1d0
+      fc1= 1.0_rp
     else if( r.gt.rin .and. r.le.rout ) then
-      fc1= 0.5d0 *(cos((r-rin)/(rout-rin)*pi)+1d0)
+      fc1= 0.5_rp *(cos((r-rin)/(rout-rin)*pi)+1.0_rp)
     else
-      fc1= 0d0
+      fc1= 0.0_rp
     endif
     return
   end function fc1
@@ -461,11 +461,11 @@ contains
     real(rp):: dfc1
 
     if( r.le.rin ) then
-      Dfc1= 0d0
+      Dfc1= 0.0_rp
     else if( r.gt.rin .and. r.le.rout ) then
-      dfc1= -0.5d0*pi/(rout-rin) *sin((r-rin)/(rout-rin)*pi)
+      dfc1= -0.5_rp*pi/(rout-rin) *sin((r-rin)/(rout-rin)*pi)
     else
-      dfc1= 0d0
+      dfc1= 0.0_rp
     endif
     return
   end function dfc1
@@ -649,8 +649,8 @@ contains
     integer,parameter:: iorad = 51
     integer,parameter:: ioang = 52
 
-    rmin = 1d+10
-    rmax = -1d0
+    rmin = 1e+10_rp
+    rmax = -1.0_rp
     do is=1,nspmax
       do js=is,nspmax
         ispl = idpair(is,js)
@@ -692,7 +692,7 @@ contains
     open(ioang,file=trim(cfang),status='replace')
     da = (1.0-(-1.0))/(ndpnts-1)
     do i=1,ndpnts
-      ri = -1d0 +da*(i-1)
+      ri = -1.0_rp +da*(i-1)
       write(ioang,'(2x,f7.3)',advance='no') ri
       do is=1,nspmax
         do js=1,nspmax
@@ -785,21 +785,21 @@ contains
     enddo
 
 !.....Create vector b
-    vb(1:ndim)= 0d0
+    vb(1:ndim)= 0.0_rp
     do i=1,n
       vb(2*i-1)= dat(2,i)
       vb(2*i  )= dat(2,i+1)
     enddo
 
 !.....Create matrix A
-    amat(:,:) = 0d0
+    amat(:,:) = 0.0_rp
 !.....0th order
     do i=1,n
-      amat(2*i-1,4*i-3)= 1d0
+      amat(2*i-1,4*i-3)= 1.0_rp
       amat(2*i-1,4*i-2)= dat(1,i)
       amat(2*i-1,4*i-1)= dat(1,i)**2
       amat(2*i-1,4*i  )= dat(1,i)**3
-      amat(2*i  ,4*i-3)= 1d0
+      amat(2*i  ,4*i-3)= 1.0_rp
       amat(2*i  ,4*i-2)= dat(1,i+1)
       amat(2*i  ,4*i-1)= dat(1,i+1)**2
       amat(2*i  ,4*i  )= dat(1,i+1)**3
@@ -807,40 +807,40 @@ contains
 !.....1st order derivative
     ibase= 2*n
     do i=1,n-1
-      amat(ibase+i,4*i-2)= 1d0
-      amat(ibase+i,4*i-1)= 2d0*dat(1,i+1)
-      amat(ibase+i,4*i  )= 3d0*dat(1,i+1)**2
-      amat(ibase+i,4*(i+1)-2)= -1d0
-      amat(ibase+i,4*(i+1)-1)= -2d0*dat(1,i+1)
-      amat(ibase+i,4*(i+1)  )= -3d0*dat(1,i+1)**2
+      amat(ibase+i,4*i-2)= 1.0_rp
+      amat(ibase+i,4*i-1)= 2.0_rp*dat(1,i+1)
+      amat(ibase+i,4*i  )= 3.0_rp*dat(1,i+1)**2
+      amat(ibase+i,4*(i+1)-2)= -1.0_rp
+      amat(ibase+i,4*(i+1)-1)= -2.0_rp*dat(1,i+1)
+      amat(ibase+i,4*(i+1)  )= -3.0_rp*dat(1,i+1)**2
     enddo
 !.....2nd order derivative
     ibase= 2*n +n-1
     do i=1,n-1
-      amat(ibase+i,4*i-1)= 2d0
-      amat(ibase+i,4*i  )= 6d0*dat(1,i+1)
-      amat(ibase+i,4*(i+1)-1)= -2d0
-      amat(ibase+i,4*(i+1)  )= -6d0*dat(1,i+1)
+      amat(ibase+i,4*i-1)= 2.0_rp
+      amat(ibase+i,4*i  )= 6.0_rp*dat(1,i+1)
+      amat(ibase+i,4*(i+1)-1)= -2.0_rp
+      amat(ibase+i,4*(i+1)  )= -6.0_rp*dat(1,i+1)
     enddo
 
     ibase= 2*n +2*(n-1)  ! ibase for both left and right edges
 !.....Left BC
     if( bcl.eq.'clamped' ) then
-      amat(ibase+1,2)= 1d0
-      amat(ibase+1,3)= 2d0*dat(1,1)
-      amat(ibase+1,4)= 3d0*dat(1,1)**2
+      amat(ibase+1,2)= 1.0_rp
+      amat(ibase+1,3)= 2.0_rp*dat(1,1)
+      amat(ibase+1,4)= 3.0_rp*dat(1,1)**2
     else ! default: 'natural'
-      amat(ibase+1,3)= 2d0
-      amat(ibase+1,4)= 6d0*dat(1,1)
+      amat(ibase+1,3)= 2.0_rp
+      amat(ibase+1,4)= 6.0_rp*dat(1,1)
     endif
 !.....Right BC
     if( bcr.eq.'clamped' ) then
-      amat(ibase+2,ndim-2)= 1d0
-      amat(ibase+2,ndim-1)= 2d0*dat(1,npnts)
-      amat(ibase+2,ndim  )= 3d0*dat(1,npnts)**2
+      amat(ibase+2,ndim-2)= 1.0_rp
+      amat(ibase+2,ndim-1)= 2.0_rp*dat(1,npnts)
+      amat(ibase+2,ndim  )= 3.0_rp*dat(1,npnts)**2
     else ! default: 'natural'
-      amat(ibase+2,ndim-1)= 2d0
-      amat(ibase+2,ndim  )= 6d0*dat(1,npnts)
+      amat(ibase+2,ndim-1)= 2.0_rp
+      amat(ibase+2,ndim  )= 6.0_rp*dat(1,npnts)
     endif
 
 !.....Get inverse of matrix A
@@ -851,7 +851,7 @@ contains
     call ludc_inv(ndim,amat,amati)
 
 !.....Compute Ai*b to get x
-    vx(1:ndim)= 0d0
+    vx(1:ndim)= 0.0_rp
     do i=1,ndim
       do j=1,ndim
         vx(i)=vx(i) +amati(i,j)*vb(j)

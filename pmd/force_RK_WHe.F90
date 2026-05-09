@@ -61,9 +61,9 @@ contains
       allocate(rho(namax),sqrho(namax))
     endif
 
-    epotl= 0d0
-    rho(:)= 0d0
-    sqrho(:)= 0d0
+    epotl= 0.0_rp
+    rho(:)= 0.0_rp
+    sqrho(:)= 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -82,7 +82,7 @@ contains
         rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
         rho(i)= rho(i) +phi_IWHe(rij,is,js)*sfac
       enddo
-      sqrho(i)= dsqrt(rho(i)+p_d)
+      sqrho(i)= sqrt(rho(i)+p_d)
     enddo
 
     call copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex,&
@@ -99,9 +99,9 @@ contains
       xi(1:3)= ra(1:3,i)
       is= int(tag(i))
       if( is.eq.1 ) then
-        dfi= -0.5d0*(rho(i)+2d0*p_d)/sqrho(i)**3
+        dfi= -0.5_rp*(rho(i)+2.0_rp*p_d)/sqrho(i)**3
       elseif( is.eq.2 ) then
-        dfi= 0d0
+        dfi= 0.0_rp
       endif
       do k=1,lspr(0,i)
         j=lspr(k,i)
@@ -116,7 +116,7 @@ contains
         if( rij.gt.rc ) cycle
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
-        v2= 0.5d0 *v2_IWHe(rij,is,js)
+        v2= 0.5_rp *v2_IWHe(rij,is,js)
         dv2= dv2_IWHe(rij,is,js)
         epi(i)= epi(i) +v2
         epi(j)= epi(j) +v2
@@ -131,14 +131,14 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dv2*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*dv2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*dv2*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
 !.....N-body term
         if( is.ne.1 .or. js.ne.1 ) cycle
-        dfj= -0.5d0*(rho(j)+2d0*p_d)/sqrho(j)**3
+        dfj= -0.5_rp*(rho(j)+2.0_rp*p_d)/sqrho(j)**3
         dphi= dphi_IWHe(rij,is,js) !/2
         dphj= dphi_IWHe(rij,js,is) !/2
         tmp= (dfi*dphi+dfj*dphj)
@@ -151,9 +151,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
@@ -318,7 +318,7 @@ contains
     real(rp):: v2_IWHe,x,alpha,beta,gamma,rs,rl
 !    real(rp),external:: fc
 
-    v2_IWHe= 0d0
+    v2_IWHe= 0.0_rp
     rl= p_rl(is,js)
     rs= p_rs(is,js)
     if( r.ge.rl ) return
@@ -333,7 +333,7 @@ contains
 !.....W-He or He-W
     else
       v2_IWHe= p_Z(is)*p_Z(js)*p_fac/r *exp(-alpha*r) *fc(x) &
-           *(1d0 +beta*r*r +gamma*r*r*r)
+           *(1.0_rp +beta*r*r +gamma*r*r*r)
     endif
 
     return
@@ -351,13 +351,13 @@ contains
     real(rp):: dv2_IWHe,ri,x,exar,paren,alpha,beta,gamma,dx,rs,rl
 !    real(rp),external:: fc,dfc
 
-    dv2_IWHe= 0d0
+    dv2_IWHe= 0.0_rp
     rl= p_rl(is,js)
     rs= p_rs(is,js)
     if( r.ge.rl) return
-    ri= 1d0/r
+    ri= 1.0_rp/r
     x= (r-rs)/(rl-rs)
-    dx= 1d0/(rl-rs)
+    dx= 1.0_rp/(rl-rs)
     alpha= p_alpha(is,js)
     beta = p_beta(is,js)
     gamma= p_gamma(is,js)
@@ -369,10 +369,10 @@ contains
 !.....He-He, W-He
     else
       exar= exp(-alpha*r)
-      paren= (1d0+beta*r*r +gamma*r*r*r) 
+      paren= (1.0_rp+beta*r*r +gamma*r*r*r) 
       dv2_IWHe= p_Z(is)*p_Z(js) *p_fac *exar &
-           *( fc(x)*(-1d0*ri*ri -alpha*ri)*paren &
-           +ri*fc(x)*(2d0*beta*r +3d0*gamma*r*r) &
+           *( fc(x)*(-1.0_rp*ri*ri -alpha*ri)*paren &
+           +ri*fc(x)*(2.0_rp*beta*r +3.0_rp*gamma*r*r) &
            +ri*dfc(x)*dx*paren )
     endif
 
@@ -391,7 +391,7 @@ contains
     real(rp):: phi_IWHe,x
 !    real(rp),external:: fc
 
-    phi_IWHe= 0d0
+    phi_IWHe= 0.0_rp
 
 !.....phi_W
     if( r.le.p_rlp ) then
@@ -411,13 +411,13 @@ contains
     real(rp):: dphi_IWHe,rd,x,dx
 !    real(rp),external:: fc,dfc
 
-    dphi_IWHe= 0d0
+    dphi_IWHe= 0.0_rp
 
 !.....phi_W
     if( r.le.p_rlp ) then
       x=(r-p_rsp)/(p_rlp-p_rsp)
-      dx=1d0/(p_rlp-p_rsp)
-      dphi_IWHe= p_B *exp(-p_c*r) *((1d0-p_c*r)*fc(x) +dfc(x)*dx*r)
+      dx=1.0_rp/(p_rlp-p_rsp)
+      dphi_IWHe= p_B *exp(-p_c*r) *((1.0_rp-p_c*r)*fc(x) +dfc(x)*dx*r)
     endif
 
     return
@@ -430,12 +430,12 @@ contains
     real(rp),intent(in):: x
     real(rp):: fc
 
-    if( x.lt.0d0 ) then
-      fc= 1d0
-    elseif( x.ge.0d0 .and. x.lt.1d0 ) then
-      fc= (-6d0*x*x +15d0*x -10d0)*x*x*x +1d0
+    if( x.lt.0.0_rp ) then
+      fc= 1.0_rp
+    elseif( x.ge.0.0_rp .and. x.lt.1.0_rp ) then
+      fc= (-6.0_rp*x*x +15.0_rp*x -10.0_rp)*x*x*x +1.0_rp
     else
-      fc= 0d0
+      fc= 0.0_rp
     endif
     return
   end function fc
@@ -447,12 +447,12 @@ contains
     real(rp),intent(in):: x
     real(rp):: dfc
 
-    if( x.lt.0d0 ) then
-      dfc= 0d0
-    elseif( x.ge.0d0 .and. x.lt.1d0 ) then
-      dfc= -30d0*x*x*(x-1d0)*(x-1d0)
+    if( x.lt.0.0_rp ) then
+      dfc= 0.0_rp
+    elseif( x.ge.0.0_rp .and. x.lt.1.0_rp ) then
+      dfc= -30.0_rp*x*x*(x-1.0_rp)*(x-1.0_rp)
     else
-      dfc= 0d0
+      dfc= 0.0_rp
     endif
     return
   end function dfc

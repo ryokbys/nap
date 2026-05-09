@@ -36,8 +36,8 @@ contains
 
     if( l1st ) then
       allocate(rho(namax))
-      rs= a_rs /dsqrt(2d0)/z_fe**(1d0/3)
-      rs_feh= a_rs /sqrt(z_fe**(2d0/3)+z_h**(2d0/3))
+      rs= a_rs /sqrt(2.0_rp)/z_fe**(1.0_rp/3)
+      rs_feh= a_rs /sqrt(z_fe**(2.0_rp/3)+z_h**(2.0_rp/3))
 !!$!.....assuming fixed (constant) atomic volume (BCC)
 !!$      avol= alcfe**3 /2
 !!$      if(myid_md.eq.0) write(6,'(a,es12.4)') ' avol =',avol
@@ -60,8 +60,8 @@ contains
       allocate(rho(namax))
     endif
 
-    epotl= 0d0
-    rho(:)= 0d0
+    epotl= 0.0_rp
+    rho(:)= 0.0_rp
 
 !.....rho(i)
     do i=1,natm
@@ -75,7 +75,7 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij=dsqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
+        rij=sqrt(xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3))
         if( rij.gt.rc_rho ) cycle ! Fortunately, rc_rho is common
         if( is.eq.1 .and. js.eq.1 ) then ! Fe-Fe
           rho(i)=rho(i) +fpsi(rij)
@@ -103,8 +103,8 @@ contains
     do i=1,natm
       is= int(tag(i))
       xi(1:3)= ra(1:3,i)
-      vemb=0d0
-      dfi= 0d0
+      vemb=0.0_rp
+      dfi= 0.0_rp
       if( is.eq.1 ) then ! F_{Fe}
         vemb= femb(rho(i))
         dfi= dfemb(rho(i))
@@ -126,15 +126,15 @@ contains
         drdxi(1:3)= -xij(1:3)/rij
 !.....2-body term
         if( is.eq.1 .and. js.eq.1 ) then ! Fe-Fe
-          t1= 0.5d0 *fvphi(rij,rs)
+          t1= 0.5_rp *fvphi(rij,rs)
           t2= dfvphi(rij,rs)
         else if( is.ne.js ) then ! Fe-H
           if( rij.ge.r_phi_feh(7) ) cycle
-          t1= 0.5d0 *fvphi_feh(rij,rs_feh)
+          t1= 0.5_rp *fvphi_feh(rij,rs_feh)
           t2= dfvphi_feh(rij,rs_feh)
         else if( is.eq.2 .and. js.eq.2 ) then ! H-H
           if( rij.ge.rc_phi_hh ) cycle
-          t1= 0.5d0 *fvphi_hh(rij)
+          t1= 0.5_rp *fvphi_hh(rij)
           t2= dfvphi_hh(rij)
         endif
         epi(i)= epi(i) +t1
@@ -150,15 +150,15 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*t2*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*t2*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*t2*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
 !.....Embedded term
         if( rij.gt.rc_rho ) cycle
-        dfj= 0d0
-        tmp= 0d0
+        dfj= 0.0_rp
+        tmp= 0.0_rp
         if( is.eq.1 .and. js.eq.1 ) then ! F_{Fe}, Fe-Fe
           dfj= dfemb(rho(j))
           tmp= (dfi+dfj) *dfpsi(rij)
@@ -178,9 +178,9 @@ contains
         do ixyz=1,3
           do jxyz=1,3
             strs(jxyz,ixyz,i)=strs(jxyz,ixyz,i) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
             strs(jxyz,ixyz,j)=strs(jxyz,ixyz,j) &
-                 -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                 -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
           enddo
         enddo
       enddo
@@ -222,10 +222,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: fphi
 
-    fphi= 0.1818d0*exp(-3.2d0*x) &
-         +0.5099d0*exp(-0.9423d0*x) &
-         +0.2802d0*exp(-0.4029d0*x) &
-         +0.02817d0*exp(-0.2016d0*x)
+    fphi= 0.1818_rp*exp(-3.2_rp*x) &
+         +0.5099_rp*exp(-0.9423_rp*x) &
+         +0.2802_rp*exp(-0.4029_rp*x) &
+         +0.02817_rp*exp(-0.2016_rp*x)
     return
   end function fphi
 !=======================================================================
@@ -237,10 +237,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: dfphi
 
-    dfphi= -0.58176d0*exp(-3.2d0*x) &
-         -0.48047877d0*exp(-0.9423d0*x) &
-         -0.11289258d0*exp(-0.4029d0*x) &
-         -0.005679072d0*exp(-0.2016d0*x)
+    dfphi= -0.58176_rp*exp(-3.2_rp*x) &
+         -0.48047877_rp*exp(-0.9423_rp*x) &
+         -0.11289258_rp*exp(-0.4029_rp*x) &
+         -0.005679072_rp*exp(-0.2016_rp*x)
     return
   end function dfphi
 !=======================================================================
@@ -253,7 +253,7 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    fvphi=0d0
+    fvphi=0.0_rp
     if( r.le.r1 ) then
       fvphi=fvphi +z2q2/r*fphi(r/rs)
     else if( r.le.r2 ) then
@@ -276,19 +276,19 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    dfvphi= 0d0
+    dfvphi= 0.0_rp
     if( r.le.r1 ) then
       dfvphi=dfvphi -z2q2/r**2*fphi(r/rs) &
            +z2q2/r/rs*dfphi(r/rs)
     else if( r.le.r2 ) then
-      dfvphi=dfvphi +(b1 +2d0*b2*r +3d0*b3*r**2) &
+      dfvphi=dfvphi +(b1 +2.0_rp*b2*r +3.0_rp*b3*r**2) &
            *exp(b0 +b1*r +b2*r**2 +b3*r**3)
     else
       do i=2,14
         dfvphi=dfvphi -a_vphi(i)*(r_vphi(i)-r)**2 &
              *hvsd(r_vphi(i)-r)
       enddo
-      dfvphi=dfvphi*3d0
+      dfvphi=dfvphi*3.0_rp
     endif
     return
   end function dfvphi
@@ -305,7 +305,7 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    fpsi=0d0
+    fpsi=0.0_rp
     do i=1,3
       fpsi=fpsi +a_psi(i)*(r_psi(i)-r)**3 &
            *hvsd(r_psi(i)-r)
@@ -325,12 +325,12 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    dfpsi=0d0
+    dfpsi=0.0_rp
     do i=1,3
       dfpsi=dfpsi -a_psi(i)*(r_psi(i)-r)**2 &
            *hvsd(r_psi(i)-r)
     enddo
-    dfpsi=dfpsi*3d0
+    dfpsi=dfpsi*3.0_rp
     return
   end function dfpsi
 !=======================================================================
@@ -344,7 +344,7 @@ contains
     real(rp),intent(in):: rho
     real(rp):: femb
 
-    femb= (-dsqrt(rho) +a_emb*rho*rho)
+    femb= (-sqrt(rho) +a_emb*rho*rho)
     return
   end function femb
 !=======================================================================
@@ -358,7 +358,7 @@ contains
     real(rp),intent(in):: rho
     real(rp):: dfemb
 
-    dfemb= (-0.5d0/dsqrt(rho)+2d0*a_emb*rho)
+    dfemb= (-0.5_rp/sqrt(rho)+2.0_rp*a_emb*rho)
     return
   end function dfemb
 !=======================================================================
@@ -372,7 +372,7 @@ contains
 
     integer:: i
 
-    rho_feh= 0d0
+    rho_feh= 0.0_rp
     do i=1,6
       rho_feh= rho_feh +a_rho_feh(i)*(r_rho_feh(i)-r)**3 &
            *hvsd(r_rho_feh(i)-r)
@@ -389,12 +389,12 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    drho_feh=0d0
+    drho_feh=0.0_rp
     do i=1,6
       drho_feh=drho_feh -a_rho_feh(i)*(r_rho_feh(i)-r)**2 &
            *hvsd(r_rho_feh(i)-r)
     enddo
-    drho_feh=drho_feh*3d0
+    drho_feh=drho_feh*3.0_rp
     return
   end function drho_feh
 !=======================================================================
@@ -408,7 +408,7 @@ contains
 
     integer:: i
 
-    rho_hfe= 0d0
+    rho_hfe= 0.0_rp
     do i=1,5
       rho_hfe= rho_hfe +a_rho_hfe(i)*(r_rho_hfe(i)-r)**3 &
            *hvsd(r_rho_hfe(i)-r)
@@ -425,12 +425,12 @@ contains
     integer:: i
     real(rp),external:: hvsd
 
-    drho_hfe=0d0
+    drho_hfe=0.0_rp
     do i=1,5
       drho_hfe=drho_hfe -a_rho_hfe(i)*(r_rho_hfe(i)-r)**2 &
            *hvsd(r_rho_hfe(i)-r)
     enddo
-    drho_hfe=drho_hfe*3d0
+    drho_hfe=drho_hfe*3.0_rp
     return
   end function drho_hfe
 !=======================================================================
@@ -441,9 +441,9 @@ contains
     real(rp),intent(in):: r
     real(rp):: rho_hh
     
-    rho_hh=0d0
+    rho_hh=0.0_rp
     if( r.ge.rc_phi_hh ) return
-    rho_hh= c_rho_hh *r**2 *exp(-2d0*r) *fcut(r)
+    rho_hh= c_rho_hh *r**2 *exp(-2.0_rp*r) *fcut(r)
     return
   end function rho_hh
 !=======================================================================
@@ -456,11 +456,11 @@ contains
 
     real(rp):: e1,fc
 
-    drho_hh=0d0
+    drho_hh=0.0_rp
     if( r.ge.rc_phi_hh ) return
-    e1= exp(-2d0*r)
+    e1= exp(-2.0_rp*r)
     fc= fcut(r)
-    drho_hh= c_rho_hh *(2d0*r*e1*fc -2d0*r**2*e1*fc +r**2*e1*dfcut(r))
+    drho_hh= c_rho_hh *(2.0_rp*r*e1*fc -2.0_rp*r**2*e1*fc +r**2*e1*dfcut(r))
     return
   end function drho_hh
 !=======================================================================
@@ -471,7 +471,7 @@ contains
     real(rp),intent(in):: r
     real(rp):: fcut
 
-    fcut= exp(1d0/(r-rc_phi_hh))
+    fcut= exp(1.0_rp/(r-rc_phi_hh))
     return
   end function fcut
 !=======================================================================
@@ -482,7 +482,7 @@ contains
     real(rp),intent(in):: r
     real(rp):: dfcut
 
-    dfcut= -1d0/(r-rc_phi_hh)**2 *fcut(r)
+    dfcut= -1.0_rp/(r-rc_phi_hh)**2 *fcut(r)
     return
   end function dfcut
 !=======================================================================
@@ -494,7 +494,7 @@ contains
     real(rp):: fh
     integer:: i
 
-    fh= 0d0
+    fh= 0.0_rp
     do i=1,6
       fh= fh +a_f(i) *rho**i
     enddo
@@ -509,7 +509,7 @@ contains
     real(rp):: dfh
     integer:: i
 
-    dfh= 0d0
+    dfh= 0.0_rp
     do i=1,6
       dfh=dfh +a_f(i) *rho**(i-1) *i
     enddo
@@ -525,29 +525,29 @@ contains
 
     real(rp):: rho,emol,adag,sr,x,ex,exm
 
-    fvphi_hh= 0d0
+    fvphi_hh= 0.0_rp
 !.....correction term to avoid H-H clustering
     if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
       x=(r-r0_hh_corr)/lmbd_hh_corr
       ex= exp( -x**k_hh_corr )
-      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1.0_rp)*ex
     else if( r.ge.r1_hh_corr ) then
       x=(r-r0_hh_corr)/lmbd_hh_corr
       ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
-      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1d0)*ex
+      fvphi_hh=fvphi_hh +c0_hh_corr*x**(k_hh_corr-1.0_rp)*ex
     endif
 
     if( r.gt.rc_phi_hh ) return
     x=a_tanh_hh*(r-r_tanh_hh)
     ex= exp(x)
-    exm=1d0/ex
-    sr= 0.5d0 *(1d0 -(ex-exm)/(ex+exm))
+    exm=1.0_rp/ex
+    sr= 0.5_rp *(1.0_rp -(ex-exm)/(ex+exm))
 !      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
     adag= (r-r0_hh)/(r0_hh*almbd_hh)
-    emol= -2d0 *eb_hh *(1d0+adag) *exp(-adag)
+    emol= -2.0_rp *eb_hh *(1.0_rp+adag) *exp(-adag)
     rho= rho_hh(r)
 
-    fvphi_hh= sr *(emol -2d0*fh(rho))
+    fvphi_hh= sr *(emol -2.0_rp*fh(rho))
 !      fvphi_hh= sr *(-2d0*fh(rho))
 
     return
@@ -563,50 +563,50 @@ contains
     real(rp):: emol,rho,adag,sr,x,ex,exm,xk1,xk2
     real(rp):: dsr,demolr,dfhr,drhor
 
-    dfvphi_hh= 0d0
+    dfvphi_hh= 0.0_rp
 
 !.....correction term to avoid H-H clustering
     if( r.ge.r0_hh_corr .and. r.lt.r1_hh_corr ) then
       x=(r-r0_hh_corr)/lmbd_hh_corr
-      xk1= x**(k_hh_corr-1d0)
-      xk2= x**(k_hh_corr-2d0)
+      xk1= x**(k_hh_corr-1.0_rp)
+      xk2= x**(k_hh_corr-2.0_rp)
       ex= exp( -x**k_hh_corr )
       dfvphi_hh=dfvphi_hh &
-           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1.0_rp) &
             *xk2 *ex &
            +c0_hh_corr*xk1*ex &
             *(-k_hh_corr/lmbd_hh_corr *xk1)
     else if( r.ge.r1_hh_corr ) then
       x=(r-r0_hh_corr)/lmbd_hh_corr
-      xk1= x**(k_hh_corr-1d0)
-      xk2= x**(k_hh_corr-2d0)
+      xk1= x**(k_hh_corr-1.0_rp)
+      xk2= x**(k_hh_corr-2.0_rp)
       ex= exp( -x**k_hh_corr -b0_hh_corr*(r-r0_hh_corr)**2 )
       dfvphi_hh=dfvphi_hh &
-           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1d0) &
+           +c0_hh_corr/lmbd_hh_corr*(k_hh_corr-1.0_rp) &
             *xk2 *ex &
            +c0_hh_corr*xk1*ex &
             *(-k_hh_corr/lmbd_hh_corr *xk1 &
-            -2d0*b0_hh_corr*(r-r1_hh_corr))
+            -2.0_rp*b0_hh_corr*(r-r1_hh_corr))
     endif
 
     if( r.gt.rc_phi_hh ) return
 !      sr= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
     x=a_tanh_hh*(r-r_tanh_hh)
     ex=exp(x)
-    exm=1d0/ex
-    sr= 0.5d0 *(1d0 -(ex-exm)/(ex+exm))
+    exm=1.0_rp/ex
+    sr= 0.5_rp *(1.0_rp -(ex-exm)/(ex+exm))
     adag= (r-r0_hh)/(r0_hh*almbd_hh)
-    emol= -2d0 *eb_hh *(1d0+adag) *exp(-adag)
+    emol= -2.0_rp *eb_hh *(1.0_rp+adag) *exp(-adag)
     rho= rho_hh(r)
     drhor= drho_hh(r)
 
 !      dsr= -0.5d0 *a_tanh_hh *2d0 /cosh(a_tanh_hh*(r-r_tanh_hh))**2
 !      dsr= -a_tanh_hh /cosh(a_tanh_hh*(r-r_tanh_hh))**2
-    dsr= -a_tanh_hh *2d0/(ex+exm)**2
-    demolr= 2d0 *eb_hh *adag *exp(-adag) /(r0_hh*almbd_hh)
+    dsr= -a_tanh_hh *2.0_rp/(ex+exm)**2
+    demolr= 2.0_rp *eb_hh *adag *exp(-adag) /(r0_hh*almbd_hh)
     dfhr= drhor *dfh(rho)
 
-    dfvphi_hh= dsr*(emol-2d0*fh(rho)) +sr*(demolr-2d0*dfhr)
+    dfvphi_hh= dsr*(emol-2.0_rp*fh(rho)) +sr*(demolr-2.0_rp*dfhr)
 !      dfvphi_hh= dsr*(-2d0*fh(rho)) +sr*(-2d0*dfhr)
     return
   end function dfvphi_hh
@@ -618,7 +618,7 @@ contains
     real(rp),intent(in):: r
     real(rp):: s_hh
 
-    s_hh= 0.5d0 *(1d0 -tanh(a_tanh_hh*(r-r_tanh_hh)))
+    s_hh= 0.5_rp *(1.0_rp -tanh(a_tanh_hh*(r-r_tanh_hh)))
     return
   end function s_hh
 !=======================================================================
@@ -632,7 +632,7 @@ contains
     real(rp):: rr,r4
     real(rp),external:: hvsd
 
-    fvphi_feh=0d0
+    fvphi_feh=0.0_rp
     if( r.le.r1_feh ) then
       fvphi_feh= z2q2_feh/r*fphi(r/rs)
     else if( r.le.r2_feh ) then
@@ -662,7 +662,7 @@ contains
     real(rp):: r4,r3,rr
     real(rp),external:: hvsd
 
-    dfvphi_feh= 0d0
+    dfvphi_feh= 0.0_rp
     if( r.le.r1_feh ) then
       dfvphi_feh= -z2q2_feh/r**2*fphi(r/rs) &
            +z2q2_feh/r/rs*dfphi(r/rs)
@@ -670,8 +670,8 @@ contains
       rr=r**2
       r3=rr*r
       r4=r3*r
-      dfvphi_feh= (b1_feh +2d0*b2_feh*r +3d0*b3_feh*rr &
-           +4d0*b4_feh*r3 +5d0*b5_feh*r4)
+      dfvphi_feh= (b1_feh +2.0_rp*b2_feh*r +3.0_rp*b3_feh*rr &
+           +4.0_rp*b4_feh*r3 +5.0_rp*b5_feh*r4)
 !!$      dfvphi_feh= (b1_feh +2d0*b2_feh*r +3d0*b3_feh*rr &
 !!$           +4d0*b4_feh*r3 +5d0*b5_feh*r4) &
 !!$           *exp(b0_feh +b1_feh*r +b2_feh*rr +b3_feh*r3 &
@@ -681,7 +681,7 @@ contains
         dfvphi_feh=dfvphi_feh -a_phi_feh(i)*(r_phi_feh(i)-r)**2 &
              *hvsd(r_phi_feh(i)-r)
       enddo
-      dfvphi_feh=dfvphi_feh*3d0
+      dfvphi_feh=dfvphi_feh*3.0_rp
     endif
     return
   end function dfvphi_feh

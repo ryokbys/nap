@@ -77,15 +77,15 @@ contains
     character(len=3):: cspi,cspj
 
     if( myid_md.eq.0 ) then
-      ea_a(:) = 0d0
-      ea_xi(:) = 0d0
-      ea_b(:,:) = 0d0
-      ea_c(:,:) = 0d0
-      ea_re(:,:) = 0d0
-      ea_alp(:,:) = 0d0
-      ea_beta(:,:) = 0d0
-      ea_rcin(:,:) = -1d0
-      ea_rcout(:,:) = -1d0
+      ea_a(:) = 0.0_rp
+      ea_xi(:) = 0.0_rp
+      ea_b(:,:) = 0.0_rp
+      ea_c(:,:) = 0.0_rp
+      ea_re(:,:) = 0.0_rp
+      ea_alp(:,:) = 0.0_rp
+      ea_beta(:,:) = 0.0_rp
+      ea_rcin(:,:) = -1.0_rp
+      ea_rcout(:,:) = -1.0_rp
       ea_interact(:) = .false.
       pair_interact(:,:) = .false.
       fname = trim(paramsdir)//'/'//trim(paramsfname)
@@ -150,9 +150,9 @@ contains
 
 !.....Define rcin and rcout for pairs as averages bewteen species
       do isp=1,nspmax
-        if( ea_rcin(isp,isp).lt.0d0 ) cycle
+        if( ea_rcin(isp,isp).lt.0.0_rp ) cycle
         do jsp=1,nspmax
-          if( ea_rcin(jsp,jsp).lt.0d0 ) cycle
+          if( ea_rcin(jsp,jsp).lt.0.0_rp ) cycle
           ea_rcin(isp,jsp) = (ea_rcin(isp,isp)+ea_rcin(jsp,jsp))/2
           ea_rcin(jsp,isp) = ea_rcin(isp,jsp)
           ea_rcout(isp,jsp) = (ea_rcout(isp,isp)+ea_rcout(jsp,jsp))/2
@@ -281,9 +281,9 @@ contains
       allocate(rho(namax))
     endif
 
-    epotl= 0d0
-    rho(:)= 0d0
-    strsl(:,:,:) = 0d0
+    epotl= 0.0_rp
+    rho(:)= 0.0_rp
+    strsl(:,:,:) = 0.0_rp
 
 !-----rho(i)
     do i=1,natm
@@ -304,7 +304,7 @@ contains
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij=xij(1)*xij(1)+ xij(2)*xij(2) +xij(3)*xij(3)
         if( rij.ge.rc2 ) cycle
-        rij= dsqrt(rij)
+        rij= sqrt(rij)
         rho(i) = rho(i) +rhoij(is,js,rij,rcin,rcout,type_rho(is,js))
       enddo
     enddo
@@ -320,7 +320,7 @@ contains
       if( ea_interact(is) ) then
         dfi = dfrho(is,rho(i),type_frho(is))
       else
-        dfi = 0d0
+        dfi = 0.0_rp
       endif
       do k=1,lspr(0,i)
         j=lspr(k,i)
@@ -337,10 +337,10 @@ contains
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         rij= xij(1)**2+ xij(2)**2 +xij(3)**2
         if( rij.ge.rc2 ) cycle
-        rij= dsqrt(rij)
+        rij= sqrt(rij)
         drdxi(1:3)= -xij(1:3)/rij
         drdxj(1:3)= -drdxi(1:3)
-        tmp = 0.5d0 *phi(is,js,rij,rcin,rcout,type_phi(is,js))
+        tmp = 0.5_rp *phi(is,js,rij,rcin,rcout,type_phi(is,js))
         epi(i)= epi(i) +tmp
         epi(j)= epi(j) +tmp
         if(j.le.natm) then
@@ -356,9 +356,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*dtmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*dtmp*xij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
@@ -374,9 +374,9 @@ contains
           do ixyz=1,3
             do jxyz=1,3
               strsl(jxyz,ixyz,i)=strsl(jxyz,ixyz,i) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
               strsl(jxyz,ixyz,j)=strsl(jxyz,ixyz,j) &
-                   -0.5d0*tmp*xij(ixyz)*(-drdxi(jxyz))
+                   -0.5_rp*tmp*xij(ixyz)*(-drdxi(jxyz))
             enddo
           enddo
         endif
@@ -416,7 +416,7 @@ contains
     real(rp):: rhoij
     real(rp),external:: fcut1
 
-    rhoij = 0d0
+    rhoij = 0.0_rp
     if( trim(ctype).eq.'exp1' ) then
       rhoij = ea_xi(js)*exp(-ea_beta(is,js)*(rij-ea_re(is,js))) &
            *fcut1(rij,rcin,rcout)
@@ -431,7 +431,7 @@ contains
     real(rp):: drhoij
     real(rp):: r
 
-    drhoij = 0d0
+    drhoij = 0.0_rp
     if( trim(ctype).eq.'exp1' ) then
       r = rij -ea_re(is,js)
       drhoij= -ea_xi(js)*ea_beta(is,js)*exp(-ea_beta(is,js)*r)*fcut1(rij,rcin,rcout) &
@@ -451,7 +451,7 @@ contains
     
     real(rp):: frho
 
-    frho = 0d0
+    frho = 0.0_rp
     if( trim(ctype).eq.'sqrt1' ) then
       frho = -ea_a(is)*sqrt(rho/ea_xi(is))
     endif
@@ -464,9 +464,9 @@ contains
     character(len=*),intent(in):: ctype 
     real(rp):: dfrho
 
-    dfrho = 0d0
+    dfrho = 0.0_rp
     if( trim(ctype).eq.'sqrt1') then
-      dfrho = -ea_a(is) /ea_xi(is) *0.5d0 /sqrt(rho/ea_xi(is))
+      dfrho = -ea_a(is) /ea_xi(is) *0.5_rp /sqrt(rho/ea_xi(is))
     endif
     return
   end function dfrho
@@ -478,11 +478,11 @@ contains
     real(rp):: phi
     real(rp):: r
 
-    phi = 0d0
+    phi = 0.0_rp
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
-      phi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
-           -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
+      phi = 2.0_rp*ea_b(is,js)*exp(-0.5_rp*ea_beta(is,js)*r) &
+           -ea_c(is,js)*(1.0_rp+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
       phi = phi*fcut1(rij,rcin,rcout)
 !!$    else if( trim(ctype).eq.'Bonny' ) then
 !!$      
@@ -497,15 +497,15 @@ contains
     real(rp):: dphi,tmp
     real(rp):: r
 
-    dphi = 0d0
+    dphi = 0.0_rp
     if( trim(ctype).eq.'SM' ) then
       r = rij -ea_re(is,js)
 !!$      dphi = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
 !!$           -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
-      tmp = 2d0*ea_b(is,js)*exp(-0.5d0*ea_beta(is,js)*r) &
-           -ea_c(is,js)*(1d0+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
+      tmp = 2.0_rp*ea_b(is,js)*exp(-0.5_rp*ea_beta(is,js)*r) &
+           -ea_c(is,js)*(1.0_rp+ea_alp(is,js)*r)*exp(-ea_alp(is,js)*r)
       dphi= -ea_beta(is,js)*ea_b(is,js) &
-           *exp(-0.5d0*ea_beta(is,js)*r)*fcut1(rij,rcin,rcout)  &
+           *exp(-0.5_rp*ea_beta(is,js)*r)*fcut1(rij,rcin,rcout)  &
            + ea_c(is,js)*ea_alp(is,js)*ea_alp(is,js)*r &
            *exp(-ea_alp(is,js)*r)*fcut1(rij,rcin,rcout) &
            + tmp*dfcut1(rij,rcin,rcout)
@@ -519,7 +519,7 @@ contains
     real(rp),intent(in):: r
     real(rp):: veq
 !.....TODO: code...
-    veq = 0d0
+    veq = 0.0_rp
     return
   end function veq
 !=======================================================================
@@ -528,10 +528,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: xi
 
-    xi= 0.1818d0*exp(-3.2d0*x) &
-         +0.5099d0*exp(-0.9423d0*x) &
-         +0.2802d0*exp(-0.4029d0*x) &
-         +0.02817d0*exp(-0.2016d0*x)
+    xi= 0.1818_rp*exp(-3.2_rp*x) &
+         +0.5099_rp*exp(-0.9423_rp*x) &
+         +0.2802_rp*exp(-0.4029_rp*x) &
+         +0.02817_rp*exp(-0.2016_rp*x)
     return
   end function xi
 !=======================================================================
@@ -540,10 +540,10 @@ contains
     real(rp),intent(in):: x
     real(rp):: dxi
 
-    dxi= -0.58176d0*exp(-3.2d0*x) &
-         -0.48047877d0*exp(-0.9423d0*x) &
-         -0.11289258d0*exp(-0.4029d0*x) &
-         -0.005679072d0*exp(-0.2016d0*x)
+    dxi= -0.58176_rp*exp(-3.2_rp*x) &
+         -0.48047877_rp*exp(-0.9423_rp*x) &
+         -0.11289258_rp*exp(-0.4029_rp*x) &
+         -0.005679072_rp*exp(-0.2016_rp*x)
     return
   end function dxi
 !=======================================================================
@@ -552,7 +552,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: zeta
 
-    zeta = (3d0*x**5 -10d0*x**3 +15d0*x +8d0)/16d0
+    zeta = (3.0_rp*x**5 -10.0_rp*x**3 +15.0_rp*x +8.0_rp)/16.0_rp
     return
   end function zeta
 !=======================================================================
@@ -561,7 +561,7 @@ contains
     real(rp),intent(in):: x
     real(rp):: dzeta
 
-    dzeta = (15d0*x**4 -30d0*x**2 +15d0)/16d0
+    dzeta = (15.0_rp*x**4 -30.0_rp*x**2 +15.0_rp)/16.0_rp
     return
   end function dzeta
 end module EAM

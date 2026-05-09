@@ -53,9 +53,9 @@ contains
 !.....but these variables could change when the cell size and shape change.
     rc2= rcut**2
 !.....Number of division along each lattice vector
-    lcx=anxi/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rcut
-    lcy=anyi/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rcut
-    lcz=anzi/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rcut
+    lcx=anxi/sqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rcut
+    lcy=anyi/sqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rcut
+    lcz=anzi/sqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rcut
 !.....In case that system is thinner than rc, modify lc?.
 !.....but notice this modification does not correct results.
     if( lcx.eq.0 ) lcx=1
@@ -69,9 +69,9 @@ contains
     rcx= anxi/lcx
     rcy= anyi/lcy
     rcz= anzi/lcz
-    rcxi=1d0/rcx
-    rcyi=1d0/rcy
-    rczi=1d0/rcz
+    rcxi=1.0_rp/rcx
+    rcyi=1.0_rp/rcy
+    rczi=1.0_rp/rcz
 
 !-----allocate LSCL & LSHD after obtaining lcxyz2
     if( .not.allocated(lscl) ) then
@@ -360,7 +360,7 @@ contains
       enddo
     enddo
 
-    dlist(:) = 0d0
+    dlist(:) = 0.0_rp
     ilist(:) = 0
 
 !-----reset pair list, LSPR
@@ -433,7 +433,7 @@ contains
                 ic = idcell(kux,kuy,kuz)
                 vc(1:3) = vecc(1:3,ic)
 !.....Project atoms in cell-m onto the neighboring cell vector
-                dlist(:) = 0d0
+                dlist(:) = 0.0_rp
                 ilist(:) = 0
                 inc = 0
                 i= lshd(m)
@@ -557,9 +557,9 @@ contains
     if( l1st ) then
       rc2= rc**2
 !-----make a linked cell list, LSCL
-      lcx= 1d0/dsqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
-      lcy= 1d0/dsqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
-      lcz= 1d0/dsqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
+      lcx= 1.0_rp/sqrt(hi(1,1)**2+hi(1,2)**2+hi(1,3)**2)/rc
+      lcy= 1.0_rp/sqrt(hi(2,1)**2+hi(2,2)**2+hi(2,3)**2)/rc
+      lcz= 1.0_rp/sqrt(hi(3,1)**2+hi(3,2)**2+hi(3,3)**2)/rc
       if( lcx.lt.2 .or. lcy.lt.2 .or. lcz.lt.2 ) then
         write(6,'(a)') ' [Error] mk_lspr_sngl cannot handle' &
              //' too small system !!!'
@@ -567,12 +567,12 @@ contains
       endif
       lcyz= lcy*lcz
       lcxyz= lcx*lcyz
-      rcx= 1d0/lcx
-      rcy= 1d0/lcy
-      rcz= 1d0/lcz
-      rcxi=1d0/rcx
-      rcyi=1d0/rcy
-      rczi=1d0/rcz
+      rcx= 1.0_rp/lcx
+      rcy= 1.0_rp/lcy
+      rcz= 1.0_rp/lcz
+      rcxi=1.0_rp/rcx
+      rcyi=1.0_rp/rcy
+      rczi=1.0_rp/rcz
 !-----allocate LSCL & LSHD after obtaining lcxyz
       if( allocated(lscl) ) then
         call accum_mem('pairlist',-4*size(lscl)-4*size(lshd))
@@ -615,34 +615,34 @@ contains
       mz= min(max(mz,1),lcz)
       m= (mx-1)*lcyz +(my-1)*lcz +mz
       do kux=-1,1
-        shft(1) = 0d0
+        shft(1) = 0.0_rp
         m1x = mx +kux
         if( m1x.lt.1   ) then
           m1x= m1x +lcx
-          shft(1) = -1d0
+          shft(1) = -1.0_rp
         else if( m1x.gt.lcx ) then
           m1x= m1x -lcx
-          shft(1) = +1d0
+          shft(1) = +1.0_rp
         endif
         do kuy=-1,1
-          shft(2) = 0d0
+          shft(2) = 0.0_rp
           m1y= my +kuy
           if( m1y.lt.1   ) then
             m1y= m1y +lcy
-            shft(2) = -1d0
+            shft(2) = -1.0_rp
           else if( m1y.gt.lcy ) then
             m1y= m1y -lcy
-            shft(2) = +1d0
+            shft(2) = +1.0_rp
           endif
           do kuz=-1,1
-            shft(3) = 0d0
+            shft(3) = 0.0_rp
             m1z= mz +kuz
             if( m1z.lt.1   ) then
               m1z= m1z +lcz
-              shft(3) = -1d0
+              shft(3) = -1.0_rp
             else if( m1z.gt.lcz ) then
               m1z= m1z -lcz
-              shft(3) = +1d0
+              shft(3) = +1.0_rp
             endif
             m1= (m1x-1)*lcyz +(m1y-1)*lcz +m1z
             if( lshd(m1).eq.0 ) cycle
@@ -700,7 +700,7 @@ contains
       print *, h(1:3,3)
       vol= h(1,1)*sgm(1,1) +h(2,1)*sgm(2,1) +h(3,1)*sgm(3,1)
       do i=1,3
-        asgm= dsqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
+        asgm= sqrt(sgm(1,i)**2 +sgm(2,i)**2 +sgm(3,i)**2)
         nex(i)= int(rc/(vol/asgm))
         print *, ' rc,vol,asgm,nex=',rc,vol,asgm,nex(i)
 !          nex(i)= int(1d0/dsqrt(hi(1,i)**2+hi(2,i)**2+hi(3,i)**2)/rc)
@@ -825,15 +825,15 @@ contains
 
     integer:: i,mmax
     real(rp):: vratio
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 
     mmax = 0
     do i=1,natm
       mmax = max(mmax,lspr(0,i))
     enddo
 !.....vratio = sphere/cube
-    vratio = 2d0**2*pi/3d0**4
-    vratio = 1.25d0 *vratio
+    vratio = 2.0_rp**2*pi/3.0_rp**4
+    vratio = 1.25_rp *vratio
     mmax = int(mmax *vratio)
     if( mmax.gt.nnmax ) then
       print *,'ERROR: Max num of neighbors exceeds the limit:'
@@ -942,14 +942,14 @@ contains
     do i=1,natm
       xi(1:3) = ra(1:3,i)
 !.....Create a temporary list of neighbor distances
-      dists(:) = 0d0
+      dists(:) = 0.0_rp
       nn = lspr(0,i)
       do jj=1,nn
         j = lspr(jj,i)
         xij(1:3) = ra(1:3,j) -xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
-        dists(jj) = dsqrt(dij2)
+        dists(jj) = sqrt(dij2)
       enddo
 !.....Sort lspr according to dists
       call arg_heapsort_arr(nn,nnmax,dists,idxarr)
@@ -979,7 +979,7 @@ contains
          ncell,ncelltot
     integer:: ix,iy,iz
     real(rp):: volc,rho
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 !!$    logical,save:: l1st = .true. 
 
     nmaxl = 0
@@ -1009,7 +1009,7 @@ contains
 
     volc = vol/(lcx*lcy*lcz)/nxyz
 !!$    rho = dble(nmax)/volc
-    rho = dble(ntot)/(volc*ncelltot)
+    rho = real(ntot, rp)/(volc*ncelltot)
     nnmax_estimate = int(4*pi*(rc+rbuf)**3*rho/3) +1
 !!$    print *,'vol,lcx,lcy,lcz=',vol,lcx,lcy,lcz
 !!$    print *,'myid,nmaxl,nmax,volc,rho,nnmax_estimate=', &

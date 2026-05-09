@@ -43,18 +43,18 @@ contains
       allocate(aa1(3,namax),aa2(3,namax))
 !.....cut-off for He-He term
       xc= p_HeHe_rc /p_HeHe_rm
-      x2i= 1d0/xc/xc
+      x2i= 1.0_rp/xc/xc
       x6i= x2i*x2i*x2i
       rexp= exp(-p_HeHe_alpha*xc +p_HeHe_beta*xc*xc)
       tmp=  p_HeHe_c6*x6i &
            +p_HeHe_c8*x6i*x2i &
            +p_HeHe_c10*x6i*x6i/x2i
       vc_HeHe= p_HeHe_A*rexp -f_x(xc,p_HeHe_D)*tmp
-      dvc_HeHe= p_HeHe_A*rexp*(-p_HeHe_alpha +2d0*p_HeHe_beta*xc) &
+      dvc_HeHe= p_HeHe_A*rexp*(-p_HeHe_alpha +2.0_rp*p_HeHe_beta*xc) &
            -df_x(xc,p_HeHe_D)*tmp &
-           -f_x(xc,p_HeHe_D)*( -6d0*p_HeHe_c6*x6i &
-           -8d0*p_HeHe_c8*x6i*x2i &
-           -10d0*p_HeHe_c10*x6i*x6i/x2i )/xc
+           -f_x(xc,p_HeHe_D)*( -6.0_rp*p_HeHe_c6*x6i &
+           -8.0_rp*p_HeHe_c8*x6i*x2i &
+           -10.0_rp*p_HeHe_c10*x6i*x6i/x2i )/xc
 !.....If you do not want to apply cutoff, set vc_HeHe and dvc_HeHe as 0
 !        vc_HeHe=0d0
 !        dvc_HeHe= 0d0
@@ -68,9 +68,9 @@ contains
     endif
 
 !-----initialize
-    aa1(1:3,1:namax)= 0d0
-    aa2(1:3,1:namax)= 0d0
-    epotl= 0d0
+    aa1(1:3,1:namax)= 0.0_rp
+    aa2(1:3,1:namax)= 0.0_rp
+    epotl= 0.0_rp
 
 !-----Repulsive term: V_R
     do i=1,natm
@@ -84,12 +84,12 @@ contains
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-        rij= dsqrt(dot(xij,xij))
+        rij= sqrt(dot(xij,xij))
 !.....He-He
         if( is.eq.2 .and. js.eq.2 ) then
           if( rij.gt.p_HeHe_rc ) cycle
           x= rij/p_HeHe_rm
-          x2i= 1d0/x/x
+          x2i= 1.0_rp/x/x
           x6i= x2i*x2i*x2i
 !.....potential
           rexp= exp(-p_HeHe_alpha*x +p_HeHe_beta*x*x)
@@ -99,7 +99,7 @@ contains
           vx= p_HeHe_A *rexp -f_x(x,p_HeHe_D)*tmp &
                -vc_HeHe &
                -(x-xc)*dvc_HeHe
-          vx= vx *p_HeHe_eps *0.5d0
+          vx= vx *p_HeHe_eps *0.5_rp
           epi(i)= epi(i) +vx
           if(j.le.natm) then
             epi(j)=epi(j)+vx
@@ -108,14 +108,14 @@ contains
             epotl=epotl +vx
           endif
 !.....force
-          riji= 1d0/rij
+          riji= 1.0_rp/rij
           dixij(1:3)= -xij(1:3)*riji
           djxij(1:3)=  xij(1:3)*riji
-          dvrdr= p_HeHe_A*rexp*(-p_HeHe_alpha +2d0*p_HeHe_beta*x) &
+          dvrdr= p_HeHe_A*rexp*(-p_HeHe_alpha +2.0_rp*p_HeHe_beta*x) &
                -df_x(x,p_HeHe_D)*tmp &
-               -f_x(x,p_HeHe_D)*( -6d0*p_HeHe_c6*x6i &
-               -8d0*p_HeHe_c8*x6i*x2i &
-               -10d0*p_HeHe_c10*x6i*x6i/x2i )/x &
+               -f_x(x,p_HeHe_D)*( -6.0_rp*p_HeHe_c6*x6i &
+               -8.0_rp*p_HeHe_c8*x6i*x2i &
+               -10.0_rp*p_HeHe_c10*x6i*x6i/x2i )/x &
                -dvc_HeHe
           dvrdr= dvrdr *p_HeHe_eps /p_HeHe_rm
           aa1(1:3,i)= aa1(1:3,i) +dvrdr*dixij(1:3)
@@ -132,8 +132,8 @@ contains
           D0= p_D0(is,js)
           r0= p_r0(is,js)
 !---------potential
-          rexp= dexp(-beta*dsqrt(2d0*s)*(rij-r0))
-          tmp=0.5d0*fc_r(rij,R1,D1)*D0/(s-1d0)*rexp
+          rexp= exp(-beta*sqrt(2.0_rp*s)*(rij-r0))
+          tmp=0.5_rp*fc_r(rij,R1,D1)*D0/(s-1.0_rp)*rexp
           epi(i)=epi(i)+tmp
           if(j.le.natm) then
             epi(j)=epi(j)+tmp
@@ -142,11 +142,11 @@ contains
             epotl=epotl +tmp
           endif
 !---------force
-          riji= 1d0/rij
+          riji= 1.0_rp/rij
           dixij(1:3)= -xij(1:3)*riji
           djxij(1:3)=  xij(1:3)*riji
-          dvrdr= D0/(s-1d0)*rexp*( dfc_r(rij,R1,D1) &
-               -beta*dsqrt(2d0*s)*fc_r(rij,R1,D1) )
+          dvrdr= D0/(s-1.0_rp)*rexp*( dfc_r(rij,R1,D1) &
+               -beta*sqrt(2.0_rp*s)*fc_r(rij,R1,D1) )
           aa1(1:3,i)= aa1(1:3,i) +dvrdr*dixij(1:3)
           aa1(1:3,j)= aa1(1:3,j) +dvrdr*djxij(1:3)
         endif
@@ -169,7 +169,7 @@ contains
         z= xj(3) -xi(3)
         xij(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
         xji(1:3)= -xij(1:3)
-        rij= dsqrt(dot(xij,xij))
+        rij= sqrt(dot(xij,xij))
         R1ij= p_R1(is,js)
         D1ij= p_D1(is,js)
 !---------cutoff judgement
@@ -178,22 +178,22 @@ contains
         s= p_s(is,js)
         D0= p_D0(is,js)
         r0= p_r0(is,js)
-        riji= 1d0/rij
+        riji= 1.0_rp/rij
         dixij(1:3)= -xij(1:3)*riji
         djxij(1:3)=  xij(1:3)*riji
         djxji(1:3)= -xji(1:3)*riji
         dixji(1:3)=  xji(1:3)*riji
-        aexp= dexp(-beta*dsqrt(2d0/s)*(rij-r0))
-        va= fc_r(rij,R1ij,D1ij)*D0*s/(s-1d0)*aexp
-        dvadr= D0*s/(s-1d0)*aexp*( dfc_r(rij,R1ij,D1ij) &
-             -beta*dsqrt(2d0/s)*fc_r(rij,R1ij,D1ij) ) 
+        aexp= exp(-beta*sqrt(2.0_rp/s)*(rij-r0))
+        va= fc_r(rij,R1ij,D1ij)*D0*s/(s-1.0_rp)*aexp
+        dvadr= D0*s/(s-1.0_rp)*aexp*( dfc_r(rij,R1ij,D1ij) &
+             -beta*sqrt(2.0_rp/s)*fc_r(rij,R1ij,D1ij) ) 
 !.....parameters for g(theta)
         gij= p_gamma(is,js)
         cij= p_c(is,js)
         dij= p_d(is,js)
         hij= p_h(is,js)
 !---------make gfi
-        tk= 0d0
+        tk= 0.0_rp
         do kk=1,lspr(0,i)
           k= lspr(kk,i)
           if(k.eq.j) cycle
@@ -202,25 +202,25 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(dot(xik,xik))
+          rik=sqrt(dot(xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
           if(rik.gt.R1ik+D1ik) cycle
-          riki= 1d0/rik
+          riki= 1.0_rp/rik
           cs= dot(xij,xik)*riji*riki
-          gc= gij*(1d0 +cij**2/dij**2 &
+          gc= gij*(1.0_rp +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
-          aexp= 1d0
+          aexp= 1.0_rp
           tk=tk +gc*fc_r(rik,R1ik,D1ik) *aexp
         enddo
-        gfi= 1d0 +tk
+        gfi= 1.0_rp +tk
 !---------scan k around i to get bij
-        tk= 0d0
-        fi(1:3)= 0d0
-        fj(1:3)= 0d0
-        t1= -0.5d0*gfi**(-1.5d0)
+        tk= 0.0_rp
+        fi(1:3)= 0.0_rp
+        fj(1:3)= 0.0_rp
+        t1= -0.5_rp*gfi**(-1.5_rp)
         do kk=1,lspr(0,i)
           k= lspr(kk,i)
           if(k.eq.j) cycle
@@ -229,12 +229,12 @@ contains
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
           xik(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rik=dsqrt(dot(xik,xik))
+          rik=sqrt(dot(xik,xik))
           R1ik= p_R1(is,ks)
           D1ik= p_D1(is,ks)
 !-----------cutoff judgement
           if(rik.gt.R1ik+D1ik) cycle
-          riki= 1d0/rik
+          riki= 1.0_rp/rik
           dixik(1:3)= -xik(1:3)*riki
           dkxik(1:3)=  xik(1:3)*riki
           cs= dot(xij,xik)*riji*riki
@@ -242,33 +242,33 @@ contains
                -cs*(dixij(1:3)*riji+dixik(1:3)*riki)
           djcs(1:3)= riji*riki*xik(1:3) -cs*djxij(1:3)*riji
           dkcs(1:3)= riji*riki*xij(1:3) -cs*dkxik(1:3)*riki
-          gc= gij*(1d0 +cij**2/dij**2 -(cij**2/(dij**2 &
+          gc= gij*(1.0_rp +cij**2/dij**2 -(cij**2/(dij**2 &
                +(hij+cs)**2)))
-          dgc= 2d0*(hij+cs)*gij*cij**2/(dij**2+(hij+cs)**2)**2
+          dgc= 2.0_rp*(hij+cs)*gij*cij**2/(dij**2+(hij+cs)**2)**2
           frik = fc_r(rik,R1ik,D1ik)
           dfrik= dfc_r(rik,R1ik,D1ik)
           tk=tk +gc*frik
           fi(1:3)=fi(1:3) +dics(1:3)*dgc*frik &
                +gc*dfrik*dixik(1:3)
           fj(1:3)=fj(1:3) +djcs(1:3)*dgc*frik
-          aa2(1:3,k)=aa2(1:3,k) -0.5d0*va*t1*( dkcs(1:3)*dgc*frik &
+          aa2(1:3,k)=aa2(1:3,k) -0.5_rp*va*t1*( dkcs(1:3)*dgc*frik &
                +gc*dfrik*dkxik(1:3) )
         enddo
 !---------derivative of bij part
-        aa2(1:3,i)=aa2(1:3,i) -0.5d0*va*t1*fi(1:3)
-        aa2(1:3,j)=aa2(1:3,j) -0.5d0*va*t1*fj(1:3)
+        aa2(1:3,i)=aa2(1:3,i) -0.5_rp*va*t1*fi(1:3)
+        aa2(1:3,j)=aa2(1:3,j) -0.5_rp*va*t1*fj(1:3)
 !---------potential
-        bij= gfi**(-0.5d0)
-        epi(i)=epi(i) -0.5d0*0.5d0*bij*va
-        epi(j)=epi(j) -0.5d0*0.5d0*bij*va
-        epotl=epotl -0.5d0*bij*va
+        bij= gfi**(-0.5_rp)
+        epi(i)=epi(i) -0.5_rp*0.5_rp*bij*va
+        epi(j)=epi(j) -0.5_rp*0.5_rp*bij*va
+        epotl=epotl -0.5_rp*bij*va
 !---------derivative of va part
-        aa2(1:3,i)=aa2(1:3,i) -0.5d0*bij*dvadr*dixij(1:3)
-        aa2(1:3,j)=aa2(1:3,j) -0.5d0*bij*dvadr*djxij(1:3)
+        aa2(1:3,i)=aa2(1:3,i) -0.5_rp*bij*dvadr*dixij(1:3)
+        aa2(1:3,j)=aa2(1:3,j) -0.5_rp*bij*dvadr*djxij(1:3)
 !---------if j.gt.natm, no need to calc the term around j
         if(j.gt.natm) cycle
 !---------make gfj
-        tk= 0d0
+        tk= 0.0_rp
         do kk=1,lspr(0,j)
           k= lspr(kk,j)
           if(k.eq.i) cycle
@@ -277,25 +277,25 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(dot(xjk,xjk))
+          rjk=sqrt(dot(xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
           if(rjk.gt.R1jk+D1jk) cycle
-          rjki= 1d0/rjk
+          rjki= 1.0_rp/rjk
           cs= dot(xji,xjk)*riji*rjki
-          gc= gij*(1d0 +cij**2/dij**2 &
+          gc= gij*(1.0_rp +cij**2/dij**2 &
                -(cij**2/(dij**2 +(hij+cs)**2)))
 !.....alpha is always 0d0 in cases of W-W and W-He
-          aexp= 1d0
+          aexp= 1.0_rp
           tk=tk +gc*fc_r(rjk,R1jk,D1jk) *aexp
         enddo
-        gfj= 1d0 +tk
+        gfj= 1.0_rp +tk
 !---------scan k around j to get bji
-        tk= 0d0
-        fi(1:3)= 0d0
-        fj(1:3)= 0d0
-        t1= -0.5d0*gfj**(-1.5d0)
+        tk= 0.0_rp
+        fi(1:3)= 0.0_rp
+        fj(1:3)= 0.0_rp
+        t1= -0.5_rp*gfj**(-1.5_rp)
         do kk=1,lspr(0,j)
           k= lspr(kk,j)
           if(k.eq.i) cycle
@@ -304,12 +304,12 @@ contains
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
           xjk(1:3)= h(1:3,1,0)*x +h(1:3,2,0)*y +h(1:3,3,0)*z
-          rjk=dsqrt(dot(xjk,xjk))
+          rjk=sqrt(dot(xjk,xjk))
           R1jk= p_R1(js,ks)
           D1jk= p_D1(js,ks)
 !-----------cutoff judgement
           if(rjk.gt.R1jk+D1jk) cycle
-          rjki= 1d0/rjk
+          rjki= 1.0_rp/rjk
           djxjk(1:3)= -xjk(1:3)*rjki
           dkxjk(1:3)=  xjk(1:3)*rjki
           cs= dot(xji,xjk)*riji*rjki
@@ -317,29 +317,29 @@ contains
                -cs*(djxji(1:3)*riji+djxjk(1:3)*rjki)
           dics(1:3)= riji*rjki*xjk(1:3) -cs*dixji(1:3)*riji
           dkcs(1:3)= riji*rjki*xji(1:3) -cs*dkxjk(1:3)*rjki
-          gc= gij*(1d0 +cij**2/dij**2 -(cij**2/(dij**2 &
+          gc= gij*(1.0_rp +cij**2/dij**2 -(cij**2/(dij**2 &
                +(hij+cs)**2)))
-          dgc= 2d0*(hij+cs)*gij*cij**2/(dij**2+(hij+cs)**2)**2
+          dgc= 2.0_rp*(hij+cs)*gij*cij**2/(dij**2+(hij+cs)**2)**2
           frjk = fc_r(rjk,R1jk,D1jk)
           dfrjk= dfc_r(rjk,R1jk,D1jk)
           tk=tk +gc*frjk
           fj(1:3)=fj(1:3) +djcs(1:3)*dgc*frjk &
                +gc*dfrjk*djxjk(1:3)
           fi(1:3)=fi(1:3) +dics(1:3)*dgc*frjk
-          aa2(1:3,k)=aa2(1:3,k) -0.5d0*va*t1*( dkcs(1:3)*dgc*frjk &
+          aa2(1:3,k)=aa2(1:3,k) -0.5_rp*va*t1*( dkcs(1:3)*dgc*frjk &
                +gc*dfrjk*dkxjk(1:3))
         enddo
 !---------derivative of bji part
-        aa2(1:3,i)=aa2(1:3,i) -0.5d0*va*t1*fi(1:3)
-        aa2(1:3,j)=aa2(1:3,j) -0.5d0*va*t1*fj(1:3)
+        aa2(1:3,i)=aa2(1:3,i) -0.5_rp*va*t1*fi(1:3)
+        aa2(1:3,j)=aa2(1:3,j) -0.5_rp*va*t1*fj(1:3)
 !---------potential
-        bji= gfj**(-0.5d0)
-        epi(i)=epi(i) -0.5d0*0.5d0*bji*va
-        epi(j)=epi(j) -0.5d0*0.5d0*bji*va
-        epotl=epotl -0.5d0*bji*va
+        bji= gfj**(-0.5_rp)
+        epi(i)=epi(i) -0.5_rp*0.5_rp*bji*va
+        epi(j)=epi(j) -0.5_rp*0.5_rp*bji*va
+        epotl=epotl -0.5_rp*bji*va
 !---------derivative of va part
-        aa2(1:3,i)=aa2(1:3,i) -0.5d0*bji*dvadr*dixij(1:3)
-        aa2(1:3,j)=aa2(1:3,j) -0.5d0*bji*dvadr*djxij(1:3)
+        aa2(1:3,i)=aa2(1:3,i) -0.5_rp*bji*dvadr*dixij(1:3)
+        aa2(1:3,j)=aa2(1:3,j) -0.5_rp*bji*dvadr*djxij(1:3)
       enddo
     enddo
 
@@ -372,13 +372,13 @@ contains
     implicit none
     real(rp),intent(in):: r,r1,d1
     real(rp):: fc_r
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 
-    fc_r= 0d0
+    fc_r= 0.0_rp
     if(r.lt.r1-d1) then
-      fc_r= 1d0
+      fc_r= 1.0_rp
     elseif(r1-d1.le.r .and. r.lt.r1+d1) then
-      fc_r= 0.5d0*( 1d0 -sin(0.5d0*pi*(r-r1)/d1) )
+      fc_r= 0.5_rp*( 1.0_rp -sin(0.5_rp*pi*(r-r1)/d1) )
     endif
     return
   end function fc_r
@@ -388,11 +388,11 @@ contains
     implicit none 
     real(rp),intent(in):: r,r1,d1
     real(rp):: dfc_r
-    real(rp),parameter:: pi = 3.14159265358979d0
+    real(rp),parameter:: pi = 3.14159265358979_rp
 
-    dfc_r= 0d0
+    dfc_r= 0.0_rp
     if(r1-d1.le.r .and. r.lt.r1+d1) then
-      dfc_r= -0.5d0*cos(0.5d0*pi*(r-r1)/d1)*0.5d0*pi/d1
+      dfc_r= -0.5_rp*cos(0.5_rp*pi*(r-r1)/d1)*0.5_rp*pi/d1
     endif
     return
   end function dfc_r
@@ -403,10 +403,10 @@ contains
     real(rp):: f_x,tmp
 
     if( x.lt.d ) then
-      tmp= d/x -1d0
-      f_x= dexp(-tmp*tmp)
+      tmp= d/x -1.0_rp
+      f_x= exp(-tmp*tmp)
     else
-      f_x= 1d0
+      f_x= 1.0_rp
     endif
 
     return
@@ -418,10 +418,10 @@ contains
     real(rp):: df_x,tmp
 
     if( x.lt.d ) then
-      tmp= d/x -1d0
-      df_x= 2d0*d/x/x *tmp *dexp(-tmp*tmp)
+      tmp= d/x -1.0_rp
+      df_x= 2.0_rp*d/x/x *tmp *exp(-tmp*tmp)
     else
-      df_x= 0d0
+      df_x= 0.0_rp
     endif
     return
   end function df_x

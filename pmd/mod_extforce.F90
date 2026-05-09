@@ -11,8 +11,8 @@ module extforce
   logical:: initialized = .false.
   character(len=3):: cspc_extfrc = 'all' ! [default: 'all']
   integer:: ispc_extfrc
-  real(rp):: extfrc(3) = (/ 0d0, 0d0, 0d0 /)   ! in [eV/Ang]
-  real(rp):: extaa(3) = (/ 0d0, 0d0, 0d0 /)
+  real(rp):: extfrc(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)   ! in [eV/Ang]
+  real(rp):: extaa(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)
   
 contains
 !=======================================================================
@@ -74,8 +74,8 @@ contains
     integer:: i,is,ierr
     real(rp):: sump(3),tmps(3),tmp,amtot,ami
 
-    sump(:)= 0d0
-    amtot = 0d0
+    sump(:)= 0.0_rp
+    amtot = 0.0_rp
     do i=1,natm
       is = int(tag(i))
       if( is.eq.ispc_extfrc ) cycle
@@ -87,7 +87,7 @@ contains
     call mpi_allreduce(tmps,sump,3,mpi_real_rp,mpi_sum,mpi_world,ierr)
     tmp= amtot
     call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum,mpi_world,ierr)
-    if( amtot.lt.1d-1 ) then
+    if( amtot.lt.1e-1_rp ) then
       print *,'Error: amtot.le.0.1 !, myid=',myid
       stop
     endif
