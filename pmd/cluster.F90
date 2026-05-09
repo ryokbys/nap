@@ -27,9 +27,10 @@ program cluster_analysis
   character(len=20),parameter:: cfinput='in.cluster'
 
   real(rp):: hunit,hmat(3,3,0:1)
-  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  integer(4),allocatable:: tagtot_isp(:),tagtot_ifmv(:),tagtot_igrp(:,:),tagtot_itot(:)
+  real(rp),allocatable:: rtot(:,:),vtot(:,:),atot(:,:)
 
-  integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nacmax
+  integer:: ia,ic,nc,is,js,msp,inc,ict,i,ib,l,n,nacmax
   integer,allocatable:: ictot(:),nacs(:),icouts(:),nhist(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax),lrecur
   real(rp):: rcut,outthd,t0,tmp
@@ -40,8 +41,9 @@ program cluster_analysis
 !.....Read atom configuration
 !!$  call read_pmdtot_ascii(10,trim(cpmdini))
   ntot = get_ntot_ascii(20,trim(cpmdini))
-  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot))
-  call read_pmdtot_ascii(20,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
+  allocate(tagtot_isp(ntot),tagtot_ifmv(ntot),tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot))
+  allocate(rtot(3,ntot),vtot(3,ntot))
+  call read_pmdtot_ascii(20,trim(cpmdini),ntot,hunit,h,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
   call get_hi(h,hi)
 
 !.....Read input
@@ -52,13 +54,13 @@ program cluster_analysis
 
 !.....Make neighbor list
   allocate(lspr(0:nnmax,ntot))
-  call mk_lspr_sngl(ntot,ntot,nnmax,tagtot,rtot,rcut,h,hi, &
+  call mk_lspr_sngl(ntot,ntot,nnmax,tagtot_isp,rtot,rcut,h,hi, &
        lspr,iprint,.true.)
   maxnn = 0
   msp = 0
   do ia=1,ntot
     maxnn = max(maxnn,lspr(0,ia))
-    msp = max(msp,int(tagtot(ia)))
+    msp = max(msp,tagtot_isp(ia))
   enddo
   print *,'Max num of neighbors = ',maxnn
   print *,'Max species ID = ',msp
@@ -79,10 +81,10 @@ program cluster_analysis
   ictot(:) = 0
   if( lrecur ) then
     print *,'clustering with recursive routine.'
-    call clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+    call clustering2(ntot,tagtot_isp,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
   else
     print *,'clustering without recursive routine.'
-    call clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+    call clustering1(ntot,tagtot_isp,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
   endif
   print '(a,f0.3)',' Time for clustering = ',mpi_wtime()-tmp
 
@@ -90,7 +92,7 @@ program cluster_analysis
   allocate(nacs(nc))
   nacs(:) = 0
   do ia=1,ntot
-    is = int(tagtot(ia))
+    is = tagtot_isp(ia)
     if( .not.lspc(is) ) cycle
     ic = ictot(ia)
     nacs(ic) = nacs(ic) + 1
@@ -138,7 +140,7 @@ program cluster_analysis
     write(20,'(i10)') nacs(ic)
     do ia=1,ntot
       if( ictot(ia).eq.ic ) then
-        write(20,'(7es23.14e3,11es13.4e3)') tagtot(ia) &
+        write(20,'(7es23.14e3,11es13.4e3)') real(tagtot_isp(ia),rp) &
              ,rtot(1:3,ia),vtot(1:3,ia)    ! dt
       endif
     enddo
@@ -247,15 +249,15 @@ subroutine get_hi(h,hi)
   return
 end subroutine get_hi
 !=======================================================================
-subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+subroutine clustering1(ntot,tagtot_isp,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
 !
 !  Clustering not using the recursive routine.
 !
   use mod_precision
-  implicit none 
+  implicit none
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
   logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
-  real(rp),intent(in):: tagtot(ntot)
+  integer,intent(in):: tagtot_isp(ntot)
   integer,intent(out):: ictot(ntot),nc
 
   integer:: iter,icid,num_update,ia,is,icmin0,icmax,icmin,jj,ja,js,jc,ic
@@ -266,7 +268,7 @@ subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
     num_update = 0
     nc = 0
     do ia=1,ntot
-      is = int(tagtot(ia))
+      is = tagtot_isp(ia)
       if( .not. lspc(is) ) cycle
       icmin0 = ictot(ia)
       icmax  = ictot(ia)
@@ -274,7 +276,7 @@ subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
       if( ictot(ia).ne.0 ) icmin = ictot(ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tagtot(ja))
+        js = tagtot_isp(ja)
         if( .not. lpair(is,js) ) cycle
         jc = ictot(ja)
         icmin0 = min(icmin0,jc)
@@ -303,7 +305,7 @@ subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
       ictot(ia) = ic
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tagtot(ja))
+        js = tagtot_isp(ja)
         if( .not. lpair(is,js) ) cycle
         ictot(ja) = ic
       enddo
@@ -317,27 +319,26 @@ subroutine clustering1(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
   return
 end subroutine clustering1
 !=======================================================================
-subroutine clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
+subroutine clustering2(ntot,tagtot_isp,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
 !
 !  Clustering using the recursive routine.
 !
   use mod_precision
-  implicit none 
+  implicit none
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax
   logical,intent(in):: lpair(nspmax,nspmax),lspc(nspmax)
-  real(rp),intent(in):: tagtot(ntot)
+  integer,intent(in):: tagtot_isp(ntot)
   integer,intent(out):: ictot(ntot),nc
 
   integer:: is,js,ic,ia
 
   ic = 0
   do ia=1,ntot
-    is = int(tagtot(ia))
+    is = tagtot_isp(ia)
     if( .not.lspc(is) ) cycle
     if( ictot(ia).ne.0 ) cycle
     ic = ic +1
-!!$    print *,'ic,ia = ',ic,ia
-    call neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,lpair,ia,is,ic)
+    call neighbor_connection(ntot,ictot,tagtot_isp,nnmax,lspr,nspmax,lpair,ia,is,ic)
   end do
 
   nc = ic
@@ -345,22 +346,21 @@ subroutine clustering2(ntot,tagtot,nnmax,lspr,nspmax,lpair,lspc,ictot,nc)
   return
 end subroutine clustering2
 !=======================================================================
-recursive subroutine neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,&
+recursive subroutine neighbor_connection(ntot,ictot,tagtot_isp,nnmax,lspr,nspmax,&
      lpair,ia,is,ic)
   use mod_precision
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),nspmax,ia,is,ic
   logical,intent(in):: lpair(nspmax,nspmax)
-  real(rp),intent(in):: tagtot(ntot)
+  integer,intent(in):: tagtot_isp(ntot)
   integer,intent(inout):: ictot(ntot)
 
   ictot(ia) = ic
-  
+
   do jj=1,lspr(0,ia)
     ja = lspr(jj,ia)
-    js = int(tagtot(ja))
+    js = tagtot_isp(ja)
     if( lpair(is,js) .and. ictot(ja).eq.0 ) then
-!!$      print *,'ia,ja,is,js = ',ia,ja,is,js
-      call neighbor_connection(ntot,ictot,tagtot,nnmax,lspr,nspmax,lpair,ja,js,ic)
+      call neighbor_connection(ntot,ictot,tagtot_isp,nnmax,lspr,nspmax,lpair,ja,js,ic)
     endif
   enddo
   return

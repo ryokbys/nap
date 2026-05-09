@@ -10,12 +10,15 @@ program voids
 !    > otherwise (void mesh) ==> -1
 !-----------------------------------------------------------------------
   use mod_precision
+  use pmdvars,only: ngrpmax
   use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   implicit none
 
   character(len=128),parameter:: cpmdini='pmdini'
   integer:: ntot
-  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  real(rp):: hunit,h(3,3,0:1)
+  integer,allocatable:: tagtot_isp(:),tagtot_ifmv(:),tagtot_igrp(:,:),tagtot_itot(:)
+  real(rp),allocatable:: rtot(:,:),vtot(:,:),atot(:,:)
   real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
   real(rp),allocatable:: auxtot(:,:)
 
@@ -23,7 +26,7 @@ program voids
   integer:: lcx,lcy,lcz,lcyz,lcxyz,mx,my,mz,m,m1x,m1y,m1z,m1
   integer,allocatable:: imesh(:,:,:),lscl(:),lshd(:)
   real(rp):: vol,sgm(3,3),hi(3,3)
-  real(rp):: alx,aly,alz,x,y,z,rcx,rcy,rcz,rcxi,rcyi,rczi,pi(3) &
+  real(rp):: alx,aly,alz,x,y,z,rc,rcx,rcy,rcz,rcxi,rcyi,rczi,pi(3) &
        ,xij(3),rij(3),rij2,rc2,sidelen
   real(rp),allocatable:: pmesh(:,:)
   character(len=128):: cusage,cfname,ctmp
@@ -47,10 +50,11 @@ program voids
   read(ctmp,*) rc
 
 !.....Read system info
-  ntot = get_ntot_bin(10,trim(cpmdini))
-  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
+  ntot = get_ntot_ascii(10,trim(cpmdini))
+  allocate(tagtot_isp(ntot),tagtot_ifmv(ntot),tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot))
+  allocate(rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
        ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
-  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
+  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
 
 !.....Make volumetric data mesh
   call boxmat(h,hi,vol,sgm)

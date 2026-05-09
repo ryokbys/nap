@@ -48,7 +48,8 @@ program pmd
 
   real(rp):: hunit,hmat(3,3,0:1)
   integer:: ntot0
-  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  integer(4),allocatable:: tagtot_isp(:),tagtot_ifmv(:),tagtot_igrp(:,:),tagtot_itot(:)
+  real(rp),allocatable:: rtot(:,:),vtot(:,:),atot(:,:)
   real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
   real(rp),allocatable:: auxtot(:,:)
 
@@ -83,15 +84,17 @@ program pmd
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       write(6,*) 'Read pmdini in binary mode.'
       ntot0 = get_ntot_bin(20,trim(cpmdini))
-      allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
+      allocate(tagtot_isp(ntot0),tagtot_ifmv(ntot0),tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0))
+      allocate(rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
-      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,hmat,tagtot,rtot,vtot)
+      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
     else if( trim(ciofmt).eq.'ascii' ) then
       write(6,*) 'Read pmdini in ascii mode.'
       ntot0 = get_ntot_ascii(20,trim(cpmdini))
-      allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
+      allocate(tagtot_isp(ntot0),tagtot_ifmv(ntot0),tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0))
+      allocate(rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
-      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,hmat,tagtot,rtot,vtot)
+      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
     else
       write(6,*) 'Error: io_format must be either ascii, ' &
            //'bin or binary.'
@@ -120,7 +123,7 @@ program pmd
     endif
 
     call cell_info(hmat)
-    call spcs_info(ntot0,tagtot)
+    call spcs_info(ntot0,tagtot_isp)
 
     write(6,*) ''
     write(6,'(a,i0)') ' Num of MPI processes = ',nprocs
@@ -139,14 +142,14 @@ program pmd
     if( ifpmd.eq.2 ) then ! if dump output
       call make_cdumpauxarr()
     endif
-    call calc_nfmv(ntot0,tagtot)
+    call calc_nfmv(ntot0,tagtot_ifmv,tagtot_igrp)
 
     call write_initial_setting()
 !        call write_inpmd(10,trim(cinpmd))
     if( num_forces.eq.0 ) stop ' ERROR: no force-field specified'
 
 !.....Num of groups and group IDs from tag
-    call check_tags(ntot0,tagtot,iprint)
+    call check_tags(ntot0,tagtot_itot,iprint)
 
     if( trim(ctctl).eq.'ttm' ) then
       print *,''
@@ -225,7 +228,7 @@ program pmd
   call mpi_bcast(specorder,3*nspmax,mpi_character,0,mpicomm,ierr)
   call mpi_bcast(has_specorder,1,mpi_logical,0,mpicomm,ierr)
 
-  call set_nsp(ntot0,tagtot)
+  call set_nsp(ntot0,tagtot_isp)
 
 !.....It is required to call init_force and read some in.params.XXX to define aux array
   call init_force(.true.)
@@ -252,7 +255,8 @@ program pmd
 !.....Make ntot and ?tot() not null in nodes myid_md != 0
   else
     ntot0 = 1
-    allocate(tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
+    allocate(tagtot_isp(ntot0),tagtot_ifmv(ntot0),tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0))
+    allocate(rtot(3,ntot0),vtot(3,ntot0),epitot(ntot0) &
          ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0) )
     allocate(auxtot(naux,ntot0))
   endif
@@ -304,7 +308,7 @@ program pmd
   endif
 
 !.....Initial settting for color charge NEMD
-  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iaux_clr,:),tagtot &
+  if( lclrchg ) call init_clrchg(specorder,ntot0,auxtot(iaux_clr,:),tagtot_isp &
        ,myid_md,iprint)
 !.....Init for local flux
   if( lflux ) call init_lflux(myid_md,nx,ny,nz,hmat,lclrchg &
@@ -318,22 +322,23 @@ program pmd
 
 !.....Add PKA velocity to some atom
   if( pka_energy .gt. 0.0_rp ) then
-    call add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
+    call add_pka_velocity(ntot0,hmat,tagtot_isp,rtot,vtot)
   endif
 
   call accum_time('overhead',real(mpi_wtime(),rp)-t0)
 !.....Call pmd_core to perform MD; all the arguments are in pmdvars module
-  call pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-       ekitot,epitot,auxtot,epot,ekin,stnsr)
+  call pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+       rtot,vtot,atot,stot,ekitot,epitot,auxtot,epot,ekin,stnsr)
 
   if( myid_md.eq.0 ) then
     tmp = real(mpi_wtime(),rp)
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       call write_pmdtot_bin(20,cpmdfin,ntot,hunit,hmat, &
-             tagtot,rtot,vtot)
+             tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
     elseif( trim(ciofmt).eq.'ascii' ) then
       call write_pmdtot_ascii(20,cpmdfin,ntot,hunit,hmat, &
-             tagtot,rtot,vtot,atot,epot,ekin,stnsr,.true.,min(nstp,istp))
+             tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+             rtot,vtot,atot,epot,ekin,stnsr,.true.,min(nstp,istp))
     endif
     call accum_time('write_xxx',real(mpi_wtime(),rp)-tmp)
   endif
@@ -355,7 +360,7 @@ program pmd
 1 continue
   call mpi_barrier(mpicomm,ierr)
   call mpi_comm_free(mpi_md_world,ierr)
-  deallocate(tagtot,rtot,vtot,epitot,ekitot,stot,atot)
+  deallocate(tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,epitot,ekitot,stot,atot)
   deallocate(auxtot)
   call mpi_finalize(ierr)
 
@@ -792,28 +797,26 @@ subroutine bcast_params(nprocs)
 
 end subroutine bcast_params
 !=======================================================================
-subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
+subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot_itot,atot,stnsr)
   use pmdmpi
   use mod_precision
-  use util,only: itotOf
   implicit none
   include "./params_unit.h"
   integer,intent(in):: ionum,ntot
+  integer,intent(in):: tagtot_itot(ntot)
   character(len=*),intent(in):: cpostfix
   real(rp),intent(in):: h(3,3),epot,stnsr(3,3)
-  real(rp),intent(inout):: tagtot(ntot),atot(3,ntot)
+  real(rp),intent(inout):: atot(3,ntot)
 
   integer:: i,n0,ixyz,ierr
   real(rp):: at(3),ptmp(6)
   integer,parameter:: nmpi = 2
-!!$  integer,external:: itotOf
-
 
 !.....Write out forces
   open(ionum,file='frc'//trim(cpostfix),status='replace')
   write(ionum,'(i10)') ntot
   do i=1,ntot
-    write(ionum,'(3es15.7,i8)') atot(1:3,i),itotOf(tagtot(i))
+    write(ionum,'(3es15.7,i8)') atot(1:3,i),tagtot_itot(i)
   enddo
   close(ionum)
 
@@ -895,24 +898,23 @@ subroutine check_ensemble()
 
 end subroutine check_ensemble
 !=======================================================================
-subroutine check_tags(ntot,tagtot,iprint)
+subroutine check_tags(ntot,tagtot_itot,iprint)
 !
 !  Check sanity of tags:
 !  - whether the num of atoms is consistent with itotOf(tag)
 !
   use pmdmpi
   use mod_precision
-  use util,only: ithOf, itotOf
   use pmdvars,only: myid_md, mpicomm
   integer,intent(in):: ntot,iprint
-  real(rp),intent(in):: tagtot(ntot)
+  integer,intent(in):: tagtot_itot(ntot)
 
   integer:: i,itotmax
 
   ierr = 0
   itotmax = 0
   do i=1,ntot
-    itotmax = max(itotOf(tagtot(i)), itotmax)
+    itotmax = max(tagtot_itot(i), itotmax)
   enddo
   if( itotmax.gt.ntot ) then
     print *, 'ERROR: max itotOf(tag) exceeds the number of atoms. '
@@ -923,10 +925,10 @@ subroutine check_tags(ntot,tagtot,iprint)
   return
 end subroutine check_tags
 !=======================================================================
-subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
-! 
+subroutine add_pka_velocity(ntot0,hmat,tagtot_isp,rtot,vtot)
+!
 ! Add PKA velocity to some atom from a given PKA energy
-! 
+!
   use pmdmpi
   use mod_precision
   use pmdvars
@@ -934,7 +936,8 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
   implicit none
   include './params_unit.h'
   integer,intent(in):: ntot0
-  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),hmat(3,3,0:1)
+  integer,intent(in):: tagtot_isp(ntot0)
+  real(rp),intent(in):: rtot(3,ntot0),hmat(3,3,0:1)
   real(rp),intent(inout):: vtot(3,ntot0)
 
   integer:: i,icntr,is
@@ -969,7 +972,7 @@ subroutine add_pka_velocity(ntot0,hmat,tagtot,rtot,vtot)
     rx = sin(theta)*cos(phi)
     ry = sin(theta)*sin(phi)
     rz = cos(theta)
-    is = int(tagtot(icntr))
+    is = tagtot_isp(icntr)
 !.....[eV] to [Ang/fs]
     vel = sqrt(pka_energy*ev2j *2.0_rp /(am(is)*ump2kg)) *m2ang /s2fs
     vx = rx*vel

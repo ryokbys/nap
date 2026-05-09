@@ -27,7 +27,7 @@ module clrchg
   
 contains
 !=======================================================================
-  subroutine init_clrchg(specorder,ntot,clrtot,tagtot,myid,iprint)
+  subroutine init_clrchg(specorder,ntot,clrtot,tagtot_isp,myid,iprint)
 !
 !  Initialization for color charge.
 !  This routine should be called after broadcasting data from node-0,
@@ -36,7 +36,7 @@ contains
     use force,only: luse_charge
     integer,intent(in):: myid,iprint,ntot
     character(len=3),intent(in):: specorder(nspmax)
-    real(rp),intent(in):: tagtot(ntot)
+    integer,intent(in):: tagtot_isp(ntot)
     real(rp),intent(inout):: clrtot(ntot)
 
 !!$    real(rp),external:: urnd
@@ -52,10 +52,10 @@ contains
       call read_clr(ntot,clrtot,myid)
       initialized = .true.
     else if( trim(clr_set).eq.'all_one' ) then  ! set all the clr == 1.0
-      call set_clr_one(ntot,tagtot,clrtot,myid,iprint)
+      call set_clr_one(ntot,tagtot_isp,clrtot,myid,iprint)
       initialized = .true.
     else if( trim(clr_set).eq.'random' ) then ! random
-      call set_clr_random(ntot,tagtot,clrtot,myid,iprint)
+      call set_clr_random(ntot,tagtot_isp,clrtot,myid,iprint)
       initialized = .true.
     else if( index(clr_set,'chg').ne.0 ) then  ! charge related
       if( .not. luse_charge ) stop 'ERROR: clr_set is set as chg related, ' &
@@ -89,20 +89,20 @@ contains
     return
   end subroutine read_clr
 !=======================================================================
-  subroutine set_clr_one(ntot,tagtot,clrtot,myid,iprint)
+  subroutine set_clr_one(ntot,tagtot_isp,clrtot,myid,iprint)
 !
 !  Set all the clr one
 !
     integer,intent(in):: ntot,myid,iprint
-    real(rp),intent(in):: tagtot(ntot)
+    integer,intent(in):: tagtot_isp(ntot)
     real(rp),intent(inout):: clrtot(ntot)
 
     integer:: i,is
-    
+
     if( myid.eq.0 ) then
       clrtot(:) = 0.0_rp
       do i=1,ntot
-        is = int(tagtot(i))
+        is = tagtot_isp(i)
         if( is.eq.ispc_clrchg ) then
           clrtot(i) = 1.0_rp
         endif
@@ -129,22 +129,22 @@ contains
     return
   end subroutine set_clr_round_chg
 !=======================================================================
-  subroutine set_clr_random(ntot,tagtot,clrtot,myid,iprint)
+  subroutine set_clr_random(ntot,tagtot_isp,clrtot,myid,iprint)
 !
 !  Set clr of each atom randomly.
 !
     integer,intent(in):: ntot,myid,iprint
-    real(rp),intent(in):: tagtot(ntot)
+    integer,intent(in):: tagtot_isp(ntot)
     real(rp),intent(inout):: clrtot(ntot)
 
     integer:: i,is,nclr,np,nm
     real(rp):: r
-    
+
     if( myid.eq.0 ) then
 !.....Count num of ions which color charges are to be set.
       nclr = 0
       do i=1,ntot
-        is = int(tagtot(i))
+        is = tagtot_isp(i)
         if( is.eq.ispc_clrchg ) then
           nclr = nclr +1
         endif
@@ -156,7 +156,7 @@ contains
       nm = nclr/2
       clrtot(:) = 0.0_rp
       do i=1,ntot
-        is = int(tagtot(i))
+        is = tagtot_isp(i)
         if( is.ne.ispc_clrchg ) cycle
 !!$        r = urnd()  !<=== something wrong with urnd() func...
         call random_number(r)

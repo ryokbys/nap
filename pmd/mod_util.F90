@@ -237,15 +237,15 @@ contains
 
   end subroutine cell_info
 !=======================================================================
-  subroutine spcs_info(ntot,tagtot)
+  subroutine spcs_info(ntot,tagtot_isp)
     use pmdvars,only: nspmax,specorder
     integer,intent(in):: ntot
-    real(rp),intent(in):: tagtot(ntot)
+    integer,intent(in):: tagtot_isp(ntot)
     integer:: nsps(nspmax),ia,is
 
     nsps(:) = 0
     do ia=1,ntot
-      is = int(tagtot(ia))
+      is = tagtot_isp(ia)
       nsps(is) = nsps(is) +1
     enddo
     write(6,'(a)') ' Number of each species in the initial configuration'
@@ -334,22 +334,19 @@ contains
     return
   end function idumpauxof
 !=======================================================================
-  subroutine calc_nfmv(ntot,tagtot)
-    use pmdvars,only: myid_md,mpi_md_world,iprint,nfmv
+  subroutine calc_nfmv(ntot,tagtot_ifmv,tagtot_igrp)
+    use pmdvars,only: myid_md,mpi_md_world,iprint,nfmv,ngrpmax
     include 'mpif.h'
     include './const.h'
     integer,intent(in):: ntot
-    real(rp),intent(in):: tagtot(ntot)
+    integer,intent(in):: tagtot_ifmv(ntot),tagtot_igrp(ngrpmax,ntot)
 
-    integer:: ia,ierr,igrp
-!!$    integer,external:: ifmvOf
+    integer:: ia,ierr
 
     if( myid_md.eq.0 ) then
-      igrp = 1  ! ifmv is assigned to group #1
       nfmv = 0
       do ia=1,ntot
-!!$        nfmv = max(nfmv,ifmvOf(tagtot(ia)))
-        nfmv = max(nfmv,ithOf(tagtot(ia),igrp))
+        nfmv = max(nfmv,tagtot_ifmv(ia))
       enddo
       if( iprint.ge.ipl_basic ) then
         print *,''

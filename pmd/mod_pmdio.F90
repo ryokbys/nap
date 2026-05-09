@@ -84,14 +84,18 @@ contains
 
   end function get_ntot_bin
 !=======================================================================
-  subroutine read_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot)
+  subroutine read_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot_isp, &
+       tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+    use pmdvars,only: ngrpmax
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in):: cfname
     real(rp),intent(out):: hunit,h(3,3,0:1)
-    real(rp),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    integer,intent(out):: tagtot_isp(ntot),tagtot_ifmv(ntot)
+    integer,intent(out):: tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot)
+    real(rp),intent(out):: rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,itmp,num
+    real(8):: tmp_tag
     character(len=128):: ctmp
 
     open(ionum,file=trim(cfname),status='old')
@@ -136,7 +140,8 @@ contains
       stop
     endif
     do i=1,ntot
-      read(ionum,*) tagtot(i),rtot(1:3,i),vtot(1:3,i)
+      read(ionum,*) tmp_tag,rtot(1:3,i),vtot(1:3,i)
+      call tag_decode(tmp_tag, tagtot_isp(i), tagtot_ifmv(i), tagtot_igrp(:,i), tagtot_itot(i))
       rtot(1,i) = pbc(rtot(1,i))
       rtot(2,i) = pbc(rtot(2,i))
       rtot(3,i) = pbc(rtot(3,i))
@@ -145,19 +150,21 @@ contains
 
   end subroutine read_pmdtot_ascii
 !=======================================================================
-  subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot,atot,epot,ekin,stnsr,lforce,istp)
-    use pmdvars,only: has_specorder,specorder,lcomb_pos
+  subroutine write_pmdtot_ascii(ionum,cfname,ntot,hunit,h,tagtot_isp, &
+       tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,epot,ekin,stnsr,lforce,istp)
+    use pmdvars,only: has_specorder,specorder,lcomb_pos,ngrpmax
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
     character(len=*),intent(in) :: cfname
     real(rp),intent(in):: hunit,h(3,3,0:1)
-    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
+    integer,intent(in):: tagtot_isp(ntot),tagtot_ifmv(ntot)
+    integer,intent(in):: tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot)
+    real(rp),intent(in):: rtot(3,ntot),vtot(3,ntot),atot(3,ntot)
     real(rp),intent(in):: epot,ekin,stnsr(3,3)
     logical,intent(in):: lforce
 
     integer:: ia,ib,l,i,msp,num
-    real(rp):: atmp(3)
+    real(rp):: atmp(3),tmp_tag
     character(len=128):: cftmp
     logical:: lopen = .false.
     logical:: lclose = .false.
@@ -187,7 +194,7 @@ contains
     if( has_specorder ) then
       msp = 0
       do i=1,ntot
-        msp = max(msp,int(tagtot(i)))
+        msp = max(msp,tagtot_isp(i))
       enddo
       write(ionum,'(a,9(2x,a))') '#  specorder: ',(trim(specorder(i)),i=1,msp)
     endif
@@ -210,12 +217,14 @@ contains
 !.....All the length values (r,v,a) are scaled by h-mat in pmd format
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
-        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tagtot(i) &
+        tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tmp_tag &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
-        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tagtot(i) &
+        tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tmp_tag &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif
@@ -223,15 +232,18 @@ contains
     return
   end subroutine write_pmdtot_ascii
 !=======================================================================
-  subroutine read_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot)
-    use pmdvars,only: specorder
+  subroutine read_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot_isp, &
+       tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+    use pmdvars,only: specorder,ngrpmax
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in):: cfname
     real(rp),intent(out):: hunit,h(3,3,0:1)
-    real(rp),intent(out):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    integer,intent(out):: tagtot_isp(ntot),tagtot_ifmv(ntot)
+    integer,intent(out):: tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot)
+    real(rp),intent(out):: rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp,itmp
+    real(rp),allocatable:: tmp_tags(:)
 
     open(ionum,file=trim(cfname),form='unformatted',status='old')
 !-----natm: num. of particles in this node
@@ -245,61 +257,73 @@ contains
       print *,' ERROR: itmp.ne.ntot !'
       stop
     endif
-    read(ionum) tagtot(1:ntot)
+    allocate(tmp_tags(ntot))
+    read(ionum) tmp_tags(1:ntot)
     read(ionum) rtot(1:3,1:ntot)
     read(ionum) vtot(1:3,1:ntot)
     close(ionum)
     do i=1,ntot
+      call tag_decode(real(tmp_tags(i),8), tagtot_isp(i), tagtot_ifmv(i), tagtot_igrp(:,i), tagtot_itot(i))
       rtot(1,i) = pbc(rtot(1,i))
       rtot(2,i) = pbc(rtot(2,i))
       rtot(3,i) = pbc(rtot(3,i))
     enddo
+    deallocate(tmp_tags)
 
   end subroutine read_pmdtot_bin
 !=======================================================================
-  subroutine write_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot, &
-       rtot,vtot)
-    use pmdvars,only: specorder
+  subroutine write_pmdtot_bin(ionum,cfname,ntot,hunit,h,tagtot_isp, &
+       tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+    use pmdvars,only: specorder,ngrpmax
     include './params_unit.h'
     integer,intent(in):: ionum,ntot
     character(len=*),intent(in) :: cfname
     real(rp),intent(in):: hunit,h(3,3,0:1)
-    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot)
+    integer,intent(in):: tagtot_isp(ntot),tagtot_ifmv(ntot)
+    integer,intent(in):: tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot)
+    real(rp),intent(in):: rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp
+    real(rp),allocatable:: tmp_tags(:)
 
     open(ionum,file=cfname,form='unformatted',status='replace')
     msp = 0
     do ia=1,ntot
-      msp = max(msp,int(tagtot(ia)))
+      msp = max(msp,tagtot_isp(ia))
     enddo
     write(ionum) msp
     write(ionum) (specorder(i),i=1,msp)
     write(ionum) hunit
     write(ionum) (((h(ia,ib,l)/hunit,ia=1,3),ib=1,3),l=0,1)
     write(ionum) ntot
-    write(ionum) tagtot(1:ntot)
+    allocate(tmp_tags(ntot))
+    do i=1,ntot
+      tmp_tags(i) = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+    enddo
+    write(ionum) tmp_tags(1:ntot)
+    deallocate(tmp_tags)
     write(ionum) rtot(1:3,1:ntot)
     write(ionum) vtot(1:3,1:ntot)
     close(ionum)
 
   end subroutine write_pmdtot_bin
 !=======================================================================
-  subroutine write_dump(ionum,cfname,ntot,hunit,h,tagtot,rtot,vtot, &
-       atot,stot,ekitot,epitot,naux,auxtot,istp)
+  subroutine write_dump(ionum,cfname,ntot,hunit,h,tagtot_isp,tagtot_itot, &
+       rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
 !
 !     Write atomic configuration in LAMMPS-dump format file.
 !
     use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder,&
-         iaux_chg,iaux_tei,iaux_clr,iaux_edesc,lcomb_pos,tag_isp,tag_itot
-    use util,only: itotOf,iauxof
+         iaux_chg,iaux_tei,iaux_clr,iaux_edesc,lcomb_pos
+    use util,only: iauxof
     use time,only: accum_time
     implicit none
     include "mpif.h"
     integer,intent(in):: ionum,ntot,naux,istp
+    integer,intent(in):: tagtot_isp(ntot),tagtot_itot(ntot)
     character(len=*),intent(in) :: cfname
     real(rp),intent(in):: hunit,h(3,3,0:1)
-    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
+    real(rp),intent(in):: rtot(3,ntot),vtot(3,ntot), &
          atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot), &
          epitot(ntot),auxtot(naux,ntot)
 
@@ -402,14 +426,13 @@ contains
     enddo
     write(ionum,*) ''
     do i=1,ntot
-      write(ionum,'(i8)',advance='no') tag_itot(i)
+      write(ionum,'(i8)',advance='no') tagtot_itot(i)
       if( has_specorder ) then
-        is = tag_isp(i)
+        is = tagtot_isp(i)
         csp = specorder(is)
         write(ionum,'(a4)',advance='no') trim(csp)
-!!$      print *,'tag,i,csp = ',tagtot(i),itotOf(tagtot(i)),csp
       else
-        write(ionum,'(i3)',advance='no') tag_isp(i)
+        write(ionum,'(i3)',advance='no') tagtot_isp(i)
       endif
       write(ionum,'(3f12.5)',advance='no') dlmp(1:3,i)  ! pos
       write(ionum,'('//trim(cndlmp)//'es11.2e3)') dlmp(4:ndlmp,i)  ! except pos
@@ -418,7 +441,7 @@ contains
     if( .not. lcomb_pos ) close(ionum)
   end subroutine write_dump
 !=======================================================================
-  subroutine write_extxyz(ionum,cfname,ntot,hunit,h,tagtot, &
+  subroutine write_extxyz(ionum,cfname,ntot,hunit,h,tagtot_isp, &
        rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,stnsr,istp)
 !
 !  Format of the extxyz is like the following:
@@ -429,13 +452,14 @@ contains
 !  Si  1.36000000  1.36000000  1.36000000  0.00e-00  0.00e-00  0.00e-00 -9.4438e-05 -5.7187e-04 -2.6944e-04
 !  ...
 !  ---
-    use pmdvars,only: has_specorder,specorder,lcomb_pos,tag_isp
+    use pmdvars,only: has_specorder,specorder,lcomb_pos
     use util, only: basename
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
+    integer,intent(in):: tagtot_isp(ntot)
     character(len=*),intent(in) :: cfname
     real(rp),intent(in):: hunit,h(3,3,0:1)
-    real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),vtot(3,ntot), &
+    real(rp),intent(in):: rtot(3,ntot),vtot(3,ntot), &
          atot(3,ntot),stot(3,3,ntot),ekitot(3,3,ntot),epitot(ntot)
     real(rp),intent(in):: epot,ekin,stnsr(3,3)
 
@@ -493,7 +517,7 @@ contains
 
 !===== Atom information starts
     do i=1,ntot
-      is = tag_isp(i)
+      is = tagtot_isp(i)
       csp = specorder(is)
       ri(1:3)= h(1:3,1,0)*rtot(1,i) +h(1:3,2,0)*rtot(2,i) +h(1:3,3,0)*rtot(3,i)
       vi(1:3)= h(1:3,1,0)*vtot(1,i) +h(1:3,2,0)*vtot(2,i) +h(1:3,3,0)*vtot(3,i)

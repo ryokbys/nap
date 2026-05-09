@@ -3,8 +3,8 @@
 !-----------------------------------------------------------------------
 ! Core subroutines/functions needed for pmd.
 !-----------------------------------------------------------------------
-subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
-     ,ekitot,epitot,auxtot,epot,ekin,stnsr)
+subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,atot,stot,ekitot,epitot,auxtot,epot,ekin,stnsr)
 !.....All the arguments are in pmdvars module
   use mod_precision
   use pmdio,only: write_pmdtot_ascii, write_pmdtot_bin, write_dump, &
@@ -50,8 +50,9 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   include "./const.h"
   integer,intent(inout):: ntot0
   real(rp),intent(in):: hunit
-  real(rp),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
-       hmat(3,3,0:1)
+  integer,intent(inout):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(inout):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
   real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(rp),intent(out):: epot,ekin,stnsr(3,3)
@@ -173,7 +174,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 !.....perform space decomposition after reading atomic configuration
   tmp = real(mpi_wtime(),rp)
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
+  call space_decomp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,auxtot,.true.)
   call accum_time('space_decomp',real(mpi_wtime(),rp)-tmp)
 !.....Some conversions
   do i=1,natm
@@ -434,13 +435,13 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !      write(cnum(1:4),'(i4.4)') 0
   write(cnum,'(i0)') 0
   tmp = real(mpi_wtime(),rp)
-  call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
+  call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot, &
        ekitot,epitot,auxtot)
   call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
   if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
     if( ifsort.gt.0 ) then
       tmp = real(mpi_wtime(),rp)
-      call sort_by_tag(ntot,tagtot,rtot,vtot &
+      call sort_by_tag(ntot,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
       call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
     endif
@@ -449,26 +450,28 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
         call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot,rtot,vtot)
+             tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
       elseif( trim(ciofmt).eq.'ascii' ) then
         if( lcomb_pos ) then
           call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+               rtot,vtot,atot,epot,ekin,sth,loutforce,0)
         else
           call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+               rtot,vtot,atot,epot,ekin,sth,loutforce,0)
         endif
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
       if( lcomb_pos ) then  ! if combined, filename is dump.
-        call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+        call write_dump(20,'dump',ntot,hunit,h,tagtot_isp,tagtot_itot, &
              rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
       else  ! otherwise, filename contains timestep
-        call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+        call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot_isp,tagtot_itot, &
              rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
       endif
     else if( ifpmd.eq.3 ) then  ! extxyz format
-      call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+      call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
            rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0)
     endif
     call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
@@ -953,14 +956,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       iocntpmd=iocntpmd+1
       write(cnum,'(i0)') istp
 !.....vtot and atot are scaled by hmat in space_comp
-      call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
+      call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot, &
            ekitot,epitot,auxtot)
       call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
       ltot_updated = .true.
       if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
         if( ifsort.gt.0 ) then
           tmp = real(mpi_wtime(),rp)
-          call sort_by_tag(ntot0,tagtot,rtot,vtot &
+          call sort_by_tag(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot &
                ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
           call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
         endif
@@ -969,26 +972,28 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
             call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                 tagtot,rtot,vtot)
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
           elseif( trim(ciofmt).eq.'ascii' ) then
             if( lcomb_pos ) then
               call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
-                   tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
             else
               call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                   tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
             endif
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
           if( lcomb_pos ) then
-            call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+            call write_dump(20,'dump',ntot,hunit,h,tagtot_isp,tagtot_itot, &
                  rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
           else
-            call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+            call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot_isp,tagtot_itot, &
                  rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
           endif
         else if( ifpmd.eq.3 ) then  ! extxyz format
-          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
                rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
         endif
         call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
@@ -1008,12 +1013,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( .not. ltot_updated ) then
     tmp = real(mpi_wtime(),rp)
 !.....vtot and atot are scaled by hmat in space_comp
-    call space_comp(ntot0,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
+    call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot,ekitot,epitot, &
          auxtot)
     call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
     if( myid_md.eq.0 ) then
       tmp = real(mpi_wtime(),rp)
-      call sort_by_tag(ntot0,tagtot,rtot,vtot &
+      call sort_by_tag(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot &
            ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
       call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
     endif
@@ -1100,8 +1105,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   deallocate(aux)
 end subroutine pmd_core
 !=======================================================================
-subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-     ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
+subroutine oneshot(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,atot,stot,ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
 !
 !  In case that only one shot force calculation is required,
 !  especially called from fitpot.
@@ -1116,7 +1121,9 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   include "./const.h"
   integer,intent(in):: ntot0
   real(rp),intent(in):: hunit,hmat(3,3,0:1)
-  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+  integer,intent(in):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(in):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(in):: rtot(3,ntot0),vtot(3,ntot0)
   real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
   real(rp),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: linit
@@ -1144,7 +1151,7 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   b = ',h(1:3,2,0)
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
+  call space_decomp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,auxtot,.true.)
 
 !.....Some conversions
   nsp= 0
@@ -1185,13 +1192,12 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   stnsr(:,:) = stnsr(:,:) *up2gpa
 
   if( iprint.ge.ipl_info ) print *,'space_comp...'
-  call space_comp(ntot0,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
+  call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot,ekitot,epitot, &
        auxtot)
 
-!.....revert forces to the unit eV/A before going out 
+!.....revert forces to the unit eV/A before going out
   if( myid_md.eq.0 ) then
     do i=1,ntot0
-      is= int(tagtot(i))
       aai(1:3)= h(1:3,1,0)*atot(1,i) &
            +h(1:3,2,0)*atot(2,i) &
            +h(1:3,3,0)*atot(3,i)
@@ -1202,8 +1208,8 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   return
 end subroutine oneshot
 !=======================================================================
-subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-     ekitot,epitot,auxtot,ekin,epot,stnsr,lgrad,lgrad_done, &
+subroutine oneshot4fp(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,atot,stot,ekitot,epitot,auxtot,ekin,epot,stnsr,lgrad,lgrad_done, &
      ndimp,maxisp,gwe,gwf,gws,lematch,lfmatch,lsmatch, &
      nfcal,lfrc_eval)
 !
@@ -1226,7 +1232,9 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   include "./const.h"
   integer,intent(in):: ntot0
   real(rp),intent(in):: hunit,hmat(3,3,0:1)
-  real(rp),intent(in):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0)
+  integer,intent(in):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(in):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(in):: rtot(3,ntot0),vtot(3,ntot0)
   real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0),auxtot(naux,ntot0)
   real(rp),intent(out):: ekitot(3,3,ntot0),epitot(ntot0),ekin,epot,stnsr(3,3)
   logical,intent(in):: lgrad, lgrad_done
@@ -1261,7 +1269,7 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     write(6,'(a,"[ ",3f12.3," ]")') '   c = ',h(1:3,3,0)
   endif
   call boxmat(h,hi,ht,g,gi,gt,vol,sgm)
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
+  call space_decomp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,auxtot,.true.)
 
 !.....Some conversions
   nsp= 0
@@ -1353,13 +1361,12 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   stnsr(:,:) = stnsr(:,:) *up2gpa
 
   if( iprint.ge.ipl_basic ) print *,'space_comp...'
-  call space_comp(ntot0,tagtot,rtot,vtot,atot,stot,ekitot,epitot, &
+  call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot,ekitot,epitot, &
        auxtot)
 
-!.....revert forces to the unit eV/A before going out 
+!.....revert forces to the unit eV/A before going out
   if( myid_md.eq.0 ) then
     do i=1,ntot0
-      is= int(tagtot(i))
       aai(1:3)= h(1:3,1,0)*atot(1,i) &
            +h(1:3,2,0)*atot(2,i) &
            +h(1:3,3,0)*atot(3,i)
@@ -1370,8 +1377,8 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   return
 end subroutine oneshot4fp
 !=======================================================================
-subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
-     ,ekitot,epitot,auxtot,epot,stnsr)
+subroutine min_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,atot,stot,ekitot,epitot,auxtot,epot,stnsr)
 !
 !  Minimization/relaxation routine.
 !  Since MD and minimization could be very different, use different
@@ -1398,8 +1405,9 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   include "./const.h"
   integer,intent(inout):: ntot0
   real(rp),intent(in):: hunit
-  real(rp),intent(inout):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0), &
-       hmat(3,3,0:1)
+  integer,intent(inout):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(inout):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
   real(rp),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
        ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0)
   real(rp),intent(out):: epot,stnsr(3,3)
@@ -1450,7 +1458,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....perform space decomposition after reading atomic configuration
   tmp = real(mpi_wtime(),rp)
-  call space_decomp(ntot0,tagtot,rtot,vtot,auxtot,.true.)
+  call space_decomp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,auxtot,.true.)
   call accum_time('space_decomp',real(mpi_wtime(),rp)-tmp)
 !.....Some conversions
   do i=1,natm
@@ -1567,13 +1575,13 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....output initial configuration including epi, eki, and strs
     write(cnum,'(i0)') istp
     tmp = real(mpi_wtime(),rp)
-    call space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
+    call space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot, &
          ekitot,epitot,auxtot)
     call accum_time('space_comp',real(mpi_wtime(),rp)-tmp)
     if( ifpmd.gt.0 .and. myid_md.eq.0 ) then
       if( ifsort.gt.0 ) then
         tmp = real(mpi_wtime(),rp)
-        call sort_by_tag(ntot,tagtot,rtot,vtot &
+        call sort_by_tag(ntot,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot &
              ,atot,ekitot,epitot,stot,auxtot,naux,ifsort)
         call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
       endif
@@ -1581,27 +1589,29 @@ subroutine min_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       if( ifpmd.eq.1 ) then  ! pmd format
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
           call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot,rtot,vtot)
+               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
         elseif( trim(ciofmt).eq.'ascii' ) then
           sth(:,:) = stnsr(:,:)*up2gpa
           if( lcomb_pos ) then
             call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
-                 tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
-          else            
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+          else
             call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                 tagtot,rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
           endif
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
         if( lcomb_pos ) then
-          call write_dump(20,'dump',ntot,hunit,h,tagtot, &
+          call write_dump(20,'dump',ntot,hunit,h,tagtot_isp,tagtot_itot, &
                rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
         else
-          call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot, &
+          call write_dump(20,'dump_'//trim(cnum),ntot,hunit,h,tagtot_isp,tagtot_itot, &
                rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
         endif
       else if( ifpmd.eq.3 ) then  ! extxyz format
-        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot, &
+        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
              rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
       endif
       call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
@@ -1687,16 +1697,16 @@ subroutine set_fmv(fmv)
 
 end subroutine set_fmv
 !=======================================================================
-subroutine set_nsp(ntot,tagtot)
+subroutine set_nsp(ntot,tagtot_isp)
 !
 !  Set nsp from specorder.
 !
   use pmdmpi
   use mod_precision
   use pmdvars,only: nsp,nspmax,specorder,myid_md,mpi_md_world,iprint
-  implicit none 
+  implicit none
   integer,intent(in):: ntot
-  real(rp),intent(in):: tagtot(ntot)
+  integer,intent(in):: tagtot_isp(ntot)
   include './const.h'
 
   integer:: i,ierr
@@ -1704,7 +1714,7 @@ subroutine set_nsp(ntot,tagtot)
   if( myid_md.eq.0 ) then
     nsp = 0
     do i=1,ntot
-      nsp = max(int(tagtot(i)),nsp)
+      nsp = max(tagtot_isp(i),nsp)
     enddo
   
     if( nsp.gt.nspmax ) then
@@ -2948,7 +2958,8 @@ subroutine vfire(num_fire,alp0_fire,alp_fire,falp_fire,dtmax_fire &
 !     &     ,ierr)
 end subroutine vfire
 !=======================================================================
-subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
+subroutine space_decomp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,auxtot,l1st)
 !
 !  Decompose the system and scatter atoms to every process.
 !
@@ -2959,7 +2970,9 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   use clrchg,only: lclrchg
   implicit none
   integer,intent(in):: ntot0
-  real(rp),intent(inout):: rtot(3,ntot0),tagtot(ntot0)
+  integer,intent(inout):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(inout):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(inout):: rtot(3,ntot0)
   real(rp),intent(in):: vtot(3,ntot0)
   real(rp),intent(in):: auxtot(naux,ntot0)
   logical,intent(in):: l1st
@@ -3005,10 +3018,10 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
                rtot(2,i).le.syogt+1.0_rp/ny .and. &
                rtot(3,i).ge.szogt .and. &
                rtot(3,i).le.szogt+1.0_rp/nz .and. &
-               tagtot(i).gt.0.0_rp) then
+               tagtot_isp(i).gt.0) then
             n = n+1
-!.....Set the tag negative if the atom is assigned to a certain cell
-            tagtot(i) = -tagtot(i)
+!.....Set the isp negative if the atom is assigned to a certain cell
+            tagtot_isp(i) = -tagtot_isp(i)
           endif
         enddo
         nalmax = max(nalmax,n)
@@ -3030,9 +3043,9 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
         write(6,'(a,i10)')   '     namax = nalmax*1.2 + nbmax  = ' &
              ,namax
       endif
-!.....Reset the tags positive
+!.....Reset the isp positive
       do i=1,ntot0
-        tagtot(i) = abs(tagtot(i))
+        tagtot_isp(i) = abs(tagtot_isp(i))
       enddo
     endif ! myid.eq.0
     call mpi_bcast(namax,1,mpi_integer,0,mpi_md_world,ierr)
@@ -3053,9 +3066,9 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
           print '(a,2i0)', ' space_decomp: old_namax,new_namax = ',namax,newnamax
           print '(a,2i0)', ' space_decomp: old_nbmax,new_nbmax = ',nbmax,newnbmax
         endif
-!.....Reset the tags positive
+!.....Reset the isp positive
         do i=1,ntot0
-          tagtot(i) = abs(tagtot(i))
+          tagtot_isp(i) = abs(tagtot_isp(i))
         enddo
       endif
       call mpi_bcast(newnamax,1,mpi_integer,0,mpi_md_world,ierr)
@@ -3083,15 +3096,18 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
              rtot(2,i).le.syogt+1.0_rp/ny .and. &
              rtot(3,i).ge.szogt .and. &
              rtot(3,i).le.szogt+1.0_rp/nz .and. &
-             tagtot(i).gt.0.0_rp ) then
+             tagtot_isp(i).gt.0 ) then
           natm = natm +1
-          call tag_decode(real(tagtot(i),8), tag_isp(natm), tag_ifmv(natm), tag_igrp(:,natm), tag_itot(natm))
+          tag_isp(natm)  = tagtot_isp(i)
+          tag_ifmv(natm) = tagtot_ifmv(i)
+          tag_igrp(:,natm) = tagtot_igrp(:,i)
+          tag_itot(natm) = tagtot_itot(i)
           ra(1:3,natm)= rtot(1:3,i)
 !!$          va(1:3,natm)= vtot(1:3,i)
 !.....va is in real unit, whereas vtot is in scaled unit
           va(1:3,natm)= h(1:3,1,0)*vtot(1,i) +h(1:3,2,0)*vtot(2,i) &
                +h(1:3,3,0)*vtot(3,i)
-          tagtot(i) = -tagtot(i)
+          tagtot_isp(i) = -tagtot_isp(i)
           if( naux.gt.0 ) aux(1:naux,natm) = auxtot(1:naux,i)
         endif
       enddo
@@ -3113,9 +3129,9 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
       endif
     enddo
 !        write(6,'(a,f10.3)') ' time space_decomp = ',real(mpi_wtime(),rp) -t0
-!.....Reset the tags positive
+!.....Reset the isp positive
     do i=1,ntot0
-      tagtot(i) = abs(tagtot(i))
+      tagtot_isp(i) = abs(tagtot_isp(i))
     enddo
   else ! myid_md.ne.0
     call mpi_recv(natm,1,mpi_integer,0,myid_md+1 &
@@ -3137,8 +3153,8 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
 
 end subroutine space_decomp
 !=======================================================================
-subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
-     ekitot,epitot,auxtot)
+subroutine space_comp(ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     rtot,vtot,atot,stot,ekitot,epitot,auxtot)
 !
 !  Opposite to space_decomp, gather atoms from every process
 !  to create the total system for output.
@@ -3147,10 +3163,11 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
   use mod_precision
   use pmdvars
   use pmdio,only: tag_encode
-  use util,only: itotOf
   implicit none
   integer,intent(in):: ntot0
-  real(rp),intent(out):: tagtot(ntot0),rtot(3,ntot0),vtot(3,ntot0) &
+  integer,intent(out):: tagtot_isp(ntot0),tagtot_ifmv(ntot0)
+  integer,intent(out):: tagtot_igrp(ngrpmax,ntot0),tagtot_itot(ntot0)
+  real(rp),intent(out):: rtot(3,ntot0),vtot(3,ntot0) &
        ,atot(3,ntot0),epitot(ntot0),ekitot(3,3,ntot0),stot(3,3,ntot0)
   real(rp),intent(out):: auxtot(naux,ntot0)
   integer,parameter:: nmpi = 10
@@ -3169,7 +3186,10 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
   if( myid_md.eq.0 ) then
     n0 = natm
     do i=1,natm
-      tagtot(i) = real(tag_encode(tag_isp(i),tag_ifmv(i),tag_igrp(:,i),tag_itot(i)),rp)
+      tagtot_isp(i)  = tag_isp(i)
+      tagtot_ifmv(i) = tag_ifmv(i)
+      tagtot_igrp(:,i) = tag_igrp(:,i)
+      tagtot_itot(i) = tag_itot(i)
     enddo
     rtot(1:3,1:natm) = ra(1:3,1:natm)
     do i=1,natm
@@ -3192,8 +3212,10 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
            ,mpi_md_world,istat,ierr)
       if( natmt.eq.0 ) cycle
       ntott = ntott + natmt
-      call mpi_recv(tagtot(n0),natmt,mpi_real_rp &
-           ,ixyz,itag+1,mpi_md_world,istat,ierr)
+      call mpi_recv(tagtot_isp(n0), natmt,         mpi_integer,ixyz,itag+1,  mpi_md_world,istat,ierr)
+      call mpi_recv(tagtot_ifmv(n0),natmt,         mpi_integer,ixyz,itag+21, mpi_md_world,istat,ierr)
+      call mpi_recv(tagtot_igrp(1,n0),ngrpmax*natmt,mpi_integer,ixyz,itag+22,mpi_md_world,istat,ierr)
+      call mpi_recv(tagtot_itot(n0), natmt,         mpi_integer,ixyz,itag+23, mpi_md_world,istat,ierr)
       call mpi_recv(rtot(1,n0),3*natmt,mpi_real_rp &
            ,ixyz,itag+2,mpi_md_world,istat,ierr)
       call mpi_recv(vtot(1,n0),3*natmt,mpi_real_rp &
@@ -3224,11 +3246,10 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
     call mpi_send(natm,1,mpi_integer,0,itag &
          ,mpi_md_world,ierr)
     if( natm.gt.0 ) then
-      do i=1,natm
-        ratmp(1,i) = real(tag_encode(tag_isp(i),tag_ifmv(i),tag_igrp(:,i),tag_itot(i)),rp)
-      enddo
-      call mpi_send(ratmp(1,1),natm,mpi_real_rp,0,itag+1 &
-           ,mpi_md_world,ierr)
+      call mpi_send(tag_isp, natm,          mpi_integer,0,itag+1,  mpi_md_world,ierr)
+      call mpi_send(tag_ifmv,natm,          mpi_integer,0,itag+21, mpi_md_world,ierr)
+      call mpi_send(tag_igrp,ngrpmax*natm,  mpi_integer,0,itag+22, mpi_md_world,ierr)
+      call mpi_send(tag_itot,natm,          mpi_integer,0,itag+23, mpi_md_world,ierr)
 !.....Positions should be shifted, velocities and forces should be converted to scaled ones
       do i=1,natm
         ratmp(1:3,i) = ra(1:3,i) + sorg(1:3)
@@ -3258,53 +3279,53 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
 
 end subroutine space_comp
 !=======================================================================
-subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
+subroutine sort_by_tag(natm,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+     ra,va,aa,eki,epi,strs,aux,naux,ifsort)
 !
 !  Sort by tag for output.
 !  - ifsort
 !      1: quick sort
 !      2: heap sort
-!  
+!
   use pmdmpi
   use mod_precision
-  use util,only: itotOf
+  use pmdvars,only: ngrpmax
   use time,only: accum_time
-!!$  use force,only: luse_charge, luse_elec_temp
   implicit none
-  integer,intent(in):: natm,ifsort
+  integer,intent(in):: natm,ifsort,naux
+  integer,intent(inout):: tagtot_isp(natm),tagtot_ifmv(natm)
+  integer,intent(inout):: tagtot_igrp(ngrpmax,natm),tagtot_itot(natm)
   real(rp),intent(inout):: ra(3,natm),va(3,natm),aa(3,natm) &
-       ,eki(3,3,natm),epi(natm),strs(3,3,natm),tag(natm)
-  integer,intent(in):: naux
+       ,eki(3,3,natm),epi(natm),strs(3,3,natm)
   real(rp),intent(inout):: aux(naux,natm)
 
   integer,allocatable,save:: itag(:),idxarr(:)
+  integer,allocatable,save:: ibuf(:,:)   ! (2+ngrpmax, natm): [isp, ifmv, igrp(1:ngrpmax), itot]
   real(rp),allocatable,save:: buf(:,:)
-  integer:: i,j,k
+  integer:: i,j,k,tmp_isp,tmp_ifmv,tmp_itot
+  integer,allocatable:: tmp_igrp(:)
   integer,save:: nsave = 0
   integer,save:: ndata
-  real(rp):: tmp
-!!$  integer,external:: itotOf
 
-!!$  ndata = 33
   ndata = 9
 
   if( .not. allocated(itag) .or. natm.gt.nsave ) then
-    if( allocated(itag) ) deallocate(itag,idxarr,buf)
+    if( allocated(itag) ) deallocate(itag,idxarr,buf,ibuf)
     nsave = natm
     allocate(itag(natm),idxarr(natm),buf(ndata,natm))
+    allocate(ibuf(2+ngrpmax,natm))
   endif
+  allocate(tmp_igrp(ngrpmax))
 
   do i=1,natm
-    itag(i)= itotOf(tag(i))
+    itag(i) = tagtot_itot(i)
   enddo
 
-!!$  tmp = real(mpi_wtime(),rp)
   if( ifsort.eq.1 ) then
     call arg_heapsort_iarr(natm,natm,itag,idxarr)
   else  ! default 2
     call arg_qsort_iarr(natm,1,natm,itag,idxarr)
   endif
-!!$  call accum_time('sorting',real(mpi_wtime(),rp)-tmp)
 
   buf(1:3,1:natm) = ra(1:3,1:natm)
   buf(4:6,1:natm) = va(1:3,1:natm)
@@ -3315,7 +3336,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
     va(1:3,i) = buf(4:6,j)
     aa(1:3,i) = buf(7:9,j)
   enddo
-  
+
   buf(1:3,1:natm) = strs(1:3,1,1:natm)
   buf(4:6,1:natm) = strs(1:3,2,1:natm)
   buf(7:9,1:natm) = strs(1:3,3,1:natm)
@@ -3325,7 +3346,7 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
     strs(1:3,2,i) = buf(4:6,j)
     strs(1:3,3,i) = buf(7:9,j)
   enddo
-  
+
   buf(1:3,1:natm) = eki(1:3,1,1:natm)
   buf(4:6,1:natm) = eki(1:3,2,1:natm)
   buf(7:9,1:natm) = eki(1:3,3,1:natm)
@@ -3335,23 +3356,29 @@ subroutine sort_by_tag(natm,tag,ra,va,aa,eki,epi,strs,aux,naux,ifsort)
     eki(1:3,2,i) = buf(4:6,j)
     eki(1:3,3,i) = buf(7:9,j)
   enddo
-  
-  buf(1,1:natm) = tag(1:natm)
+
+!.....Sort tag arrays and epi/aux together
+  ibuf(1,1:natm) = tagtot_isp(1:natm)
+  ibuf(2,1:natm) = tagtot_ifmv(1:natm)
+  do k=1,ngrpmax
+    ibuf(2+k,1:natm) = tagtot_igrp(k,1:natm)
+  enddo
+  buf(1,1:natm) = real(tagtot_itot(1:natm),rp)
   buf(2,1:natm) = epi(1:natm)
-!.....This part may cause cache mishits and harm the efficiency
   buf(2+1:2+naux,1:natm) = aux(1:naux,1:natm)
-!!$  do k=1,naux
-!!$    buf(2+k,1:natm) = aux(k,1:natm)
-!!$  enddo
   do i=1,natm
     j = idxarr(i)
-    tag(i) = buf(1,j)
+    tagtot_isp(i)  = ibuf(1,j)
+    tagtot_ifmv(i) = ibuf(2,j)
+    do k=1,ngrpmax
+      tagtot_igrp(k,i) = ibuf(2+k,j)
+    enddo
+    tagtot_itot(i) = nint(buf(1,j))
     epi(i) = buf(2,j)
-!!$    do k=1,naux
-!!$      aux(k,i) = buf(2+k,j)
-!!$    enddo
     aux(1:naux,i) = buf(2+1:2+naux,j)
   enddo
+
+  deallocate(tmp_igrp)
 
 end subroutine sort_by_tag
 !=======================================================================

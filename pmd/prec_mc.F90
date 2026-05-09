@@ -1128,6 +1128,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
      ,nstps_pmd,nx,ny,nz,mpi_md_world,nodes_md,myid_md,nstps_done)
   use pmdmpi
   use mod_precision
+  use pmdvars,only: ngrpmax
   use pmc, only: symbol2sid
   implicit none
   integer,intent(in):: natm,nstps_pmd,nx,ny,nz&
@@ -1151,7 +1152,9 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 
   logical,save:: l1st = .true.
   integer,save:: ntot = 0
-  real(rp),save,allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:) &
+  integer(4),save,allocatable:: tagtot_isp(:),tagtot_ifmv(:) &
+       ,tagtot_igrp(:,:),tagtot_itot(:)
+  real(rp),save,allocatable:: rtot(:,:),vtot(:,:),atot(:,:) &
        ,epitot(:),ekitot(:,:,:),stot(:,:,:),chgtot(:),chitot(:)
 
 !.....at the 1st call, evaluate number of total atoms to be used in pmd
@@ -1165,20 +1168,26 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
     enddo
     if( ntot.ne.inc ) then
       ntot = inc
-      if( allocated(tagtot) ) then
-        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
+      if( allocated(tagtot_isp) ) then
+        deallocate(tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot &
+             ,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
       endif
-      allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
+      allocate(tagtot_isp(ntot),tagtot_ifmv(ntot) &
+           ,tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot) &
+           ,rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
            ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot) &
            ,chgtot(ntot),chitot(ntot))
     endif
   else
     if( ntot.ne.1 ) then
       ntot = 1
-      if( allocated(tagtot) ) then
-        deallocate(tagtot,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
+      if( allocated(tagtot_isp) ) then
+        deallocate(tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot &
+             ,rtot,vtot,atot,epitot,ekitot,stot,chgtot,chitot)
       endif
-      allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
+      allocate(tagtot_isp(ntot),tagtot_ifmv(ntot) &
+           ,tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot) &
+           ,rtot(3,ntot),vtot(3,ntot),atot(3,ntot) &
            ,epitot(ntot),ekitot(3,3,ntot),stot(3,3,ntot) &
            ,chgtot(ntot),chitot(ntot))
     endif
@@ -1194,7 +1203,10 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
       csi = csymbols(i)
       if( csi.eq.'V' ) cycle
       inc = inc + 1
-      tagtot(inc) = real(symbol2sid(csi), rp) +0.1_rp +1e-14_rp*inc
+      tagtot_isp(inc) = symbol2sid(csi)
+      tagtot_ifmv(inc) = 1
+      tagtot_igrp(:,inc) = 0
+      tagtot_itot(inc) = inc
       rtot(1:3,inc) = pos0(1:3,i)
       vtot(1:3,inc) = 0.0_rp
       atot(1:3,inc) = 0.0_rp
@@ -1253,7 +1265,7 @@ subroutine run_pmd(hmat,natm,pos0,csymbols,epimc,epotmc &
 !.....call pmd_core to perfom MD
 !!$  print *,'nstps_pmd = ',nstps_pmd
 !!$  print *,'minstp = ',minstp
-  call pmd_core(hunit,h,ntot,tagtot,rtot,vtot,atot,stot &
+  call pmd_core(hunit,h,ntot,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot &
        ,ekitot,epitot,chgtot,chitot,nstps_pmd,nerg,npmd &
        ,myid_md,mpi_md_world,nodes_md,nx,ny,nz &
        ,nismax,am,dt,ciofmt,ifpmd,numff,cffs,rc,rbuf,ifdmp,dmp,minstp &

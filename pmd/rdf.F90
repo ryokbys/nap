@@ -16,6 +16,7 @@ program rdf
 !   - out.sfac:      Structure factor S(q) data obtained from total RDF.
 !-----------------------------------------------------------------------
   use mod_precision
+  use pmdvars,only: ngrpmax,nspmax,specorder
   use pmdio,only: read_pmdtot_ascii, get_ntot_ascii
   use pairlist,only: mk_lspr_sngl
   implicit none
@@ -25,15 +26,17 @@ program rdf
   character(len=128),parameter:: cfinput='in.rdf'
   character(len=128),parameter:: cfoutrdf='out.rdf'
   character(len=128),parameter:: cfoutsq='out.sfac'
-  integer,parameter:: nspmax = 9
-
+  integer,parameter:: nnmax_dflt = 200
+  integer,parameter:: iprint_dflt = 1
   integer:: ia,ic,nc,maxnn,is,js,msp,inc,ict,i,ib,l,n,nbins
   integer:: nspc(nspmax)
   integer:: ntot
-  real(rp),allocatable:: tagtot(:),rtot(:,:),vtot(:,:),atot(:,:)
+  integer,allocatable:: tagtot_isp(:),tagtot_ifmv(:),tagtot_igrp(:,:),tagtot_itot(:)
+  real(rp),allocatable:: rtot(:,:),vtot(:,:),atot(:,:)
   real(rp),allocatable:: stot(:,:,:),epitot(:),ekitot(:,:,:)
   real(rp),allocatable:: auxtot(:,:)
-  integer,allocatable:: lspr(:,:),ls1nn(:,:)
+  integer,allocatable:: lspr(:,:)
+  real(rp):: hunit,h(3,3,0:1)
   real(rp),allocatable:: rdfs(:,:,:),denoms(:,:),sqs(:)
   logical:: lpair(nspmax,nspmax),lspc(nspmax)
   real(rp):: rcut,hi(3,3),t0,tmp,vol,dr,r
@@ -45,11 +48,12 @@ program rdf
   t0 = mpi_wtime()
 
 !.....Read atom configuration
-  ntot = get_ntot_bin(10,trim(cpmdini))
-  allocate(tagtot(ntot),rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
+  ntot = get_ntot_ascii(10,trim(cpmdini))
+  allocate(tagtot_isp(ntot),tagtot_ifmv(ntot),tagtot_igrp(ngrpmax,ntot),tagtot_itot(ntot))
+  allocate(rtot(3,ntot),vtot(3,ntot),epitot(ntot) &
        ,ekitot(3,3,ntot),stot(3,3,ntot),atot(3,ntot))
-  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot,rtot,vtot)
-  call get_hi(h,hi,vol)
+  call read_pmdtot_ascii(10,trim(cpmdini),ntot,hunit,h,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+  call get_hi(h(1:3,1:3,0),hi,vol)
   print *,'Num of atoms = ',ntot
 
 !.....Default values
@@ -66,14 +70,14 @@ program rdf
   print *,'dq    = ',dq
 
 !.....Make neighbor list
-  allocate(lspr(0:nnmax,ntot),ls1nn(0:nnmax,ntot))
-  call mk_lspr_sngl(ntot,ntot,nnmax,tagtot,rtot,rcut,rcut,h,hi, &
-       lspr,ls1nn,iprint,.true.)
+  allocate(lspr(0:nnmax_dflt,ntot))
+  call mk_lspr_sngl(ntot,ntot,nnmax_dflt,tagtot_isp,rtot,rcut,h(1:3,1:3,0),hi, &
+       lspr,iprint_dflt,.true.)
   maxnn = 0
   msp = 0
   nspc(:) = 0
   do ia=1,ntot
-    is = int(tagtot(ia))
+    is = tagtot_isp(ia)
     maxnn = max(maxnn,lspr(0,ia))
     msp = max(msp,is)
     nspc(is) = nspc(is) +1
@@ -97,7 +101,7 @@ program rdf
 !.....Compute RDF
   tmp = mpi_wtime()
   allocate(rdfs(0:msp,0:msp,nbins),denoms(0:msp,0:msp))
-  call comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
+  call comp_rdf(ntot,tagtot_isp,h(1:3,1:3,0),rtot,rcut,nnmax_dflt,lspr,msp,nbins,rdfs)
   print '(a,f0.3)',' Time for comp RDF = ',mpi_wtime()-tmp
 
 !.....Aggregate pairwise to get total RDF
@@ -200,9 +204,10 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 !  If pairs is specified, output pairwise RDF in addition to total RDF.
 !-----------------------------------------------------------------------
   use mod_precision
-  use pmdvars,only: csp2isp,nspmax
-  use util, only: num_data
-  implicit none 
+  use pmdvars,only: nspmax
+  use pmdio,only: split_pair
+  use util, only: num_data,csp2isp
+  implicit none
   integer,intent(in):: ionum
   character(len=*),intent(in):: cfname
   real(rp),intent(inout):: rcut,qcut
@@ -211,7 +216,7 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
 
   integer,parameter:: maxpair = 5
 
-  integer:: i,nentry,isp1,isp2,npair
+  integer:: i,nentry,isp1,isp2,npair,nnmax_tmp
   character(len=128):: c1st,cline
   character(len=7):: cpairs(maxpair)
   character(len=3):: csp1,csp2
@@ -260,7 +265,7 @@ subroutine read_in_rdf(ionum,cfname,rcut,qcut,nbins,lpair)
         print *,'ERROR: nentry != 2 !!!'
         stop 1
       endif
-      read(cline,*) c1st, nnmax
+      read(cline,*) c1st, nnmax_tmp
     endif
   end do
 1 close(ionum)
@@ -304,14 +309,15 @@ subroutine get_hi(h,hi,vol)
   return
 end subroutine get_hi
 !=======================================================================
-subroutine comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
+subroutine comp_rdf(ntot,tagtot_isp,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
 !
 !  Compute RDF.
 !
   use mod_precision
   implicit none
   integer,intent(in):: ntot,nnmax,lspr(0:nnmax,ntot),msp,nbins
-  real(rp),intent(in):: tagtot(ntot),rtot(3,ntot),rcut,h(3,3)
+  integer,intent(in):: tagtot_isp(ntot)
+  real(rp),intent(in):: rtot(3,ntot),rcut,h(3,3)
   real(rp),intent(out):: rdfs(0:msp,0:msp,nbins)
 
   integer:: ia,is,ja,js,jj,ib
@@ -321,11 +327,11 @@ subroutine comp_rdf(ntot,tagtot,h,rtot,rcut,nnmax,lspr,msp,nbins,rdfs)
   rc2 = rcut*rcut
   rdfs(:,:,:) = 0.0_rp
   do ia=1,ntot
-    is = int(tagtot(ia))
+    is = tagtot_isp(ia)
     xi(1:3) = rtot(1:3,ia)
     do jj=1,lspr(0,ia)
       ja = lspr(jj,ia)
-      js = int(tagtot(ja))
+      js = tagtot_isp(ja)
       xj(1:3)= rtot(1:3,ja)
       xij(1:3)= xj(1:3)-xi(1:3) -anint(xj(1:3)-xi(1:3))
       rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
