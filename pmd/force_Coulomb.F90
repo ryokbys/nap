@@ -821,7 +821,7 @@ contains
     return
   end subroutine read_params
 !=======================================================================
-  subroutine force_Coulomb(namax,natm,tag,ra,nnmax,aa,strs &
+  subroutine force_Coulomb(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strs &
        ,chg,h,hi,nb,nbmax,lsb,nex,lsrc &
        ,myparity,nn,sv,rc,lspr,sorg &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint &
@@ -838,8 +838,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),sorg(3)
+         ,sv(3,6),sorg(3)
     real(rp),intent(inout):: chg(namax)
     real(rp),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
@@ -867,7 +868,7 @@ contains
       call accum_mem('force_Coulomb',8*size(strsl)+8*size(aal))
 
       if( trim(cchgs).eq.'fixed_bvs' ) then
-        call set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint,specorder)
+        call set_charge_BVS(natm,nb,tag_isp,chg,myid,mpi_md_world,iprint,specorder)
       endif
 !.....In case that Coulomb interactions work only between species having
 !     charges of the same sign, set interaction array after setting BVS charges.
@@ -893,7 +894,7 @@ contains
 
     if( trim(cchgs).eq.'fixed' ) then
       do i=1,natm+nb
-        is = int(tag(i))
+        is = tag_isp(i)
         chg(i) = schg(is)
       enddo
     endif
@@ -908,37 +909,37 @@ contains
     eself = 0.0_rp
 
     if( lvc .or. trim(cterms).eq.'full' .or. trim(cterms).eq.'long' ) then
-      call self_term(namax,natm,tag,chg,epi,eselfl,iprint,lvc)
+      call self_term(namax,natm,tag_isp,chg,epi,eselfl,iprint,lvc)
       call mpi_allreduce(eselfl,eself,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'short' ) then
-      call Ewald_short(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+      call Ewald_short(namax,natm,tag_isp,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
       call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if(  trim(cterms).eq.'full' .or. &
          trim(cterms).eq.'long' ) then
-      call Ewald_long(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+      call Ewald_long(namax,natm,tag_isp,tag_itot,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs &
            ,lcell_updated)
       call mpi_allreduce(elrl,elr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
 
     if( trim(cterms).eq.'direct' ) then
-      call force_direct(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+      call force_direct(namax,natm,tag_isp,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc)
       call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'direct_cut' ) then
-      call force_direct_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+      call force_direct_cut(namax,natm,tag_isp,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
     if( trim(cterms).eq.'screened_cut' ) then
-      call force_screened_cut(namax,natm,tag,ra,nnmax,aal,strsl,chg,h,hi &
+      call force_screened_cut(namax,natm,tag_isp,ra,nnmax,aal,strsl,chg,h,hi &
            ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
       call mpi_allreduce(esrl,esr,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
@@ -974,7 +975,7 @@ contains
 
   end subroutine force_Coulomb
 !=======================================================================
-  subroutine force_direct(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+  subroutine force_direct(namax,natm,tag_isp,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc)
 !
 !  Direct Coulomb interaction with cutoff radius without any cutoff treatment.
@@ -982,7 +983,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
     real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
@@ -997,13 +999,13 @@ contains
     esrl = 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -1042,7 +1044,7 @@ contains
 
   end subroutine force_direct
 !=======================================================================
-  subroutine force_direct_cut(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+  subroutine force_direct_cut(namax,natm,tag_isp,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Direct Coulomb interaction with cutoff radius.
@@ -1055,7 +1057,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs,l1st
     real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
@@ -1075,11 +1078,11 @@ contains
 !$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
@@ -1116,7 +1119,7 @@ contains
 
   end subroutine force_direct_cut
 !=======================================================================
-  subroutine force_screened_cut(namax,natm,tag,ra,nnmax,aa,strsl &
+  subroutine force_screened_cut(namax,natm,tag_isp,ra,nnmax,aa,strsl &
        ,chg,h,hi,lspr,epi,esrl,iprint,lstrs,rc,l1st)
 !
 !  Screened Coulomb with cutoff that uses rho_scr.
@@ -1127,7 +1130,8 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc,tag(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc
     real(rp),intent(inout):: chg(namax)
     real(rp),intent(inout):: strsl(3,3,namax),aa(3,namax)&
          ,epi(namax),esrl
@@ -1168,13 +1172,13 @@ contains
 !$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi= chg(i)
       do jj=1,lspr(0,i)
         j=lspr(jj,i)
 !!$        if(j.eq.0) exit
 !!$        if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         if( .not.interact(is,js) ) cycle
         qj= chg(j)
         xj(1:3)= ra(1:3,j)
@@ -1225,12 +1229,13 @@ contains
 
   end subroutine force_screened_cut
 !=======================================================================
-  subroutine Ewald_short(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi &
+  subroutine Ewald_short(namax,natm,tag_isp,ra,nnmax,aa,strsl,chg,h,hi &
        ,lspr,epi,esrl,iprint,lstrs,rc)
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax), &
          h(3,3),hi(3,3),rc
     logical,intent(in):: lstrs
     real(rp),intent(inout):: aa(3,namax),strsl(3,3,namax), &
@@ -1253,12 +1258,12 @@ contains
 !$omp     reduction(+:esrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
 !!$        if( j.le.i ) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -1310,7 +1315,7 @@ contains
 
   end subroutine Ewald_short
 !=======================================================================
-  subroutine Ewald_long(namax,natm,tag,ra,nnmax,aa,strsl,chg,h,hi,&
+  subroutine Ewald_long(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strsl,chg,h,hi,&
        lspr,sorg,epi,elrl,iprint,myid,mpi_md_world,lstrs,lcell_updated)
 !
 !  Long-range term of Ewald sum.
@@ -1319,7 +1324,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          myid,mpi_md_world,lspr(0:nnmax,namax)
-    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax),&
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),chg(namax),&
          h(3,3),hi(3,3),sorg(3)
     logical,intent(in):: lstrs,lcell_updated
     real(rp),intent(inout):: aa(3,namax),epi(namax),&
@@ -1335,7 +1341,7 @@ contains
 !.....Compute reciprocal vectors
     if( lcell_updated ) call get_recip_vectors(h)
 !.....Compute structure factor of the local processor
-    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
+    call calc_qcos_qsin(namax,natm,tag_isp,tag_itot,ra,chg,h,iprint &
          ,myid,mpi_md_world,sorg)
 
 !.....Compute long-range contribution to potential energy
@@ -1352,8 +1358,8 @@ contains
 !$omp     reduction(+:elrl)
     do i=1,natm
       xi(1:3)= ra(1:3,i) +sorg(1:3)
-      is= int(tag(i))
-      itot = itotOf(tag(i))
+      is= tag_isp(i)
+      itot = tag_itot(i)
       qi = chg(i)
 !!$      if( abs(qi).lt.qthd ) cycle
       ri(1:3) = h(1:3,1)*xi(1) +h(1:3,2)*xi(2) +h(1:3,3)*xi(3)
@@ -1495,12 +1501,13 @@ contains
 
   end subroutine Ewald_long
 !=======================================================================
-  subroutine self_term(namax,natm,tag,chg,&
+  subroutine self_term(namax,natm,tag_isp,chg,&
        epi,eselfl,iprint,lvc)
     implicit none
     integer,intent(in):: namax,natm,iprint
     logical,intent(in):: lvc
-    real(rp),intent(in):: tag(namax),chg(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: chg(namax)
     real(rp),intent(inout):: epi(namax),eselfl
 
     integer:: i,is
@@ -1510,7 +1517,7 @@ contains
     if( lvc ) then  ! variable charge
       eselfl = 0.0_rp
       do i=1,natm
-        is = int(tag(i))
+        is = tag_isp(i)
         qi = chg(i)
         q2 = qi*qi
         tmp = (vc_e0(is) +vc_chi(is)*qi +0.5_rp*vc_jii(is)*q2)
@@ -1522,7 +1529,7 @@ contains
 !....If charge per atom is fixed, it is constant, though.
       eselfl = 0.0_rp
       do i=1,natm
-        is = int(tag(i))
+        is = tag_isp(i)
         q2 = chg(i)*chg(i)
         tmp = -q2 /sgm_ew *acc/sqrt(2.0_rp*pi)
         eselfl = eselfl +tmp
@@ -1532,14 +1539,15 @@ contains
     return
   end subroutine self_term
 !=======================================================================
-  subroutine qforce_short(namax,natm,tag,ra,nnmax,chg,h &
+  subroutine qforce_short(namax,natm,tag_isp,ra,nnmax,chg,h &
        ,lspr,iprint,rc,fq,esr)
 !
 !  Compute q-force of short-range term of Ewald sum.
 !
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax),h(3,3),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax),h(3,3),rc
     real(rp),intent(inout):: fq(namax),esr
 
     integer:: i,j,jj,is,js,ixyz,jxyz
@@ -1556,7 +1564,7 @@ contains
     esr = 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
 !!$      if( abs(qi).lt.qthd ) cycle
 !!$      sgmi = sgm(is)
@@ -1564,7 +1572,7 @@ contains
         j = lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         qj = chg(j)
 !!$        if( abs(qj).lt.qthd ) cycle
         xj(1:3) = ra(1:3,j)
@@ -1596,7 +1604,7 @@ contains
     return
   end subroutine qforce_short
 !=======================================================================
-  subroutine qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h &
+  subroutine qforce_direct_cut(namax,natm,tag_isp,ra,nnmax,chg,h &
        ,lspr,iprint,rc,fq,esr,l1st)
 !
 !  Compute q-force of direct_cut Coulomb potential.
@@ -1604,7 +1612,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax), &
          h(3,3),rc
     real(rp),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
@@ -1625,11 +1634,11 @@ contains
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
@@ -1655,7 +1664,7 @@ contains
     return
   end subroutine qforce_direct_cut
 !=======================================================================
-  subroutine qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h &
+  subroutine qforce_screened_cut(namax,natm,tag_isp,ra,nnmax,chg,h &
        ,lspr,iprint,rc,fq,esr,l1st)
 !
 !  Compute q-force of screened_cut Coulomb potential.
@@ -1663,7 +1672,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in)::tag(namax),ra(3,namax),chg(namax), &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in)::ra(3,namax),chg(namax), &
          h(3,3),rc
     real(rp),intent(inout):: fq(namax),esr
     logical,intent(in):: l1st 
@@ -1704,13 +1714,13 @@ contains
 !$omp    reduction(+:esr)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qi = chg(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
 !!$        if( j.eq.0 ) exit
 !!$        if( j.le.i ) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not.interact(is,js) ) cycle
         qj = chg(j)
         xj(1:3) = ra(1:3,j)
@@ -1744,14 +1754,15 @@ contains
     return
   end subroutine qforce_screened_cut
 !=======================================================================
-  subroutine qforce_long(namax,natm,tag,ra,chg,h, &
+  subroutine qforce_long(namax,natm,tag_isp,tag_itot,ra,chg,h, &
        sorg,mpi_md_world,myid,iprint,fq,elr)
 !
 !  Derivative of Ewald long-range term w.r.t. charges
 !
     implicit none
     integer,intent(in):: namax,natm,mpi_md_world,myid,iprint
-    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax),h(3,3),sorg(3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),chg(namax),h(3,3),sorg(3)
     real(rp),intent(inout):: fq(namax),elr
 
     integer:: i,ik,k1,k2,k3,is,ierr
@@ -1762,7 +1773,7 @@ contains
     call get_recip_vectors(h)
     prefac = 1.0_rp /(2.0_rp*vol*eps0)
 !.....Compute structure factor
-    call calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint &
+    call calc_qcos_qsin(namax,natm,tag_isp,tag_itot,ra,chg,h,iprint &
          ,myid,mpi_md_world,sorg)
 
     ik = 0
@@ -1779,7 +1790,7 @@ contains
           bb2 = dot(bb,bb)
           do i=1,natm
             xi(1:3)= ra(1:3,i)
-            is= int(tag(i))
+            is= tag_isp(i)
             sgmi = sgm_ew
             sgmi2= sgmi*sgmi
             qi = chg(i)
@@ -1814,12 +1825,13 @@ contains
     return
   end subroutine qforce_long
 !=======================================================================
-  subroutine qforce_self(namax,natm,tag,chg,fq,eself)
+  subroutine qforce_self(namax,natm,tag_isp,chg,fq,eself)
 !
 !  Derivative of self term w.r.t. charges
 !
     integer,intent(in):: namax,natm
-    real(rp),intent(in):: tag(namax),chg(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: chg(namax)
     real(rp),intent(inout):: fq(namax),eself
 
     integer:: i,is
@@ -1830,7 +1842,7 @@ contains
 !$omp do private(i,is,qi,q2,sgmi,tmp) &
 !$omp    reduction(+:eself)
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       qi = chg(i)
       q2 = qi*qi
       sgmi = sgm_ew
@@ -1847,7 +1859,7 @@ contains
 !
 !  Wrapper routine for calculating forces on charges.
 !
-    use pmdvars,only: namax,natm,nnmax,tag,ra,h,lspr, &
+    use pmdvars,only: namax,natm,nnmax,tag_isp,tag_itot,ra,h,lspr, &
          rc,sorg,myid_md,mpi_md_world,iprint
     real(rp),intent(in):: chg(namax)
     logical,intent(in):: l1st
@@ -1858,30 +1870,30 @@ contains
     real(rp):: eclong,eself,ecshort
 
     fq(:) = 0.0_rp
-    call qforce_self(namax,natm,tag,chg,fq,eselfl)
+    call qforce_self(namax,natm,tag_isp,chg,fq,eselfl)
     call mpi_allreduce(eselfl,eself,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
 
     if( trim(cterms).eq.'long' ) then
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
+      call qforce_long(namax,natm,tag_isp,tag_itot,ra,chg,h,sorg,mpi_md_world, &
            myid_md,iprint,fq,eclongl)
       call mpi_allreduce(eclongl,eclong,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'full' ) then
-      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+      call qforce_short(namax,natm,tag_isp,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
-      call qforce_long(namax,natm,tag,ra,chg,h,sorg,mpi_md_world, &
+      call qforce_long(namax,natm,tag_isp,tag_itot,ra,chg,h,sorg,mpi_md_world, &
            myid_md,iprint,fq,eclongl)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
       call mpi_allreduce(eclongl,eclong,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'direct_cut'  ) then
-      call qforce_direct_cut(namax,natm,tag,ra,nnmax,chg,h, &
+      call qforce_direct_cut(namax,natm,tag_isp,ra,nnmax,chg,h, &
            lspr,iprint,rc,fq,ecshortl,l1st)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'short' .or. trim(cterms).eq.'screened' ) then
-      call qforce_short(namax,natm,tag,ra,nnmax,chg,h,lspr,iprint &
+      call qforce_short(namax,natm,tag_isp,ra,nnmax,chg,h,lspr,iprint &
            ,rc,fq,ecshortl)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     else if( trim(cterms).eq.'screened_cut'  ) then
-      call qforce_screened_cut(namax,natm,tag,ra,nnmax,chg,h, &
+      call qforce_screened_cut(namax,natm,tag_isp,ra,nnmax,chg,h, &
            lspr,iprint,rc,fq,ecshortl,l1st)
       call mpi_allreduce(ecshortl,ecshort,1,mpi_real_rp,mpi_sum,mpi_md_world,ierr)
     endif
@@ -1890,7 +1902,7 @@ contains
     return
   end subroutine get_qforce
 !=======================================================================
-  subroutine set_charge_BVS(natm,nb,tag,chg,myid,mpi_md_world,iprint &
+  subroutine set_charge_BVS(natm,nb,tag_isp,chg,myid,mpi_md_world,iprint &
        ,specorder)
 !
 ! Reset actual charges of atoms using effective charge information
@@ -1899,7 +1911,7 @@ contains
 ! This would be called only once at the beginning.
 !
     integer,intent(in):: natm,nb,myid,mpi_md_world,iprint
-    real(rp),intent(in):: tag(natm+nb)
+    integer,intent(in):: tag_isp(natm+nb)
     real(rp),intent(out):: chg(natm+nb)
     character(len=3),intent(in):: specorder(nspmax)
 
@@ -1912,7 +1924,7 @@ contains
     nbvsl(1:nspmax) = 0
     nbvs(1:nspmax) = 0
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       nbvsl(is) = nbvsl(is) +1
     enddo
 
@@ -1956,7 +1968,7 @@ contains
     endif
 
     do i=1,natm+nb
-      is= int(tag(i))
+      is= tag_isp(i)
       chg(i) = schg(is)
 !!$!.....Negative charge for anion and positive for cation
 !!$      if( is .eq. 1 ) then
@@ -1990,14 +2002,15 @@ contains
     return
   end subroutine get_recip_vectors
 !=======================================================================
-  subroutine calc_qcos_qsin(namax,natm,tag,ra,chg,h,iprint&
+  subroutine calc_qcos_qsin(namax,natm,tag_isp,tag_itot,ra,chg,h,iprint&
        ,myid,mpi_md_world,sorg)
 !
 !  Compute qcos and qsin needed for calculation of Ewald long-range term.
 !
     implicit none
     integer,intent(in):: namax,natm,iprint,myid,mpi_md_world
-    real(rp),intent(in):: tag(namax),ra(3,namax),chg(namax) &
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),chg(namax) &
          ,h(3,3),sorg(3)
 
     integer:: ik,k1,k2,k3,is,i,ierr
@@ -2230,7 +2243,7 @@ contains
     deallocate(bbs)
   end subroutine setup_kspace
 !=======================================================================
-  subroutine chgopt_matrix(namax,natm,h,ra,tag,chg,nnmax,lspr, &
+  subroutine chgopt_matrix(namax,natm,h,ra,tag_isp,chg,nnmax,lspr, &
        rc,sorg,myid,mpi_world,iprint,l1st)
 !
 !  Charge optimization/equilibration by matrix inversion.
@@ -2238,7 +2251,8 @@ contains
 !
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: h(3,3),ra(3,natm),tag(natm),rc,sorg(3)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: h(3,3),ra(3,natm),rc,sorg(3)
     logical,intent(in):: l1st
     real(rp),intent(inout):: chg(natm)
 
@@ -2262,7 +2276,7 @@ contains
 
 !.....Make A-matrix and X-vector for linear equation, A*Q=X
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
 !.....Since qforces contain chi(i) that should not be in A-matrix,
 !     extract chi from fq
       fq(i) = fq(i) +vc_chi(is)
@@ -2467,7 +2481,7 @@ contains
 
   end subroutine set_params_Coulomb
 !=======================================================================
-  subroutine gradw_Coulomb(namax,natm,nb,tag,ra,chg,nnmax &
+  subroutine gradw_Coulomb(namax,natm,nb,tag_isp,ra,chg,nnmax &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
        ,lematch,lfmatch,lsmatch,iprm0,myid,mpi_world,specorder)
 !
@@ -2481,7 +2495,8 @@ contains
     integer,intent(in):: namax,natm,nb,nnmax,iprint,iprm0 &
          ,myid,mpi_world
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc
     real(rp),intent(inout):: epot,chg(namax)
     integer,intent(in):: ndimp
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
@@ -2507,12 +2522,12 @@ contains
       call accum_mem('force_Coulomb',8*size(gf_rho))
     endif
 
-    call set_charge_BVS(natm,nb,tag,chg,myid,mpi_world,iprint,specorder)
+    call set_charge_BVS(natm,nb,tag_isp,chg,myid,mpi_world,iprint,specorder)
 
 !.....Max isp
     maxisp = 0
     do i=1,natm
-      maxisp = max(maxisp,int(tag(i)))
+      maxisp = max(maxisp,tag_isp(i))
     enddo
 
     rc2 = rc*rc
@@ -2524,14 +2539,14 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3) = ra(1:3,i)
-      isp = int(tag(i))
+      isp = tag_isp(i)
       if( .not. ispflag(isp) ) cycle
       qi = chg(i)
       do jj=1,lspr(0,i)
         j= lspr(jj,i)
         if( j.eq.0 ) exit
         if( j.le.i ) cycle
-        jsp = int(tag(j))
+        jsp = tag_isp(j)
 !.....Check if two species interact
         if( .not. interact(isp,jsp) ) cycle
         xj(1:3) = ra(1:3,j)

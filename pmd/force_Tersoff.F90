@@ -89,7 +89,7 @@ contains
 !!$    ts_rc2= ts_rc**2
   end subroutine init_tersoff
 !=======================================================================
-  subroutine force_tersoff(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_tersoff(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint &
        ,tei)
@@ -99,8 +99,9 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,tag(namax),rc
+         ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
     character(len=3),intent(in):: specorder(nspmax)
@@ -174,11 +175,11 @@ contains
 !$omp    reduction(+:epotl1)
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
-      is = int(tag(ia))
+      is = tag_isp(ia)
       if( ts_type(1:2).eq.'Te' ) call set_ted_params(tei(ia),is)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         if( .not.interact(is,js) ) cycle
         if( ja.le.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
@@ -251,12 +252,12 @@ contains
 !$omp            dexp3ij,dexp3ik,dzdcs,dgzijk,djcs,dkcs,dics,diz,djz,dkz,tmpk ) &
 !$omp    reduction(+:epotl2)
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
       if( ts_type(1:2).eq.'Te' ) call set_ted_params(tei(ia),is)
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         if( .not.interact(is,js) ) cycle
         if( ja.eq.ia ) cycle
         xij(1:3) = ra(1:3,ja) -xi(1:3)
@@ -274,7 +275,7 @@ contains
         zeta = 0.0_rp
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
 !.....Currently Tersoff potential is only available fro js==ks
           if( ks.ne.js ) cycle
           if( ka.eq.ja ) cycle
@@ -330,7 +331,7 @@ contains
         do kk=1,lspr(0,ia)
           ka = lspr(kk,ia)
           if( ka.eq.ja ) cycle
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
 !.....Currently Tersoff potential is only available fro js==ks
           if( ks.ne.js ) cycle
           xik(1:3) = ra(1:3,ka) -xi(1:3)

@@ -194,19 +194,19 @@ contains
     return
   end subroutine read_rdcfrc_params
 !=======================================================================
-  subroutine reduce_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
+  subroutine reduce_forces(namax,natm,aa,tag_isp,tag_itot,ra,h,nnmax,lspr)
 !
 !  Reduce forces on atoms that are selected in some way...
 !
     use structure,only: idcna
-    use util,only: itotOf
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     real(rp),intent(inout):: aa(3,namax)
 
     integer:: ia,is,i,itot,icna
     real(rp):: beta
-!!$    integer,external:: itotOf
+
 
     if( ctype_fmod(1:5).eq.'neigh' ) then
       if( .not. allocated(ann) ) allocate(ann(namax))
@@ -242,7 +242,7 @@ contains
       endif
     else if( trim(ctype_fmod).eq.'ID' ) then
       do ia=1,natm
-        itot = itotOf(tag(ia))
+        itot = tag_itot(ia)
         do is=1,nids
           if( itot.eq.ids_fmod(is) ) then
             aa(1:3,ia) = alpha *aa(1:3,ia)
@@ -268,7 +268,7 @@ contains
       endif
     else ! default: species
       do ia=1,natm
-        is = int(tag(ia))
+        is = tag_isp(ia)
         if( is.eq.is_rdcfrc ) aa(1:3,ia) = alpha *aa(1:3,ia)
       enddo
     endif

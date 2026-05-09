@@ -223,7 +223,7 @@ contains
     return
   end subroutine read_params_EAM
 !=======================================================================
-  subroutine force_EAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_EAM(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
@@ -240,8 +240,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -288,12 +289,12 @@ contains
 !-----rho(i)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       if( .not. ea_interact(is) ) cycle
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. ea_interact(js) ) cycle
         rcout= ea_rcout(is,js)
         rc2 = rcout*rcout
@@ -316,7 +317,7 @@ contains
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       if( ea_interact(is) ) then
         dfi = dfrho(is,rho(i),type_frho(is))
       else
@@ -326,7 +327,7 @@ contains
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not.pair_interact(is,js) ) cycle
         rcout = ea_rcout(is,js)
         rc2 = rcout*rcout

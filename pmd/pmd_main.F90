@@ -835,12 +835,13 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot,atot,stnsr)
 
 end subroutine write_force
 !=======================================================================
-subroutine set_atomic_charges(ntot,chg,tag,nspmax,chgfix,schg,myid,iprint)
+subroutine set_atomic_charges(ntot,chg,tag_isp,nspmax,chgfix,schg,myid,iprint)
   use pmdmpi
   use mod_precision
-  implicit none 
+  implicit none
   integer,intent(in):: ntot,nspmax,myid,iprint
-  real(rp),intent(in):: tag(ntot),schg(nspmax)
+  integer,intent(in):: tag_isp(ntot)
+  real(rp),intent(in):: schg(nspmax)
   character(len=*),intent(in):: chgfix
   real(rp),intent(out):: chg(ntot)
 
@@ -851,7 +852,7 @@ subroutine set_atomic_charges(ntot,chg,tag,nspmax,chgfix,schg,myid,iprint)
       print *,'Charges are set from input.'
     endif
     do i=1,ntot
-      is = int(tag(i))
+      is = tag_isp(i)
       chg(i)= schg(is)
     enddo
   endif

@@ -4,7 +4,7 @@ module Lu_WHe
   use vector,only: dot
 
 contains
-  subroutine force_Lu_WHe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_Lu_WHe(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -18,8 +18,9 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,lspr(0:nnmax,namax),nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,tag(namax),rc
+         ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -75,11 +76,11 @@ contains
 !-----Repulsive term: V_R
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       do jj=1,lspr(0,i)
         j= lspr(jj,i)
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
         z= ra(3,j) -xi(3)
@@ -156,11 +157,11 @@ contains
 !-----Attractive term: -Bij*V_A
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do jj=1,lspr(0,i)
         j= lspr(jj,i)
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Skip He-He pair
         if( is.eq.2 .and. js.eq.2 ) cycle
         xj(1:3)= ra(1:3,j)
@@ -197,7 +198,7 @@ contains
         do kk=1,lspr(0,i)
           k= lspr(kk,i)
           if(k.eq.j) cycle
-          ks= int(tag(k))
+          ks= tag_isp(k)
           x= ra(1,k) -xi(1)
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
@@ -224,7 +225,7 @@ contains
         do kk=1,lspr(0,i)
           k= lspr(kk,i)
           if(k.eq.j) cycle
-          ks=int(tag(k))
+          ks=tag_isp(k)
           x= ra(1,k) -xi(1)
           y= ra(2,k) -xi(2)
           z= ra(3,k) -xi(3)
@@ -272,7 +273,7 @@ contains
         do kk=1,lspr(0,j)
           k= lspr(kk,j)
           if(k.eq.i) cycle
-          ks=int(tag(k))
+          ks=tag_isp(k)
           x= ra(1,k) -xj(1)
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)
@@ -299,7 +300,7 @@ contains
         do kk=1,lspr(0,j)
           k= lspr(kk,j)
           if(k.eq.i) cycle
-          ks=int(tag(k))
+          ks=tag_isp(k)
           x= ra(1,k) -xj(1)
           y= ra(2,k) -xj(2)
           z= ra(3,k) -xj(3)

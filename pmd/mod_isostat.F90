@@ -24,7 +24,7 @@ module isostat
        ndof,eks,temps,nfmv,cmass,cgmm,nspmax,srlx,ttgt_lang,stgt,ptgt, &
        pini,pfin,cpctl,ifdmp,strs,eki,sgm,dt,stbeta,vol,natm,lhydrostatic, &
        ntemps, lmultemps
-  use util,only: ithOf
+  
   use random,only: box_muller
   implicit none
   include "./params_unit.h"
@@ -193,13 +193,14 @@ contains
 
   end subroutine setup_cell_min
 !=======================================================================
-  subroutine vel_update_langevin(natm,tag,va,aa)
+  subroutine vel_update_langevin(natm,tag_isp,tag_ifmv,va,aa)
 !
 !  Update of velocities in Langevin thermostat using G-JF algorithm.
 !
     implicit none
     integer,intent(in):: natm
-    real(rp),intent(in):: tag(natm),aa(3,natm)
+    integer,intent(in):: tag_isp(natm),tag_ifmv(natm)
+    real(rp),intent(in):: aa(3,natm)
     real(rp),intent(inout):: va(3,natm)
 
     integer:: i,is,itemp,l
@@ -218,8 +219,8 @@ contains
     endif
 
     do i=1,natm
-      itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
-      is = int(tag(i))
+      itemp = tag_ifmv(i)  ! Group-ID for itemp == 1
+      is = tag_isp(i)
       if( itemp.eq.0 ) cycle
       if( tfac(itemp).lt.0.0_rp ) cycle
       ami= am(is)
@@ -243,13 +244,13 @@ contains
     enddo
   end subroutine vel_update_langevin
 !=======================================================================
-  subroutine vel_update_berendsen(natm,tag,va)
+  subroutine vel_update_berendsen(natm,tag_isp,tag_ifmv,va)
 !
 !  2nd update of velocities in Berendsen thermostat.
 !
     implicit none 
     integer,intent(in):: natm
-    real(rp),intent(in):: tag(natm)
+    integer,intent(in):: tag_isp(natm),tag_ifmv(natm)
     real(rp),intent(inout):: va(3,natm)
 
     integer:: i,is,itemp
@@ -271,7 +272,7 @@ contains
       endif
     enddo
     do i=1,natm
-      itemp = ithOf(tag(i),1)  ! Group-ID for itemp == 1
+      itemp = tag_ifmv(i)  ! Group-ID for itemp == 1
       if( itemp.le.0 .or. ttgt(itemp).lt.0.0_rp ) cycle
       va(1:3,i)= va(1:3,i) *tfac(itemp)
     enddo

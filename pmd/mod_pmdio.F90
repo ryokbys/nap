@@ -9,6 +9,36 @@ module pmdio
 
 contains
 !=======================================================================
+  function tag_encode(isp, ifmv, igrp, itot) result(tag_r)
+!  Encode 4 tag components into a real(8) tag value (legacy format).
+!  Always uses real(8) regardless of rp to preserve precision.
+    integer,intent(in):: isp, ifmv, igrp(4), itot
+    real(8):: tag_r
+    tag_r = real(isp,8) &
+          + real(ifmv,8) * 0.1d0 &
+          + real(igrp(1),8) * 0.01d0 &
+          + real(igrp(2),8) * 0.001d0 &
+          + real(igrp(3),8) * 0.0001d0 &
+          + real(igrp(4),8) * 0.00001d0 &
+          + real(itot,8)    * 1.0d-14
+  end function tag_encode
+!=======================================================================
+  subroutine tag_decode(tag_r, isp, ifmv, igrp, itot)
+!  Decode a real(8) tag value into 4 tag components (legacy format).
+    real(8),intent(in):: tag_r
+    integer,intent(out):: isp, ifmv, igrp(4), itot
+    real(8):: tmp
+    isp     = int(tag_r)
+    ifmv    = int(mod(tag_r * 10.0d0, 10.0d0))
+    igrp(1) = int(mod(tag_r * 1.0d2,  10.0d0))
+    igrp(2) = int(mod(tag_r * 1.0d3,  10.0d0))
+    igrp(3) = int(mod(tag_r * 1.0d4,  10.0d0))
+    igrp(4) = int(mod(tag_r * 1.0d5,  10.0d0))
+    tmp     = tag_r * 1.0d5
+    tmp     = tmp - int(tmp)
+    itot    = nint(tmp * 1.0d9)
+  end subroutine tag_decode
+!=======================================================================
   function get_ntot_ascii(ionum,cfname) result(ntot)
     integer,intent(in):: ionum
     character(len=*),intent(in):: cfname
@@ -261,7 +291,7 @@ contains
 !     Write atomic configuration in LAMMPS-dump format file.
 !
     use pmdvars,only: ndumpaux,cdumpauxarr,specorder,has_specorder,&
-         iaux_chg,iaux_tei,iaux_clr,iaux_edesc,lcomb_pos
+         iaux_chg,iaux_tei,iaux_clr,iaux_edesc,lcomb_pos,tag_isp,tag_itot
     use util,only: itotOf,iauxof
     use time,only: accum_time
     implicit none
@@ -372,14 +402,14 @@ contains
     enddo
     write(ionum,*) ''
     do i=1,ntot
-      write(ionum,'(i8)',advance='no') itotOf(tagtot(i))
+      write(ionum,'(i8)',advance='no') tag_itot(i)
       if( has_specorder ) then
-        is = int(tagtot(i))
+        is = tag_isp(i)
         csp = specorder(is)
         write(ionum,'(a4)',advance='no') trim(csp)
 !!$      print *,'tag,i,csp = ',tagtot(i),itotOf(tagtot(i)),csp
       else
-        write(ionum,'(i3)',advance='no') int(tagtot(i))
+        write(ionum,'(i3)',advance='no') tag_isp(i)
       endif
       write(ionum,'(3f12.5)',advance='no') dlmp(1:3,i)  ! pos
       write(ionum,'('//trim(cndlmp)//'es11.2e3)') dlmp(4:ndlmp,i)  ! except pos
@@ -399,7 +429,7 @@ contains
 !  Si  1.36000000  1.36000000  1.36000000  0.00e-00  0.00e-00  0.00e-00 -9.4438e-05 -5.7187e-04 -2.6944e-04
 !  ...
 !  ---
-    use pmdvars,only: has_specorder,specorder,lcomb_pos
+    use pmdvars,only: has_specorder,specorder,lcomb_pos,tag_isp
     use util, only: basename
     include './params_unit.h'
     integer,intent(in):: ionum,ntot,istp
@@ -463,7 +493,7 @@ contains
 
 !===== Atom information starts
     do i=1,ntot
-      is = int(tagtot(i))
+      is = tag_isp(i)
       csp = specorder(is)
       ri(1:3)= h(1:3,1,0)*rtot(1,i) +h(1:3,2,0)*rtot(2,i) +h(1:3,3,0)*rtot(3,i)
       vi(1:3)= h(1:3,1,0)*vtot(1,i) +h(1:3,2,0)*vtot(2,i) +h(1:3,3,0)*vtot(3,i)

@@ -147,7 +147,7 @@ contains
     return
   end subroutine pre_desci
 !=======================================================================
-  subroutine make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
+  subroutine make_gsf_arrays(l1st,namax,natm,tag_isp,nnmax,lspr &
        ,myid,mpi_world,iprint)
 !
 !  Make or update gsf arrays
@@ -155,7 +155,7 @@ contains
     logical,intent(in):: l1st
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),iprint
     integer,intent(in):: myid,mpi_world
-    real(rp),intent(in):: tag(namax)
+    integer,intent(in):: tag_isp(namax)
 
     integer:: i,ierr
     integer:: ns_gsf(2),ns_dgsf(4)
@@ -287,12 +287,13 @@ contains
     return
   end subroutine make_gsf_arrays
 !=======================================================================
-  subroutine calc_desc(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+  subroutine calc_desc(namax,natm,nb,nnmax,h,tag_isp,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
     logical,intent(in):: l1st
 
     real(rp):: time0
@@ -302,10 +303,10 @@ contains
     time0 = mpi_wtime()
 
     if( lcheby ) then
-      call calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+      call calc_desc_cheby(namax,natm,nb,nnmax,h,tag_isp,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     else ! default
-      call calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+      call calc_desc_default(namax,natm,nb,nnmax,h,tag_isp,ra,lspr,rc &
            ,myid,mpi_world,l1st,iprint)
     endif
 
@@ -314,13 +315,14 @@ contains
     return
   end subroutine calc_desc
 !=======================================================================
-  subroutine calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+  subroutine calc_desci(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
 !
 !  Wrapper for descriptor calculation
 !
     integer,intent(in):: ia,namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
 
     integer:: isf
 
@@ -330,9 +332,9 @@ contains
 
     if( lupdate_gsf ) then
       if( lcheby ) then
-        call desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+        call desci_cheby(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
       else ! Behler-Parrinello Symmetry Functions
-        call desci_bpsf(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+        call desci_bpsf(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
       endif
       if( lfitpot ) then
         if( .not. allocated(gsf) .or. .not. allocated(dgsf) &
@@ -386,7 +388,7 @@ contains
     endif
   end subroutine prepare_desci
 !=======================================================================
-  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+  subroutine calc_desc_default(namax,natm,nb,nnmax,h,tag_isp,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 !
 !  Evaluate descriptors (symmetry functions)
@@ -398,7 +400,8 @@ contains
 !!$    implicit none
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
     logical,intent(in):: l1st 
 
     integer:: isf,ia,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2 &
@@ -437,7 +440,7 @@ contains
     itypp = -1
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
-      is= int(tag(ia))
+      is= tag_isp(ia)
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
@@ -447,7 +450,7 @@ contains
         dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.ge.rcmax2 ) cycle
         dij = sqrt(dij2)
-        js= int(tag(ja))
+        js= tag_isp(ja)
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
         is1 = min(is,js)
@@ -525,7 +528,7 @@ contains
 !!$        ttmp = mpi_wtime()
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
-          ks= int(tag(ka))
+          ks= tag_isp(ka)
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
           xik(1:3)= xk(1:3) -xi(1:3)
@@ -745,7 +748,7 @@ contains
     return
   end subroutine calc_desc_default
 !=======================================================================
-  subroutine desci_bpsf(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+  subroutine desci_bpsf(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
 !
 !  Evaluate Behler-Parrinello symmetry functions (BPSF) of an atom-i only
 !  and their derivatives wrt positions for multi-species system.
@@ -755,7 +758,8 @@ contains
 !
     integer,intent(in):: ia,namax,natm,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
 
     integer:: isf,jj,ja,kk,ka,is,js,ks,ierr,i,isp,jsp,ksp,ityp,is1,is2 &
          ,ksf,itypp
@@ -770,7 +774,7 @@ contains
 !!$    real(rp),save:: time2, time3
 
     xi(1:3)= ra(1:3,ia)
-    is= int(tag(ia))
+    is= tag_isp(ia)
     do jj=1,lspr(0,ia)
       ja= lspr(jj,ia)
       if( ja.eq.ia ) cycle
@@ -780,7 +784,7 @@ contains
       dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
       if( dij2.ge.rcmax2 ) cycle
       dij = sqrt(dij2)
-      js= int(tag(ja))
+      js= tag_isp(ja)
       driji(1:3)= -rij(1:3)/dij
       drijj(1:3)= -driji(1:3)
       is1 = min(is,js)
@@ -855,7 +859,7 @@ contains
       if( dij.gt.rc3max ) cycle
       do kk=1,lspr(0,ia)
         ka= lspr(kk,ia)
-        ks= int(tag(ka))
+        ks= tag_isp(ka)
         if( ka.eq.ia .or. ka.le.ja ) cycle
         xk(1:3)= ra(1:3,ka)
         xik(1:3)= xk(1:3) -xi(1:3)
@@ -1073,7 +1077,7 @@ contains
     return
   end subroutine desci_bpsf
 !=======================================================================
-  subroutine calc_desc_cheby(namax,natm,nb,nnmax,h,tag,ra,lspr,rc &
+  subroutine calc_desc_cheby(namax,natm,nb,nnmax,h,tag_isp,ra,lspr,rc &
        ,myid,mpi_world,l1st,iprint)
 !-----------------------------------------------------------------------
 !  Evaluate descriptors (Chebyshev polynomials)
@@ -1083,7 +1087,8 @@ contains
 !-----------------------------------------------------------------------
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
     logical,intent(in):: l1st
 
     integer:: ia,ja,ka,jj,kk,is,js,ks,n,isf,ierr,isf0
@@ -1116,7 +1121,7 @@ contains
 
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
-      is= int(tag(ia))
+      is= tag_isp(ia)
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
@@ -1126,7 +1131,7 @@ contains
         dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij2.ge.rcmax2 ) cycle
         dij = sqrt(dij2)
-        js= int(tag(ja))
+        js= tag_isp(ja)
         driji(1:3)= -rij(1:3)/dij
         drijj(1:3)= -driji(1:3)
 !.....Rcut for 2-body common for all 2-body
@@ -1169,7 +1174,7 @@ contains
         call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
-          ks= int(tag(ka))
+          ks= tag_isp(ka)
           if( ka.eq.ia .or. ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
           xik(1:3)= xk(1:3)-xi(1:3)
@@ -1218,14 +1223,15 @@ contains
     return    
   end subroutine calc_desc_cheby
 !=======================================================================
-  subroutine desci_cheby(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+  subroutine desci_cheby(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
 !-----------------------------------------------------------------------
 !  Chebyshev descriptor of an atom-ia
 !  See Artrith et al., PRB96, 014112 (2017)
 !-----------------------------------------------------------------------
     integer,intent(in):: ia,namax,natm,nnmax,iprint, &
          lspr(0:nnmax,namax)
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax),rc
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax),rc
 
     integer:: ja,ka,jj,kk,is,js,ks,n,isf,ierr,isf0
     real(rp):: x,xi(3),xj(3),xij(3),rij(3),dij,dij2,xk(3),xik(3) &
@@ -1234,7 +1240,7 @@ contains
          ,dgdcs,dgdij,dgdik,dgdr,wgt,rcut2,rcut3,rcut,wgts(nsf)
 
     xi(1:3)= ra(1:3,ia)
-    is= int(tag(ia))
+    is= tag_isp(ia)
     do jj=1,lspr(0,ia)
       ja= lspr(jj,ia)
       if( ja.eq.ia ) cycle
@@ -1244,7 +1250,7 @@ contains
       dij2= rij(1)**2 +rij(2)**2 +rij(3)**2
       if( dij2.ge.rcmax2 ) cycle
       dij = sqrt(dij2)
-      js= int(tag(ja))
+      js= tag_isp(ja)
       driji(1:3)= -rij(1:3)/dij
       drijj(1:3)= -driji(1:3)
 !.....Rcut for 2-body common for all 2-body
@@ -1285,7 +1291,7 @@ contains
       call get_fc_dfc(dij,is,js,rcut,fcij,dfcij)
       do kk=1,lspr(0,ia)
         ka= lspr(kk,ia)
-        ks= int(tag(ka))
+        ks= tag_isp(ka)
         if( ka.eq.ia .or. ka.le.ja ) cycle
         xk(1:3)= ra(1:3,ka)
         xik(1:3)= xk(1:3)-xi(1:3)
@@ -1801,16 +1807,15 @@ contains
     return
   end subroutine set_params_desc_new
 !=======================================================================
-  subroutine write_desc_unformatted(ionum,natm,namax,nnmax,lspr,tag)
+  subroutine write_desc_unformatted(ionum,natm,namax,nnmax,lspr,tag_isp,tag_itot)
 !
 !   Write out descriptor data (gsf,dgsf,igsf) unformatted.
 !   Buffer atom indices are replaced to resident atom ones.
 !
-    use util,only: itotOf
     implicit none
     integer,intent(in):: ionum
     integer,intent(in):: natm,namax,nnmax,lspr(0:nnmax,namax)
-    real(rp),intent(in):: tag(namax)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
 
     integer:: ia,jj,ja,jra,isf,ihl0
     real(rp),allocatable:: dgsfo(:,:,:,:)
@@ -1835,7 +1840,7 @@ contains
         else
           ja= lspr(jj,ia)
         endif
-        jra= itotOf(tag(ja))
+        jra= tag_itot(ja)
         do isf=1,nsf
           dgsfo(1:3,jra,isf,ia)= dgsfo(1:3,jra,isf,ia) &
                +dgsf(1:3,isf,jj,ia)
@@ -1863,7 +1868,7 @@ contains
     deallocate(dgsfo,igsfo)
   end subroutine write_desc_unformatted
 !=======================================================================
-  subroutine write_desc(namax,natm,nnmax,lspr,h,tag,ra,rcin, &
+  subroutine write_desc(namax,natm,nnmax,lspr,h,tag_isp,ra,rcin, &
        myid,mpi_world,iprint)
 !
 !  Calculate and write out descriptors.
@@ -1871,13 +1876,15 @@ contains
 !
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          myid,mpi_world,iprint
-    real(rp),intent(in):: tag(namax),ra(3,namax),rcin,h(3,3)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
+    real(rp),intent(in):: rcin
 
     integer:: ia,is,isf
     character(len=12),save:: cnum
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
-    call make_gsf_arrays(.true.,namax,natm,tag,nnmax,lspr, &
+    call make_gsf_arrays(.true.,namax,natm,tag_isp,nnmax,lspr, &
          myid,mpi_world,iprint)
 
     open(ionum,file='out.desc.gsf',status='replace')
@@ -1886,7 +1893,7 @@ contains
     write(cnum,'(i0)') nsf
 
     do ia=1,natm
-      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
+      call calc_desci(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rcin,iprint)
       write(ionum,'('//trim(cnum)//'es13.4e3)') (gsfi(isf),isf=1,nsf)
     enddo
     close(ionum)

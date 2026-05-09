@@ -169,7 +169,7 @@ contains
     return
   end subroutine read_params_ZBL
 !=======================================================================
-  subroutine force_ZBL(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_ZBL(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -178,8 +178,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -218,12 +219,12 @@ contains
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
@@ -272,7 +273,7 @@ contains
 
   end subroutine force_ZBL
 !=======================================================================
-  subroutine force_ZBL_overlay(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_ZBL_overlay(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -289,8 +290,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -321,12 +323,12 @@ contains
 
     do i=1,natm
       xi(1:3) = ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       alpi = ol_alphas(0,i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        js = int(tag(j))
+        js = tag_isp(j)
 !!$        if( .not. interact(is,js) ) cycle
         x= ra(1,j) -xi(1)
         y= ra(2,j) -xi(2)
@@ -361,11 +363,11 @@ contains
 !.....Derivatives wrt alphas, which requires energy per atom, epit
     do i=1,natm
       xi(1:3) = ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       alpi = ol_alphas(0,i)
       do k=1,lspr(0,i)
         j= lspr(k,i)
-        js = int(tag(j))
+        js = tag_isp(j)
 !!$        if( .not. interact(is,js) ) cycle
         ri = ol_pair(1,is,js)
         ro = ol_pair(2,is,js)

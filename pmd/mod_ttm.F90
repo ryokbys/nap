@@ -765,14 +765,15 @@ contains
 
   end subroutine compute_nac
 !=======================================================================
-  subroutine calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
+  subroutine calc_Ta(namax,natm,nspmax,h,tag_isp,tag_ifmv,va,fmv,fekin &
        ,istp,myid,mpi_world,iprint)
 !
 !  Compute and set Ta and Tap array from atomic kinetic energies.
 !
-    use util,only: ifmvOf
+    
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,istp,iprint
-    real(rp),intent(in):: tag(namax),fmv(3,0:9),va(3,namax),h(3,3) &
+    integer,intent(in):: tag_isp(namax),tag_ifmv(namax)
+    real(rp),intent(in):: fmv(3,0:9),va(3,namax),h(3,3) &
          ,fekin(nspmax)
 
     integer:: i,ic,ierr,is,ix,iy,iz,l,ifmv,idof,mem
@@ -809,7 +810,7 @@ contains
 !.....Compute Ekin per atom using thermal part of velocities
     do i=1,natm
       ic = a2c(i)
-      is = int(tag(i))
+      is = tag_isp(i)
       vat(1:3) = va(1:3,i) -vac(1:3,ic)
       ekti(i) = (vat(1)**2 +vat(2)**2 +vat(3)**2) *fekin(is)
     enddo
@@ -820,7 +821,7 @@ contains
     ekpsuml(1:nxyz) = 0.0_rp
     do i=1,natm
       ic = a2c(i)
-      ifmv = ifmvOf(tag(i))
+      ifmv = tag_ifmv(i)
       idof = 0
       do l=1,3
         idof = idof +nint(fmv(l,ifmv))
@@ -1266,15 +1267,16 @@ contains
     return
   end function d2te
 !=======================================================================
-  subroutine langevin_ttm(namax,natm,va,aa,tag,am,h, &
+  subroutine langevin_ttm(namax,natm,va,aa,tag_isp,tag_ifmv,am,h, &
        nspmax,fa2v,fekin,ediff,dtmd,myid,mpi_world,iprint)
 !
 !  Langevin thermostat for atomic system.
 !
-    use util,only: itotOf, ifmvOf
+    use util,only: itotOf
     include "params_unit.h"
     integer,intent(in):: namax,natm,nspmax,myid,mpi_world,iprint
-    real(rp),intent(in):: aa(3,namax),tag(namax),am(nspmax), &
+    integer,intent(in):: tag_isp(namax),tag_ifmv(namax)
+    real(rp),intent(in):: aa(3,namax),am(nspmax), &
          fa2v(nspmax),fekin(nspmax),dtmd,h(3,3)
     real(rp),intent(inout):: va(3,namax),ediff(nspmax)
 
@@ -1306,8 +1308,8 @@ contains
     deinl(1:nspmax) = 0.0_rp
     deoutl(1:nspmax) = 0.0_rp
     do i=1,natm
-      ifmv = ifmvOf(tag(i))
-      isp = int(tag(i))
+      ifmv = tag_ifmv(i)
+      isp = tag_isp(i)
       if( ifmv.eq.0 ) then
         va(1:3,i)= 0.0_rp
       else
@@ -1393,14 +1395,15 @@ contains
     return
   end subroutine langevin_ttm
 !=======================================================================
-  subroutine non_reflecting_bc(natm,tag,ra,va,h,sorg,dtmd &
+  subroutine non_reflecting_bc(natm,tag_isp,ra,va,h,sorg,dtmd &
        ,nspmax,am,fa2v,myid,mpi_world,iprint)
 !
 !  Langevin Non-reflecting_bc for atomic system.
 !  See Shugaev, et al., PRB96 (2017) for details.
 !
     integer,intent(in):: natm,myid,mpi_world,iprint,nspmax
-    real(rp),intent(in):: ra(3,natm),h(3,3),sorg(3),tag(natm) &
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: ra(3,natm),h(3,3),sorg(3) &
          ,dtmd,am(nspmax),fa2v(nspmax)
     real(rp),intent(inout):: va(3,natm)
 
@@ -1423,7 +1426,7 @@ contains
       xi = ra(1,i) +sorg(1)
       if( xi.lt.xrmd-xdnr ) cycle
       vx = va(1,i)
-      isp = int(tag(i))
+      isp = tag_isp(i)
       ami = am(isp)
       zimp = ami *rho_latt *sspeed_latt
       ic = a2c(i)
@@ -1662,7 +1665,7 @@ contains
     
   end subroutine output_energy_balance
 !=======================================================================
-  subroutine remove_ablated_atoms(simtime,namax,natm,tag,ra,va,&
+  subroutine remove_ablated_atoms(simtime,namax,natm,tag_isp,ra,va,&
        aux,naux,h,sorg)
 !
 !  Remove atoms evapolated from left surface by laser ablation.
@@ -1677,7 +1680,8 @@ contains
     use pmdmpi,only: nid2xyz
     integer,intent(in):: namax,naux
     integer,intent(inout):: natm
-    real(rp),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+    integer,intent(inout):: tag_isp(namax)
+    real(rp),intent(inout):: ra(3,namax),va(3,namax)
     real(rp),intent(inout):: aux(naux,namax)
     real(rp),intent(in):: h(3,3),simtime,sorg(3)
     
@@ -1736,7 +1740,7 @@ contains
         if( ra(1,ia).lt.0.0_rp ) then
           inc = inc + 1
           list(inc) = ia
-          tagabl(inc) = tag(ia)
+          tagabl(inc) = tag_isp(ia)
           rt(1:3) = ra(1:3,ia) +sorg(1:3)
           r(1:3) = h(1:3,1)*rt(1) +h(1:3,2)*rt(2) +h(1:3,3)*rt(3)
           rabl(1:3,inc) = r(1:3)
@@ -1775,7 +1779,7 @@ contains
         do ja=1,inc
           if( ia.eq.list(ja) ) then
             lremove = .true.
-!!$            print *,' remove itot,myid=',itotOf(tag(ia)),myid_md
+!!$            print *,' remove itot,myid=',itotOf(tag_isp(ia)),myid_md
             exit
           endif
         enddo
@@ -1783,7 +1787,7 @@ contains
           inc2 = inc2 + 1
           ra(1:3,inc2) = ra(1:3,ia)
           va(1:3,inc2) = va(1:3,ia)
-          tag(inc2) = tag(ia)
+          tag_isp(inc2) = tag_isp(ia)
           do iaux=1,naux
             aux(naux,inc2) = aux(naux,ia)
           enddo

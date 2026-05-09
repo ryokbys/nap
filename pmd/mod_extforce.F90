@@ -37,13 +37,14 @@ contains
     initialized = .true.
   end subroutine init_extfrc
 !=======================================================================
-  subroutine add_extfrc(natm,tag,aa,hi,specorder,myid,iprint)
+  subroutine add_extfrc(natm,tag_isp,aa,hi,specorder,myid,iprint)
 !
 !  Add external forces on atoms of specified species
 !
     integer,intent(in):: natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(rp),intent(in):: tag(natm),hi(3,3)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: hi(3,3)
     real(rp),intent(inout):: aa(3,natm)
 
     integer:: i,is
@@ -56,7 +57,7 @@ contains
          +hi(1:3,3)*extfrc(3)
 
     do i=1,natm
-      is= int(tag(i))
+      is= tag_isp(i)
       if( is.ne.ispc_extfrc ) cycle
       aa(1:3,i)= aa(1:3,i) +extaa(1:3)
     enddo

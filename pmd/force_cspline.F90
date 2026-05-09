@@ -35,7 +35,7 @@ module cspline
   real(rp):: epot_cspln
 contains
 !=======================================================================
-  subroutine force_cspline(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_cspline(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,specorder,lstrs,iprint,l1st)
     include "./params_unit.h"
@@ -43,8 +43,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc
     character(len=3),intent(in):: specorder(nspmax)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
@@ -137,12 +138,12 @@ contains
     if( .not. l2b ) goto 20
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
-      is = int(tag(ia))
+      is = tag_isp(ia)
       do jj=1,lspr(0,ia)
         ja=lspr(jj,ia)
         if( ja.eq.0 ) exit
         if( ja.le.ia ) cycle
-        js = int(tag(ja))
+        js = tag_isp(ja)
         ispl = idpair(is,js)
         if( ispl.le.0 ) cycle
         spl = spls(ispl)
@@ -188,10 +189,10 @@ contains
     if( .not. l3b ) goto 21
     do ia=1,natm
       xi(1:3)= ra(1:3,ia)
-      is = int(tag(ia))
+      is = tag_isp(ia)
       do jj=1,lspr(0,ia)-1
         ja= lspr(jj,ia)
-        js= int(tag(ja))
+        js= tag_isp(ja)
         l3b_exist = .false.
         do ks=1,nspmax
           if( idtriplet(is,js,ks).gt.0 ) then
@@ -208,7 +209,7 @@ contains
         dij= sqrt(dij2)
         do kk=jj+1,lspr(0,ia)
           ka= lspr(kk,ia)
-          ks= int(tag(ka))
+          ks= tag_isp(ka)
           ispl = idtriplet(is,js,ks)
           if( ispl.le.0 ) cycle
           spl = spls(ispl)

@@ -11,7 +11,7 @@ module pairlist
 
   public:: mk_lspr_para,mk_lscl_para,sort_arrays, &
        check_lspr, check_lscl
-  public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, &
+  public:: mk_lspr_gonnet, mk_lspr_sngl, mk_lspr_brute, sort_by_lscl, sort_by_lscl_int, &
        swap, qsort_list, sort_lspr, set_nnmax
   
   integer,allocatable:: lscl(:),lshd(:)
@@ -123,18 +123,19 @@ contains
     return
   end subroutine mk_lscl_para
 !=======================================================================
-  subroutine sort_arrays(namax,natm,nb,tag,ra,va,aux,naux)
+  subroutine sort_arrays(namax,natm,nb,tag_isp,ra,va,aux,naux)
 !
 !  Sort arrays (tag,ra,va, and some more) using the cell list
 !  NOTE: This is not going to work well for now...,
 !    and thus it should not be used...
 !
     integer,intent(in):: namax,natm,nb,naux
-    real(rp),intent(inout):: tag(namax),ra(3,namax),va(3,namax)
+    integer,intent(inout):: tag_isp(namax)
+    real(rp),intent(inout):: ra(3,namax),va(3,namax)
     real(rp),intent(inout):: aux(naux,namax)
 
 !.....Sort arrays
-    call sort_by_lscl(namax,natm,nb,1,tag)
+    call sort_by_lscl_int(namax,natm,nb,1,tag_isp)
     call sort_by_lscl(namax,natm,nb,3,ra)
     call sort_by_lscl(namax,natm,nb,3,va)
     call sort_by_lscl(namax,natm,nb,naux,aux)
@@ -158,7 +159,7 @@ contains
 !  Cutoff radius is already set in the mk_lscl_para, and thus not given
 !  as an argument.
 !
-    use pmdvars,only: namax,natm,nbmax,nb,nnmax,maxnn,tag,ra,va,h,hi,&
+    use pmdvars,only: namax,natm,nbmax,nb,nnmax,maxnn,tag_isp,ra,va,h,hi,&
          anxi,anyi,anzi,lspr,iprint,rc,rbuf,mpi_md_world,myid_md, &
          ratio_nnmax_update
     implicit none
@@ -286,7 +287,7 @@ contains
 
   end subroutine mk_lspr_para
 !=======================================================================
-  subroutine mk_lspr_gonnet(namax,natm,nbmax,nb,nnmax,tag,ra,va &
+  subroutine mk_lspr_gonnet(namax,natm,nbmax,nb,nnmax,tag_isp,ra,va &
        ,rc,h,hi,anxi,anyi,anzi,lspr,iprint,l1st)
 !
 !  Make a pairlist by Gonnet's algorithm using cell list created before.
@@ -297,7 +298,8 @@ contains
     integer,intent(in):: namax,natm,nbmax,nb,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax)
     real(rp),intent(in):: rc,anxi,anyi,anzi,hi(3,3),h(3,3)
-    real(rp),intent(inout):: ra(3,namax),tag(namax),va(3,namax)
+    integer,intent(inout):: tag_isp(namax)
+    real(rp),intent(inout):: ra(3,namax),va(3,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ii,jj,inc,nleft
@@ -375,7 +377,7 @@ contains
           if(lshd(m).eq.0) cycle
           i = lshd(m)
 11        continue
-          ic= int(tag(i))
+          ic= tag_isp(i)
           xi(1:3)= ra(1:3,i)
 
 !.....Search for neighbors within the same cell
@@ -383,7 +385,7 @@ contains
 12        continue
           if( j.le.i ) goto 13
 
-          jc= int(tag(j))
+          jc= tag_isp(j)
           xij(1:3)= ra(1:3,j) -xi(1:3)
           rij(1)= h(1,1)*xij(1) +h(1,2)*xij(2) +h(1,3)*xij(3)
           rij(2)= h(2,1)*xij(1) +h(2,2)*xij(2) +h(2,3)*xij(3)
@@ -529,7 +531,7 @@ contains
 
   end subroutine qsort_list
 !=======================================================================
-  subroutine mk_lspr_sngl(namax,natm,nnmax,tag,ra,rc,h,hi &
+  subroutine mk_lspr_sngl(namax,natm,nnmax,tag_isp,ra,rc,h,hi &
        ,lspr,iprint,l1st)
 !
 ! Make lspr in serial implimentation taking the periodic boundary
@@ -543,7 +545,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(out):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3),tag(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),rc,hi(3,3),h(3,3)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n
@@ -671,7 +674,7 @@ contains
 
   end subroutine mk_lspr_sngl
 !=======================================================================
-  subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag,ra,rc &
+  subroutine mk_lspr_brute(namax,natm,nbmax,nb,nnmax,tag_isp,ra,rc &
        ,h,hi,sgm,lspr,iprint,l1st)
 !
 !  Make pair list, lspr, by brute force approach, because the system
@@ -683,7 +686,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nbmax,iprint
     integer,intent(out):: lspr(0:nnmax,natm),nb
     real(rp),intent(in):: rc,hi(3,3),h(3,3),sgm(3,3)
-    real(rp),intent(out):: ra(3,namax),tag(namax)
+    integer,intent(out):: tag_isp(namax)
+    real(rp),intent(out):: ra(3,namax)
     logical,intent(in):: l1st
 
     integer:: i,j,k,l,m,n,ia,ja,inc,ix,iy,iz
@@ -730,7 +734,7 @@ contains
             ra(1,natm+inc)= ra(1,ia) +ix
             ra(2,natm+inc)= ra(2,ia) +iy
             ra(3,natm+inc)= ra(3,ia) +iz
-            tag(natm+inc)= tag(ia)
+            tag_isp(natm+inc)= tag_isp(ia)
           enddo
         enddo
       enddo
@@ -898,6 +902,52 @@ contains
     enddo
 
   end subroutine sort_by_lscl
+!=======================================================================
+  subroutine sort_by_lscl_int(namax,natm,nb,ndim,arr)
+  use mod_precision
+!
+! Integer version of sort_by_lscl for integer arrays (e.g. tag_isp).
+!
+    integer,intent(in):: namax,natm,nb,ndim
+    integer,intent(inout):: arr(ndim,namax)
+
+    integer,allocatable,save:: tmparri(:)
+    integer:: n,mz,my,mx,i,j,m
+
+    if( .not. allocated(tmparri) ) then
+      allocate(tmparri(ndim*namax))
+    else if( size(tmparri).lt.ndim*namax ) then
+      deallocate(tmparri)
+      allocate(tmparri(ndim*namax))
+    endif
+
+    n = 0
+    do mz=1,lcz
+      do my=1,lcy
+        do mx=1,lcx
+          m= mx*lcyz2 +my*lcz2 +mz +1
+          i = lshd(m)
+          if( i.eq.0 ) cycle
+          if( i.le.natm ) then
+            n = n +1
+            tmparri(ndim*(n-1)+1:ndim*n) = arr(1:ndim,i)
+          endif
+          do while(lscl(i).ne.0)
+            i = lscl(i)
+            if( i.gt.natm ) cycle
+            n = n +1
+            tmparri(ndim*(n-1)+1:ndim*n) = arr(1:ndim,i)
+          end do
+        enddo
+      enddo
+    enddo
+    do i=1,n
+      do j=1,ndim
+        arr(j,i) = tmparri(ndim*(i-1)+j)
+      enddo
+    enddo
+
+  end subroutine sort_by_lscl_int
 !=======================================================================
   subroutine swap(ndim,i,j,dlist,ilist)
     use mod_precision

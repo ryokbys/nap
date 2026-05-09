@@ -60,7 +60,7 @@ module DNN
 
 contains
 !=======================================================================
-  subroutine force_DNN(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_DNN(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsf,dgsf,igsf,nsf,nal,calc_desc,make_gsf_arrays, &
@@ -71,7 +71,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -88,7 +89,7 @@ contains
     character(len=8):: cnum
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
-    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr,myid,mpi_world,iprint)
+    call make_gsf_arrays(l1st,namax,natm,tag_isp,nnmax,lspr,myid,mpi_world,iprint)
 
     if( l1st ) then
 
@@ -180,8 +181,8 @@ contains
     aal(1:3,1:namax) = 0.0_rp
     do ia=1,natm
       call calc_desci(ia,namax,natm,nnmax,h &
-           ,tag,ra,lspr,rcin,iprint)
-      is = int(tag(ia))
+           ,tag_isp,ra,lspr,rcin,iprint)
+      is = tag_isp(ia)
       xi(1:3) = ra(1:3,ia)
       call comp_nodes_of(ia)
       epi(ia) = hls(1,nlayer)
@@ -203,7 +204,7 @@ contains
         dji2= rji(1)**2 +rji(2)**2 +rji(3)**2
         if( dji2.ge.rcmax2 ) cycle
         dji = sqrt(dji2)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         do ml0=1,nhl(0)  ! no bias contribution to force
           aal(1:3,ja) = aal(1:3,ja) -gw(ml0)*dgsfi(1:3,ml0,jj)
 !.....Stress
@@ -242,7 +243,7 @@ contains
     return
   end subroutine force_DNN
 !=======================================================================
-  subroutine gradw_DNN(namax,natm,tag,ra,nnmax &
+  subroutine gradw_DNN(namax,natm,tag_isp,tag_itot,ra,nnmax &
        ,h,rc,lspr,iprint,ndimp,gwe,gwf,gws &
        ,lematch,lfmatch,lsmatch,iprm0)
 !=======================================================================
@@ -256,7 +257,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc
     integer,intent(in):: ndimp
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
@@ -298,7 +300,7 @@ contains
 
     do ia=1,natm
       xi(1:3) = ra(1:3,ia)
-      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rc,iprint)
+      call calc_desci(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rc,iprint)
 !!$      print *,'ia=',ia
       call comp_nodes_of(ia)
       if( lematch ) then
@@ -366,7 +368,7 @@ contains
             ja = ia
           else
             jja = lspr(jj,ia)
-            ja = itotOf(tag(jja))
+            ja = tag_itot(jja)
             xj(1:3) = ra(1:3,jja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -428,7 +430,7 @@ contains
             ja = ia
           else
             jja = lspr(jj,ia)
-            ja = itotOf(tag(jja))
+            ja = tag_itot(jja)
             xj(1:3) = ra(1:3,jja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -519,7 +521,7 @@ contains
 !!$                if( jj.eq.0 ) then
 !!$                  ja = ia
 !!$                else
-!!$                  ja = itotOf(tag(jja))
+!!$                  ja = tag_itot(jja)
 !!$                endif
 !!$                do l=n,nlayer ! This should be inside the loop over n
 !!$                  wsgm1 = wxs(l,n)

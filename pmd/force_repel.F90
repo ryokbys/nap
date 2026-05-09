@@ -149,7 +149,7 @@ contains
     
   end subroutine parse_option
 !=======================================================================
-  subroutine force_repel(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_repel(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc_global,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
@@ -159,8 +159,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc_global &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -224,11 +225,11 @@ contains
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
 !!$        if( j.le.i ) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)

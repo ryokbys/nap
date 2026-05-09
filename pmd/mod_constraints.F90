@@ -4,7 +4,7 @@ module constraints
 !
   use mod_precision
   use vector,only: abc2cart, cart2abc, dot, norm2
-  use util, only: num_data, itotOf, is_numeric
+  use util, only: num_data, is_numeric
   implicit none
   save
   include 'mpif.h'
@@ -212,22 +212,21 @@ contains
     return
   end subroutine read_const_params
 !=======================================================================
-  subroutine get_indice(namax,natm,tag)
+  subroutine get_indice(namax,natm,tag_itot)
 !
 !  Convert itot of constrained atoms (k1,k2) to current indice (i1,i2).
 !  NOTE: This is not applicable to parallel MD...
 !
     integer,intent(in):: namax,natm
-    real(rp),intent(in):: tag(namax)
-!!$    integer,external:: itotOf
+    integer,intent(in):: tag_itot(namax)
     integer:: ia,ic
-    
+
 !.....At first, find out two atoms that are constrained
     idcs(1:2,1:nconst) = -1
     do ia=1,natm
       do ic=1,nconst
-        if( itotOf(tag(ia)).eq.idcs0(1,ic) ) idcs(1,ic) = ia
-        if( itotOf(tag(ia)).eq.idcs0(2,ic) ) idcs(2,ic) = ia
+        if( tag_itot(ia).eq.idcs0(1,ic) ) idcs(1,ic) = ia
+        if( tag_itot(ia).eq.idcs0(2,ic) ) idcs(2,ic) = ia
       enddo
 !.....If you want to skip searching once all the indices are set,
 !     write a code for that hereafter...
@@ -238,15 +237,15 @@ contains
     return
   end subroutine get_indice
 !=======================================================================
-  subroutine update_const(namax,natm,tag,ra,h,istp,maxstp)
+  subroutine update_const(namax,natm,tag_isp,tag_ifmv,tag_itot,ra,h,istp,maxstp)
     integer,intent(in):: namax,natm,istp,maxstp
-    real(rp),intent(in):: tag(namax),ra(1:3,namax),h(3,3)
-!!$    integer,external:: itotOf
+    integer,intent(in):: tag_isp(namax),tag_ifmv(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(1:3,namax),h(3,3)
 
     integer:: ic,i,j
     real(rp):: ri(3),rj(3)
 
-    call get_indice(namax,natm,tag)
+    call get_indice(namax,natm,tag_itot)
     do ic=1,nconst
       if( constype(ic) == 'bond' ) then  ! bond
         if( maxstp.lt.1 ) then
@@ -277,12 +276,13 @@ contains
     return
   end subroutine update_const
 !=======================================================================
-  subroutine update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
+  subroutine update_const_pos(namax,natm,h,hi,tag_isp,tag_ifmv,ra,va,dt,nspmax,am)
 !
 !  Constraints on positions
 !
     integer,intent(in):: namax,natm,nspmax
-    real(rp),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
+    integer,intent(in):: tag_isp(namax),tag_ifmv(namax)
+    real(rp),intent(in):: h(3,3),hi(3,3),dt,am(nspmax)
     real(rp),intent(inout):: ra(3,namax),va(3,namax)
 
     integer:: i,j,ia,ic,is,js,iter,ixyz,jxyz
@@ -331,8 +331,8 @@ contains
       do ic=1,nconst
         i = idcs(1,ic)
         j = idcs(2,ic)
-        is = int(tag(i))
-        js = int(tag(j))
+        is = tag_isp(i)
+        js = tag_isp(j)
         ami = am(is)
         amj = am(js)
         amij = ami*amj/(ami+amj)
@@ -391,12 +391,13 @@ contains
     return
   end subroutine update_const_pos
 !=======================================================================
-  subroutine update_const_vel(namax,natm,h,hi,tag,va,dt,nspmax,am)
+  subroutine update_const_vel(namax,natm,h,hi,tag_isp,tag_ifmv,va,dt,nspmax,am)
 !
 !  Update velocities of atoms involved by the contraints
 !
     integer,intent(in):: namax,natm,nspmax
-    real(rp),intent(in):: h(3,3),hi(3,3),tag(namax),dt,am(nspmax)
+    integer,intent(in):: tag_isp(namax),tag_ifmv(namax)
+    real(rp),intent(in):: h(3,3),hi(3,3),dt,am(nspmax)
     real(rp),intent(inout):: va(3,namax)
 
     integer:: ic,i,j,iter,is,js,ixyz
@@ -427,8 +428,8 @@ contains
           endif
           i = idcs(1,ic)
           j = idcs(2,ic)
-          is = int(tag(i))
-          js = int(tag(j))
+          is = tag_isp(i)
+          js = tag_isp(j)
           ami = am(is)
           amj = am(js)
           amij = ami*amj /(ami+amj)
@@ -445,8 +446,8 @@ contains
           endif
           i = idcs(1,ic)
           j = idcs(2,ic)
-          is = int(tag(i))
-          js = int(tag(j))
+          is = tag_isp(i)
+          js = tag_isp(j)
           ami = am(is)
           amj = am(js)
           amij = ami*amj /(ami+amj)

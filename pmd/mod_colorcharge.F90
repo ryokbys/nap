@@ -111,18 +111,19 @@ contains
 
   end subroutine set_clr_one
 !=======================================================================
-  subroutine set_clr_round_chg(natm,tag,clr,chg,myid,iprint)
+  subroutine set_clr_round_chg(natm,tag_isp,clr,chg,myid,iprint)
 !
 !  Set clr as round(chg)
 !
     integer,intent(in):: natm,myid,iprint
-    real(rp),intent(in):: tag(natm),chg(natm)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: chg(natm)
     real(rp),intent(inout):: clr(natm)
 
     integer:: i,is
 
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       clr(i) = anint(chg(i))
     enddo
     return
@@ -182,14 +183,15 @@ contains
 
   end subroutine set_clr_random
 !=======================================================================
-  subroutine clrchg_force(namax,natm,tag,aa,aux,hi,specorder,myid,iprint)
+  subroutine clrchg_force(namax,natm,tag_isp,aa,aux,hi,specorder,myid,iprint)
 !
 !  Add external forces on atoms of specified species
 !
     use pmdvars,only: naux,iaux_chg,iaux_clr,ra,sorg
     integer,intent(in):: namax,natm,myid,iprint
     character(len=3),intent(in):: specorder(nspmax)
-    real(rp),intent(in):: tag(namax),hi(3,3)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: hi(3,3)
     real(rp),intent(inout):: aa(3,namax),aux(naux,namax)
     logical,save:: l1st = .true.
 
@@ -240,7 +242,7 @@ contains
     else if( trim(clr_set).eq.'region') then
       aux(iaux_clr,1:natm) = 0.0_rp
       do i=1,natm
-        if( int(tag(i)).ne.ispc_clrchg ) cycle
+        if( tag_isp(i).ne.ispc_clrchg ) cycle
         ri(1:3) = ra(1:3,i) +sorg(1:3)
         if( clrregion(1,1).lt.ri(1) .and. ri(1).lt.clrregion(1,2) .and. &
             clrregion(2,1).lt.ri(2) .and. ri(2).lt.clrregion(2,2) .and. &
@@ -251,7 +253,7 @@ contains
     endif
 
     do i=1,natm
-      is= int(tag(i))
+      is= tag_isp(i)
       if( is.ne.ispc_clrchg ) cycle
       aa(1:3,i)= aa(1:3,i) +aux(iaux_clr,i)*clrfield(1:3)
     enddo
@@ -279,13 +281,14 @@ contains
     
   end subroutine accum_vels
 !=======================================================================
-  subroutine rm_trans_clrchg(natm,tag,va,am,mpi_world,myid,iprint)
+  subroutine rm_trans_clrchg(natm,tag_isp,va,am,mpi_world,myid,iprint)
 !
 !  Remove translational momentum of all the atoms except specified species.
 !
     use pmdvars,only: nrmtrans
     integer,intent(in):: natm,mpi_world,myid,iprint
-    real(rp),intent(in):: tag(natm),am(nspmax)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: am(nspmax)
     real(rp),intent(inout):: va(3,natm)
     
     integer:: i,is,ierr
@@ -298,7 +301,7 @@ contains
     sump(:)= 0.0_rp
     amtot = 0.0_rp
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       if( is.eq.ispc_clrchg ) cycle
       ami= am(is)
       sump(1:3)= sump(1:3) +ami*va(1:3,i)
@@ -313,7 +316,7 @@ contains
       stop
     endif
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       if( is.eq.ispc_clrchg ) cycle
       va(1:3,i)= va(1:3,i) -sump(1:3)/amtot
     enddo

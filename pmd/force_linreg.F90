@@ -56,7 +56,7 @@ module linreg
           /)
 
 contains
-  subroutine force_linreg_old(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_linreg_old(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
     implicit none
@@ -64,7 +64,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -116,7 +117,7 @@ contains
         iwgt= iwgt +1
         wgt= coeff(iwgt)
         aexp= exps(ielem)
-        call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,dbna,rc &
+        call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag_isp,dbna,rc &
              ,ielem,aexp,bnai)
 #ifdef __FITPOT__
         write(80,'(2i10,f5.1,es23.14e3)') ia,ielem,aexp,bnai
@@ -169,7 +170,7 @@ contains
     return
   end subroutine force_linreg_old
 !=======================================================================
-  subroutine force_linreg(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_linreg(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays &
@@ -179,7 +180,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -195,7 +197,7 @@ contains
     real(rp),save:: rcin2 
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
-    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr &
+    call make_gsf_arrays(l1st,namax,natm,tag_isp,nnmax,lspr &
          ,myid,mpi_world,iprint)
 
     if( l1st ) then
@@ -216,7 +218,7 @@ contains
 !.....Energy
     do ia=1,natm
       call calc_desci(ia,namax,natm,nnmax,h &
-           ,tag,ra,lspr,rcin,iprint)
+           ,tag_isp,ra,lspr,rcin,iprint)
       do isf=1,nsf
         wgt = coeff(isf)
         tmp = wgt*gsfi(isf)
@@ -242,7 +244,7 @@ contains
 !.....Stress
       if( .not.lstrs ) cycle
       xi(1:3)= ra(1:3,ia)
-      is = int(tag(ia))
+      is = tag_isp(ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
         xj(1:3) = ra(1:3,ja)
@@ -252,7 +254,7 @@ contains
         if( dji.ge.rcin2 ) cycle
         dji = sqrt(dji)
         if( dji.ge.rcin ) exit
-        js = int(tag(ja))
+        js = tag_isp(ja)
         do isf=1,nsf
           if( igsfi(isf,jj).eq.0 ) cycle
           wgt = coeff(isf)
@@ -304,7 +306,7 @@ contains
     return
   end function dfc
 !=======================================================================
-  subroutine bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag,dbna,rc &
+  subroutine bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag_isp,dbna,rc &
        ,ielem,aexp,bnai)
 !
 !  basis function in the linear regression potetnial
@@ -312,7 +314,8 @@ contains
     implicit none
     integer,intent(in):: ia,natm,namax,nnmax,lspr(0:nnmax,natm) &
          ,ielem
-    real(rp),intent(in):: ra(3,namax),h(3,3),tag(namax),rc,aexp
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc,aexp
     real(rp),intent(out):: bnai,dbna(3,nelem,namax)
 
     integer:: ja,jj,ka,kk,is,js,ks
@@ -322,13 +325,13 @@ contains
 
     bnai= 0.0_rp
     xi(1:3)= ra(1:3,ia)
-    is= int(tag(ia))
+    is= tag_isp(ia)
     if( itype(ielem).eq.3 ) then ! angular (3-body) basis
       if( is.ne.icmb(1,ielem) ) return
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
-        js= int(tag(ja))
+        js= tag_isp(ja)
         if( js.ne.icmb(2,ielem) .and. js.ne.icmb(3,ielem) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -340,7 +343,7 @@ contains
         do kk=1,lspr(0,ia)
           ka= lspr(kk,ia)
           if( ka.le.ja ) cycle
-          ks= int(tag(ka))
+          ks= tag_isp(ka)
           if( .not.( (js.eq.icmb(2,ielem).and.ks.eq.icmb(3,ielem)) .or. &
                (js.eq.icmb(3,ielem).and.ks.eq.icmb(2,ielem))) ) cycle
           xk(1:3)= ra(1:3,ka)
@@ -358,7 +361,7 @@ contains
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
-        js=int(tag(ja))
+        js=tag_isp(ja)
         if( js.ne.icmb(2,ielem) .and. js.ne.icmb(3,ielem) ) cycle
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3)-xi(1:3)
@@ -373,7 +376,7 @@ contains
           ka= lspr(kk,ia)
           if( ka.le.ja ) cycle
           xk(1:3)= ra(1:3,ka)
-          ks= int(tag(ka))
+          ks= tag_isp(ka)
           if( .not.( (js.eq.icmb(2,ielem).and.ks.eq.icmb(3,ielem)) .or. &
                (js.eq.icmb(3,ielem).and.ks.eq.icmb(2,ielem))) ) cycle
           xik(1:3)= xk(1:3)-xi(1:3)
@@ -427,7 +430,7 @@ contains
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
-        js= int(tag(ja))
+        js= tag_isp(ja)
         if( .not. ((is.eq.icmb(1,ielem).and.js.eq.icmb(2,ielem)) .or. &
              (is.eq.icmb(2,ielem).and.js.eq.icmb(1,ielem))) ) cycle
         xj(1:3)= ra(1:3,ja)
@@ -443,7 +446,7 @@ contains
       do jj=1,lspr(0,ia)
         ja= lspr(jj,ia)
         if( ja.eq.ia ) cycle
-        js= int(tag(ja))
+        js= tag_isp(ja)
         if( .not. ((is.eq.icmb(1,ielem).and.js.eq.icmb(2,ielem)) .or. &
              (is.eq.icmb(2,ielem).and.js.eq.icmb(1,ielem))) ) cycle
         xj(1:3)= ra(1:3,ja)
@@ -727,7 +730,7 @@ contains
     return
   end subroutine set_params_linreg
 !=======================================================================
-  subroutine gradw_linreg(namax,natm,tag,ra,nnmax,h,rcin,lspr &
+  subroutine gradw_linreg(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rcin,lspr &
        ,iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
 !
 !  Derivative of linreg pot w.r.t parameters.
@@ -735,22 +738,22 @@ contains
 !
     use descriptor,only: gsfi,dgsfi,igsfi,nsf,calc_desci,make_gsf_arrays, &
          pre_desci
-    use util,only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,ndimp,iprint,lspr(0:nnmax,namax)&
          ,iprm0
-    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),rcin
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rcin
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
 
     integer:: i,ia,ja,jj,isf,ne,nf,jra
-!!$    integer,external:: itotOf
+
     real(rp):: ftmp(3),xi(3),xj(3),xij(3),rij(3)
 
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
     
     do ia=1,natm
-      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
+      call calc_desci(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rcin,iprint)
       if( lematch ) then
         ne = iprm0
         do isf=1,nsf
@@ -767,7 +770,7 @@ contains
 !!$          else
 !!$            ja = lspr(jj,ia)
 !!$          endif
-!!$          jra = itotOf(tag(ja))
+!!$          jra = itotOf(tag_isp(ja))
 !!$          nf = iprm0
 !!$          do isf=1,nsf
 !!$            nf = nf + 1
@@ -786,7 +789,7 @@ contains
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
           endif
-          jra = itotOf(tag(ja))
+          jra = tag_itot(ja)
           if( jj.eq.0 ) then
             nf = iprm0
             do isf=1,nsf

@@ -1052,7 +1052,7 @@ contains
 
   end subroutine bcast_uf3d_params
 !=======================================================================
-  subroutine force_uf3_tmp(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_uf3_tmp(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
@@ -1066,7 +1066,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1128,7 +1129,7 @@ contains
 !$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
 !$omp      reduction(+:epotl2,epotl3)
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
@@ -1136,7 +1137,7 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
+        js = tag_isp(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -1214,9 +1215,9 @@ contains
 !!$          p3 = prm3s(i3b)
           do jj=1,lspr(0,ia)
             ja = lspr(jj,ia)
-            js = int(tag(ja))
+            js = tag_isp(ja)
 !!$            if( js /= jsp ) cycle
-            jtot = itotOf(tag(ja))
+            jtot = tag_itot(ja)
             xj(1:3) = ra(1:3,ja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -1230,11 +1231,11 @@ contains
             do kk=jj+1,lspr(0,ia)
               ka = lspr(kk,ia)
 !!$              if( ka == ja ) cycle
-              ktot = itotOf(tag(ka))
+              ktot = tag_itot(ka)
 !.....Taking into account the double counting of symmetric terms
               fac3b = 1.0_rp
 !!$              if( jsp == ksp ) fac3b = 0.5d0
-              ks = int(tag(ka))
+              ks = tag_isp(ka)
 !!$              if( ks /= ksp ) cycle
               i3b = interact3(is,js,ks)
               if( i3b <= 0 ) cycle
@@ -1347,7 +1348,7 @@ contains
     return
   end subroutine force_uf3_tmp
 !=======================================================================
-  subroutine force_uf3(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_uf3(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
@@ -1361,7 +1362,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1423,7 +1425,7 @@ contains
 !$omp      l,nij,c3t,tmpij,tmpik,tmpjk) &
 !$omp      reduction(+:epotl2,epotl3)
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
 !!$      epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
@@ -1431,7 +1433,7 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
+        js = tag_isp(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -1509,9 +1511,9 @@ contains
           p3 = prm3s(i3b)
           do jj=1,lspr(0,ia)
             ja = lspr(jj,ia)
-            js = int(tag(ja))
+            js = tag_isp(ja)
             if( js /= jsp ) cycle
-            jtot = itotOf(tag(ja))
+            jtot = tag_itot(ja)
             xj(1:3) = ra(1:3,ja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -1524,11 +1526,11 @@ contains
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( ka == ja ) cycle
-              ktot = itotOf(tag(ka))
+              ktot = tag_itot(ka)
 !.....Taking into account the double counting of symmetric terms
               fac3b = 1.0_rp
               if( jsp == ksp ) fac3b = 0.5_rp
-              ks = int(tag(ka))
+              ks = tag_isp(ka)
               if( ks /= ksp ) cycle
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
@@ -1637,7 +1639,7 @@ contains
     return
   end subroutine force_uf3
 !=======================================================================
-  subroutine force_uf3l(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_uf3l(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
@@ -1651,7 +1653,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -1723,8 +1726,8 @@ contains
     epot_elem = 0.0_rp
 #endif
     do ia=1,natm
-      is = int(tag(ia))
-      itot = itotOf(tag(ia))
+      is = tag_isp(ia)
+      itot = tag_itot(ia)
       epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
 #ifdef CONTRIB
@@ -1734,8 +1737,8 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
-        jtot = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jtot = tag_itot(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -1827,8 +1830,8 @@ contains
 
       do jj=1,lspr(0,ia)-1
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jtot = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jtot = tag_itot(ja)
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) - xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -1839,7 +1842,7 @@ contains
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
           i3b = interact3(is,js,ks)
           if( i3b <= 0 ) cycle
           p3 = prm3ls(i3b)
@@ -1854,7 +1857,7 @@ contains
             rcik2= rcij2
           endif
           if(  dij2 > rcij2 ) exit
-          ktot = itotOf(tag(ka))
+          ktot = tag_itot(ka)
 !!$          fac3b = 1d0
 !!$          if( js == ks ) fac3b = 0.5d0
           xk(1:3) = ra(1:3,ka)
@@ -1996,7 +1999,7 @@ contains
     return
   end subroutine force_uf3l
 !=======================================================================
-  subroutine force_uf3d(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_uf3d(namax,natm,tag_isp,tag_itot,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcin,lspr &
        ,mpi_world,myid,epi,epot,lstrs,iprint,l1st)
 !
@@ -2010,7 +2013,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6)
     real(rp),intent(inout):: rcin
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
@@ -2070,16 +2074,16 @@ contains
     ftaul(:) = 0.0_rp
 #endif
     do ia=1,natm
-      is = int(tag(ia))
-      itot = itotOf(tag(ia))
+      is = tag_isp(ia)
+      itot = tag_itot(ia)
       epi(ia) = epi(ia) +erg1s(is)
       epotl1 = epotl1 +erg1s(is)
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
-        jtot = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jtot = tag_itot(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -2149,8 +2153,8 @@ contains
 
       do jj=1,lspr(0,ia)-1
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jtot = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jtot = tag_itot(ja)
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) - xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -2162,7 +2166,7 @@ contains
         
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
           i3b = interact3(is,js,ks)
           if( i3b <= 0 ) cycle
           p3 = prm3ds(i3b)
@@ -2177,7 +2181,7 @@ contains
             rcik2= rcij2
           endif
           if(  dij2 > rcij2 ) exit
-          ktot = itotOf(tag(ka))
+          ktot = tag_itot(ka)
           xk(1:3) = ra(1:3,ka)
           xik(1:3) = xk(1:3) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
@@ -2306,7 +2310,7 @@ contains
     return
   end subroutine force_uf3d
 !=======================================================================
-  subroutine gradw_uf3(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+  subroutine gradw_uf3(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rcin,lspr, &
        iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
        lgrad_done,nfcal,lfrc_eval)
 !
@@ -2319,7 +2323,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
@@ -2429,7 +2434,7 @@ contains
     ttmp = mpi_wtime()
 
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
 !!$      epi(ia) = epi(ia) +erg1s(is)
 !!$      epotl1 = epotl1 +erg1s(is)
       gerg1s(is) = gerg1s(is) +1.0_rp
@@ -2437,8 +2442,8 @@ contains
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
 !!$        if( ja <= ia ) cycle
-        js = int(tag(ja))
-        jra = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jra = tag_itot(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -2501,9 +2506,9 @@ contains
           p3 = prm3s(i3b)
           do jj=1,lspr(0,ia)
             ja = lspr(jj,ia)
-            js = int(tag(ja))
+            js = tag_isp(ja)
             if( js /= jsp ) cycle
-            jra = itotOf(tag(ja))
+            jra = tag_itot(ja)
             xj(1:3) = ra(1:3,ja)
             xij(1:3) = xj(1:3) -xi(1:3)
             rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -2516,11 +2521,11 @@ contains
             do kk=1,lspr(0,ia)
               ka = lspr(kk,ia)
               if( ka == ja ) cycle
-              kra = itotOf(tag(ka))
+              kra = tag_itot(ka)
 !.....Taking into account the double counting of symmetric terms
               fac3b = 1.0_rp
               if( jsp == ksp ) fac3b = 0.5_rp
-              ks = int(tag(ka))
+              ks = tag_isp(ka)
               if( ks /= ksp ) cycle
               xk(1:3) = ra(1:3,ka)
               xik(1:3) = xk(1:3) -xi(1:3)
@@ -2655,7 +2660,7 @@ contains
       do ia=1,natm
         if( .not. lfrc_eval(ia) ) cycle
         ifcal = ia2ifcal(ia)
-        is = int(tag(ia))
+        is = tag_isp(ia)
         ip = iprm0 +n1b  ! no contrib. from solo term to forces
         do i2b=1,n2b
           p2 = prm2s(i2b)
@@ -2718,7 +2723,7 @@ contains
     return
   end subroutine gradw_uf3
 !=======================================================================
-  subroutine gradw_uf3l(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+  subroutine gradw_uf3l(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rcin,lspr, &
        iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
        lgrad_done,nfcal,lfrc_eval)
 !
@@ -2731,7 +2736,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
@@ -2843,13 +2849,13 @@ contains
     enddo
 
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
       gerg1s(is) = gerg1s(is) +1.0_rp
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jra = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jra = tag_itot(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -2897,8 +2903,8 @@ contains
       tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jra = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jra = tag_itot(ja)
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) - xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -2908,7 +2914,7 @@ contains
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
           i3b = interact3(is,js,ks)
           if( i3b <= 0 ) cycle
           p3 = prm3ls(i3b)
@@ -2923,7 +2929,7 @@ contains
             rcik2= rcij2
           endif
           if(  dij2 > rcij2 ) exit
-          kra = itotOf(tag(ka))
+          kra = tag_itot(ka)
           xk(1:3) = ra(1:3,ka)
           xik(1:3) = xk(1:3) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
@@ -3132,7 +3138,7 @@ contains
       do ia=1,natm
         if( .not. lfrc_eval(ia) ) cycle
         ifcal = ia2ifcal(ia)
-        is = int(tag(ia))
+        is = tag_isp(ia)
         ip = iprm0 +n1b  ! no contrib. from solo term to forces
         do i2b=1,n2b
           p2 = prm2s(i2b)
@@ -3200,7 +3206,7 @@ contains
     return
   end subroutine gradw_uf3l
 !=======================================================================
-  subroutine gradw_uf3d(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+  subroutine gradw_uf3d(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rcin,lspr, &
        iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
        lgrad_done,nfcal,lfrc_eval)
 !
@@ -3213,7 +3219,8 @@ contains
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
@@ -3327,13 +3334,13 @@ contains
     enddo
 
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
       gerg1s(is) = gerg1s(is) +1.0_rp
       xi(1:3) = ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jra = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jra = tag_itot(ja)
 !.....Pair terms
         i2b = interact2(is,js)
         if( i2b <= 0 ) cycle
@@ -3381,8 +3388,8 @@ contains
       tmp3 = 0.0_rp
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
-        jra = itotOf(tag(ja))
+        js = tag_isp(ja)
+        jra = tag_itot(ja)
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) - xi(1:3)
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -3392,7 +3399,7 @@ contains
         drijj(1:3) = rij(1:3)*diji
         do kk=jj+1,lspr(0,ia)
           ka = lspr(kk,ia)
-          ks = int(tag(ka))
+          ks = tag_isp(ka)
           i3b = interact3(is,js,ks)
           if( i3b <= 0 ) cycle
           p3 = prm3ds(i3b)
@@ -3407,7 +3414,7 @@ contains
             rcik2= rcij2
           endif
           if(  dij2 > rcij2 ) exit
-          kra = itotOf(tag(ka))
+          kra = tag_itot(ka)
           xk(1:3) = ra(1:3,ka)
           xik(1:3) = xk(1:3) -xi(1:3)
           rik(1:3) = h(1:3,1)*xik(1) +h(1:3,2)*xik(2) +h(1:3,3)*xik(3)
@@ -3677,7 +3684,7 @@ contains
       do ia=1,natm
         if( .not. lfrc_eval(ia) ) cycle
         ifcal = ia2ifcal(ia)
-        is = int(tag(ia))
+        is = tag_isp(ia)
         ip = iprm0 +n1b  ! no contrib. from solo term to forces
         do i2b=1,n2b
           p2 = prm2s(i2b)

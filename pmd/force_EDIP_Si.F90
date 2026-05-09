@@ -2,7 +2,7 @@ module EDIP_Si
   use pmdmpi
   use mod_precision
 contains
-  subroutine force_EDIP_Si(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_EDIP_Si(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -17,7 +17,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
@@ -104,11 +105,11 @@ contains
     dz(1:3,0:nnmax,natm)= 0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        js= int(tag(j))
+        js= tag_isp(j)
         xx(1:3)= ra(1:3,j)-xi(1:3)
         xij(1:3)= h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3)
         rij2=xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
@@ -127,11 +128,11 @@ contains
 !-----2-body term
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        js= int(tag(j))
+        js= tag_isp(j)
         xx(1:3)= ra(1:3,j)-xi(1:3)
         xij(1:3)= h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3)
         rij2=xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
@@ -167,7 +168,7 @@ contains
 !-----3-body term
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       qz=ed_q0*exp(-ed_mu*z(i))
       dqz= -ed_mu*qz
       tz= ed_u1 +ed_u2*(ed_u3*exp(-ed_u4*z(i))-exp(-2.0_rp*ed_u4*z(i)))
@@ -176,7 +177,7 @@ contains
       do jj=1,lspr(0,i)
         j=lspr(jj,i)
         if(j.eq.0) exit
-        js= int(tag(j))
+        js= tag_isp(j)
         xx(1:3)= ra(1:3,j)-xi(1:3)
         xij(1:3)= ( h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3) )
         rij2=xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
@@ -194,7 +195,7 @@ contains
           k=lspr(kk,i)
           if(k.eq.0) exit
           if( k.le.j ) cycle
-          ks= int(tag(k))
+          ks= tag_isp(k)
           xx(1:3)= ra(1:3,k)-xi(1:3)
           xik(1:3)= ( h(1:3,1)*xx(1) +h(1:3,2)*xx(2) +h(1:3,3)*xx(3) )
           rik2= xik(1)*xik(1)+xik(2)*xik(2)+xik(3)*xik(3)

@@ -202,14 +202,15 @@ contains
     return
   end subroutine get_fol_dfol
 !=======================================================================
-  subroutine calc_overlay(namax,natm,nb,nnmax,h,tag,ra,lspr &
+  subroutine calc_overlay(namax,natm,nb,nnmax,h,tag_isp,ra,lspr &
        ,l1st,iprint)
 !
 !  Compute overlay coefficients of each pair and atom.
 !
     integer,intent(in):: namax,natm,nb,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: iprint
-    real(rp),intent(in):: h(3,3),tag(namax),ra(3,namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: h(3,3),ra(3,namax)
     logical,intent(in):: l1st
 
     integer:: ia,ja,jj,is,js
@@ -224,10 +225,10 @@ contains
 
     do ia=1,natm+nb
       xi(1:3) = ra(1:3,ia)
-      is = int(tag(ia))
+      is = tag_isp(ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         xj(1:3)= ra(1:3,ja)
         xij(1:3)= xj(1:3) -xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)

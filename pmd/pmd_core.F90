@@ -181,12 +181,12 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   enddo
 
 !.....Grouping
-  call grouping(namax,natm,h,tag,ra,sorg,istp,myid_md,mpi_md_world,iprint)
+  call grouping(namax,natm,h,tag_isp,tag_igrp,ra,sorg,istp,myid_md,mpi_md_world,iprint)
   
 #ifdef __FITPOT__
 !.....check whether order of atoms and total-id of atoms match
   do ia=1,natm
-    if( itotOf(tag(ia)).ne.ia ) then
+    if( tag_itot(ia).ne.ia ) then
       print *, '[Error] itotOf(tag(ia)).ne.ia !!!'
       print *, '  In case of FITPOT mode, the order of atom'// &
            ' must be the same of itot of the atom-tag.'
@@ -242,23 +242,23 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Set ifmv of top and bottom atoms for z-loading if needed
   if( trim(czload_type) .eq. 'atoms' ) then
-    call set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,nstp &
+    call set_zload_atoms(natm,ra,tag_ifmv,h,fmv,sorg,strfin,nstp &
          ,zskin_width,myid_md,mpi_md_world,iprint)
   else if( trim(czload_type).eq.'shear' ) then
-    call set_shear(natm,ra,tag,h,fmv,sorg,strfin,nstp &
+    call set_shear(natm,ra,tag_ifmv,h,fmv,sorg,strfin,nstp &
          ,zskin_width,zshear_angle,myid_md,mpi_md_world,iprint)
   endif
 
 !.....Set initial temperature if needed
   if( tinit.gt.1e-5_rp ) then
-    call setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
+    call setv(h,hi,natm,tag_isp,va,nspmax,am,tinit,dt)
   elseif( abs(tinit).le.1e-5_rp ) then
     va(1:3,1:natm)= 0.0_rp
   endif
   if( lclrchg ) then  ! special treatment for translational momentum
-    call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+    call rm_trans_clrchg(natm,tag_isp,va,am,mpi_md_world,myid_md,iprint)
   elseif( nrmtrans.ge.0 ) then
-    call rm_trans_motion(natm,tag,va,nspmax,am,mpi_md_world,myid_md,iprint)
+    call rm_trans_motion(natm,tag_isp,va,nspmax,am,mpi_md_world,myid_md,iprint)
   endif
 
   if( ifdmp.eq.2 ) then
@@ -267,7 +267,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   endif
 
 !-----calc kinetic energy
-  call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
+  call get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
        ,vmax,mpi_md_world)
   vmaxold=vmax
 
@@ -278,7 +278,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call init_ttm(namax,natm,ra,h,sorg,dt,lvardt, &
          boundary,myid_md,mpi_md_world,iprint)
 !!$    call assign_atom2cell(namax,natm,ra,sorg,boundary)
-    call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
+    call calc_Ta(namax,natm,nspmax,h,tag_isp,tag_ifmv,va,fmv,fekin &
          ,0,myid_md,mpi_md_world,iprint)
     call te2tei(namax,natm,aux(iaux_tei,:))
     if( lcouple_3d1d ) then
@@ -317,7 +317,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !.....Output descriptor and stop
   if( lout_desc ) then
     if( nodes_md.ne.1 ) stop 'ERROR: write_desc cannot be done in parallel.'
-    call write_desc(namax,natm,nnmax,lspr,h,tag,ra,rc, &
+    call write_desc(namax,natm,nnmax,lspr,h,tag_isp,ra,rc, &
          myid_md,mpi_md_world,iprint)
   endif
 
@@ -354,17 +354,17 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
     call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
   endif
 !.....Color charge NEMD
-  if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
+  if( lclrchg ) call clrchg_force(namax,natm,tag_isp,aa,aux,hi,specorder &
        ,myid_md,iprint)
 !.....External force
-  if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
+  if( lextfrc ) call add_extfrc(natm,tag_isp,aa,hi,specorder,myid_md,iprint)
 !.....Constraints
   if( lconst ) then
-    call update_const(namax,natm,tag,ra,h,0,nstp)
+    call update_const(namax,natm,tag_isp,tag_ifmv,tag_itot,ra,h,0,nstp)
   endif
 !.....Force_modify
   if( lrdcfrc ) then
-    call reduce_forces(namax,natm,aa,tag,ra,h,nnmax,lspr)
+    call reduce_forces(namax,natm,aa,tag_isp,tag_itot,ra,h,nnmax,lspr)
   endif
 
 #ifdef __DISL__
@@ -514,7 +514,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( trim(czload_type).eq.'atoms' .or. &
        trim(czload_type).eq.'shear' ) then
-    call get_forces_on_base(natm,ra,aa,tag,h,ftop &
+    call get_forces_on_base(natm,ra,aa,tag_ifmv,h,ftop &
          ,fbot,sorg,myid_md,mpi_md_world,iprint,czload_type)
     if( myid_md.eq.0 ) then
       write(iozload,'(i8,3es15.7)') 0,0.0,ftop,fbot
@@ -539,7 +539,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
   if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iaux_clr,:),istp,dt &
        ,myid_md,mpi_md_world,nxyz)
-  if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
+  if( lpdens ) call accum_pdens(namax,natm,tag_isp,ra,sorg)
 
 !!$  print *,'Time at 4 = ',real(mpi_wtime(),rp) -tcpu0
   i_conv = 0
@@ -549,7 +549,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Metadynamics
     if( lmetaD ) then
-      call update_metaD(istp,namax,natm,nsp,tag,ra,h,nnmax,lspr &
+      call update_metaD(istp,namax,natm,nsp,tag_isp,tag_itot,ra,h,nnmax,lspr &
            ,myid_md,mpi_md_world,iprint)
     endif
 
@@ -588,7 +588,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !-------first kick of velocities (both va and aa are in real unit)
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
     enddo
     
@@ -611,21 +611,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !-------multiply fmv
     do i=1,natm
-      l= int(mod(tag(i)*10,10.0_rp))
+      l= tag_ifmv(i)
       va(1:3,i)=va(1:3,i) *fmv(1:3,l)
     enddo
 
     if( lclrchg ) then  ! special treatment for translational momentum
-      call rm_trans_clrchg(natm,tag,va,am,mpi_md_world,myid_md,iprint)
+      call rm_trans_clrchg(natm,tag_isp,va,am,mpi_md_world,myid_md,iprint)
     elseif( nrmtrans.gt.0 ) then
-      if( mod(istp,nrmtrans).eq.0 ) call rm_trans_motion(natm,tag,va,nspmax,am &
+      if( mod(istp,nrmtrans).eq.0 ) call rm_trans_motion(natm,tag_isp,va,nspmax,am &
            ,mpi_md_world,myid_md,iprint)
     endif
 
 !!$    print *,'Time at 5 = ',real(mpi_wtime(),rp) -tcpu0
 !.....Update positions
     if( lconst ) then
-      call update_const_pos(namax,natm,h,hi,tag,ra,va,dt,nspmax,am)
+      call update_const_pos(namax,natm,h,hi,tag_isp,tag_ifmv,ra,va,dt,nspmax,am)
     else
 !.....Here va is converted from real to hmat-normalized length scale.
       do i=1,natm
@@ -633,21 +633,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
              +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i) )*dt
       enddo
     endif
-    if( nvwall>0 ) call correct_pos_vwall(natm,tag,ra,va)
+    if( nvwall>0 ) call correct_pos_vwall(natm,tag_isp,ra,va)
     ltot_updated = .false.
     if( chgopt_method(1:4).eq.'xlag' ) &
          call update_auxq(aux(iaux_q,:),aux(iaux_vq,:))
 
 !.....Grouping    
-    call grouping(namax,natm,h,tag,ra,sorg,istp,myid_md,mpi_md_world,iprint)
+    call grouping(namax,natm,h,tag_isp,tag_igrp,ra,sorg,istp,myid_md,mpi_md_world,iprint)
 
     if( trim(czload_type).eq.'atoms' ) then
-      call zload_atoms(natm,ra,tag,nstp,strfin,strnow &
+      call zload_atoms(natm,ra,tag_ifmv,nstp,strfin,strnow &
            ,sorg,myid_md,mpi_md_world)
     else if( trim(czload_type).eq.'box' ) then
       call zload_box(natm,nstp,istp,dt,strfin,strnow,h,myid_md)
     else if( trim(czload_type).eq.'shear' ) then
-      call shear_atoms(natm,ra,tag,nstp,strfin,strnow &
+      call shear_atoms(natm,ra,tag_ifmv,nstp,strfin,strnow &
            ,sorg,myid_md,mpi_md_world)
     endif
 
@@ -707,7 +707,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 !!$    print *,'Time at 6 = ',real(mpi_wtime(),rp) -tcpu0
 
 #ifdef IMPULSE
-    call set_ia_impls(natm,tag,mpi_md_world)
+    call set_ia_impls(natm,tag_isp,mpi_md_world)
 #endif
 
     if(ifpmd.gt.0.and. mod(istp,noutpmd).eq.0 )then
@@ -731,21 +731,21 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       call acna(namax,natm,h,ra,nb,nnmax,lspr,rc_struct)
     endif
 !.....Color charge NEMD
-    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
+    if( lclrchg ) call clrchg_force(namax,natm,tag_isp,aa,aux,hi,specorder &
          ,myid_md,iprint)
 !.....External force
-    if( lextfrc ) call add_extfrc(natm,tag,aa,hi,specorder,myid_md,iprint)
+    if( lextfrc ) call add_extfrc(natm,tag_isp,aa,hi,specorder,myid_md,iprint)
 !.....Force from metadynamics
     if( lmetaD ) then
-      call force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot &
+      call force_metaD(istp,namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot &
            ,nnmax,lspr,myid_md,mpi_md_world,iprint)
     endif
 !.....Update some variables in constraints if needed
     if( lconst ) then
-      call update_const(namax,natm,tag,ra,h,istp,nstp)
+      call update_const(namax,natm,tag_isp,tag_ifmv,tag_itot,ra,h,istp,nstp)
     endif
 !.....Force_modify
-    if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag,ra &
+    if( lrdcfrc ) call reduce_forces(namax,natm,aa,tag_isp,tag_itot,ra &
          ,h,nnmax,lspr)
 !!$    print *,'Time at 7 = ',real(mpi_wtime(),rp) -tcpu0
 !.....In damping-MD, scale large-forces as log-scale.
@@ -762,10 +762,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Second kick of velocities
     if( index(ctctl,'lange').ne.0 ) then
-      call vel_update_langevin(natm,tag,va,aa)
+      call vel_update_langevin(natm,tag_isp,tag_ifmv,va,aa)
     else
       do i=1,natm
-        is = int(tag(i))
+        is = tag_isp(i)
         va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
       enddo
     endif
@@ -773,35 +773,35 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
 !.....Impulse analysis
     if( l_impls ) then
-      call comp_ptau(natm,tag,ra,va,h,sorg)
+      call comp_ptau(natm,tag_isp,ra,va,h,sorg)
       call write_impulse(istp,simtime,myid_md, mpi_md_world,iprint)
     endif
     
 
 !.....Constraints for velocities
     if( lconst ) then
-      call update_const_vel(namax,natm,h,hi,tag,va,dt,nspmax,am)
+      call update_const_vel(namax,natm,h,hi,tag_isp,tag_ifmv,va,dt,nspmax,am)
     endif
 
 !.....Calc kinetic energy
     vmaxold= vmax
-    call get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
+    call get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
          ,vmax,mpi_md_world)
 !!$    print *,'Time at 8 = ',real(mpi_wtime(),rp) -tcpu0
 
 !.....Some thermostats come after get_ekin, since they require eks values
     if( index(ctctl,'beren').ne.0 ) then
-      call vel_update_berendsen(natm,tag,va)
+      call vel_update_berendsen(natm,tag_isp,tag_ifmv,va)
     else if( index(ctctl,'ttm').ne.0 ) then
       tmp = real(mpi_wtime(),rp)
       call assign_atom2cell(namax,natm,ra,sorg,boundary)
       call compute_nac(natm,myid_md,mpi_md_world,iprint)
-      call calc_Ta(namax,natm,nspmax,h,tag,va,fmv,fekin &
+      call calc_Ta(namax,natm,nspmax,h,tag_isp,tag_ifmv,va,fmv,fekin &
            ,istp,myid_md,mpi_md_world,iprint)
-      call langevin_ttm(namax,natm,va,aa,tag,am,h &
+      call langevin_ttm(namax,natm,va,aa,tag_isp,tag_ifmv,am,h &
            ,nspmax,fa2v,fekin,ediff,dt,myid_md,mpi_md_world,iprint)
       call update_ttm(simtime,dt,natm,ra,h,sorg,myid_md,mpi_md_world,iprint)
-      call non_reflecting_bc(natm,tag,ra,va,h,sorg,dt,nspmax,am,fa2v &
+      call non_reflecting_bc(natm,tag_isp,ra,va,h,sorg,dt,nspmax,am,fa2v &
            ,myid_md,mpi_md_world,iprint)
       call te2tei(namax,natm,aux(iaux_tei,:))
       if( lcouple_3d1d ) then
@@ -848,7 +848,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
 
       if( trim(czload_type).eq.'atoms' &
            .or. trim(czload_type).eq.'shear' ) then
-        call get_forces_on_base(natm,ra,aa,tag,h,ftop &
+        call get_forces_on_base(natm,ra,aa,tag_ifmv,h,ftop &
              ,fbot,sorg,myid_md,mpi_md_world,iprint,czload_type)
       endif
 
@@ -939,11 +939,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
       i_conv = 0
     endif
 
-!!$    if( lclrchg ) call clrchg_force(namax,natm,tag,aa,aux,hi,specorder &
+!!$    if( lclrchg ) call clrchg_force(namax,natm,tag_isp,aa,aux,hi,specorder &
 !!$         ,myid_md,iprint)
     if( lflux ) call accum_lflux(namax,natm,h,ra,va,aux(iaux_clr,:),istp,dt &
          ,myid_md,mpi_md_world,nxyz)
-    if( lpdens ) call accum_pdens(namax,natm,tag,ra,sorg)
+    if( lpdens ) call accum_pdens(namax,natm,tag_isp,ra,sorg)
 
 !-------write the particle positions
     if(ifpmd.gt.0.and. &
@@ -1095,7 +1095,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot &
   if( ltdst ) then
     deallocate(tdst,nadst)
   endif
-  deallocate(ra,va,aa,ra0,strs,tag,lspr &
+  deallocate(ra,va,aa,ra0,strs,tag_isp,tag_ifmv,tag_igrp,tag_itot,lspr &
        ,epi,eki,lsb,lsex)
   deallocate(aux)
 end subroutine pmd_core
@@ -1150,7 +1150,7 @@ subroutine oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   nsp= 0
   do i=1,natm
 !-------species of atom-i
-    nsp= max(int(tag(i)),nsp)
+    nsp= max(tag_isp(i),nsp)
   enddo
 !-----get total number of species
   nspl = nsp
@@ -1267,7 +1267,7 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
   nsp= 0
   do i=1,natm
 !-------species of atom-i
-    nsp= max(int(tag(i)),nsp)
+    nsp= max(tag_isp(i),nsp)
   enddo
 !-----get total number of species
   nspl = nsp
@@ -1307,39 +1307,39 @@ subroutine oneshot4fp(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
     if( use_force('Morse') &
          .and. use_force('screened_Coulomb') ) then
       iprm0 = 0
-      call gradw_Coulomb(namax,natm,nb,tag,ra,aux(iauxof('chg'),:), &
+      call gradw_Coulomb(namax,natm,nb,tag_isp,ra,aux(iauxof('chg'),:), &
            nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
            lematch,lfmatch,lsmatch,iprm0,myid_md,mpi_md_world,specorder)
       iprm0 = maxisp
-      call gradw_Morse(namax,natm,tag, &
+      call gradw_Morse(namax,natm,tag_isp, &
            ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
            lematch,lfmatch,lsmatch,iprm0)
     else if( use_force('Morse') ) then
       iprm0 = 0
-      call gradw_Morse(namax,natm,tag, &
+      call gradw_Morse(namax,natm,tag_isp, &
            ra,nnmax,h,rc,lspr,epott,iprint,ndimp,gwe,gwf,gws, &
            lematch,lfmatch,lsmatch,iprm0)
     else if( use_force('linreg') ) then
       iprm0 = 0
-      call gradw_linreg(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+      call gradw_linreg(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
     else if( use_force('DNN') ) then
       iprm0 = 0
-      call gradw_DNN(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+      call gradw_DNN(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0)
     else if( use_force('UF3').or.use_force('uf3') ) then
       iprm0 = 0
-      call gradw_uf3(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+      call gradw_uf3(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
            lgrad_done,nfcal,lfrc_eval)
     else if( use_force('UF3L').or.use_force('uf3l') ) then
       iprm0 = 0
-      call gradw_uf3l(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+      call gradw_uf3l(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
            lgrad_done,nfcal,lfrc_eval)
     else if( use_force('UF3D').or.use_force('uf3d') ) then
       iprm0 = 0
-      call gradw_uf3d(namax,natm,tag,ra,nnmax,h,rc,lspr, &
+      call gradw_uf3d(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rc,lspr, &
            iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
            lgrad_done,nfcal,lfrc_eval)
     endif
@@ -1893,16 +1893,16 @@ subroutine ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
   return
 end subroutine ntset
 !=======================================================================
-subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
+subroutine get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
      ,vmax,mpi_md_world)
   use pmdmpi
   use mod_precision
-  use util,only: ithOf
+  use pmdvars,only: ngrpmax
   use time,only: accum_time
-  implicit none 
+  implicit none
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
-  real(rp),intent(in):: va(3,namax),h(3,3),fekin(nspmax) &
-       ,tag(namax)
+  integer,intent(in):: tag_isp(namax),tag_igrp(ngrpmax,namax)
+  real(rp),intent(in):: va(3,namax),h(3,3),fekin(nspmax)
   real(rp),intent(out):: ekin,eki(3,3,namax),vmax,eks(nspmax)
 !-----locals
   integer:: i,ierr,is,ixyz,jxyz,imax,igrp,itemp
@@ -1915,8 +1915,8 @@ subroutine get_ekin(namax,natm,va,tag,h,nspmax,fekin,ekin,eki,eks &
 
   igrp = 1  ! temperature category is Group-#1 (same as fmv)
   do i=1,natm
-    is= int(tag(i))
-    itemp = ithOf(tag(i),igrp)
+    is= tag_isp(i)
+    itemp = tag_igrp(igrp,i)
     if( itemp.eq.0 ) cycle
 !.....Tensor form eki
     do jxyz=1,3
@@ -2042,10 +2042,9 @@ end subroutine calc_temp_dist
 subroutine get_num_dof()
   use pmdmpi
   use mod_precision
-  use pmdvars,only: natm,tag,fmv,nfmv,ndof, &
+  use pmdvars,only: natm,tag_ifmv,fmv,nfmv,ndof, &
        myid_md,mpi_md_world,iprint
   use time,only: accum_time
-  use util,only: ithOf
   implicit none
   include "./const.h"
 !!$  integer,intent(in):: natm,myid_md,mpi_md_world,iprint
@@ -2061,7 +2060,7 @@ subroutine get_num_dof()
   ndofl(1:9)= 0
   do i=1,natm
 !!$    l= int(mod(tag(i)*10,10d0))
-    ifmv= ithOf(tag(i),igrp)
+    ifmv= tag_ifmv(i)
     do k=1,3
       if( abs(fmv(k,ifmv)).lt.0.5_rp ) cycle
       ndofl(ifmv)= ndofl(ifmv) +1
@@ -2130,6 +2129,7 @@ subroutine bacopy(l1st)
   use pmdvars
   use force
   use pmdmpi
+  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2307,7 +2307,10 @@ subroutine bacopy(l1st)
           iex= lsex(i,ku)
           ra(1:3,natm+nbnew+i)= ra(1:3,j)
           ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-          tag(natm+nbnew+i)= tag(j)
+          tag_isp(natm+nbnew+i)  = tag_isp(j)
+          tag_ifmv(natm+nbnew+i) = tag_ifmv(j)
+          tag_igrp(:,natm+nbnew+i) = tag_igrp(:,j)
+          tag_itot(natm+nbnew+i) = tag_itot(j)
           aux(1:naux,natm+nbnew+i) = aux(1:naux,j)
         enddo
         nbnew= nbnew +lsb(0,ku)
@@ -2326,7 +2329,7 @@ subroutine bacopy(l1st)
         do i=1,nsd
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-          dbuf(4,i)  = tag(j)
+          dbuf(4,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
           do iaux=1,naux
             dbuf(4+iaux,i) = aux(iaux,j)
           enddo
@@ -2335,7 +2338,7 @@ subroutine bacopy(l1st)
              ,nrc*ndimbuf,21,mpi_md_world)
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-          tag(natm+nbnew+i)   = dbufr(4,i)
+          call tag_decode(real(dbufr(4,i),8), tag_isp(natm+nbnew+i), tag_ifmv(natm+nbnew+i), tag_igrp(:,natm+nbnew+i), tag_itot(natm+nbnew+i))
           do iaux=1,naux
             aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
@@ -2385,6 +2388,7 @@ subroutine bacopy_fixed()
   use pmdvars
   use force
   use pmdmpi
+  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   implicit none
 
@@ -2423,7 +2427,10 @@ subroutine bacopy_fixed()
           iex= lsex(i,ku)
           ra(1:3,natm+nbnew+i)= ra(1:3,j)
           ra(kd,natm+nbnew+i)= ra(kd,natm+nbnew+i) +iex
-          tag(natm+nbnew+i)= tag(j)
+          tag_isp(natm+nbnew+i)  = tag_isp(j)
+          tag_ifmv(natm+nbnew+i) = tag_ifmv(j)
+          tag_igrp(:,natm+nbnew+i) = tag_igrp(:,j)
+          tag_itot(natm+nbnew+i) = tag_itot(j)
           aux(1:naux,natm+nbnew+i) = aux(1:naux,j)
         enddo
         nbnew= nbnew +lsb(0,ku)
@@ -2439,7 +2446,7 @@ subroutine bacopy_fixed()
         do i=1,nsd
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-          dbuf(4,i)  = tag(j)
+          dbuf(4,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
           do iaux=1,naux
             dbuf(4+iaux,i) = aux(iaux,j)
           enddo
@@ -2448,7 +2455,7 @@ subroutine bacopy_fixed()
              ,nrc*ndimbuf,21,mpi_md_world)
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-          tag(natm+nbnew+i)   = dbufr(4,i)
+          call tag_decode(real(dbufr(4,i),8), tag_isp(natm+nbnew+i), tag_ifmv(natm+nbnew+i), tag_igrp(:,natm+nbnew+i), tag_itot(natm+nbnew+i))
           do iaux=1,naux
             aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
           enddo
@@ -2477,6 +2484,7 @@ subroutine bamove()
   use pmdvars
   use force
   use pmdmpi
+  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2516,7 +2524,7 @@ subroutine bamove()
 !-------num of to-be-moved atoms
     do i=1,natm+newim
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       if (is.gt.0) then
         if (bmv(xi(1),xi(2),xi(3),kul,anxi,anyi,anzi)) then
           mvque(0,kul)=mvque(0,kul)+1
@@ -2628,9 +2636,9 @@ subroutine bamove()
         j= mvque(i,ku)
         dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
         dbuf(4:6,i)= va(1:3,j)
-        dbuf(7,i)  = tag(j)
+        dbuf(7,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
 !-----------Eliminate the record of a moved-out atom
-        tag(j)= 0.0_rp
+        tag_isp(j)=0; tag_ifmv(j)=0; tag_igrp(:,j)=0; tag_itot(j)=0
         m = 7
         do iaux=1,naux
           dbuf(7+iaux,i) = aux(iaux,j)
@@ -2641,7 +2649,7 @@ subroutine bamove()
       do i=1,nrc
         ra(1:3,natm+newim+i)= dbufr(1:3,i)
         va(1:3,natm+newim+i)= dbufr(4:6,i)
-        tag(natm+newim+i)   = dbufr(7,i)
+        call tag_decode(real(dbufr(7,i),8), tag_isp(natm+newim+i), tag_ifmv(natm+newim+i), tag_igrp(:,natm+newim+i), tag_itot(natm+newim+i))
         m = 7
         do iaux=1,naux
           aux(iaux,natm+newim+i) = dbufr(7+iaux,i)
@@ -2658,12 +2666,13 @@ subroutine bamove()
 !-----Compression
   ipt=0
   do i=1,natm+newim
-    is= int(tag(i))
+    is= tag_isp(i)
     if(is.ne.0) then
       ipt=ipt+1
       ra(1:3,ipt)= ra(1:3,i)
       va(1:3,ipt)= va(1:3,i)
-      tag(ipt)   = tag(i)
+      tag_isp(ipt)=tag_isp(i); tag_ifmv(ipt)=tag_ifmv(i)
+      tag_igrp(:,ipt)=tag_igrp(:,i); tag_itot(ipt)=tag_itot(i)
       aux(1:naux,ipt) = aux(1:naux,i)
     endif
   enddo
@@ -2772,14 +2781,15 @@ subroutine sa2stnsr(natm,strs,eki,stnsr,vol,mpi_md_world)
   return
 end subroutine sa2stnsr
 !=======================================================================
-subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
+subroutine setv(h,hi,natm,tag_isp,va,nspmax,am,tinit,dt)
   use pmdmpi
   use mod_precision
   use random,only: box_muller
   implicit none
   include 'params_unit.h'
   integer,intent(in):: natm,nspmax
-  real(rp),intent(in):: tag(natm),am(nspmax),tinit,dt &
+  integer,intent(in):: tag_isp(natm)
+  real(rp),intent(in):: am(nspmax),tinit,dt &
        ,h(3,3,0:1),hi(3,3)
   real(rp),intent(out):: va(3,natm)
   integer:: i,l,is
@@ -2792,7 +2802,7 @@ subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
 
 !-----velocities in Maxwell-Boltzmann distribution
   do i=1,natm
-    is= int(tag(i))
+    is= tag_isp(i)
     do l=1,3
       va(l,i)=facv(is) *box_muller()
     enddo
@@ -2807,7 +2817,7 @@ subroutine setv(h,hi,natm,tag,va,nspmax,am,tinit,dt)
 
 end subroutine setv
 !=======================================================================
-subroutine rm_trans_motion(natm,tag,va,nspmax,am &
+subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
      ,mpi_md_world,myid_md,iprint)
   use pmdmpi
   use mod_precision
@@ -2815,7 +2825,8 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
   implicit none
   include "./const.h"
   integer,intent(in):: natm,nspmax,mpi_md_world,myid_md,iprint
-  real(rp),intent(in):: tag(natm),am(nspmax)
+  integer,intent(in):: tag_isp(natm)
+  real(rp),intent(in):: am(nspmax)
   real(rp),intent(out):: va(3,natm)
 
   integer:: i,is,ierr
@@ -2827,7 +2838,7 @@ subroutine rm_trans_motion(natm,tag,va,nspmax,am &
   sumpz=0.0_rp
   amtot=0.0_rp
   do i=1,natm
-    is= int(tag(i))
+    is= tag_isp(i)
     amss= am(is)
     sumpx=sumpx+amss*va(1,i)
     sumpy=sumpy+amss*va(2,i)
@@ -2944,6 +2955,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   use pmdmpi
   use mod_precision
   use pmdvars
+  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   implicit none
   integer,intent(in):: ntot0
@@ -3073,7 +3085,7 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
              rtot(3,i).le.szogt+1.0_rp/nz .and. &
              tagtot(i).gt.0.0_rp ) then
           natm = natm +1
-          tag(natm)= tagtot(i)
+          call tag_decode(real(tagtot(i),8), tag_isp(natm), tag_ifmv(natm), tag_igrp(:,natm), tag_itot(natm))
           ra(1:3,natm)= rtot(1:3,i)
 !!$          va(1:3,natm)= vtot(1:3,i)
 !.....va is in real unit, whereas vtot is in scaled unit
@@ -3086,8 +3098,10 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
       if( ixyz.ne.0 ) then
         call mpi_send(natm,1,mpi_integer,ixyz,ixyz+1 &
              ,mpi_md_world,ierr)
-        call mpi_send(tag,natm,mpi_real_rp,ixyz,ixyz+2 &
-             ,mpi_md_world,ierr)
+        call mpi_send(tag_isp, natm,         mpi_integer,ixyz,ixyz+2, mpi_md_world,ierr)
+        call mpi_send(tag_ifmv,natm,         mpi_integer,ixyz,ixyz+21,mpi_md_world,ierr)
+        call mpi_send(tag_igrp,ngrpmax*natm, mpi_integer,ixyz,ixyz+22,mpi_md_world,ierr)
+        call mpi_send(tag_itot,natm,         mpi_integer,ixyz,ixyz+23,mpi_md_world,ierr)
         call mpi_send(ra,3*natm,mpi_real_rp,ixyz,ixyz+3 &
              ,mpi_md_world,ierr)
         call mpi_send(va,3*natm,mpi_real_rp,ixyz,ixyz+4 &
@@ -3106,8 +3120,10 @@ subroutine space_decomp(ntot0,tagtot,rtot,vtot,auxtot,l1st)
   else ! myid_md.ne.0
     call mpi_recv(natm,1,mpi_integer,0,myid_md+1 &
          ,mpi_md_world,istat,ierr)
-    call mpi_recv(tag,natm,mpi_real_rp,0,myid_md+2 &
-         ,mpi_md_world,istat,ierr)
+    call mpi_recv(tag_isp, natm,         mpi_integer,0,myid_md+2, mpi_md_world,istat,ierr)
+    call mpi_recv(tag_ifmv,natm,         mpi_integer,0,myid_md+21,mpi_md_world,istat,ierr)
+    call mpi_recv(tag_igrp,ngrpmax*natm, mpi_integer,0,myid_md+22,mpi_md_world,istat,ierr)
+    call mpi_recv(tag_itot,natm,         mpi_integer,0,myid_md+23,mpi_md_world,istat,ierr)
     call mpi_recv(ra,3*natm,mpi_real_rp,0,myid_md+3 &
          ,mpi_md_world,istat,ierr)
     call mpi_recv(va,3*natm,mpi_real_rp,0,myid_md+4 &
@@ -3130,6 +3146,7 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
   use pmdmpi
   use mod_precision
   use pmdvars
+  use pmdio,only: tag_encode
   use util,only: itotOf
   implicit none
   integer,intent(in):: ntot0
@@ -3151,7 +3168,9 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
 
   if( myid_md.eq.0 ) then
     n0 = natm
-    tagtot(1:natm) = tag(1:natm)
+    do i=1,natm
+      tagtot(i) = real(tag_encode(tag_isp(i),tag_ifmv(i),tag_igrp(:,i),tag_itot(i)),rp)
+    enddo
     rtot(1:3,1:natm) = ra(1:3,1:natm)
     do i=1,natm
       vtot(1:3,i) = hi(1:3,1)*va(1,i) +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i)
@@ -3205,7 +3224,10 @@ subroutine space_comp(ntot0,tagtot,rtot,vtot,atot,stot, &
     call mpi_send(natm,1,mpi_integer,0,itag &
          ,mpi_md_world,ierr)
     if( natm.gt.0 ) then
-      call mpi_send(tag,natm,mpi_real_rp,0,itag+1 &
+      do i=1,natm
+        ratmp(1,i) = real(tag_encode(tag_isp(i),tag_ifmv(i),tag_igrp(:,i),tag_itot(i)),rp)
+      enddo
+      call mpi_send(ratmp(1,1),natm,mpi_real_rp,0,itag+1 &
            ,mpi_md_world,ierr)
 !.....Positions should be shifted, velocities and forces should be converted to scaled ones
       do i=1,natm
@@ -3409,18 +3431,19 @@ subroutine alloc_namax_related()
   if( allocated(aa) ) deallocate(aa)
   if( allocated(ra0) ) deallocate(ra0)
   if( allocated(strs) ) deallocate(strs)
-  if( allocated(tag) ) deallocate(tag)
+  if( allocated(tag_isp) ) deallocate(tag_isp,tag_ifmv,tag_igrp,tag_itot)
   if( allocated(epi) ) deallocate(epi)
   if( allocated(eki) ) deallocate(eki)
   if( allocated(aux) ) deallocate(aux)
   if( allocated(lsb) ) deallocate(lsb)
   if( allocated(lsex) ) deallocate(lsex)
   allocate(ra(3,namax),va(3,namax),aa(3,namax),ra0(3,namax) &
-       ,strs(3,3,namax),tag(namax) &
+       ,strs(3,3,namax) &
+       ,tag_isp(namax),tag_ifmv(namax),tag_igrp(ngrpmax,namax),tag_itot(namax) &
        ,epi(namax),eki(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   allocate(aux(naux,namax))
-  mem = 8*namax*(3 +3 +3 +3 +9 +1 +1 +9 +naux)
+  mem = 8*namax*(3 +3 +3 +3 +9 +1 +9 +naux) +4*namax*(1+1+ngrpmax+1)
   mem = 4*6*(nbmax+1) +4*6*nbmax
   call accum_mem('pmd',mem)
   
@@ -3436,7 +3459,7 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   use mod_precision
   use pmdvars
   use memory, only: accum_mem
-  use util, only: resize_darr, resize_darr2, resize_darr3
+  use util, only: resize_darr, resize_darr2, resize_darr3, resize_iarr, resize_iarr2
   implicit none
   integer,intent(in):: newnalmax,newnbmax
 
@@ -3479,9 +3502,12 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   call resize_darr3(strs, [3,3,newnamax])
   mem = mem -8*ndim +8*9*newnamax
 
-!.....tag
-  call resize_darr(tag, [newnamax])
-  mem = mem -8*ndim +8*newnamax
+!.....tag components
+  call resize_iarr(tag_isp, [newnamax])
+  call resize_iarr(tag_ifmv, [newnamax])
+  call resize_iarr2(tag_igrp, [ngrpmax,newnamax])
+  call resize_iarr(tag_itot, [newnamax])
+  mem = mem +4*newnamax*(1+1+ngrpmax+1)
 
 !.....epi
   call resize_darr(epi, [newnamax])
@@ -3691,19 +3717,19 @@ subroutine get_shortest_distances(dshort)
 !
   use pmdmpi
   use mod_precision
-  use pmdvars,only: natm,tag,ra,lspr,h,nspmax
+  use pmdvars,only: natm,tag_isp,ra,lspr,h,nspmax
   implicit none
   real(rp),intent(inout):: dshort(nspmax,nspmax)
-  
+
   integer:: ia,is,jj,ja,js
   real(rp):: xi(3),xj(3),xij(3),rij(3),dij2,dij
 
   do ia=1,natm
-    is = int(tag(ia))
+    is = tag_isp(ia)
     xi(:) = ra(:,ia)
     do jj=1,lspr(0,ia)
       ja = lspr(jj,ia)
-      js = int(tag(ja))
+      js = tag_isp(ja)
       xj(:) = ra(:,ja)
       xij(:) = xj(:) -xi(:)
       rij(1:3) = h(1:3,1,0)*xij(1) +h(1:3,2,0)*xij(2) +h(1:3,3,0)*xij(3)

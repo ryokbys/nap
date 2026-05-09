@@ -34,7 +34,7 @@ module angular
   real(rp),allocatable:: gs_alp(:,:,:,:),gs_bet(:,:,:,:),gs_gmm(:,:,:,:)
   
 contains
-  subroutine force_angular(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_angular(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint,l1st)
 !-----------------------------------------------------------------------
@@ -48,7 +48,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
@@ -122,11 +123,11 @@ contains
 !$omp            dcsnj,dcsnk,dcsni,tmpj,tmpk,ixyz)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
 !.....Loop over j
       do n=1,lspr(0,i)-1
         j=lspr(n,i)
-        js= int(tag(j))
+        js= tag_isp(j)
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
@@ -140,7 +141,7 @@ contains
 !.....Loop over k
         do m=n+1,lspr(0,i)
           k=lspr(m,i)
-          ks= int(tag(k))
+          ks= tag_isp(k)
           if( .not. interact3(is,js,ks) ) cycle
           rc3 = rc3s(is,js,ks)
           if( rij.ge.rc3 ) cycle
@@ -453,7 +454,7 @@ contains
     endif
   end function itype_from
 !=======================================================================
-  subroutine gradw_angular(namax,natm,tag,ra,nnmax,h,rcin,lspr, &
+  subroutine gradw_angular(namax,natm,tag_isp,tag_itot,ra,nnmax,h,rcin,lspr, &
        iprint,ndimp,gwe,gwf,gws,lematch,lfmatch,lsmatch,iprm0, &
        nfcal,lfrc_eval)
 !
@@ -461,11 +462,11 @@ contains
 !  Note: This routine is always called in single run,
 !  thus no need of parallel implementation.
 !
-    use util, only: itotOf
     implicit none
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),tag(namax),h(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3)
     real(rp),intent(inout):: rcin
     integer,intent(in):: ndimp
     integer,intent(in):: nfcal
@@ -527,7 +528,7 @@ contains
 !.....Set nsp by max isp of atoms in the system
     nsp = 0
     do i=1,natm
-      nsp = max(nsp,int(tag(i)))
+      nsp = max(nsp,tag_isp(i))
     enddo
 
     if( lematch ) then
@@ -564,11 +565,11 @@ contains
 
     do i=1,natm
       xi(1:3)=ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
 !.....Loop over j
       do n=1,lspr(0,i)-1
         j=lspr(n,i)
-        js= int(tag(j))
+        js= tag_isp(j)
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
         y = xj(2) -xi(2)
@@ -576,14 +577,14 @@ contains
         xij(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)
         rij2 = xij(1)*xij(1) +xij(2)*xij(2) +xij(3)*xij(3)
         if( rij2.gt.rcmax2 ) cycle
-        jra = itotOf(tag(j))
+        jra = tag_itot(j)
         rij = sqrt(rij2)
         riji= 1.0_rp/rij
         drijj(1:3)= xij(1:3)*riji
 !.....Loop over k
         do m=n+1,lspr(0,i)
           k=lspr(m,i)
-          ks= int(tag(k))
+          ks= tag_isp(k)
           if( .not. interact3(is,js,ks) ) cycle
           rc3 = rc3s(is,js,ks)
           if( rij.ge.rc3 ) cycle
@@ -594,7 +595,7 @@ contains
           xik(1:3)= (h(1:3,1)*x +h(1:3,2)*y +h(1:3,3)*z)
           rik2 = xik(1)*xik(1) +xik(2)*xik(2) +xik(3)*xik(3)
           if( rik2.ge.rc3*rc3 ) cycle
-          kra = itotOf(tag(k))
+          kra = tag_itot(k)
           rik = sqrt(rik2)
           riki= 1.0_rp/rik
           drijc= 1.0_rp/(rij-rc3)
@@ -728,7 +729,7 @@ contains
       do ia=1,natm
         if( .not. lfrc_eval(ia) ) cycle
         ifcal = ia2ifcal(ia)
-        is = int(tag(ia))
+        is = tag_isp(ia)
         ip = iprm0
         do is=1,nspmax
           do js=1,nspmax

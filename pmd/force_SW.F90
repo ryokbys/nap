@@ -54,7 +54,7 @@ module SW
   real(rp):: aswt(msp,msp,msp)
 
 contains
-  subroutine force_SW(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_SW(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_world,myid,epi,epot,nismax,specorder,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -70,7 +70,8 @@ contains
     integer,intent(in):: namax,natm,nnmax,nismax,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_world,myid,lspr(0:nnmax,namax),nex(3)
-    real(rp),intent(in):: ra(3,namax),tag(namax) &
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     character(len=3),intent(in):: specorder(msp)
@@ -138,14 +139,14 @@ contains
     aa2(1:3,1:natm+nb)=0.0_rp
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       epotl1 = epotl1 +aswe*aswei(is)
       epi(i) = epi(i) +aswe*aswei(is)
       do k=1,lspr(0,i)
         j=lspr(k,i)
 !!$        if(j.eq.0) exit
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         if( .not. interact(is,js) ) cycle
         src= aswrc(is,js)
         xj(1:3)= ra(1:3,j)
@@ -206,13 +207,13 @@ contains
 !-----atom (i)
     do i=1,natm
       xi(1:3)=ra(1:3,i)
-      is= int(tag(i))
+      is= tag_isp(i)
       do n=1,lspr(0,i)
 !---------atom (j)
         j=lspr(n,i)
         if(j.eq.0) exit
         if( j.eq.i ) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         srcij= aswrc(is,js)
         xj(1:3)= ra(1:3,j)
         x = xj(1) -xi(1)
@@ -233,7 +234,7 @@ contains
           k=lspr(m,i)
           if(k.eq.0) exit
           if( k.le.j .or. k.eq.i ) cycle
-          ks= int(tag(k))
+          ks= tag_isp(k)
           if( .not. interact3(is,js,ks) ) cycle
           srcik= aswrc(is,ks)
           xk(1:3)= ra(1:3,k)

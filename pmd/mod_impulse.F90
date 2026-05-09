@@ -102,16 +102,17 @@ contains
 
   end subroutine set_ia_impls
 !=======================================================================
-  subroutine comp_ptau(natm,tag,ra,va,h,sorg)
+  subroutine comp_ptau(natm,tag_isp,ra,va,h,sorg)
     use pmdvars,only: am,fa2v,nsp
     integer,intent(in):: natm
-    real(rp),intent(in):: tag(natm),ra(3,natm),va(3,natm),h(3,3),sorg(3)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: ra(3,natm),va(3,natm),h(3,3),sorg(3)
 
     integer:: is, ixyz
     real(rp):: di(3)
 
     if( ia_impls > 0 ) then  ! only the node contains itot_impls does this
-      is = int(tag(ia_impls))
+      is = tag_isp(ia_impls)
 !.....Displacement along tau
       di(1:3) = ra(1:3,ia_impls) +sorg(1:3) -orig_impls(1:3)
       do ixyz=1,3

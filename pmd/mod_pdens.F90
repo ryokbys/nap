@@ -107,20 +107,21 @@ contains
     return
   end subroutine init_pdens
 !=======================================================================
-  subroutine accum_pdens(namax,natm,tag,ra,sorg)
+  subroutine accum_pdens(namax,natm,tag_isp,ra,sorg)
 !
 !  Accumurate density of specified species.
 !
     use vector,only: matxvec3
     integer,intent(in):: namax,natm
-    real(rp),intent(in):: ra(3,namax),tag(namax),sorg(3)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),sorg(3)
 
     integer:: i,ipx,ipy,ipz,idx,is
     integer,parameter:: nmpi = 2
     real(rp):: ri(3),sri(3)
 
     do i=1,natm
-      is = int(tag(i))
+      is = tag_isp(i)
       if( is.ne.ispc_pdens ) cycle
 !.....Convert from hmat-rep to shsub-rep
       ri(1:3) = ra(1:3,i) +sorg(1:3) -sosub(1:3)

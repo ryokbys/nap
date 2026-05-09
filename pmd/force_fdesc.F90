@@ -178,7 +178,7 @@ contains
     return
   end subroutine read_fdesc_params
 !=======================================================================
-  subroutine force_fdesc(namax,natm,nnmax,lspr,rcin,h,hi,tag,ra, &
+  subroutine force_fdesc(namax,natm,nnmax,lspr,rcin,h,hi,tag_isp,tag_igrp,ra, &
        aa,epot,edesci,strs,nb,nbmax,lsb,nex,lsrc, &
        myparity,nn,myid,mpi_world,iprint,l1st)
 !
@@ -190,7 +190,9 @@ contains
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax), &
          myid,mpi_world,iprint,nn(6),nex(3), &
          nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3)
-    real(rp),intent(in):: rcin,tag(namax),h(3,3),hi(3,3),ra(3,namax)
+    integer,intent(in):: tag_isp(namax)
+    integer,intent(in):: tag_igrp(4,namax)
+    real(rp),intent(in):: rcin,h(3,3),hi(3,3),ra(3,namax)
     real(rp),intent(inout):: aa(3,namax),edesci(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
 
@@ -208,18 +210,18 @@ contains
     
 !.....Compute descriptor values of atoms
     call pre_desci(namax,natm,nnmax,lspr,iprint,rcin)
-    call make_gsf_arrays(l1st,namax,natm,tag,nnmax,lspr,myid,mpi_world,iprint)
+    call make_gsf_arrays(l1st,namax,natm,tag_isp,nnmax,lspr,myid,mpi_world,iprint)
 
     edesc = 0.0_rp
     edesci(:) = 0.0_rp
     descfrc(:,:) = 0.0_rp
     descstrs(:,:,:) = 0.0_rp
     do ia=1,natm
-      igv = igvarOf(tag(ia),giddesc)
+      igv = tag_igrp(giddesc,ia)
       if( igv.eq.0 ) cycle  ! fdesc works only on atoms of igv > 0 
-      isp = int(tag(ia))
+      isp = tag_isp(ia)
 !!$      if( .not. ldspc(isp) ) cycle  ! only specified species pass here
-      call calc_desci(ia,namax,natm,nnmax,h,tag,ra,lspr,rcin,iprint)
+      call calc_desci(ia,namax,natm,nnmax,h,tag_isp,ra,lspr,rcin,iprint)
       xi(1:3) = ra(1:3,ia)
 !!$      dpca1 = 0d0
 !!$      pca1 = 0d0

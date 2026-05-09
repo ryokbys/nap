@@ -34,7 +34,7 @@ module LJ
   integer:: rpl_n(msp,msp)
 
 contains
-  subroutine force_LJ(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_LJ(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint)
 !-----------------------------------------------------------------------
@@ -48,8 +48,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical:: lstrs
 
@@ -108,12 +109,12 @@ contains
     do ia=1,natm
 !!$      aal(:,i) = 0d0
 !!$      strsl(:,:,i) = 0d0
-      isp = int(tag(ia))
+      isp = tag_isp(ia)
       xi(1:3)= ra(1:3,ia)
 !$acc loop seq
       do jj=1,lspr(0,ia)
         ja=lspr(jj,ia)
-        jsp = int(tag(ja))
+        jsp = tag_isp(ja)
 !!$        if( j < i ) cycle
         x= ra(1,ja) -xi(1)
         y= ra(2,ja) -xi(2)
@@ -176,7 +177,7 @@ contains
 
   end subroutine force_LJ
 !=======================================================================
-  subroutine force_LJ_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_LJ_repul(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -189,8 +190,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -250,10 +252,10 @@ contains
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3) = ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       do jj=1,lspr(0,i)
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         rij(1:3) = ra(1:3,j) -xi(1:3)
         xij(1:3) = h(1:3,1,0)*rij(1) +h(1:3,2,0)*rij(2) +h(1:3,3,0)*rij(3)

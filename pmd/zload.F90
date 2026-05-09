@@ -20,7 +20,7 @@ module zload
   real(rp):: d1,d2
   
 contains
-  subroutine set_zload_atoms(natm,ra,tag,h,fmv,sorg,strfin,nstp &
+  subroutine set_zload_atoms(natm,ra,tag_ifmv,h,fmv,sorg,strfin,nstp &
        ,zskin_width,myid_md,mpi_md_world,iprint)
 !
 !     Choose atoms to be applied z-loading.
@@ -31,7 +31,8 @@ contains
     implicit none
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
     real(rp),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width
-    real(rp),intent(inout):: tag(natm),fmv(3,0:9)
+    integer,intent(inout):: tag_ifmv(natm)
+    real(rp),intent(inout):: fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
     real(rp):: ztopl,zbotl,dzlfin
 
@@ -71,10 +72,10 @@ contains
     nzbotl = 0
     do i=1,natm
       if( ra(3,i)+sorg(3) .gt. ztop -zskin_width/h(3,3) ) then
-        call replaceTag('ifmv',9,tag(i))
+        tag_ifmv(i) = 9
         nztopl = nztopl +1
       else if( ra(3,i)+sorg(3) .lt. zbot +zskin_width/h(3,3) ) then
-        call replaceTag('ifmv',9,tag(i))
+        tag_ifmv(i) = 9
         nzbotl = nzbotl +1
       endif
     enddo
@@ -89,7 +90,7 @@ contains
 
   end subroutine set_zload_atoms
 !=======================================================================
-  subroutine zload_atoms(natm,ra,tag,nstp,strfin,strnow &
+  subroutine zload_atoms(natm,ra,tag_ifmv,nstp,strfin,strnow &
        ,sorg,myid_md,mpi_md_world)
 !
 !  Apply z-loading by moving atoms of top and
@@ -101,12 +102,13 @@ contains
     implicit none
     integer,intent(in):: natm,nstp,myid_md,mpi_md_world
     real(rp),intent(in):: strfin,sorg(3)
-    real(rp),intent(inout):: ra(3,natm),strnow,tag(natm)
+    integer,intent(in):: tag_ifmv(natm)
+    real(rp),intent(inout):: ra(3,natm),strnow
 
     integer:: i,l,ierr,ifmv
 
     do i=1,natm
-      ifmv= int(mod(tag(i)*10,10.0_rp))
+      ifmv= tag_ifmv(i)
       if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then  !top
         ra(3,i)= ra(3,i) +dzl
       else if( ifmv.eq.9 .and. ra(3,i)+sorg(3).le.0.5_rp ) then  !bottom
@@ -119,7 +121,7 @@ contains
 
   end subroutine zload_atoms
 !=======================================================================
-  subroutine set_shear(natm,ra,tag,h,fmv,sorg,strfin,nstp &
+  subroutine set_shear(natm,ra,tag_ifmv,h,fmv,sorg,strfin,nstp &
        ,zskin_width,zshear_angle,myid_md,mpi_md_world,iprint)
 !
 !  Choose atoms to be applied shear loading.
@@ -131,7 +133,8 @@ contains
     integer,intent(in):: natm,myid_md,mpi_md_world,nstp,iprint
     real(rp),intent(in):: ra(3,natm),sorg(3),strfin,h(3,3),zskin_width &
          ,zshear_angle
-    real(rp),intent(inout):: tag(natm),fmv(3,0:9)
+    integer,intent(inout):: tag_ifmv(natm)
+    real(rp),intent(inout):: fmv(3,0:9)
     integer:: ierr,i,nztopl,nzbotl
     real(rp):: ztopl,zbotl,dlfin,zskin,angle
     real(rp):: x1,y1,x2,y2,amati(2,2),det
@@ -195,10 +198,10 @@ contains
     zskin = zskin_width /h(3,3)
     do i=1,natm
       if( ra(3,i)+sorg(3) .gt. ztop -zskin ) then
-        call replaceTag('ifmv',9,tag(i))
+        tag_ifmv(i) = 9
         nztopl = nztopl +1
       else if( ra(3,i)+sorg(3) .lt. zbot +zskin ) then
-        call replaceTag('ifmv',9,tag(i))
+        tag_ifmv(i) = 9
         nzbotl = nzbotl +1
       endif
     enddo
@@ -213,7 +216,7 @@ contains
 
   end subroutine set_shear
 !=======================================================================
-  subroutine shear_atoms(natm,ra,tag,nstp,strfin,strnow &
+  subroutine shear_atoms(natm,ra,tag_ifmv,nstp,strfin,strnow &
        ,sorg,myid_md,mpi_md_world)
 !
 !  Apply shear by moving atoms of top-z layers within the plane normal to z.
@@ -224,12 +227,13 @@ contains
     implicit none
     integer,intent(in):: natm,nstp,myid_md,mpi_md_world
     real(rp),intent(in):: strfin,sorg(3)
-    real(rp),intent(inout):: ra(3,natm),strnow,tag(natm)
+    integer,intent(in):: tag_ifmv(natm)
+    real(rp),intent(inout):: ra(3,natm),strnow
 
     integer:: i,l,ierr,ifmv
 
     do i=1,natm
-      ifmv= int(mod(tag(i)*10,10.0_rp))
+      ifmv= tag_ifmv(i)
       if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then  !top
         ra(1,i)= ra(1,i) +d1
         ra(2,i)= ra(2,i) +d2
@@ -244,7 +248,7 @@ contains
 
   end subroutine shear_atoms
 !=======================================================================
-  subroutine get_forces_on_base(natm,ra,aa,tag,h,ftop,fbot &
+  subroutine get_forces_on_base(natm,ra,aa,tag_ifmv,h,ftop,fbot &
        ,sorg,myid,mpi_md_world,iprint,czload_type)
 !
 !  Compute forces on atoms at top and bottom bases,
@@ -254,7 +258,8 @@ contains
     implicit none
     include './params_unit.h'
     integer,intent(in):: natm,myid,mpi_md_world,iprint
-    real(rp),intent(in):: ra(3,natm),aa(3,natm),tag(natm),h(3,3) &
+    integer,intent(in):: tag_ifmv(natm)
+    real(rp),intent(in):: ra(3,natm),aa(3,natm),h(3,3) &
          ,sorg(3)
     real(rp),intent(out):: ftop,fbot
     character(len=*),intent(in):: czload_type
@@ -265,7 +270,7 @@ contains
     fbotl= 0.0_rp
     if( trim(czload_type).eq.'atoms' ) then
       do i=1,natm
-        ifmv= int(mod(tag(i)*10,10.0_rp))
+        ifmv= tag_ifmv(i)
 !.....Scaled force to real force to get eV/Ang unit
         if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then !top layer
           ftopl=ftopl +(h(3,1)*aa(1,i) +h(3,2)*aa(2,i) &
@@ -277,7 +282,7 @@ contains
       enddo
     else if( trim(czload_type).eq.'shear' ) then
       do i=1,natm
-        ifmv= int(mod(tag(i)*10,10.0_rp))
+        ifmv= tag_ifmv(i)
 !.....Scaled force to real force to get eV/Ang unit
         if( ifmv.eq.9 .and. ra(3,i)+sorg(3).gt.0.5_rp ) then !top layer
           fx=h(1,1)*aa(1,i) +h(1,2)*aa(2,i) &

@@ -422,7 +422,7 @@ contains
     return
   end subroutine read_params_RFMEAM
 !=======================================================================
-  subroutine force_RFMEAM(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_RFMEAM(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rcg,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -431,8 +431,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
-         ,rcg,tag(namax)
+         ,rcg
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -545,7 +546,7 @@ contains
 !$omp            dgam,dgdgam,drho,dgdy,dfdy,atmp,phi2,dphi2,skij)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       sij(:) = 0.0_rp
       dsij(:,:) = 0.0_rp
       dsfc(:,:,:) = 0.0_rp
@@ -570,14 +571,14 @@ contains
 !.....Sij and pair potential
       do jj=1,nni
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         dij2 = rijs(4,jj)
         if( dij2.gt.rcij2(is,js) ) cycle
         rij(1:3) = rijs(1:3,jj)
         dij = rijs(5,jj)
         call compute_sij(i,j,jj,is,js,rijs, &
-             namax,natm,nnmax,tag,lspr,sij(jj),dsij(:,:),skij)
+             namax,natm,nnmax,tag_isp,lspr,sij(jj),dsij(:,:),skij)
 !!$!.....Debugging
 !!$        sij(jj) = 1d0
 !!$        dsij(:,:) = 0d0
@@ -715,7 +716,7 @@ contains
         do kk=1,nni
           if( kk.eq.jj) cycle
           k = lspr(kk,i)
-          ks = int(tag(k))
+          ks = tag_isp(k)
           if( .not.interact3(ks,is,js) ) cycle
           dik2 = rijs(4,kk)
           if( dik2.gt.trcij2(is,js) ) cycle
@@ -730,7 +731,7 @@ contains
       do jj=1,nni
         if( sfc(jj).lt.tiny ) cycle
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         rij(1:3) = rijs(1:3,jj)
         dij2 = rijs(4,jj)
         dij = rijs(5,jj)
@@ -738,7 +739,7 @@ contains
         do kk=1,nni
           if( sfc(kk).lt.tiny ) cycle
           k = lspr(kk,i)
-          ks = int(tag(k))
+          ks = tag_isp(k)
           if( .not.interact3(ks,is,js) ) cycle
           dik2 = rijs(4,kk)
           if( dik2.gt.rcij2(is,ks) ) cycle
@@ -783,7 +784,7 @@ contains
       do jj=1,nni
         if( sij(jj).lt.tiny ) cycle
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not.interact(is,js) ) cycle
         dij2 = rijs(4,jj)
         if( dij2.gt.rcij2(is,js) ) cycle
@@ -792,7 +793,7 @@ contains
         fcij = fcut(is,js,dij)
         do kk=1,nni
           k = lspr(kk,i)
-          ks = int(tag(k))
+          ks = tag_isp(k)
           if( .not.interact3(ks,is,js) ) cycle
           dik2 = rijs(4,kk)
           if( dik2.gt.rcij2(is,ks) ) cycle  ! NOTE: cutoff for triplet is betw is-ks
@@ -847,7 +848,7 @@ contains
       do jj=1,nni
 !!$        if( sij(jj).lt.tiny ) cycle
         j = lspr(jj,i)
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         dij2 = rijs(4,jj)
         if( dij2.gt.trcij2(is,js) ) cycle
@@ -905,7 +906,7 @@ contains
   end subroutine force_RFMEAM
 !=======================================================================
   subroutine compute_sij(i,j,jj,is,js,rijs, &
-       namax,natm,nnmax,tag,lspr,sij,dsij,skij)
+       namax,natm,nnmax,tag_isp,lspr,sij,dsij,skij)
 !
 !  Compute Sij and its derivatives wrt r_(i,x).
 !  
@@ -919,7 +920,7 @@ contains
     integer,intent(in):: i,j,jj,is,js,namax,natm,nnmax
     integer,intent(in):: lspr(0:nnmax,namax)
     real(rp),intent(in):: rijs(5,nnmax)
-    real(rp),intent(in):: tag(namax)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(out):: sij,dsij(3,nnmax),skij(nnmax)
 
     integer:: kk,k,ks
@@ -944,7 +945,7 @@ contains
       dik2 = rijs(4,kk)
       if( dik2.gt.dij2*rcfac2(is,js) ) cycle  ! NOTE: cutoff wrt dij
       k= lspr(kk,i)
-      ks = int(tag(k))
+      ks = tag_isp(k)
       if( k.eq.j ) cycle
       if( .not. interact3(ks,is,js) ) cycle
       cmaxkij = cmax(ks,is,js)
@@ -974,7 +975,7 @@ contains
       if( skij(kk).gt.1.0_rp-tiny .or. skij(kk).lt.tiny ) cycle
       k= lspr(kk,i)
       if( k.eq.j ) cycle
-      ks = int(tag(k))
+      ks = tag_isp(k)
       if( .not. interact3(ks,is,js) ) cycle
       dik2 = rijs(4,kk)
       if( dik2.gt.dij2*rcfac2(is,js) ) cycle  ! NOTE: cutoff wrt dij

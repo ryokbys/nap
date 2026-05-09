@@ -6,8 +6,7 @@ module group
 !-----------------------------------------------------------------------
   use pmdmpi
   use mod_precision
-  use pmdvars, only: max_group, nspmax
-  use util, only: ispOf, igvarOf, replace_igvar
+  use pmdvars, only: max_group, nspmax, ngrpmax
   implicit none
   private
   include 'const.h'
@@ -148,15 +147,16 @@ contains
     
   end subroutine bcast_group
 !=======================================================================
-  subroutine grouping(namax,natm,h,tag,ra,sorg,istp,myid,mpicomm,iprint)
+  subroutine grouping(namax,natm,h,tag_isp,tag_igrp,ra,sorg,istp,myid,mpicomm,iprint)
 !
 !  Grouping according to the given grouping method name.
 !
     integer,intent(in):: namax,natm,myid,mpicomm,iprint,istp
+    integer,intent(in):: tag_isp(namax)
+    integer,intent(inout):: tag_igrp(ngrpmax,namax)
     real(rp),intent(in):: h(3,3),ra(3,namax),sorg(3)
-    real(rp),intent(inout):: tag(namax)
     integer:: gid,isp,ia,gti,igvar
-    real(rp):: ti,ri(3),dri(3),rad2
+    real(rp):: ri(3),dri(3),rad2
 
     do gid=1,4
       if( gtiming(gid).eq.0 ) cycle
@@ -165,16 +165,12 @@ contains
       gti = gtype(gid)
       if( gti.eq.1 ) then  ! species grouping
         do ia=1,natm
-          ti = tag(ia)
-          isp = ispOf(ti)
+          isp = tag_isp(ia)
           igvar = ispc(gid,isp)
-          call replace_igvar(ti,gid,igvar)
-!.....Store the modified tag
-          tag(ia) = ti
+          tag_igrp(gid,ia) = igvar
         enddo  ! ia loop
       else if( gti.eq.2 ) then  ! sphere grouping
         do ia=1,natm
-          ti = tag(ia)
           ri(1:3) = ra(1:3,ia) +sorg(1:3) -sph_org(gid,1:3)
           dri(1:3) = h(1:3,1)*ri(1) +h(1:3,2)*ri(2) +h(1:3,3)*ri(3)
           rad2 = dri(1)**2 +dri(2)**2 +dri(3)**2
@@ -183,8 +179,7 @@ contains
           else
             igvar = isph(gid,2)
           endif
-          call replace_igvar(ti,gid,igvar)
-          tag(ia) = ti
+          tag_igrp(gid,ia) = igvar
         enddo  ! ia loop
       endif
     enddo  ! gid loop

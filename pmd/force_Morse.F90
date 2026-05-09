@@ -93,7 +93,7 @@ module Morse
   real(rp),parameter:: ln_ecore = log(ecore)
 
 contains
-  subroutine force_Morse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_Morse(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rct,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
     use util,only: itotOf
@@ -104,8 +104,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -170,11 +171,11 @@ contains
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
 !!$        if( j.le.i ) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
@@ -240,7 +241,7 @@ contains
     return
   end subroutine force_Morse
 !=======================================================================
-  subroutine force_Morse_repul(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_Morse_repul(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -252,8 +253,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -296,12 +298,12 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
@@ -365,7 +367,7 @@ contains
  
   end subroutine force_Morse_repul
 !=======================================================================
-  subroutine force_fbMorse(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_fbMorse(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rct,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -384,8 +386,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rct &
-         ,tag(namax),sv(3,6)
+         ,sv(3,6)
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -449,11 +452,11 @@ contains
 !$omp     reduction(+:epotl)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do k=1,lspr(0,i)
         j=lspr(k,i)
 !!$        if( j.le.i ) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
@@ -509,7 +512,7 @@ contains
     return
   end subroutine force_fbMorse
 !=======================================================================
-  subroutine force_vcMorse(namax,natm,tag,ra,nnmax,aa,strs,chg &
+  subroutine force_vcMorse(namax,natm,tag_isp,ra,nnmax,aa,strs,chg &
        ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid,epi,epot,nismax,lstrs,iprint,l1st)
 !
@@ -522,8 +525,9 @@ contains
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),lspr(0:nnmax,namax),nex(3)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),rc &
-         ,tag(namax),sv(3,6),chg(namax)
+         ,sv(3,6),chg(namax)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -578,14 +582,14 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       chgi = chg(i)
       atdi = atdescs(is)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -665,7 +669,7 @@ contains
  
   end subroutine force_vcMorse
 !=======================================================================
-  subroutine qforce_vcMorse(namax,natm,tag,ra,fq,nnmax,chg &
+  subroutine qforce_vcMorse(namax,natm,tag_isp,ra,fq,nnmax,chg &
        ,h,rc,lspr,mpi_md_world,myid,epot,iprint,l1st)
 !
 !  Variable-charge Morse potential.
@@ -676,8 +680,9 @@ contains
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: lspr(0:nnmax,namax)
     integer,intent(in):: mpi_md_world,myid
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),rc &
-         ,tag(namax),chg(namax)
+         ,chg(namax)
     real(rp),intent(out):: epot,fq(namax)
     logical,intent(in):: l1st
 
@@ -703,14 +708,14 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       chgi = chg(i)
       atdi = atdescs(is)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -1389,7 +1394,7 @@ contains
     
   end subroutine make_pair_desc
 !=======================================================================
-  subroutine gradw_Morse(namax,natm,tag,ra,nnmax &
+  subroutine gradw_Morse(namax,natm,tag_isp,ra,nnmax &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws &
        ,lematch,lfmatch,lsmatch,iprm0)
 !
@@ -1402,7 +1407,8 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint,iprm0
     integer,intent(in):: lspr(0:nnmax,namax)
-    real(rp),intent(in):: ra(3,namax),h(3,3),rc,tag(namax)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),rc
     real(rp),intent(inout):: epot
     integer,intent(in):: ndimp
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
@@ -1440,7 +1446,7 @@ contains
 !.....Set nsp by max isp of atoms in the system
     nsp = 0
     do i=1,natm
-      nsp = max(nsp,int(tag(i)))
+      nsp = max(nsp,tag_isp(i))
     enddo
 
     rc2 = rc*rc
@@ -1458,12 +1464,12 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       do jj=1,lspr(0,i)
         j=lspr(jj,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
 !.....Check if these two species interact
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
@@ -1634,7 +1640,7 @@ contains
     return
   end subroutine gradw_Morse
 !=======================================================================
-  subroutine gradw_vcMorse(namax,natm,tag,ra,nnmax,chg &
+  subroutine gradw_vcMorse(namax,natm,tag_isp,ra,nnmax,chg &
        ,h,rc,lspr,epot,iprint,ndimp,gwe,gwf,gws)
 !
 !  Derivative w.r.t.parameters {w}.
@@ -1645,8 +1651,9 @@ contains
     include "./params_unit.h"
     integer,intent(in):: namax,natm,nnmax,iprint
     integer,intent(in):: lspr(0:nnmax,namax)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),rc &
-         ,tag(namax),chg(namax)
+         ,chg(namax)
     real(rp),intent(inout):: epot
     integer,intent(in):: ndimp
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
@@ -1670,14 +1677,14 @@ contains
 !.....Loop over resident atoms
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is=int(tag(i))
+      is=tag_isp(i)
       chgi = chg(i)
       atdi = atdescs(is)
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
 !!$        if(j.le.i) cycle
-        js= int(tag(j))
+        js= tag_isp(j)
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3)-xi(1:3)
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)

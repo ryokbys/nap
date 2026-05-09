@@ -210,10 +210,14 @@ module pmdvars
 !.....positions, velocities, and accelerations
   real(rp),allocatable:: ra(:,:),va(:,:),aa(:,:),ra0(:,:),strs(:,:,:),stt(:,:,:)
 !$acc declare create(ra)
-!.....real(rp) identifier which includes species, index of FMV, total id
-  real(rp),allocatable:: tag(:)
+!.....Per-atom tag components replacing the real(rp) tag encoding
+  integer,parameter:: ngrpmax = 4   ! Max number of group variables in tag
+  integer(4),allocatable:: tag_isp(:)    ! species index (1-nspmax)
+  integer(4),allocatable:: tag_ifmv(:)   ! FMV constraint index (0-9)
+  integer(4),allocatable:: tag_igrp(:,:) ! group variables (ngrpmax, namax)
+  integer(4),allocatable:: tag_itot(:)   ! global total atom ID
   integer,allocatable:: lspr(:,:)
-!$acc declare create(tag,lspr)
+!$acc declare create(lspr)
 !.....potential and kinetic energy per atoms
   real(rp),allocatable:: epi(:),eki(:,:,:),stp(:,:,:)
 !$acc declare create(epi)

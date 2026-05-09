@@ -217,47 +217,49 @@ contains
     return
   end subroutine sync_params
 !=======================================================================
-  subroutine update_metaD(istp,namax,natm,nsp,tag,ra,h,nnmax,lspr &
+  subroutine update_metaD(istp,namax,natm,nsp,tag_isp,tag_itot,ra,h,nnmax,lspr &
        ,myid,mpi_world,iprint)
 !
 !  Update the additive potential in metaD.
 !
     integer,intent(in):: istp,namax,natm,nnmax,lspr(0:nnmax,namax),nsp
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    integer,intent(in):: tag_isp(natm),tag_itot(natm)
+    real(rp),intent(in):: ra(3,natm),h(3,3)
 
     integer:: ihist
 
     if( mod(istp,nskip).ne.0 ) return
     ihist = istp/nskip
     if( trim(cvtype).eq.'species_pair' ) then
-      call update_species_pair(namax,natm,nsp,tag,ra,h,nnmax,lspr &
+      call update_species_pair(namax,natm,nsp,tag_isp,ra,h,nnmax,lspr &
            ,myid,mpi_world,iprint)
     else if( trim(cvtype).eq.'bonds' ) then
-      call update_bonds(namax,natm,nsp,tag,ra,h &
+      call update_bonds(namax,natm,nsp,tag_isp,tag_itot,ra,h &
            ,myid,mpi_world,iprint,ihist)
     else if( trim(cvtype).eq.'bonds_from_atoms' ) then
-      call update_bonds_from_atoms(namax,natm,nsp,tag,ra,h &
+      call update_bonds_from_atoms(namax,natm,nsp,tag_isp,tag_itot,ra,h &
            ,nnmax,lspr,myid,mpi_world,iprint,ihist)
     endif
 
   end subroutine update_metaD
 !=======================================================================
-  subroutine update_species_pair(namax,natm,nsp,tag,ra,h,nnmax,lspr &
+  subroutine update_species_pair(namax,natm,nsp,tag_isp,ra,h,nnmax,lspr &
        ,myid,mpi_world,iprint)
     integer,intent(in):: namax,natm,nnmax,lspr(0:nnmax,namax),nsp
     integer,intent(in):: myid,mpi_world,iprint
-    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    integer,intent(in):: tag_isp(natm)
+    real(rp),intent(in):: ra(3,natm),h(3,3)
 
     integer:: ia,ja,is,js,isp,jsp,jj,idiv
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij,pref,r,fval,fc
 
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
       xi(1:3)= ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         if( is.le.js ) then
           isp = is
           jsp = js
@@ -306,16 +308,15 @@ contains
     return
   end function fcut
 !=======================================================================
-  subroutine update_bonds(namax,natm,nsp,tag,ra,h &
+  subroutine update_bonds(namax,natm,nsp,tag_isp,tag_itot,ra,h &
            ,myid,mpi_world,iprint,ihist)
-    use util,only: itotOf
     integer,intent(in):: namax,natm,nsp
     integer,intent(in):: myid,mpi_world,iprint,ihist
-    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    integer,intent(in):: tag_isp(natm),tag_itot(natm)
+    real(rp),intent(in):: ra(3,natm),h(3,3)
 
     integer:: ia,ja,iat,jat,i,itot,ib,idiv1,idiv2
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij,rbonds(2),d1,d2,tmp
-!!$    integer,external:: itotOf
 
     do ib=1,nbond
       ia = ibonds(1,ib)
@@ -323,7 +324,7 @@ contains
       iat = 0
       jat = 0
       do i=1,natm
-        itot = itotOf(tag(i))
+        itot = tag_itot(i)
         if( itot.eq.ia ) iat = i
         if( itot.eq.ja ) jat = i
         if( iat.gt.0 .and. jat.gt.0 ) exit
@@ -360,24 +361,23 @@ contains
     return
   end subroutine update_bonds
 !=======================================================================
-  subroutine update_bonds_from_atoms(namax,natm,nsp,tag,ra,h &
+  subroutine update_bonds_from_atoms(namax,natm,nsp,tag_isp,tag_itot,ra,h &
        ,nnmax,lspr,myid,mpi_world,iprint,ihist)
-    use util,only: itotOf
     integer,intent(in):: namax,natm,nsp,nnmax,lspr(0:nnmax,namax)
     integer,intent(in):: myid,mpi_world,iprint,ihist
-    real(rp),intent(in):: tag(natm),ra(3,natm),h(3,3)
+    integer,intent(in):: tag_isp(natm),tag_itot(natm)
+    real(rp),intent(in):: ra(3,natm),h(3,3)
 
     integer:: i,j,ia,ja,jat,iat
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij
-!!$    integer,external:: itotOf
 
     do i=1,natm4bnd
       iat = iatm4bnd(i)
-      ia = ia_from_itot(iat,natm,tag)
+      ia = ia_from_itot(iat,natm,tag_itot)
       xi(1:3) = ra(1:3,ia)
       do j=1,lspr(0,ia)
         ja = lspr(j,ia)
-        jat = itotOf(tag(ja))
+        jat = tag_itot(ja)
         xj(1:3) = ra(1:3,jat)
         xij(1:3) = xj(1:3)-xi(1:3) -anint(xj(1:3) -xi(1:3))
         rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
@@ -387,17 +387,15 @@ contains
     enddo
   end subroutine update_bonds_from_atoms
 !=======================================================================
-  function ia_from_itot(itot,natm,tag)
-    use util,only: itotOf
+  function ia_from_itot(itot,natm,tag_itot)
     integer,intent(in):: itot,natm
-    real(rp),intent(in):: tag(natm)
+    integer,intent(in):: tag_itot(natm)
     integer:: ia_from_itot
-!!$    integer,external:: itotOf
     integer:: ia
 
     ia_from_itot = 0
     do ia=1,natm
-      if( itot.eq.itotOf(tag(ia)) ) then
+      if( itot.eq.tag_itot(ia) ) then
         ia_from_itot = ia
         return
       endif
@@ -405,32 +403,33 @@ contains
     return
   end function ia_from_itot
 !=======================================================================
-  subroutine force_metaD(istp,namax,natm,tag,ra,aa,h,hi,epot &
+  subroutine force_metaD(istp,namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot &
        ,nnmax,lspr,myid,mpi_world,iprint)
 !
 !  Wrapper for calling different force routine for given CV.
 !
     integer,intent(in):: namax,natm,istp,myid,mpi_world,iprint,nnmax&
          ,lspr(0:nnmax,namax)
-    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3)
     real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ihist
 
     ihist = istp/nskip
     if( trim(cvtype).eq.'species_pair' ) then
-      call force_species_pair(namax,natm,tag,ra,aa,h,hi,epot &
+      call force_species_pair(namax,natm,tag_isp,ra,aa,h,hi,epot &
            ,nnmax,lspr,myid,mpi_world,iprint)
     else if( trim(cvtype).eq.'bonds' ) then
-      call force_bonds(namax,natm,tag,ra,aa,h,hi,epot &
+      call force_bonds(namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot &
            ,nnmax,lspr,myid,mpi_world,iprint,ihist)
     else if( trim(cvtype).eq.'bonds_from_atoms' ) then
-      call force_bonds_from_atoms(namax,natm,tag,ra,aa,h,hi,epot &
+      call force_bonds_from_atoms(namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot &
            ,nnmax,lspr,myid,mpi_world,iprint,ihist)
     endif
   end subroutine force_metaD
 !=======================================================================
-  subroutine force_species_pair(namax,natm,tag,ra,aa,h,hi,epot&
+  subroutine force_species_pair(namax,natm,tag_isp,ra,aa,h,hi,epot&
        ,nnmax,lspr,myid,mpi_world,iprint)
 !
 !  CV is pair_species.
@@ -440,7 +439,8 @@ contains
 !
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax)
-    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    integer,intent(in):: tag_isp(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3)
     real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj
@@ -460,11 +460,11 @@ contains
     aal(:,:) = 0.0_rp
     
     do ia=1,natm
-      is = int(tag(ia))
+      is = tag_isp(ia)
       xi(1:3)= ra(1:3,ia)
       do jj=1,lspr(0,ia)
         ja = lspr(jj,ia)
-        js = int(tag(ja))
+        js = tag_isp(ja)
         isp = is
         jsp = js
         if( isp.gt.jsp ) then
@@ -540,22 +540,22 @@ contains
     return
   end function dfpair_at
 !=======================================================================
-  subroutine force_bonds(namax,natm,tag,ra,aa,h,hi,epot&
+  subroutine force_bonds(namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot&
        ,nnmax,lspr,myid,mpi_world,iprint,ihist)
 !
 !  CV is bonds.
 !
-    use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
-    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3)
     real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj,i,iat,jat,itot,ib
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3),fval,dfval &
          ,epotl,at(3),rbonds(2)
     real(rp),save,allocatable:: aal(:,:),dbdr(:)
-!!$    integer,external:: itotOf
+
 
     if( .not.allocated(dbdr) ) allocate(dbdr(nbond))
 
@@ -577,7 +577,7 @@ contains
       iat = 0
       jat = 0
       do i=1,natm
-        itot = itotOf(tag(i))
+        itot = tag_itot(i)
         if( itot.eq.ia ) iat = i
         if( itot.eq.ja ) jat = i
         if( iat.gt.0 .and. jat.gt.0 ) exit
@@ -600,7 +600,7 @@ contains
         iat = 0
         jat = 0
         do i=1,natm
-          itot = itotOf(tag(i))
+          itot = tag_itot(i)
           if( itot.eq.ia ) iat = i
           if( itot.eq.ja ) jat = i
           if( iat.gt.0 .and. jat.gt.0 ) exit
@@ -620,7 +620,7 @@ contains
         iat = 0
         jat = 0
         do i=1,natm
-          itot = itotOf(tag(i))
+          itot = tag_itot(i)
           if( itot.eq.ia ) iat = i
           if( itot.eq.ja ) jat = i
           if( iat.gt.0 .and. jat.gt.0 ) exit
@@ -722,23 +722,23 @@ contains
     return
   end subroutine dfbonds2_at
 !=======================================================================
-  subroutine force_bonds_from_atoms(namax,natm,tag,ra,aa,h,hi,epot&
+  subroutine force_bonds_from_atoms(namax,natm,tag_isp,tag_itot,ra,aa,h,hi,epot&
        ,nnmax,lspr,myid,mpi_world,iprint,ihist)
 !
 !  CV is bonds_from_atoms
 !
-    use util,only: itotOf
     integer,intent(in):: namax,natm,myid,mpi_world,iprint,nnmax &
          ,lspr(0:nnmax,namax),ihist
-    real(rp),intent(in):: tag(namax),ra(3,namax),h(3,3),hi(3,3)
+    integer,intent(in):: tag_isp(namax),tag_itot(namax)
+    real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3)
     real(rp),intent(inout):: aa(3,namax),epot
 
     integer:: ia,ja,is,js,isp,jsp,ierr,jj,i,iat,jat,itot,ib,j,jt,ih
     real(rp):: xi(3),xj(3),xij(3),rij(3),dij,dxdi(3),dxdj(3) &
          ,epotl,at(3),texp,tmp
-    logical:: l_jat_in_lspr 
+    logical:: l_jat_in_lspr
     real(rp),save,allocatable:: aal(:,:)
-!!$    integer,external:: itotOf
+
 
     if( .not. allocated(aal) ) then
       allocate(aal(3,namax))
@@ -754,15 +754,15 @@ contains
     do ih=1,ihist
       do i=1,natm4bnd
         iat = iatm4bnd(i)
-        ia = ia_from_itot(iat,natm,tag)
+        ia = ia_from_itot(iat,natm,tag_itot)
         xi(1:3) = ra(1:3,ia)
         tmp = 0.0_rp
         do ja=1,natm
-          jat = itotOf(tag(ja))
+          jat = tag_itot(ja)
           l_jat_in_lspr = .false.
           do j=1,lspr(0,ia)
             jj = lspr(j,ia)
-            jt = itotOf(tag(jj))
+            jt = tag_itot(jj)
             if( jat.eq.jt ) then
               l_jat_in_lspr = .true.
               exit
@@ -777,11 +777,11 @@ contains
         enddo
         texp = exp(tmp)
         do ja=1,natm
-          jat = itotOf(tag(ja))
+          jat = tag_itot(ja)
           l_jat_in_lspr = .false.
           do j=1,lspr(0,ia)
             jj = lspr(j,ia)
-            jt = itotOf(tag(jj))
+            jt = tag_itot(jj)
             if( jat.eq.jt ) then
               l_jat_in_lspr = .true.
               exit

@@ -146,7 +146,7 @@ module Bonny_WRe
        /)
   
 contains
-  subroutine force_Bonny_WRe(namax,natm,tag,ra,nnmax,aa,strs,h,hi &
+  subroutine force_Bonny_WRe(namax,natm,tag_isp,ra,nnmax,aa,strs,h,hi &
        ,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
        ,mpi_md_world,myid_md,epi,epot,nismax,lstrs,iprint,l1st)
     implicit none
@@ -155,8 +155,9 @@ contains
          ,iprint
     integer,intent(in):: nb,nbmax,lsb(0:nbmax,6),lsrc(6),myparity(3) &
          ,nn(6),mpi_md_world,myid_md,nex(3)
+    integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3,0:1),hi(3,3),sv(3,6) &
-         ,rc,tag(namax)
+         ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
     logical:: lstrs
@@ -214,12 +215,12 @@ contains
 !-----rho(i)
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       if( is.gt.2 ) cycle
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         xj(1:3) = ra(1:3,j)
         xij(1:3)= xj(1:3) -xi(1:3)
@@ -239,14 +240,14 @@ contains
 !-----dE/dr_i
     do i=1,natm
       xi(1:3)= ra(1:3,i)
-      is = int(tag(i))
+      is = tag_isp(i)
       if( is.gt.2 ) cycle
       dfi = dfrho(is,rho(i))
       do k=1,lspr(0,i)
         j=lspr(k,i)
         if(j.eq.0) exit
         if(j.le.i) cycle
-        js = int(tag(j))
+        js = tag_isp(j)
         if( .not. interact(is,js) ) cycle
         xj(1:3)= ra(1:3,j)
         xij(1:3)= xj(1:3) -xi(1:3)
