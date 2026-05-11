@@ -268,7 +268,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   endif
 
 !-----calc kinetic energy
-  call get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
+  call get_ekin(namax,natm,va,tag_isp,tag_ifmv,h,nspmax,fekin,ekin,eki,eks &
        ,vmax,mpi_md_world)
   vmaxold=vmax
 
@@ -788,7 +788,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
 
 !.....Calc kinetic energy
     vmaxold= vmax
-    call get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
+    call get_ekin(namax,natm,va,tag_isp,tag_ifmv,h,nspmax,fekin,ekin,eki,eks &
          ,vmax,mpi_md_world)
 !!$    print *,'Time at 8 = ',real(mpi_wtime(),rp) -tcpu0
 
@@ -1903,30 +1903,29 @@ subroutine ntset(myx,myy,myz,nx,ny,nz,nn,sv,myparity,anxi,anyi,anzi)
   return
 end subroutine ntset
 !=======================================================================
-subroutine get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
+subroutine get_ekin(namax,natm,va,tag_isp,tag_ifmv,h,nspmax,fekin,ekin,eki,eks &
      ,vmax,mpi_md_world)
   use pmdmpi
   use mod_precision
-  use pmdvars,only: ngrpmax
+  use pmdvars,only: maxntemps
   use time,only: accum_time
   implicit none
   integer,intent(in):: namax,natm,mpi_md_world,nspmax
-  integer,intent(in):: tag_isp(namax),tag_igrp(ngrpmax,namax)
+  integer,intent(in):: tag_isp(namax),tag_ifmv(namax)
   real(rp),intent(in):: va(3,namax),h(3,3),fekin(nspmax)
-  real(rp),intent(out):: ekin,eki(3,3,namax),vmax,eks(nspmax)
+  real(rp),intent(out):: ekin,eki(3,3,namax),vmax,eks(maxntemps)
 !-----locals
-  integer:: i,ierr,is,ixyz,jxyz,imax,igrp,itemp
-  real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(nspmax),tmp
+  integer:: i,ierr,is,ixyz,jxyz,imax,itemp
+  real(rp):: ekinl,x,y,z,v(3),v2,vmaxl,eksl(maxntemps),tmp
 
   ekinl=0.0_rp
   eki(1:3,1:3,1:natm)= 0.0_rp
   eksl(:)= 0.0_rp
   vmaxl= 0.0_rp
 
-  igrp = 1  ! temperature category is Group-#1 (same as fmv)
   do i=1,natm
     is= tag_isp(i)
-    itemp = tag_igrp(igrp,i)
+    itemp = tag_ifmv(i)  ! ifmv=0 means fixed atom
     if( itemp.eq.0 ) cycle
 !.....Tensor form eki
     do jxyz=1,3
@@ -1951,7 +1950,7 @@ subroutine get_ekin(namax,natm,va,tag_isp,tag_igrp,h,nspmax,fekin,ekin,eki,eks &
   call mpi_allreduce(ekinl,ekin,1,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   eks(:)= 0.0_rp
-  call mpi_allreduce(eksl,eks,nspmax,mpi_real_rp &
+  call mpi_allreduce(eksl,eks,maxntemps,mpi_real_rp &
        ,mpi_sum,mpi_md_world,ierr)
   vmax= 0.0_rp
   call mpi_allreduce(vmaxl,vmax,1,mpi_real_rp &
