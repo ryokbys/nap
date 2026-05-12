@@ -1,11 +1,15 @@
  
  PMD --- Parallel Molecular Dynamics ---
  
-   Revision: rev230405
+   Git commit-ID: 1c825c6
    Contributors: 
      - Ryo KOBAYASHI <kobayashi.ryo@nitech.ac.jp>
+
+   Compiler: GCC version 15.2.0
+   Machine: Darwin ts3-rk.ogt.nitech.ac.jp 25.1.0 arm64
+   Precision: DOUBLE (rp=8)
  
- Job started at 22:38:21 on 2023-04-27
+ Job started at 14:40:25 on 2026-05-12
  
  Read pmdini in ascii mode.
  Species order read from pmdini option: 
@@ -30,8 +34,9 @@
    Zr :  16
  
  Num of MPI processes = 1
- Warning: No such in.pmd entry, flag_coulomb !!!
- Num of OpenMP processes = 8
+ Num of OpenMP processes = 1
+ 
+ Number of ifmvs = 1
  
 ------------------------------------------------------------------------
            Initial setting   
@@ -47,9 +52,8 @@
   num_iteration     2
   num_out_energy     100
   
-  flag_out_pmd     2
+  flag_out_pmd     3
   num_out_pmd     10
-  dump_aux_order    ekin epot sxx syy szz syz sxz sxy 
   
   force_type     Coulomb  Morse
   cutoff_radius      6.000
@@ -69,16 +73,8 @@
  
   
   factor_direction
-       0   0.000   0.000   0.000
-       1   1.000   1.000   1.000
-       2   1.000   0.000   1.000
-       3   1.000   1.000   1.000
-       4   1.000   1.000   1.000
-       5   1.000   1.000   1.000
-       6   1.000   1.000   1.000
-       7   1.000   1.000   1.000
-       8   1.000   1.000   1.000
-       9   1.000   1.000   1.000
+     0:   0   0   0
+     1:   1   1   1
   
   mass
        1 O     15.9990
@@ -89,19 +85,28 @@
   boundary     ppp
   
 ------------------------------------------------------------------------
+ 
 
  Broadcast data to be shared with all the nodes.
  
  Number of total atoms = 192
  Number of species     = 4
  
- Use the following force-fields:  Coulomb  Morse 
+ Force-fields:  Coulomb  Morse 
 
  Coulomb parameters:
    csp,vid,rad,npq =    O -2.000  0.660   2
    csp,vid,rad,npq =   Li  1.000  1.280   2
    csp,vid,rad,npq =   La  3.000  2.070   6
    csp,vid,rad,npq =   Zr  4.000  1.750   5
+   selected interactions:
+     O-O
+     Li-Li
+     Li-La
+     Li-Zr
+     La-La
+     La-Zr
+     Zr-Zr
  rhoij are set from given rads of fixed_bvs entries.
    cspi,cspj,rho_scr=     O    O    1.3200
    cspi,cspj,rho_scr=    Li   Li    2.5600
@@ -112,15 +117,13 @@
    cspi,cspj,rho_scr=    Zr   Zr    3.5000
 
  Morse parameters:
-   cspi,cspj,D,alpha,rmin =    O  Li  0.988  1.938  1.940
-   cspi,cspj,D,alpha,rmin =    O  La  1.186  2.217  2.470
-   cspi,cspj,D,alpha,rmin =    O  Zr  2.191  2.041  1.996
+   cspi,cspj,D,alpha,rmin,rc =    O  Li  0.988  1.938  1.940  6.000
+   cspi,cspj,D,alpha,rmin,rc =    O  La  1.186  2.217  2.470  6.000
+   cspi,cspj,D,alpha,rmin,rc =    O  Zr  2.191  2.041  1.996  6.000
 
  Number of spatial divisions automatically set, NX,NY,NZ= 1 1 1
  
  Ensemble = NVE
- 
- Number of ifmvs = 1
  
  space_decomp:
    rcut, rbuf =  6.000 0.300
@@ -128,12 +131,13 @@
    Max number of local atoms =        192
      nbmax =       1469
      namax = nalmax*1.2 + nbmax  =       1699
- Degrees of freedom for each ifmv =  576  0  0  0  0  0  0  0  0
+
+ Degrees of freedom for each ifmv =  1) 576
  
  Estimation of num of neighbors:
    Max num in link-list cell =    25
-   Cell volume and density = 279.7   0.0894
-   Max num of neighbors, that incl. margin =   94  103
+   Cell volume and density = 279.7   0.0858
+   Max num of neighbors, that incl. margin (nnmax) =   90  99
 
  Max num of neighbors =    98
  
@@ -151,26 +155,24 @@
  Initial values:
    Kinetic energy  =          7.46180 eV =      0.039 eV/atom
    Potential energy=       -158.31108 eV =     -0.825 eV/atom
-   Temperature 1   =        302.23600 K
    Temperature     =        302.23600 K
    Pressure        =         26.60458 GPa (compressive)
    Stress tensor   =    28.724    26.956    24.134     0.291    -0.477    -0.203
  
  istp,etime,temp,epot,vol,prss= 0        0.00      302.24  -1.5831E+02  2.237E+03  2.660E+01
  istp,etime,temp,epot,vol,prss= 1        0.00      300.56  -1.5827E+02  2.237E+03  2.659E+01
- istp,etime,temp,epot,vol,prss= 2        0.01      303.31  -1.5834E+02  2.237E+03  2.653E+01
+ istp,etime,temp,epot,vol,prss= 2        0.00      303.31  -1.5834E+02  2.237E+03  2.653E+01
  
  Final values:
    Kinetic energy  =          7.48833 eV =      0.039 eV/atom
    Potential energy=       -158.33772 eV =     -0.825 eV/atom
-   Temperature 1   =        303.31072 K
    Temperature     =        303.31072 K
    Pressure        =         26.53042 GPa (compressive)
  
- Max num of neighbors during MD = 99
+ Max num of neighbors during MD and nnmax =   99  99
  Max num of boundary atoms during MD = 1141
  
  Time   total =      0.013 sec =   0h00m00s
- Memory per MPI-proc =      1.116 MB  
+ Memory per MPI-proc =      1.089 MB  
  
- Job finished at 22:38:21 on 2023-04-27
+ Job finished at 14:40:25 on 2026-05-12

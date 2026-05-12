@@ -120,7 +120,7 @@ contains
         call bfunc(ia,natm,namax,nnmax,ra,lspr,h,tag_isp,dbna,rc &
              ,ielem,aexp,bnai)
 #ifdef __FITPOT__
-        write(80,'(2i10,f5.1,es23.14e3)') ia,ielem,aexp,bnai
+        write(80,'(2i10,f5.1,'//rpfmt3//')') ia,ielem,aexp,bnai
 !        write(81,'(2i10,f5.1,3es23.14e3)') ia,ielem,aexp,fat(1:3,ia)
 #endif
 !        write(6,*) ' ia,ielem,bnai,wgt=',ia,ielem,bnai,wgt
@@ -133,7 +133,7 @@ contains
 #endif
       enddo
 #ifdef __3BODY__
-      write(6,'(a,i8,es22.14)') ' 3-body term:',ia,apot
+      write(6,'(a,i8,'//rpfmt//')') ' 3-body term:',ia,apot
 #endif
     enddo
 
@@ -151,7 +151,7 @@ contains
          ,nn,mpi_world,dbna,3*nelem)
     do ia=1,natm
       do ielem=1,nelem
-        write(81,'(2i10,3es23.14e3)') ia,ielem,dbna(1:3,ielem,ia)
+        write(81,'(2i10,3'//rpfmt3//')') ia,ielem,dbna(1:3,ielem,ia)
       enddo
     enddo
     close(80)

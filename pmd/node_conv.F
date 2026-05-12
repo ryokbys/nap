@@ -96,10 +96,10 @@ c.....Some check
      &         ra(2,j).lt.syog.or.ra(2,j).ge.syog+1.0_rp/noy.or.
      &         ra(3,j).lt.szog.or.ra(3,j).ge.szog+1.0_rp/noz)then
             write(6,'(a)')'Old node-layout error!'
-            write(6,'(i10,3es24.15)') j,ra(1:3,j)
-            write(6,'(2es24.15)') sxog, sxog+1.0_rp/nox
-            write(6,'(2es24.15)') syog, syog+1.0_rp/noy
-            write(6,'(2es24.15)') szog, szog+1.0_rp/noz
+            write(6,'(i10,3'//rpfmt//')') j,ra(1:3,j)
+            write(6,'(2'//rpfmt//')') sxog, sxog+1.0_rp/nox
+            write(6,'(2'//rpfmt//')') syog, syog+1.0_rp/noy
+            write(6,'(2'//rpfmt//')') szog, szog+1.0_rp/noz
             stop
           endif
         enddo

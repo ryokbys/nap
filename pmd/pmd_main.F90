@@ -827,7 +827,7 @@ subroutine write_force(ionum,cpostfix,h,epot,ntot,tagtot_itot,atot,stnsr)
 
 !.....Write out energy
   open(ionum+1,file='erg'//trim(cpostfix),status='replace')
-  write(ionum+1,'(es23.14e3)') epot
+  write(ionum+1,'('//rpfmt3//')') epot
   close(ionum+1)
 
 !.....Write stress tensor, negative as compressive, positive as tensile

@@ -23,7 +23,7 @@
       write(6,'(a)') " h="
       write(6,'(3es15.7)') (((h(ia,ib,l),ia=1,3),ib=1,3),l=0,1)
       do i=1,5
-        write(6,'(10es24.14)') tag(i),ra(1:3,i),va(1:3,i)
+        write(6,'(10'//rpfmt//')') tag(i),ra(1:3,i),va(1:3,i)
       enddo
 
       end program read_pmd

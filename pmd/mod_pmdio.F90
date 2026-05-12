@@ -206,25 +206,25 @@ contains
            stnsr(3,2), stnsr(1,3), stnsr(1,2)
     if(lforce) write(ionum,'(a,l1)') '#  auxiliary_data:  fx fy fz'
     write(ionum,'(a)') '#'
-    write(ionum,'(es23.14e3)') hunit
+    write(ionum,'('//rpfmt3//')') hunit
 !!$    write(ionum,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
 !!$         ,ib=1,3),l=0,1)
 !.....H-matrix IO format changed since 2024-03-07
-    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,1,l)/hunit,ia=1,3),l=0,1)
-    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,2,l)/hunit,ia=1,3),l=0,1)
-    write(ionum,'(3es24.14e3, 3es12.3e3)') ((h(ia,3,l)/hunit,ia=1,3),l=0,1)
+    write(ionum,'(3'//rpfmt3//', 3es12.3e3)') ((h(ia,1,l)/hunit,ia=1,3),l=0,1)
+    write(ionum,'(3'//rpfmt3//', 3es12.3e3)') ((h(ia,2,l)/hunit,ia=1,3),l=0,1)
+    write(ionum,'(3'//rpfmt3//', 3es12.3e3)') ((h(ia,3,l)/hunit,ia=1,3),l=0,1)
     write(ionum,'(i10)') ntot
 !.....All the length values (r,v,a) are scaled by h-mat in pmd format
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
         tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
-        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tmp_tag &
+        write(ionum,'(f17.14, 6'//rpfmt//', 11es12.4)') tmp_tag &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
         tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
-        write(ionum,'(f17.14, 6es22.14, 11es12.4)') tmp_tag &
+        write(ionum,'(f17.14, 6'//rpfmt//', 11es12.4)') tmp_tag &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
     endif

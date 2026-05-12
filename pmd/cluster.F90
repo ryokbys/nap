@@ -134,13 +134,13 @@ program cluster_analysis
     write(20,'(a)') '!'
     write(20,'(a,9(2x,a))') '!  specorder: ',(trim(specorder(i)),i=1,msp)
     write(20,'(a)') '!'
-    write(20,'(es23.14e3)') hunit
-    write(20,'(3es23.14e3)') (((h(ia,ib,l)/hunit,ia=1,3) &
+    write(20,'('//rpfmt3//')') hunit
+    write(20,'(3'//rpfmt3//')') (((h(ia,ib,l)/hunit,ia=1,3) &
          ,ib=1,3),l=0,1)
     write(20,'(i10)') nacs(ic)
     do ia=1,ntot
       if( ictot(ia).eq.ic ) then
-        write(20,'(7es23.14e3,11es13.4e3)') real(tagtot_isp(ia),rp) &
+        write(20,'(7'//rpfmt3//',11es13.4e3)') real(tagtot_isp(ia),rp) &
              ,rtot(1:3,ia),vtot(1:3,ia)    ! dt
       endif
     enddo

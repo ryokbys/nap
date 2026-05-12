@@ -134,9 +134,9 @@ c.....only use ifmv(1) for temperature
 
       if( iolevel.gt.0 ) then
         write(6,'(1x,a)') "initial values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  ="
+        write(6,'(1x,a,'//rpfmt//',a)') " kinetic energy  ="
      &       ,ekin," eV"
-        write(6,'(1x,a,es22.14,a)') " potential energy="
+        write(6,'(1x,a,'//rpfmt//',a)') " potential energy="
      &       ,epot0," eV"
         write(6,'(1x,a,es15.7,a)') " temperature     =",temp(1)," K"
 
@@ -262,9 +262,9 @@ c      enddo
 
       if( iolevel.gt.0 ) then
         write(6,'(1x,a)') "final values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  ="
+        write(6,'(1x,a,'//rpfmt//',a)') " kinetic energy  ="
      &       ,ekin," eV"
-        write(6,'(1x,a,es22.14,a)') " potential energy="
+        write(6,'(1x,a,'//rpfmt//',a)') " potential energy="
      &       ,epot," eV"
         write(6,'(1x,a,es15.7,a)') " temperature     ="
      &       ,temp(1)," K"

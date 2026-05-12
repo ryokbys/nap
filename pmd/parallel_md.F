@@ -295,8 +295,8 @@ c      if(myid_md.eq.0) write(6,'(a,i10)') " istpe=",istpe
       if(myid_md.eq.0) then
         write(6,*) ''
         write(6,'(1x,a)') "initial values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
-        write(6,'(1x,a,es22.14,a)') " potential energy=",epot0,' eV'
+        write(6,'(1x,a,'//rpfmt//',a)') " kinetic energy  =",ekin,' eV'
+        write(6,'(1x,a,'//rpfmt//',a)') " potential energy=",epot0,' eV'
         nave= 0
         tave= 0.0_rp
         do ifmv=1,9
@@ -703,8 +703,8 @@ c.....write energy and forces only for fitpot (2nd digit of iprint==1)
       if(myid_md.eq.0) then
         write(6,*) ''
         write(6,'(1x,a)') "final values:"
-        write(6,'(1x,a,es22.14,a)') " kinetic energy  =",ekin,' eV'
-        write(6,'(1x,a,es22.14,a)') " potential energy=",epot,' eV'
+        write(6,'(1x,a,'//rpfmt//',a)') " kinetic energy  =",ekin,' eV'
+        write(6,'(1x,a,'//rpfmt//',a)') " potential energy=",epot,' eV'
         nave= 0
         tave= 0.0_rp
         do ifmv=1,9
@@ -2105,13 +2105,13 @@ c.....Write out forces
      &         +h(1:3,2)*atot(2,i)
      &         +h(1:3,3)*atot(3,i)
           at(1:3)= at(1:3)/acon(is)
-          write(ionum,'(3es23.14e3)') at(1:3)
+          write(ionum,'(3'//rpfmt3//')') at(1:3)
         enddo
         close(ionum)
 
 c.....Write out energy
         open(ionum+1,file='erg'//trim(cpostfix),status='replace')
-        write(ionum+1,'(es23.14e3)') epot
+        write(ionum+1,'('//rpfmt3//')') epot
         close(ionum+1)
 
 c.....Write stress tensor

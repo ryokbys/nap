@@ -133,7 +133,7 @@ c.....Write out forces
       open(ionum,file='frc.smd',status='replace')
       write(ionum,'(i10)') natm
       do i=1,natm
-        write(ionum,'(3es23.14e3)') aa(1:3,i)
+        write(ionum,'(3'//rpfmt3//')') aa(1:3,i)
       enddo
       close(ionum)
 
@@ -148,7 +148,7 @@ c=======================================================================
       
 c.....Write out energy
       open(ionum,file='erg.smd',status='replace')
-      write(ionum,'(es23.14e3)') erg
+      write(ionum,'('//rpfmt3//')') erg
       close(ionum)
 
       end subroutine write_energy
