@@ -2138,7 +2138,6 @@ subroutine bacopy(l1st)
   use pmdvars
   use force
   use pmdmpi
-  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2151,21 +2150,28 @@ subroutine bacopy(l1st)
   real(rp):: xi(3),rcv(3),asgm,tmp
   logical,external:: bbd
   real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  integer,save,allocatable:: ibuf(:,:),ibufr(:,:)
   logical:: lshort(3)
 
-  integer,save:: ndimbuf = 4
+  integer,save:: ndimbuf = 3
+  integer,parameter:: ntag_ba = 3+ngrpmax
 
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-    ndimbuf = 4 +naux
+    if( allocated(ibuf) ) deallocate(ibuf,ibufr)
+    ndimbuf = 3 +naux
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   endif
 
   if( .not.allocated(dbuf) ) then
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   else if( size(dbuf).lt.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    deallocate(ibuf,ibufr)
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   endif
 
   call nid2xyz(myid_md,ix,iy,iz)
@@ -2338,18 +2344,26 @@ subroutine bacopy(l1st)
         do i=1,nsd
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-          dbuf(4,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
+          ibuf(1,i) = tag_isp(j)
+          ibuf(2,i) = tag_ifmv(j)
+          ibuf(3:2+ngrpmax,i) = tag_igrp(1:ngrpmax,j)
+          ibuf(3+ngrpmax,i) = tag_itot(j)
           do iaux=1,naux
-            dbuf(4+iaux,i) = aux(iaux,j)
+            dbuf(3+iaux,i) = aux(iaux,j)
           enddo
         enddo
         call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
              ,nrc*ndimbuf,21,mpi_md_world)
+        call mespasi(inode,myparity(kd),ibuf(1,1),ibufr(1,1) &
+             ,nsd*ntag_ba,nrc*ntag_ba,22,mpi_md_world)
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-          call tag_decode(real(dbufr(4,i),8), tag_isp(natm+nbnew+i), tag_ifmv(natm+nbnew+i), tag_igrp(:,natm+nbnew+i), tag_itot(natm+nbnew+i))
+          tag_isp(natm+nbnew+i)    = ibufr(1,i)
+          tag_ifmv(natm+nbnew+i)   = ibufr(2,i)
+          tag_igrp(1:ngrpmax,natm+nbnew+i) = ibufr(3:2+ngrpmax,i)
+          tag_itot(natm+nbnew+i)   = ibufr(3+ngrpmax,i)
           do iaux=1,naux
-            aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
+            aux(iaux,natm+nbnew+i) = dbufr(3+iaux,i)
           enddo
         enddo
 
@@ -2390,35 +2404,41 @@ subroutine bacopy_fixed()
 !  Exchanges boundary-atom data among neighbor nodes: tag and ra
 !  This does not search using position, just send & recv data of atoms
 !    which were listed by 'bacopy'.
-!  Different number of data are copied depending on whether 
+!  Different number of data are copied depending on whether
 !    using atomic charges or not.
 !-----------------------------------------------------------------------
   use mod_precision
   use pmdvars
   use force
   use pmdmpi
-  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   implicit none
 
   integer:: i,j,m,kd,kdd,ku,ierr,iex,ix,iy,iz,iaux
   integer:: inode,nsd,nrc,nbnew
   real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  integer,save,allocatable:: ibuf(:,:),ibufr(:,:)
   logical,save:: l1st=.true.
-  integer,save:: ndimbuf = 4
+  integer,save:: ndimbuf = 3
+  integer,parameter:: ntag_ba = 3+ngrpmax
 
   if( l1st ) then
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
-    ndimbuf = 4 +naux
-    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))    
+    if( allocated(ibuf) ) deallocate(ibuf,ibufr)
+    ndimbuf = 3 +naux
+    allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
     l1st=.false.
   endif
 
   if( .not. allocated(dbuf) ) then
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   else if( size(dbuf).lt.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    deallocate(ibuf,ibufr)
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   endif
 
   call nid2xyz(myid_md,ix,iy,iz)
@@ -2455,18 +2475,26 @@ subroutine bacopy_fixed()
         do i=1,nsd
           j= lsb(i,ku)
           dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
-          dbuf(4,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
+          ibuf(1,i) = tag_isp(j)
+          ibuf(2,i) = tag_ifmv(j)
+          ibuf(3:2+ngrpmax,i) = tag_igrp(1:ngrpmax,j)
+          ibuf(3+ngrpmax,i) = tag_itot(j)
           do iaux=1,naux
-            dbuf(4+iaux,i) = aux(iaux,j)
+            dbuf(3+iaux,i) = aux(iaux,j)
           enddo
         enddo
         call mespasd(inode,myparity(kd),dbuf,dbufr,nsd*ndimbuf &
              ,nrc*ndimbuf,21,mpi_md_world)
+        call mespasi(inode,myparity(kd),ibuf(1,1),ibufr(1,1) &
+             ,nsd*ntag_ba,nrc*ntag_ba,22,mpi_md_world)
         do i=1,nrc
           ra(1:3,natm+nbnew+i)= dbufr(1:3,i)
-          call tag_decode(real(dbufr(4,i),8), tag_isp(natm+nbnew+i), tag_ifmv(natm+nbnew+i), tag_igrp(:,natm+nbnew+i), tag_itot(natm+nbnew+i))
+          tag_isp(natm+nbnew+i)    = ibufr(1,i)
+          tag_ifmv(natm+nbnew+i)   = ibufr(2,i)
+          tag_igrp(1:ngrpmax,natm+nbnew+i) = ibufr(3:2+ngrpmax,i)
+          tag_itot(natm+nbnew+i)   = ibufr(3+ngrpmax,i)
           do iaux=1,naux
-            aux(iaux,natm+nbnew+i) = dbufr(4+iaux,i)
+            aux(iaux,natm+nbnew+i) = dbufr(3+iaux,i)
           enddo
         enddo
 
@@ -2493,7 +2521,6 @@ subroutine bamove()
   use pmdvars
   use force
   use pmdmpi
-  use pmdio,only: tag_encode,tag_decode
   use clrchg,only: lclrchg
   use time,only: accum_time
   implicit none
@@ -2503,21 +2530,28 @@ subroutine bamove()
   real(rp):: xi(3),tmp
   logical,external:: bmv
   real(rp),save,allocatable:: dbuf(:,:),dbufr(:,:)
+  integer,save,allocatable:: ibuf(:,:),ibufr(:,:)
   logical,save:: l1st=.true.
-  integer,save:: ndimbuf = 7
+  integer,save:: ndimbuf = 6
+  integer,parameter:: ntag_ba = 3+ngrpmax
 
   if( l1st ) then
-    ndimbuf = 7 +naux
+    ndimbuf = 6 +naux
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
+    if( allocated(ibuf) ) deallocate(ibuf,ibufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
     l1st=.false.
   endif
 
   if( .not.allocated(dbuf) ) then
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   else if( size(dbuf).ne.ndimbuf*nbmax ) then
     deallocate(dbuf,dbufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
+    deallocate(ibuf,ibufr)
+    allocate(ibuf(ntag_ba,nbmax),ibufr(ntag_ba,nbmax))
   endif
 
   call nid2xyz(myid_md,ix,iy,iz)
@@ -2645,23 +2679,29 @@ subroutine bamove()
         j= mvque(i,ku)
         dbuf(1:3,i)= ra(1:3,j) -sv(1:3,ku)
         dbuf(4:6,i)= va(1:3,j)
-        dbuf(7,i) = real(tag_encode(tag_isp(j),tag_ifmv(j),tag_igrp(:,j),tag_itot(j)),rp)
+        ibuf(1,i) = tag_isp(j)
+        ibuf(2,i) = tag_ifmv(j)
+        ibuf(3:2+ngrpmax,i) = tag_igrp(1:ngrpmax,j)
+        ibuf(3+ngrpmax,i) = tag_itot(j)
 !-----------Eliminate the record of a moved-out atom
         tag_isp(j)=0; tag_ifmv(j)=0; tag_igrp(:,j)=0; tag_itot(j)=0
-        m = 7
         do iaux=1,naux
-          dbuf(7+iaux,i) = aux(iaux,j)
+          dbuf(6+iaux,i) = aux(iaux,j)
         enddo
       enddo
       call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd, &
            ndimbuf*nrc,71,mpi_md_world)
+      call mespasi(inode,myparity(kd),ibuf(1,1),ibufr(1,1) &
+           ,nsd*ntag_ba,nrc*ntag_ba,72,mpi_md_world)
       do i=1,nrc
         ra(1:3,natm+newim+i)= dbufr(1:3,i)
         va(1:3,natm+newim+i)= dbufr(4:6,i)
-        call tag_decode(real(dbufr(7,i),8), tag_isp(natm+newim+i), tag_ifmv(natm+newim+i), tag_igrp(:,natm+newim+i), tag_itot(natm+newim+i))
-        m = 7
+        tag_isp(natm+newim+i)    = ibufr(1,i)
+        tag_ifmv(natm+newim+i)   = ibufr(2,i)
+        tag_igrp(1:ngrpmax,natm+newim+i) = ibufr(3:2+ngrpmax,i)
+        tag_itot(natm+newim+i)   = ibufr(3+ngrpmax,i)
         do iaux=1,naux
-          aux(iaux,natm+newim+i) = dbufr(7+iaux,i)
+          aux(iaux,natm+newim+i) = dbufr(6+iaux,i)
         enddo
       enddo
 

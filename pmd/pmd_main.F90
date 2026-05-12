@@ -382,6 +382,11 @@ subroutine write_headline()
   call write_revision()
   call write_authors()
   call write_runtime()
+  if( rp == 4 ) then
+    write(6,'(a)') '   Precision: SINGLE (rp=4)'
+  else
+    write(6,'(a)') '   Precision: DOUBLE (rp=8)'
+  end if
   write(6,*) ''
   call time_stamp(' Job started')
   write(6,*) ''
