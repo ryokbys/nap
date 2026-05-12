@@ -31,7 +31,9 @@ pmdobj= lasubs.o common_parallel.o sort.o pmd_core.o
 pmc= prec_mc.o read_input.o pmd_core.o lasubs.o common_parallel.o sort.o
 comb= node_conv.o
 
-mods= mod_precision.o mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
+premods= mod_precision.o
+
+mods= mod_pmdvars.o mod_pmdio.o mod_pmdmpi.o zload.o mod_version.o mod_force.o \
 	mod_ttm.o descriptor.o metadynamics.o mod_constraints.o mod_vector.o \
 	mod_rdcfrc.o mod_structure.o mod_deform.o mod_util.o mod_element.o \
 	mod_extforce.o mod_colorcharge.o mod_localflux.o mod_pdens.o mod_time.o \
@@ -56,7 +58,7 @@ params=params_Ramas_FeH.h params_RK_FeH.h params_RK_WHe.h params_Ito3_WHe.h \
 	params_Mishin_Al.h params_Mishin_Ni.h params_AFS_W.h params_SC_Fe.h \
 	params_SM_Al.h const.h
 
-libpmdobj= ${pmdobj} ${mods} ${forces} ${force_common}
+libpmdobj= ${pmdobj} ${premods} ${mods} ${forces} ${force_common}
 
 clstr= mod_pmdio.o mod_util.o mod_pairlist.o cluster.o
 
@@ -79,7 +81,7 @@ all: pmd lib
 clean:
 	rm -f *.o *.mod *.a *~
 
-pmd: ${mods} ${pmd} ${pmdobj} ${forces} ${force_common}
+pmd: ${premods} ${mods} ${pmd} ${pmdobj} ${forces} ${force_common}
 	${MPIFC} ${MPIFLAGS} -o $@ $^
 
 lib: ${libpmdobj}
@@ -122,14 +124,45 @@ rdf: ${rdfobj}
 	${MPIFC} ${MPIFLAGS} -o $@ ${rdfobj}
 
 #.....Dependencies
+# mod_precision (premods) must be built first; mod_pmdmpi.o is needed by
+# nearly all modules and forces, so both groups depend on it explicitly
+$(mods): $(premods)
+$(forces): $(premods) mod_pmdmpi.o
+# within-mods ordering
+mod_pmdmpi.o: mod_pmdvars.o
+mod_force.o: mod_pmdmpi.o mod_pmdvars.o
+zload.o: mod_pmdmpi.o mod_vector.o mod_util.o
+mod_util.o: mod_pmdvars.o mod_vector.o
+metadynamics.o: mod_pmdmpi.o mod_util.o
+mod_colorcharge.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o mod_force.o
+mod_localflux.o: mod_pmdmpi.o mod_pmdvars.o mod_memory.o mod_colorcharge.o
+mod_extforce.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o
+mod_pdens.o: mod_pmdmpi.o mod_memory.o mod_util.o mod_vector.o
+mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
+mod_pairlist.o: mod_memory.o mod_pmdvars.o
+mod_constraints.o: mod_vector.o mod_util.o
+mod_rdcfrc.o: mod_pmdmpi.o mod_structure.o mod_util.o
+mod_ttm.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o mod_memory.o mod_random.o
+mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
+mod_group.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o
+mod_virtual_wall.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o
+mod_impulse.o: mod_pmdmpi.o mod_pmdvars.o mod_memory.o mod_util.o
+descriptor.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o mod_memory.o
+# pmdobj dependencies
+lasubs.o: $(premods)
+sort.o: $(premods)
+common_parallel.o: $(premods) mod_pmdmpi.o
+# top-level objects
 pmd_main.o: ${mods}
 pmd_core.o: ${mods} ${forces} ${force_common}
 read_input.o: ${mods} ${force_common}
 node_conv.o: ${mods}
 pmd2akr.o: ${mods}
 put_interstitials.o: ${mods}
-force_common.o: ${forces}
+# force_common.F90 uses all individual force modules
+force_common.o: ${mods} ${forces}
 force_Ito_W-He.o: ${mods}
+# force-specific header/module dependencies
 force_Ramas_FeH.o: params_Ramas_FeH.h
 force_RK_FeH.o: params_RK_FeH.h
 force_RK_WHe.o: params_RK_WHe.h
@@ -141,7 +174,8 @@ force_Branicio_AlN.o: params_Branicio_AlN.h
 force_Mishin.o: params_Mishin_Al.h params_Mishin_Ni.h
 force_Coulomb.o: mod_util.o
 force_LJ.o: mod_util.o
-force_DNN.o: mod_util.o
+force_DNN.o: mod_util.o descriptor.o
+force_linreg.o: descriptor.o
 force_SW.o: mod_util.o
 force_ZBL.o: mod_util.o mod_element.o
 force_cspline.o: mod_util.o
@@ -152,16 +186,5 @@ force_Abell.o: ${mods}
 force_fpc.o: ${mods}
 force_Morse.o: ${mods} force_Coulomb.o
 force_angular.o: ${mods}
-force_fdesc: mod_pmdvars.o mod_util.o descriptor.o
+force_fdesc.o: mod_pmdvars.o mod_util.o descriptor.o
 force_UF3.o: ${mods}
-mod_constraints.o: mod_vector.o mod_util.o
-mod_rdcfrc.o: mod_structure.o mod_util.o
-mod_ttm.o: mod_pmdvars.o mod_util.o mod_memory.o mod_random.o
-mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
-mod_pairlist.o: mod_memory.o mod_pmdvars.o
-mod_util.o: mod_pmdvars.o mod_vector.o
-mod_isostat.o: mod_pmdvars.o mod_util.o mod_random.o
-mod_group.o: mod_pmdvars.o mod_util.o
-mod_virtual_wall.o: mod_pmdvars.o
-mod_impulse.o: mod_pmdvars.o mod_memory.o mod_util.o
-descriptor.o: mod_pmdvars.o mod_util.o mod_memory.o

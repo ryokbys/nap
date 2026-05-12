@@ -11,8 +11,8 @@ module mod_precision
   save
 #ifdef __SINGLE__
   integer,parameter:: rp = 4
-  character(len=*),parameter:: rpfmt  = 'es16.8'
-  character(len=*),parameter:: rpfmt3 = 'es18.8e3'
+  character(len=*),parameter:: rpfmt  = 'es15.7'
+  character(len=*),parameter:: rpfmt3 = 'es17.7e3'
 #else
   integer,parameter:: rp = 8
   character(len=*),parameter:: rpfmt  = 'es22.14'
