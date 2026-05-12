@@ -164,7 +164,8 @@ contains
     logical,intent(in):: lforce
 
     integer:: ia,ib,l,i,msp,num
-    real(rp):: atmp(3),tmp_tag
+    real(rp):: atmp(3)
+    real(8):: tmp_tag
     character(len=128):: cftmp
     logical:: lopen = .false.
     logical:: lclose = .false.
@@ -217,13 +218,13 @@ contains
 !.....All the length values (r,v,a) are scaled by h-mat in pmd format
     if( lforce ) then ! write forces in [eV/A/A] (scaled by h-mat)
       do i=1,ntot
-        tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+        tmp_tag = tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i))
         write(ionum,'(f17.14, 6'//rpfmt//', 11es12.4)') tmp_tag &
              ,rtot(1:3,i) ,vtot(1:3,i) ,atot(1:3,i)    ! dt
       enddo
     else
       do i=1,ntot
-        tmp_tag = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+        tmp_tag = tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i))
         write(ionum,'(f17.14, 6'//rpfmt//', 11es12.4)') tmp_tag &
              ,rtot(1:3,i),vtot(1:3,i)    ! dt
       enddo
@@ -243,7 +244,7 @@ contains
     real(rp),intent(out):: rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp,itmp
-    real(rp),allocatable:: tmp_tags(:)
+    real(8),allocatable:: tmp_tags(:)
 
     open(ionum,file=trim(cfname),form='unformatted',status='old')
 !-----natm: num. of particles in this node
@@ -263,7 +264,7 @@ contains
     read(ionum) vtot(1:3,1:ntot)
     close(ionum)
     do i=1,ntot
-      call tag_decode(real(tmp_tags(i),8), tagtot_isp(i), tagtot_ifmv(i), tagtot_igrp(:,i), tagtot_itot(i))
+      call tag_decode(tmp_tags(i), tagtot_isp(i), tagtot_ifmv(i), tagtot_igrp(:,i), tagtot_itot(i))
       rtot(1,i) = pbc(rtot(1,i))
       rtot(2,i) = pbc(rtot(2,i))
       rtot(3,i) = pbc(rtot(3,i))
@@ -284,7 +285,7 @@ contains
     real(rp),intent(in):: rtot(3,ntot),vtot(3,ntot)
 
     integer:: ia,ib,l,i,msp
-    real(rp),allocatable:: tmp_tags(:)
+    real(8),allocatable:: tmp_tags(:)
 
     open(ionum,file=cfname,form='unformatted',status='replace')
     msp = 0
@@ -298,7 +299,7 @@ contains
     write(ionum) ntot
     allocate(tmp_tags(ntot))
     do i=1,ntot
-      tmp_tags(i) = real(tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i)),rp)
+      tmp_tags(i) = tag_encode(tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i))
     enddo
     write(ionum) tmp_tags(1:ntot)
     deallocate(tmp_tags)
