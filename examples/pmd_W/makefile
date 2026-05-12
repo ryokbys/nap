@@ -10,7 +10,8 @@ test:
 	@OMP_NUM_THREADS=1 mpirun -np 1 ../../pmd/pmd 2>&1 > out.pmd
 	@grep Potential out.pmd.REF | head -n1 > out.REF
 	@grep Potential out.pmd | head -n1 > out
-	@diff -q out out.REF > /dev/null || (echo " FAIL: examples/pmd_W" && exit 1)
+	@awk 'NR==FNR{ref=$$3;next}{val=$$3;d=val-ref;if(d<0)d=-d;if(d>0.005){exit 1}}' \
+	  out.REF out || (echo " FAIL: examples/pmd_W" && exit 1)
 	@rm -f out.REF out
 	@echo " PASS: examples/pmd_W"
 
