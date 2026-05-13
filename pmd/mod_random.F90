@@ -2,33 +2,40 @@ module random
   use mod_precision
   implicit none
   save
-  real(rp):: rseed  = 12345.0_rp
+! rseed must be real(8): the LCG requires exact integer arithmetic up to ~2^31;
+! in single precision 2147483647 and 2147483648 both round to 2^31, corrupting
+! the generator and causing urnd() to return 1.0, which makes log(1-r1) = -Inf.
+  real(8):: rseed  = 12345.0d0
   real(rp),parameter:: pi= 3.14159265358979_rp
 
 contains
 !=======================================================================
   subroutine set_seed(seed)
     real(rp),intent(in):: seed
-    rseed = seed
+    rseed = real(seed, 8)
   end subroutine set_seed
 !=======================================================================
   function get_seed()
     real(rp):: get_seed
-    get_seed = rseed
+    get_seed = real(rseed, rp)
     return
   end function get_seed
 !=======================================================================
   function urnd()
 !
-!  Uniform random number generator
-!      
+!  Uniform random number generator (Lehmer LCG, Park-Miller).
+!  Internal arithmetic is always real(8): in single precision,
+!  2147483647 and 2147483648 both round to 2^31, breaking the generator.
+!
     real(rp):: urnd
-    real(rp),save:: d2p31m,d2p31
-    data d2p31m/2147483647.0_rp/
-    data d2p31 /2147483648.0_rp/
+    real(8),parameter:: d2p31m = 2147483647.0d0
+    real(8),parameter:: d2p31  = 2147483648.0d0
 
-    rseed=mod(16807.0_rp*rseed,d2p31m)
-    urnd=rseed/d2p31
+    rseed = mod(16807.0d0*rseed, d2p31m)
+    urnd  = real(rseed/d2p31, rp)
+! In single precision, values near 1.0 round up to 1.0; clamp to avoid
+! log(0) in callers such as box_muller.
+    if (urnd >= 1.0_rp) urnd = nearest(1.0_rp, -1.0_rp)
     return
   end function urnd
 !=======================================================================

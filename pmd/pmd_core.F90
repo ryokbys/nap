@@ -1772,8 +1772,8 @@ subroutine setup(nspmax,am,fekin,fa2v)
 !.....Position: Ang
 !.....Energy: eV = 1.0/1.602e-19 [J = kg*m**2/s**2]
   do is=1,nspmax
-    fa2v(is) = 0.5_rp *ev2j *j2ue /am(is)
-    fekin(is)= 0.5_rp *(am(is)*ump2kg) *ang2m**2 /fs2s**2 *j2ev
+    fa2v(is) = 0.5_rp *ev2ue /am(is)
+    fekin(is)= 0.5_rp *am(is) *ue2ev
   enddo
 
 end subroutine setup
@@ -2846,8 +2846,7 @@ subroutine setv(h,hi,natm,tag_isp,va,nspmax,am,tinit,dt)
 
 !      facv(1:nspmax)=dsqrt(tinit*fkb*ev2j /(am(1:nspmax)*amu2kg))
 !     &     *m2ang /s2fs
-  facv(1:nspmax) = sqrt(tinit *k2j &
-       *(kg2ump* m2ang**2/s2fs**2) /am(1:nspmax))
+  facv(1:nspmax) = sqrt(tinit *k2ue /am(1:nspmax))
 
 !-----velocities in Maxwell-Boltzmann distribution
   do i=1,natm
