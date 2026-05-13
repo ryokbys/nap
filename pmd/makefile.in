@@ -88,13 +88,18 @@ lib: ${libpmdobj}
 	ar rcs $@pmd.a $^
 
 pmd_examples := ../examples/pmd_*/
+ifneq ($(findstring __SINGLE__,$(CPPFLAGS)),)
+pmd_examples_excl := ../examples/pmd_ttm_Si/
+else
+pmd_examples_excl :=
+endif
 define cd_test
 	(cd $(dir ${1}) && make test)
 
 endef
 
 test: pmd
-	@$(foreach x,$(wildcard $(pmd_examples)),$(call cd_test, ${x}))
+	@$(foreach x,$(filter-out $(pmd_examples_excl),$(wildcard $(pmd_examples))),$(call cd_test, ${x}))
 
 pmc: ${mods} ${pmc} ${forces} ${force_common}
 	${MPIFC} ${MPIFLAGS} -o $@ $^
