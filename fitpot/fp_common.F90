@@ -1041,8 +1041,9 @@ contains
     use descriptor,only: get_dsgnmat_force
     use ZBL,only: r_inner,r_outer
     use pmdvars, only: nspmax,naux,nstp,nx,ny,nz,specorder,am,dt,rbuf, &
-         rc1nn,lvc
+         rc1nn,lvc,ngrpmax
     use pmdvars,only: iprint_pmd => iprint, rc_pmd => rc
+    use pmdio,only: tag_decode
     use element
     implicit none
     include "../pmd/params_unit.h"
@@ -1063,16 +1064,32 @@ contains
     character:: csp*3
     type(atom):: elem
     logical:: update_force_list
+    integer,save,allocatable:: tagtot_isp(:),tagtot_ifmv(:)
+    integer,save,allocatable:: tagtot_igrp(:,:),tagtot_itot(:)
 
     logical,external:: string_in_arr
+
+!.....Decode smpl%tag (real(8) encoded) into separate integer arrays
+!.....required by the current oneshot4fp interface
+    if( allocated(tagtot_isp) .and. size(tagtot_isp).lt.smpl%natm ) then
+      deallocate(tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot)
+    endif
+    if( .not. allocated(tagtot_isp) ) then
+      allocate(tagtot_isp(smpl%natm),tagtot_ifmv(smpl%natm))
+      allocate(tagtot_igrp(ngrpmax,smpl%natm),tagtot_itot(smpl%natm))
+    endif
+    do i=1,smpl%natm
+      call tag_decode(smpl%tag(i),tagtot_isp(i),tagtot_ifmv(i),tagtot_igrp(:,i),tagtot_itot(i))
+    enddo
 
 !.....one_shot force calculation
 !.....NOTE: unit of forces is eV/Ang. (not scaled by h-mat)
     if( iprint.gt.10 ) print *,'rum_pmd: into oneshot4fp...'
-    call oneshot4fp(smpl%h0,smpl%h,smpl%natm,smpl%tag,smpl%ra, &
+    call oneshot4fp(smpl%h0,smpl%h,smpl%natm,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,smpl%ra, &
          smpl%va,frcs,smpl%strsi,smpl%eki,smpl%epi, &
          smpl%aux,ekin,epot,ptnsr,lgrad,lgrad_done,ndimp,maxisp, &
          gwe,gwf,gws,lematch,lfmatch,lsmatch,smpl%nfcal,smpl%lfrc_eval)
+    deallocate(tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot)
 !!$!.....Stress definition, negative as compressive, positive as tensile,
 !!$!     which is opposite in pmd. So multiply -1 to ptnsr and gws.
 !!$!     But this should not be corrected here, rather before converting to sample data.
