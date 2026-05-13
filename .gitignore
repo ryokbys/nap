@@ -21,3 +21,4 @@ frc.pmd
 strs.pmd
 traj.extxyz
 subdir_[0-9]*
+log_*
