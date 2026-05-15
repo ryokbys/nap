@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nappy"
-version = "250522"
+version = "260515"
 description = "Pre/post-processing python utilities for *nap*-related programs."
 readme = "README.md"
 requires-python = ">=3.7"
