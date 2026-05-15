@@ -1752,6 +1752,12 @@ def read_vasprun_xml(fname='vasprun.xml',
     """
     import xml.etree.ElementTree as ET
 
+    ncalcs = 0
+    with open(fname, 'rb') as _f:
+        for _chunk in iter(lambda: _f.read(1 << 16), b''):
+            ncalcs += _chunk.count(b'</calculation>')
+    print(f' Num of calculations in vasprun.xml = {ncalcs:d}', flush=True)
+
     nsyss = []
     dt = -1.0
     specorder_vasp = []
@@ -1828,8 +1834,6 @@ def read_vasprun_xml(fname='vasprun.xml',
 
     if len(nsyss) == 0:
         raise ValueError(f'There is no calculation in {fname}')
-    else:
-        print(f' Num of calculations in vasprun.xml = {len(nsyss):d}')
 
     if velocity:
         # Assuming that the change/velocity of the cell does not contribute to atom velocities,
