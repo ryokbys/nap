@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Compute diffusion coefficient from MSD data.
+Optionally compute ionic conductivity via the Nernst-Einstein relation.
 
 Usage:
   msd2diff.py [options] MSD_FILE [MSD_FILE...]
@@ -19,6 +20,17 @@ Options:
   --out4fp    Output data file for fp.py in any-target mode.
   --out4fp-name OUTNAME
               File name for --out4fp. [default: data.pmd.D]
+  --structure STRUCT
+              Structure file (pmdini, POSCAR, etc.) from which cell volume and
+              number of mobile ions (matching --main-SID) are read. [default: None]
+  --natoms NATOMS
+              Number of mobile ions. Overrides the value from --structure. [default: None]
+  --volume VOLUME
+              Cell volume in Angstrom^3. Overrides the value from --structure. [default: None]
+  --temperature TEMP
+              Temperature in K. Required for Nernst-Einstein conductivity. [default: None]
+  --charge CHARGE
+              Charge number (valence) of mobile ions. [default: 1]
 """
 import os
 import sys
@@ -27,7 +39,7 @@ import numpy as np
 from nappy.util import parse_option, gen_header
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "250506"
+__version__ = "260515"
 
 def read_out_msd(fname='out.msd',offset=0,column=2):
 
@@ -94,6 +106,36 @@ def msd2D(ts,msds,fac,dim=3):
     return a,b,std
 
 
+def nernst_einstein(D, natoms, volume_ang3, temperature, charge=1):
+    """
+    Compute ionic conductivity from diffusion coefficient via Nernst-Einstein.
+
+    Parameters
+    ----------
+    D : float
+        Diffusion coefficient [cm^2/s]
+    natoms : int
+        Number of mobile ions in the cell
+    volume_ang3 : float
+        Cell volume [Angstrom^3]
+    temperature : float
+        Temperature [K]
+    charge : int
+        Charge number (valence) of mobile ions
+
+    Returns
+    -------
+    sigma : float
+        Ionic conductivity [S/cm]
+    """
+    e  = 1.60217663e-19  # C
+    kB = 1.380649e-23    # J/K
+    V_cm3 = volume_ang3 * 1.0e-24  # Ang^3 -> cm^3
+    n = natoms / V_cm3              # number density [1/cm^3]
+    sigma = n * (charge * e)**2 * D / (kB * temperature)
+    return sigma
+
+
 def main():
 
     #args = docopt(__doc__)
@@ -108,6 +150,29 @@ def main():
     plot = args['--plot']
     out4fp = args['--out4fp']
     out4fpname = args['--out4fp-name']
+    struct_fname = args['--structure']
+    temperature = float(args['--temperature']) if args['--temperature'] != 'None' else None
+    charge = int(args['--charge'])
+
+    # Resolve natoms and volume from structure file or direct options
+    natoms = None
+    volume = None
+    if struct_fname not in (None, 'None'):
+        import nappy.io
+        nsys = nappy.io.read(fname=struct_fname)
+        if type(nsys) == list:
+            nsys = nsys[0]
+        volume = nsys.get_volume()  # Ang^3
+        natoms = int((nsys.atoms.sid == sidmain).sum())
+        print(f' Structure: {struct_fname}')
+        print(f'   Cell volume = {volume:.4f} Ang^3')
+        print(f'   Num of mobile ions (SID={sidmain}) = {natoms}')
+    if args['--natoms'] != 'None':
+        natoms = int(args['--natoms'])
+    if args['--volume'] != 'None':
+        volume = float(args['--volume'])
+
+    do_conductivity = (temperature is not None and natoms is not None and volume is not None)
 
     Ds = []
     Bs = []
@@ -122,8 +187,15 @@ def main():
         fac = 1.0e-16 /1.0e-15
         #...Least square
         D,b,std = msd2D(ts,msdmain,fac,dim=dim)
-        print(f' {fname:s}:  Diffusion coefficient = {D:0.4e}'+
+        print(f' MSD: {fname:s}')
+        print(f'   Diffusion coefficient   = {D:0.4e}'+
               f' +/- {std:0.3e} [cm^2/s]')
+        if do_conductivity:
+            sigma = nernst_einstein(D, natoms, volume, temperature, charge)
+            sigma_std = nernst_einstein(std, natoms, volume, temperature, charge)
+            print(f'   Ionic conductivity (NE) = {sigma*1e3:.4e}'
+                  f' +/- {sigma_std*1e3:.3e} [mS/cm]'
+                  f'  (T={temperature:.1f} K, z={charge})')
         Ds.append(D)
         Bs.append(b)
         Ts.append(ts)
