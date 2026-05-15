@@ -1752,99 +1752,84 @@ def read_vasprun_xml(fname='vasprun.xml',
     """
     import xml.etree.ElementTree as ET
 
-    tree = ET.iterparse(fname, events=['start', 'end'])
-    calcs = []
+    nsyss = []
     dt = -1.0
     specorder_vasp = []
+    natoms = 0
+    species = []
+
     try:
-        inc = 0
+        tree = ET.iterparse(fname, events=['end'])
         for event, elem in tree:
-            if event == 'end':
-                if elem.tag == 'atominfo':
-                    species = []
-                    for entry in elem.find("array[@name='atoms']/set"):
-                        species.append(entry[0].text.strip())
-                    natoms = len(species)
-                    specorder_vasp = sorted(list(set(species)),key=species.index)
-                elif elem.tag == 'incar':
-                    for e in elem.iter():
-                        if 'name' in e.attrib.keys() \
-                          and e.attrib['name'] == 'POTIM':
-                            dt = float(e.text)
-            elif event == 'start' and elem.tag == 'calculation':
-                calcs.append(elem)
+            if elem.tag == 'atominfo':
+                species = []
+                for entry in elem.find("array[@name='atoms']/set"):
+                    species.append(entry[0].text.strip())
+                natoms = len(species)
+                specorder_vasp = sorted(list(set(species)), key=species.index)
+                for s in specorder_vasp:
+                    if s not in specorder:
+                        specorder.append(s)
+                elem.clear()
+            elif elem.tag == 'incar':
+                for e in elem.iter():
+                    if 'name' in e.attrib and e.attrib['name'] == 'POTIM':
+                        dt = float(e.text)
+                elem.clear()
+            elif elem.tag == 'calculation':
+                try:
+                    lastscf = elem.findall('scstep/energy')[-1]
+                    de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
+                          float(lastscf.find('i[@name="e_fr_energy"]').text))
+                    e_free = float(elem.find('energy/i[@name="e_fr_energy"]').text)
+                except:
+                    elem.clear()
+                    continue
+
+                nsys = NAPSystem(specorder=specorder)
+                epot = e_free + de
+                nsys.set_potential_energy(epot)
+
+                cell_elem = elem.find('structure/crystal/varray[@name="basis"]')
+                cell = np.array([np.fromstring(v.text, sep=' ') for v in cell_elem])
+
+                pos_elem = elem.find('structure/varray[@name="positions"]')
+                sposs = np.array([np.fromstring(v.text, sep=' ') for v in pos_elem])
+
+                frcs = None
+                fblocks = elem.find('varray[@name="forces"]')
+                if fblocks is not None:
+                    frcs = np.array([np.fromstring(v.text, sep=' ') for v in fblocks])
+
+                strs = None
+                sblocks = elem.find('varray[@name="stress"]')
+                if sblocks is not None:
+                    strs = np.array([np.fromstring(v.text, sep=' ') for v in sblocks])
+                    #...The definition of stress in VASP is that
+                    #     - negative when system is elongated (strain is positive)
+                    #     - positive when system is compressed (strain is negative)
+                    #   which is the same definition as pmd, so no need of change.
+                    #...And in kBar unit.
+                    strs *= 0.1
+
+                nsys.set_hmat(cell.T)  # hmat and cell are in transpose relation
+                nsys.add_atoms(species, sposs)
+                nsys.set_real_forces(frcs)
+                if strs is not None:
+                    nsys.set_stress_tensor(strs)
+                nsyss.append(nsys)
+                elem.clear()
+
     except ET.ParseError as e:
         print(f' WARNING: {fname} ends incorrectly, but keep going...')
-        if calcs and calcs[-1].find('energy') is None:
-            calcs = calcs[:-1]
     except Exception as e:
         print(f' Exception: {e}')
         raise
 
-    if len(calcs)==0:
+    if len(nsyss) == 0:
         raise ValueError(f'There is no calculation in {fname}')
     else:
-        print(f' Num of calculations in vasprun.xml = {len(calcs):d}')
-
-    # specorderを整理
-    for s in specorder_vasp:
-        if s not in specorder:
-            specorder.append(s)
-
-    nsyss = []
-    for calc in calcs:
-        nsys = NAPSystem(specorder=specorder)
-
-        try:
-            lastscf = calc.findall('scstep/energy')[-1]
-            de = (float(lastscf.find('i[@name="e_0_energy"]').text) -
-                  float(lastscf.find('i[@name="e_fr_energy"]').text))
-            e_free = float(calc.find('energy/i[@name="e_fr_energy"]').text)
-        except:
-            continue
-        epot = e_free + de
-        nsys.set_potential_energy(epot)
-
-        cell = np.zeros((3, 3), dtype=float)
-        for i, vector in enumerate(
-                calc.find('structure/crystal/varray[@name="basis"]')):
-            cell[i] = np.array([float(val) for val in vector.text.split()])
-
-        sposs = np.zeros((natoms, 3), dtype=float)
-        for i, vector in enumerate(
-                calc.find('structure/varray[@name="positions"]')):
-            sposs[i] = np.array([float(val) for val in vector.text.split()])
-
-        frcs = None
-        fblocks = calc.find('varray[@name="forces"]')
-        if fblocks is not None:
-            frcs = np.zeros((natoms, 3), dtype=float)
-            for i, vector in enumerate(fblocks):
-                frcs[i] = np.array(
-                    [float(val) for val in vector.text.split()])
-
-        strs = None
-        sblocks = calc.find('varray[@name="stress"]')
-        if sblocks is not None:
-            strs = np.zeros((3, 3), dtype=float)
-            for i, vector in enumerate(sblocks):
-                strs[i] = np.array(
-                    [float(val) for val in vector.text.split()])
-            #...The definition of stress in VASP is that
-            #     - negative when system is elongated (strain is positive)
-            #     - positive when system is compressed (strain is negative)
-            #   which is the same definition as pmd, so no need of change.
-            #...And in kBar unit.
-            # strs *= -1.0
-            strs *= 0.1
-            #strs = strss.reshape(9)[[0, 4, 8, 5, 2, 1]]
-
-        nsys.set_hmat(cell.T) # hmat and cell are in transpose relation
-        nsys.add_atoms(species, sposs,)
-        nsys.set_real_forces(frcs)
-        if strs is not None:
-            nsys.set_stress_tensor(strs)
-        nsyss.append(nsys)
+        print(f' Num of calculations in vasprun.xml = {len(nsyss):d}')
 
     if velocity:
         # Assuming that the change/velocity of the cell does not contribute to atom velocities,

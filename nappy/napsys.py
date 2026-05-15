@@ -285,55 +285,51 @@ class NAPSystem(object):
         Positions, velocities and forces are assumed to be scaled in lattice vectors.
         """
         import pandas as pd
-        #...To remove future warning for pd.concat
-        import warnings
-        warnings.simplefilter(action='ignore',
-                              category=FutureWarning)
         if not self.specorder:
             self.specorder = []
         if type(symbols) not in (list, np.ndarray):
             raise TypeError('symbols must be either list or numpy.ndarray.')
-        sids = []
-        for symbol in symbols:
+        sids = np.empty(len(symbols), dtype=np.int8)
+        for i, symbol in enumerate(symbols):
             if symbol not in self.specorder:
                 self.specorder.append(symbol)
-            sid = self.specorder.index(symbol)+1
-            sids.append(sid)
+            sids[i] = self.specorder.index(symbol) + 1
 
-        newatoms = pd.DataFrame(columns=self.atoms.columns)
         if type(poss) == list:
             poss = np.array(poss)
-        newatoms[['x','y','z']] = poss
+        n = len(poss)
 
-        #...velocities
-        if len(vels) == len(poss):
-            if type(vels) == list:
-                vels = np.array(vels)
+        if len(vels) == n:
+            vels = np.asarray(vels, dtype=np.float32)
         else:
-            vels = np.zeros(poss.shape)
-        newatoms[['vx','vy','vz']] = vels
+            vels = np.zeros(poss.shape, dtype=np.float32)
 
-        #...forces
-        if len(frcs) == len(poss):
-            if type(frcs) == list:
-                frcs = np.array(frcs)
+        if len(frcs) == n:
+            frcs = np.asarray(frcs, dtype=np.float32)
         else:
-            frcs = np.zeros(poss.shape)
-        newatoms[['fx','fy','fz']] = frcs
+            frcs = np.zeros(poss.shape, dtype=np.float32)
 
-        #...ifmvs
-        if len(ifmvs) == len(poss):
-            if type(ifmvs) == list:
-                ifmvs = np.array(ifmvs,dtype=np.int8)
+        if len(ifmvs) == n:
+            ifmvs = np.asarray(ifmvs, dtype=np.int8)
         else:
-            ifmvs = np.zeros(len(poss),dtype=np.int8)
-            ifmvs[:] = 1
-        newatoms['ifmv'] = ifmvs
+            ifmvs = np.ones(n, dtype=np.int8)
 
-        newatoms.sid = [ sid for sid in sids ]
-        self.atoms = pd.concat([self.atoms, newatoms])
-        self.atoms.reset_index(drop=True,inplace=True)
-        self._reset_atoms_dtypes()
+        newatoms = pd.DataFrame({
+            'x': poss[:, 0].astype('float64'),
+            'y': poss[:, 1].astype('float64'),
+            'z': poss[:, 2].astype('float64'),
+            'vx': vels[:, 0], 'vy': vels[:, 1], 'vz': vels[:, 2],
+            'fx': frcs[:, 0], 'fy': frcs[:, 1], 'fz': frcs[:, 2],
+            'sid': sids,
+            'ifmv': ifmvs,
+        })
+
+        if len(self.atoms) == 0:
+            self.atoms = newatoms
+        else:
+            self.atoms = pd.concat([self.atoms, newatoms], ignore_index=True)
+            self._reset_atoms_dtypes()
+
         self.assign_pbc()
         return None
 
@@ -542,10 +538,8 @@ class NAPSystem(object):
         assert len(frcs) == len(self.atoms), 'Array size inconsistent.'
         if type(frcs) == list:
             frcs = np.array(frcs)
-        sfrcs = np.zeros(frcs.shape)
         hmati = self.get_hmat_inv()
-        for ia in range(len(self.atoms)):
-            sfrcs[ia,:] = np.dot(hmati, frcs[ia,:])
+        sfrcs = np.dot(frcs, hmati.T)
         self.atoms[['fx','fy','fz']] = sfrcs
         return None
 
@@ -1019,14 +1013,8 @@ class NAPSystem(object):
 
     def assign_pbc(self):
         poss = self.get_scaled_positions()
-        for i in range(len(self.atoms)):
-            pi = poss[i]
-            newpi = np.zeros(3)
-            newpi[0] = pbc(pi[0])
-            newpi[1] = pbc(pi[1])
-            newpi[2] = pbc(pi[2])
-            #self.atoms.at[i,['x','y','z']] = newpi
-            self.atoms.loc[i,['x','y','z']] = newpi
+        poss = poss % 1.0
+        self.atoms[['x','y','z']] = poss
         return None
 
     def get_expansion_num(self,length):
