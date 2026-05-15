@@ -8,7 +8,7 @@ Available formats are,
   pmd, POSCAR, dump, xsf
 
 Usage:
-  napsys.py convert [options] INFILE OUTFILE
+  napsys.py convert [options] FILE...
   napsys.py analyze [options] INFILE
 
 Options:
@@ -1392,8 +1392,6 @@ def main():
 
     infmt= args['--in-format']
     outfmt= args['--out-format']
-    infname= args['INFILE']
-    outfname= args['OUTFILE']
     scalefactor= args['--scale']
     shift= [ float(s) for s in args['--shift'].split(',') ]
     ncycle= int(args['--cycle-coord'])
@@ -1407,42 +1405,70 @@ def main():
     else:
         charges = [ float(c) for c in charges.split(',') ]
 
-    nsyss = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
-    if type(nsyss) != list:
-        nsyss = [nsyss,]
-
     if args['analyze']:
+        infname = args['INFILE']
+        nsyss = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
+        if type(nsyss) != list:
+            nsyss = [nsyss,]
         analyze(nsyss[0])
 
     elif args['convert']:
-        postfix_num = False
-        if len(nsyss) > 1:
-            postfix_num = True
-            print(' Since the input file contains more than 1 system,'
-                  +' files with numbers are to be written.')
-        for i in range(len(nsyss)):
-            if scalefactor != "None":
-                nsyss[i].alc *= float(scalefactor)
-            nsyss[i].shift_atoms(*shift)
-            if ncycle > 0:
-                nsyss[i].cycle_coord(ncycle)
+        files = args['FILE']
+        if len(files) < 2:
+            raise ValueError('At least one input file and one output file must be specified.')
+        infnames = files[:-1]
+        outfname = files[-1]
 
-            #...Periodic copy if needed
-            copy_needed = False
-            divide_needed = False
-            for c in copies:
-                if c > 1.5:
-                    copy_needed = True
-                elif c < 0.9:
-                    divide_needed = True
-            if copy_needed:
-                nsyss[i].repeat(*copies)
-            if divide_needed:
-                nsyss[i].divide(*copies)
-            ofname = outfname
+        if len(infnames) == 1:
+            # Single input: existing behavior (may write postfix-numbered files)
+            nsyss = nappy.io.read(fname=infnames[0],format=infmt,specorder=specorder)
+            if type(nsyss) != list:
+                nsyss = [nsyss,]
+            postfix_num = len(nsyss) > 1
             if postfix_num:
-                ofname += f'_{i:d}'
-            nappy.io.write(nsyss[i],fname=ofname,format=outfmt)
+                print(' Since the input file contains more than 1 system,'
+                      +' files with numbers are to be written.')
+            for i, nsys in enumerate(nsyss):
+                if scalefactor != "None":
+                    nsys.alc *= float(scalefactor)
+                nsys.shift_atoms(*shift)
+                if ncycle > 0:
+                    nsys.cycle_coord(ncycle)
+                copy_needed = any(c > 1.5 for c in copies)
+                divide_needed = any(c < 0.9 for c in copies)
+                if copy_needed:
+                    nsys.repeat(*copies)
+                if divide_needed:
+                    nsys.divide(*copies)
+                ofname = outfname + f'_{i:d}' if postfix_num else outfname
+                nappy.io.write(nsys, fname=ofname, format=outfmt)
+        else:
+            # Multiple inputs: combine into one output file
+            fmt = outfmt if outfmt not in (None, 'None') \
+                else nappy.io.parse_filename(outfname, mode='write')
+            if fmt not in nappy.io.MULTI_FRAME_WRITE_FORMATS:
+                raise ValueError(
+                    f'Output format {fmt!r} does not support multiple frames. '
+                    f'Use one of: {nappy.io.MULTI_FRAME_WRITE_FORMATS}')
+            nsyss = []
+            for infname in infnames:
+                loaded = nappy.io.read(fname=infname,format=infmt,specorder=specorder)
+                if type(loaded) != list:
+                    loaded = [loaded,]
+                nsyss.extend(loaded)
+            for i, nsys in enumerate(nsyss):
+                if scalefactor != "None":
+                    nsys.alc *= float(scalefactor)
+                nsys.shift_atoms(*shift)
+                if ncycle > 0:
+                    nsys.cycle_coord(ncycle)
+                copy_needed = any(c > 1.5 for c in copies)
+                divide_needed = any(c < 0.9 for c in copies)
+                if copy_needed:
+                    nsys.repeat(*copies)
+                if divide_needed:
+                    nsys.divide(*copies)
+                nappy.io.write(nsys, fname=outfname, format=outfmt, append=(i > 0))
     else:
         raise NotImplementedError()
 
