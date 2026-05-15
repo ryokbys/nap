@@ -27,24 +27,19 @@ READ_FORMATS = ('pmd','POSCAR','CONTCAR','dump','xsf','lammps',
                 'cube','CHGCAR','pdb','extxyz')
 WRITE_FORMATS = ('pmd','POSCAR','dump','xsf','lammps', 'extxyz',
                  'pdb', 'cube')
+MULTI_FRAME_WRITE_FORMATS = ('dump', 'extxyz')
 
-def write(nsys,fname="pmdini",format=None,**kwargs):
+def write(nsys,fname="pmdini",format=None,append=False,**kwargs):
     global myopen, open
     if format in (None,'None'):
         format= parse_filename(fname, mode='write')
-
-    # wmode = 'w'
-    # myopen = open
-    # if fname[-3:] == '.gz':
-    #     myopen = gzip.open
-    #     wmode = 'wt'
 
     if format == 'pmd':
         write_pmd(nsys,fname,**kwargs)
     elif format == 'POSCAR':
         write_POSCAR(nsys,fname,)
     elif format == 'dump':
-        write_dump(nsys,fname,**kwargs)
+        write_dump(nsys,fname,append=append,**kwargs)
     elif format == 'xsf':
         write_xsf(nsys,fname,)
     elif format == 'lammps':
@@ -59,7 +54,8 @@ def write(nsys,fname="pmdini",format=None,**kwargs):
         ase.io.write(filename=fname,images=nsys.to_ase_atoms(),
                      format='proteindatabank')
     elif format in ('extxyz',):
-        with open(fname,'a') as f:
+        mode = 'a' if append else 'w'
+        with open(fname, mode) as f:
             write_extxyz(f,nsys)
     else:
         raise IOError('Cannot write out in the given format: '+format)
@@ -721,11 +717,11 @@ def read_dump(fname="dump",specorder=[],):
     f.close()
     return nsys
 
-def write_dump(nsys,fname='dump',auxs=['vx','vy','vz'],):
+def write_dump(nsys,fname='dump',auxs=['vx','vy','vz'],append=False):
     """
     Write LAMMPS dump format file.
     """
-    myopen, mode = get_open_func(fname,'w')
+    myopen, mode = get_open_func(fname,'a' if append else 'w')
     f= myopen(fname,mode)
     f.write("ITEM: TIMESTEP\n")
     f.write("0\n")
