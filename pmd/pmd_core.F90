@@ -3508,8 +3508,8 @@ subroutine alloc_namax_related()
        ,epi(namax),eki(3,3,namax) &
        ,lsb(0:nbmax,6),lsex(nbmax,6))
   allocate(aux(naux,namax))
-  mem = 8*namax*(3 +3 +3 +3 +9 +1 +9 +naux) +4*namax*(1+1+ngrpmax+1)
-  mem = 4*6*(nbmax+1) +4*6*nbmax
+  mem = rp*namax*(3 +3 +3 +3 +9 +1 +9 +naux) +4*namax*(1+1+ngrpmax+1) &
+       +4*6*(nbmax+1) +4*6*nbmax
   call accum_mem('pmd',mem)
   
   return
@@ -3549,23 +3549,23 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
   mem = 0
 !.....ra
   call resize_darr2(ra, [3,newnamax])
-  mem = mem -8*ndim +3*8*newnamax
-  
+  mem = mem -rp*ndim +3*rp*newnamax
+
 !.....va
   call resize_darr2(va, [3,newnamax])
-  mem = mem -8*ndim +3*8*newnamax
+  mem = mem -rp*ndim +3*rp*newnamax
 
 !.....aa
   call resize_darr2(aa, [3,newnamax])
-  mem = mem -8*ndim +3*8*newnamax
+  mem = mem -rp*ndim +3*rp*newnamax
 
 !.....ra0
   call resize_darr2(ra0, [3,newnamax])
-  mem = mem -8*ndim +3*8*newnamax
+  mem = mem -rp*ndim +3*rp*newnamax
 
 !.....strs
   call resize_darr3(strs, [3,3,newnamax])
-  mem = mem -8*ndim +8*9*newnamax
+  mem = mem -rp*ndim +rp*9*newnamax
 
 !.....tag components
   call resize_iarr(tag_isp, [newnamax])
@@ -3576,15 +3576,15 @@ subroutine realloc_namax_related(newnalmax,newnbmax)
 
 !.....epi
   call resize_darr(epi, [newnamax])
-  mem = mem -8*ndim +8*newnamax
+  mem = mem -rp*ndim +rp*newnamax
 
 !.....eki
   call resize_darr3(eki, [3,3,newnamax])
-  mem = mem -8*ndim +8*9*newnamax
+  mem = mem -rp*ndim +rp*9*newnamax
 
 !.....aux
   call resize_darr2(aux, [naux,newnamax])
-  mem = mem -8*ndim +8*naux*newnamax
+  mem = mem -rp*ndim +rp*naux*newnamax
 
 !.....lsb
   ndim = size(lsb)

@@ -730,16 +730,16 @@ subroutine copy_rho_ba(namax,natm,nb,nbmax,lsb &
   real(rp),allocatable,save:: dbuf(:),dbufr(:)
 
   if( l1st ) then
-    call accum_mem('force_common',8*nbmax*2)
+    call accum_mem('force_common',rp*nbmax*2)
     allocate(dbuf(nbmax),dbufr(nbmax))
     l1st=.false.
   endif
 
   if( .not.allocated(dbuf) ) then
-    call accum_mem('force_common',8*nbmax*2)
+    call accum_mem('force_common',rp*nbmax*2)
     allocate(dbuf(nbmax),dbufr(nbmax))
   else if( size(dbuf).ne.nbmax ) then
-    call accum_mem('force_common',-8*size(dbuf)*2 +8*nbmax*2)
+    call accum_mem('force_common',-rp*size(dbuf)*2 +rp*nbmax*2)
     deallocate(dbuf,dbufr)
     allocate(dbuf(nbmax),dbufr(nbmax))
   endif
@@ -808,17 +808,17 @@ subroutine copy_strs_ba(namax,natm,nb,nbmax,lsb &
 
   if( l1st ) then
     narrsize = 9*nbmax
-    call accum_mem('force_common',8*9*nbmax*2)
+    call accum_mem('force_common',rp*9*nbmax*2)
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
     l1st=.false.
   endif
 
   if( .not. allocated(dbuf) ) then
-    call accum_mem('force_common',8*9*nbmax*2)
+    call accum_mem('force_common',rp*9*nbmax*2)
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
   else if( size(dbuf).ne.narrsize ) then
     deallocate(dbuf,dbufr)
-    call accum_mem('force_common',8*9*nbmax*2 -8*size(dbuf)*2)
+    call accum_mem('force_common',rp*9*nbmax*2 -rp*size(dbuf)*2)
     narrsize = 9*nbmax
     allocate(dbuf(9,nbmax),dbufr(9,nbmax))
   endif
@@ -889,22 +889,22 @@ subroutine copy_dba_fwd(namax,natm,nb,nbmax,lsb,nex &
   if( l1st ) then
     maxdim = ndim
     maxbmax = nbmax
-    call accum_mem('force_common',8*maxbmax*maxdim*2)
+    call accum_mem('force_common',rp*maxbmax*maxdim*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
 
   if( ndim.gt.maxdim .or. nbmax.gt.maxbmax ) then
     call accum_mem('force_common', &
-         -8*size(dbuf)-8*size(dbufr) +8*maxbmax*maxdim)
+         -rp*size(dbuf)-rp*size(dbufr) +rp*maxbmax*maxdim)
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
     if( allocated(dbuf) ) then
-      call accum_mem('force_common', -8*size(dbuf)-8*size(dbufr) )
+      call accum_mem('force_common', -rp*size(dbuf)-rp*size(dbufr) )
       deallocate(dbuf,dbufr)
     endif
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
-    call accum_mem('force_common', 8*size(dbuf) +8*size(dbufr) )
+    call accum_mem('force_common', rp*size(dbuf) +rp*size(dbufr) )
   endif
 
   nbnew= 0
@@ -984,7 +984,7 @@ subroutine copy_dba_bk(namax,natm,nbmax,nb,lsb,nex &
   if( l1st ) then
     maxdim = ndim
     maxbmax = nbmax
-    call accum_mem('force_common',8*maxdim*maxbmax*2)
+    call accum_mem('force_common',rp*maxdim*maxbmax*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(ndim,maxbmax))
     l1st=.false.
   endif
@@ -993,10 +993,10 @@ subroutine copy_dba_bk(namax,natm,nbmax,nb,lsb,nex &
     maxdim = max(ndim,maxdim)
     maxbmax = max(nbmax,maxbmax)
     if( allocated(dbuf) ) then
-      call accum_mem('force_common', -8*size(dbuf) -8*size(dbufr))
+      call accum_mem('force_common', -rp*size(dbuf) -rp*size(dbufr))
       deallocate(dbuf,dbufr)
     endif
-    call accum_mem('force_common', 8*maxdim*maxbmax*2)
+    call accum_mem('force_common', rp*maxdim*maxbmax*2)
     allocate(dbuf(maxdim,maxbmax),dbufr(maxdim,maxbmax))
   endif
 
@@ -1279,18 +1279,18 @@ subroutine chgopt_damping(chg,l1st)
 
   if( l1st ) then
     if( allocated(vq) ) then
-      call accum_mem('force_common',-8*(size(vq)+size(fq)+size(dq)))
+      call accum_mem('force_common',-rp*(size(vq)+size(fq)+size(dq)))
       deallocate(vq,fq,dq)
     endif
     allocate(vq(namax),fq(namax),dq(namax))
-    call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
+    call accum_mem('force_common',rp*(size(vq) +size(fq)+size(dq)))
   endif
 
   if( size(vq).lt.namax ) then
-    call accum_mem('force_common',-8*(size(vq)+size(fq)+size(dq)))
+    call accum_mem('force_common',-rp*(size(vq)+size(fq)+size(dq)))
     deallocate(vq,fq,dq)
     allocate(vq(namax),fq(namax),dq(namax))
-    call accum_mem('force_common',8*(size(vq) +size(fq)+size(dq)))
+    call accum_mem('force_common',rp*(size(vq) +size(fq)+size(dq)))
   endif
 
 !!$  call mpi_allreduce(natm,ntot,1,mpi_integer,mpi_sum,mpi_md_world,ierr)
@@ -1416,19 +1416,19 @@ subroutine chgopt_xlag(chg,auxq,iflag)
 
   if( l1st ) then
     if( allocated(fq) ) then
-      call accum_mem('force_common', -8*size(fq))
+      call accum_mem('force_common', -rp*size(fq))
       deallocate(fq)
     endif
     allocate(fq(namax))
-    call accum_mem('force_common',+8*size(fq))
+    call accum_mem('force_common',+rp*size(fq))
     l1st = .false.
   endif
 
   if( size(fq).lt.namax ) then
-    call accum_mem('force_common', -8*size(fq))
+    call accum_mem('force_common', -rp*size(fq))
     deallocate(fq)
     allocate(fq(namax))
-    call accum_mem('force_common',+8*size(fq))
+    call accum_mem('force_common',+rp*size(fq))
   endif
 
   dqmax = -1.0_rp

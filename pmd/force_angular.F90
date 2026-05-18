@@ -71,11 +71,11 @@ contains
     if( l1st ) then
 !!$      call read_params_angular(myid,mpi_world,iprint,specorder)
       if( allocated(aa3) ) then
-        call accum_mem('force_angular',-8*(size(aa3)+size(strsl)))
+        call accum_mem('force_angular',-rp*(size(aa3)+size(strsl)))
         deallocate(aa3,strsl)
       endif
       allocate(aa3(3,namax),strsl(3,3,namax))
-      call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
+      call accum_mem('force_angular',rp*(size(aa3)+size(strsl)))
 !-------check rc
       rcmax = 0.0_rp
       do is=1,nspmax
@@ -105,10 +105,10 @@ contains
     endif
 
     if( size(aa3).lt.3*namax ) then
-      call accum_mem('force_angular',-8*(size(aa3)+size(strsl)))
+      call accum_mem('force_angular',-rp*(size(aa3)+size(strsl)))
       deallocate(aa3,strsl)
       allocate(aa3(3,namax),strsl(3,3,namax))
-      call accum_mem('force_angular',8*(size(aa3)+size(strsl)))
+      call accum_mem('force_angular',rp*(size(aa3)+size(strsl)))
     endif
 
     strsl(1:3,1:3,1:namax)= 0.0_rp
@@ -500,21 +500,21 @@ contains
       allocate(ge_alp(nspmax,nspmax,nspmax),ge_bet(nspmax,nspmax,nspmax),&
            ge_gmm(nspmax,nspmax,nspmax))
       call accum_mem('force_angular', &
-           8*(size(ge_alp)+size(ge_bet)+size(ge_gmm)))
+           rp*(size(ge_alp)+size(ge_bet)+size(ge_gmm)))
     endif
 
     if( lfmatch .and. (.not.allocated(gf_alp) &
          .or. size(gf_alp).ne.3*natm *nspmax**3) ) then
       if( allocated(gf_alp) ) then
         call accum_mem('force_angular', &
-             -8*(size(gf_alp)+size(gf_bet)+size(gf_gmm)))
+             -rp*(size(gf_alp)+size(gf_bet)+size(gf_gmm)))
         deallocate(gf_alp, gf_bet, gf_gmm)
       endif
       allocate(gf_alp(3,nspmax,nspmax,nspmax,natm), &
            gf_bet(3,nspmax,nspmax,nspmax,natm), &
            gf_gmm(3,nspmax,nspmax,nspmax,natm) )
       call accum_mem('force_angular', &
-           8*(size(gf_alp)+size(gf_bet)+size(gf_gmm)))
+           rp*(size(gf_alp)+size(gf_bet)+size(gf_gmm)))
     endif
 
     if( lsmatch .and. .not.allocated(gs_alp) ) then
@@ -522,7 +522,7 @@ contains
            gs_bet(6,nspmax,nspmax,nspmax), &
            gs_gmm(6,nspmax,nspmax,nspmax))
       call accum_mem('force_angular', &
-           8*(size(gs_alp)+size(gs_bet)+size(gs_gmm)))
+           rp*(size(gs_alp)+size(gs_bet)+size(gs_gmm)))
     endif
 
 !.....Set nsp by max isp of atoms in the system

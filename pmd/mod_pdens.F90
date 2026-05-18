@@ -76,7 +76,7 @@ contains
     shsubi = matinv3(shsub)
 
     allocate(pds(npz,npy,npx))
-    call accum_mem('pdens',8*size(pds))
+    call accum_mem('pdens',rp*size(pds))
     pds(:,:,:) = 0.0_rp
 
     if( myid.eq.0 .and. iprint.ge.ipl_basic ) then
@@ -157,7 +157,7 @@ contains
 !.....Reduce prob densities in each node to global prob density
     vol = get_vol(hmat)/np
     allocate(pdl(npz,npy,npx))
-    call accum_mem('pdens',8*size(pdl))
+    call accum_mem('pdens',rp*size(pdl))
     pdl(:,:,:) = 0.0_rp
     call mpi_reduce(pds,pdl,npx*npy*npz,mpi_real_rp,mpi_sum,0,mpi_world,ierr)
 !.....Write out pdens only at node-0

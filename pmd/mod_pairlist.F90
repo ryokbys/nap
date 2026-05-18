@@ -309,14 +309,14 @@ contains
 
     if( .not. allocated(dlist) ) then
       allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
-      call accum_mem('pairlist',8*size(dlist)+4*size(ilist) &
+      call accum_mem('pairlist',rp*size(dlist)+4*size(ilist) &
            +4*size(ileft)+4*size(ia2ic))
     else if( size(dlist).ne.namax ) then
-      call accum_mem('pairlist',-8*size(dlist)-4*size(ilist) &
+      call accum_mem('pairlist',-rp*size(dlist)-4*size(ilist) &
            -4*size(ileft)-4*size(ia2ic))
       deallocate(dlist,ilist,ileft,ia2ic)
       allocate(dlist(namax),ilist(namax),ileft(namax),ia2ic(namax))
-      call accum_mem('pairlist',8*size(dlist)+4*size(ilist) &
+      call accum_mem('pairlist',rp*size(dlist)+4*size(ilist) &
            +4*size(ileft)+4*size(ia2ic))
     endif
 
@@ -862,13 +862,13 @@ contains
     if( .not. allocated(tmparr) ) then
       ndmax = max(3,ndim)
       allocate(tmparr(ndmax*namax))
-      call accum_mem('pairlist',8*size(tmparr))
+      call accum_mem('pairlist',rp*size(tmparr))
     else if( size(tmparr).lt.ndim*namax ) then
       ndmax = max(ndim,ndmax)
-      call accum_mem('pairlist',-8*size(tmparr))
+      call accum_mem('pairlist',-rp*size(tmparr))
       deallocate(tmparr)
       allocate(tmparr(ndmax*namax))
-      call accum_mem('pairlist',8*size(tmparr))
+      call accum_mem('pairlist',rp*size(tmparr))
     endif
 
 !  Sort arr taking into account residents only,

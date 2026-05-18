@@ -96,7 +96,7 @@ contains
       if( allocated(hls) ) then
 !!$        mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
 !!$             -8*size(sgm2) -8*size(gw)
-        call accum_mem('force_DNN',-8*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
+        call accum_mem('force_DNN',-rp*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
         deallocate(hls,gls,zls,sgm1,sgm2,gw)
       endif
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
@@ -104,15 +104,15 @@ contains
            sgm2(0:maxnnode,nlayer),gw(0:maxnnode))
 !!$      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
 !!$           +8*size(sgm2) +8*size(gw)
-      call accum_mem('force_DNN',8*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
+      call accum_mem('force_DNN',rp*(size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
 
       if( allocated(strsl) ) then
 !!$        mem = mem -8*size(strsl) -8*size(aal)
-        call accum_mem('force_DNN',-8*(size(strsl)+size(aal)))
+        call accum_mem('force_DNN',-rp*(size(strsl)+size(aal)))
         deallocate(strsl,aal)
       endif
       allocate(strsl(3,3,namax),aal(3,namax))
-      call accum_mem('force_DNN',8*(size(strsl)+size(aal)))
+      call accum_mem('force_DNN',rp*(size(strsl)+size(aal)))
 !!$      mem = mem +8*size(strsl) +8*size(aal)
 
 !.....Set activation function type here
@@ -154,22 +154,22 @@ contains
     if( allocated(hls) .and. size(hls).eq.(maxnnode+1)*(nlayer+1) ) then
 !!$      mem = mem -8*size(hls) -8*size(gls) -8*size(zls) -8*size(sgm1) &
 !!$           -8*size(sgm2) -8*size(gw)
-      call accum_mem('force_DNN',-8*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
+      call accum_mem('force_DNN',-rp*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
       deallocate(hls,gls,zls,sgm1,sgm2,gw)
       allocate( hls(0:maxnnode,0:nlayer), gls(maxnnode,nlayer+1), &
            zls(maxnnode,nlayer), sgm1(0:maxnnode,nlayer), &
            sgm2(0:maxnnode,nlayer), gw(0:maxnnode))
 !!$      mem = mem +8*size(hls) +8*size(gls) +8*size(zls) +8*size(sgm1) &
 !!$           +8*size(sgm2) +8*size(gw)
-      call accum_mem('force_DNN',8*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
+      call accum_mem('force_DNN',rp*(size(hls)+size(gls)+size(zls)+size(sgm1)+size(sgm2)+size(gw)))
     endif
 
     if( size(strsl).lt.3*3*namax ) then
 !!$      mem = mem -8*size(strsl) -8*size(aal)
-      call accum_mem('force_DNN',-8*(size(strsl)+size(aal)))
+      call accum_mem('force_DNN',-rp*(size(strsl)+size(aal)))
       deallocate(strsl,aal)
       allocate(strsl(3,3,namax),aal(3,namax))
-      call accum_mem('force_DNN',8*(size(strsl)+size(aal)))
+      call accum_mem('force_DNN',rp*(size(strsl)+size(aal)))
 !!$      mem = mem +8*size(strsl) +8*size(aal)
     endif
 
@@ -817,7 +817,7 @@ contains
     if( allocated(wgts) ) stop "ERROR: wgts is already allocated, "&
          //"which should not happen"
     allocate(wgts(0:maxnnode,maxnnode,nlayer+1))
-    call accum_mem('force_DNN',8*size(wgts))
+    call accum_mem('force_DNN',rp*size(wgts))
     if( myid.eq.0 ) then
       wgts(:,:,:) = 0.0_rp
       wgts(:,:,nlayer+1) = 1.0_rp

@@ -64,11 +64,11 @@ contains
 
     if( l1st ) then
       if( allocated(strsl) ) then
-        call accum_mem('force_Buckingham',-8*size(strsl))
+        call accum_mem('force_Buckingham',-rp*size(strsl))
         deallocate(strsl)
       endif
       allocate(strsl(3,3,namax))
-      call accum_mem('force_Buckingham',8*size(strsl))
+      call accum_mem('force_Buckingham',rp*size(strsl))
       rcmax2 = rc*rc
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0.0_rp
@@ -89,10 +89,10 @@ contains
     endif
 
     if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_Buckingham',-8*size(strsl))
+      call accum_mem('force_Buckingham',-rp*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
-      call accum_mem('force_Buckingham',8*size(strsl))
+      call accum_mem('force_Buckingham',rp*size(strsl))
     endif
 
     epotl= 0.0_rp

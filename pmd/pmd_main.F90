@@ -107,7 +107,7 @@ program pmd
       stop
     endif
 !.....Memory assessment
-    mem = 8*ntot0*(1 +3 +3 +1 +3*3 +3*3 +3)
+    mem = rp*ntot0*(1 +3 +3 +1 +3*3 +3*3 +3)
     call accum_mem('main',mem)
 
 !.....Set mass of species if specorder is already set.
@@ -244,7 +244,7 @@ program pmd
     endif
     auxtot(:,:) = 0.0_rp
 !.....Memory assessment
-    mem = 8*naux*ntot0
+    mem = rp*naux*ntot0
     call accum_mem('main',mem)
 
 !.....Determine nx,ny,nz using rc and hmat info

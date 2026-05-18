@@ -301,7 +301,7 @@ contains
     allocate(te1d(0:nd1d+1),te1d0(0:nd1d+1),tep1d(0:nd1d+1), &
          tl1d(0:nd1d+1),tl1d0(0:nd1d+1),tlp1d(0:nd1d+1), &
          gp1d(nd1d),gmmp1d(nd1d))
-    mem = mem +8*(size(te1d) +size(tep1d) +size(tl1d) +size(tlp1d) &
+    mem = mem +rp*(size(te1d) +size(tep1d) +size(tl1d) +size(tlp1d) &
          +size(gp1d) +size(gmmp1d))
     call accum_mem('ttm',mem)
 
@@ -787,7 +787,7 @@ contains
     if( .not. allocated(dofl) ) then
       allocate(dofl(nxyz),dofpl(nxyz),eksuml(nxyz),ekpsuml(nxyz)&
            ,vacl(3,nxyz))
-      mem = 4*(size(dofl)+size(dofpl)) +8*(size(eksuml)+size(ekpsuml) +size(vacl))
+      mem = 4*(size(dofl)+size(dofpl)) +rp*(size(eksuml)+size(ekpsuml) +size(vacl))
       call accum_mem('ttm',mem)
     endif
 
@@ -949,7 +949,7 @@ contains
           endif
         enddo
         allocate(dtep(0:nz+1,0:ny+1,0:nx+1))
-        call accum_mem('ttm',8*size(dtep))
+        call accum_mem('ttm',rp*size(dtep))
       endif
       l1st = .false.
     else
@@ -1562,7 +1562,7 @@ contains
 
     if( l1st ) then
       allocate(lexists(nx),densx(nx))
-      call accum_mem('ttm',4*size(lexists)+8*size(densx))
+      call accum_mem('ttm',4*size(lexists)+rp*size(densx))
       volyz = vcell*ny*nz
     endif
 
@@ -1829,7 +1829,7 @@ contains
 
     if( l1st ) then
       allocate(dtep1d(nd1d),dtlp1d(nd1d))
-      call accum_mem('ttm',8*(size(dtep1d)+size(dtlp1d)))
+      call accum_mem('ttm',rp*(size(dtep1d)+size(dtlp1d)))
       l1st = .false.
     endif
 
