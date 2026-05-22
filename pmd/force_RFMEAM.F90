@@ -462,7 +462,7 @@ contains
            dfl(3,0:lmax,nnmax),dsfc(3,nnmax,nnmax),drhoi2(3,nnmax,lmax), &
            drhoi0(3,nnmax),dstrho2(3,nnmax),dgam(3,nnmax),drho(3,nnmax), &
            rijs(5,nnmax),skij(nnmax))
-      call accum_mem('force_RFMEAM',8*(size(aal) +size(strsl) +size(epil) &
+      call accum_mem('force_RFMEAM',rp*(size(aal) +size(strsl) +size(epil) &
            +size(sij) +size(dsij) +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
            +size(dgam) +size(drho) +size(rijs) +size(skij)))
@@ -504,15 +504,15 @@ contains
     endif
 
     if( size(aal).lt.3*namax ) then
-      call accum_mem('force_RFMEAM',-1*(8*(size(aal) +size(strsl) &
+      call accum_mem('force_RFMEAM',-1*(rp*(size(aal) +size(strsl) &
            +size(epil))))
       deallocate(aal,strsl,epil)
       allocate(aal(3,namax),strsl(3,3,namax),epil(namax))
-      call accum_mem('force_RFMEAM',(8*(size(aal) +size(strsl) +size(epil))))
+      call accum_mem('force_RFMEAM',(rp*(size(aal) +size(strsl) +size(epil))))
     endif
 
     if( size(sfc).ne.nnmax ) then
-      call accum_mem('force_RFMEAM', -8*(size(sij) +size(dsij) &
+      call accum_mem('force_RFMEAM', -rp*(size(sij) +size(dsij) &
            +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
            +size(dgam) +size(drho) +size(rijs) +size(skij)))
@@ -522,7 +522,7 @@ contains
            dfl(3,0:lmax,nnmax),dsfc(3,nnmax,nnmax),drhoi2(3,nnmax,lmax), &
            drhoi0(3,nnmax),dstrho2(3,nnmax),dgam(3,nnmax),drho(3,nnmax), &
            rijs(5,nnmax),skij(nnmax))
-      call accum_mem('force_RFMEAM', 8*(size(sij) +size(dsij) &
+      call accum_mem('force_RFMEAM', rp*(size(sij) +size(dsij) &
            +size(sfc) +size(dsfc) &
            +size(fl) +size(dfl) +size(drhoi2) +size(drhoi0) +size(dstrho2) &
            +size(dgam) +size(drho) +size(rijs) +size(skij)))

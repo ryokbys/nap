@@ -175,11 +175,11 @@ contains
 
     if( l1st ) then
       if( allocated(strsl) ) then
-        call accum_mem('force_repel',-8*size(strsl))
+        call accum_mem('force_repel',-rp*size(strsl))
         deallocate(strsl)
       endif
       allocate(strsl(3,3,namax))
-      call accum_mem('force_repel',8*size(strsl))
+      call accum_mem('force_repel',rp*size(strsl))
       rc2 = -1.0_rp
 !.....Initialize smooth cutoff
       vrcs(:,:) = 0.0_rp
@@ -207,12 +207,12 @@ contains
 
     if( .not.allocated(strsl) ) then
       allocate(strsl(3,3,namax))
-      call accum_mem('force_repel',8*size(strsl))
+      call accum_mem('force_repel',rp*size(strsl))
     else if( size(strsl).lt.3*3*namax ) then
-      call accum_mem('force_repel',-8*size(strsl))
+      call accum_mem('force_repel',-rp*size(strsl))
       deallocate(strsl)
       allocate(strsl(3,3,namax))
-      call accum_mem('force_repel',8*size(strsl))
+      call accum_mem('force_repel',rp*size(strsl))
     endif
 
     epotl= 0.0_rp

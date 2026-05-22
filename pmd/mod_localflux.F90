@@ -81,13 +81,13 @@ contains
 
     allocate(fluxl(3,nl),fluxt(3,nl),idxl2g(nl,0:nxyz-1),nargn(nl))
     allocate(idxl2gt(nl))
-    mem = 8*(size(fluxl)+size(fluxt)) +4*(size(idxl2g)+size(nargn))
+    mem = rp*(size(fluxl)+size(fluxt)) +4*(size(idxl2g)+size(nargn))
     call accum_mem('localflux',mem)
     fluxl(:,:) = 0.0_rp
     nargn(:) = 0
     if( myid.eq.0 ) then
       allocate(fluxg(3,ng))
-      call accum_mem('localflux',8*size(fluxg))
+      call accum_mem('localflux',rp*size(fluxg))
       fluxg(:,:) = 0.0_rp
     endif
 
