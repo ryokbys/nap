@@ -44,7 +44,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   use virtual_wall,only: correct_pos_vwall, write_frc_vwall
   use impulse,only: comp_ptau, write_impulse, set_ia_impls, &
        l_impls, ftaul
-  use ShellModel,only: use_xl, is_shell_sp, xl_init, xl_predict, xl_gradient_step
+  use ShellModel,only: use_xl, is_shell_sp, xl_init, xl_predict, &
+       xl_gradient_step, xl_sync_theta
 
   implicit none
   include "./params_unit.h"
@@ -699,6 +700,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
       l1st = .false.
 !.....Copy RA of boundary atoms
       call bacopy(.false.)
+!.....Sync xl_theta with bamove-wrapped positions to avoid GF2 position inconsistency
+      if( use_xl ) call xl_sync_theta(natm,tag_isp,ra)
       call accum_time('ba_xxx',real(mpi_wtime(),rp)-tmp)
 !.....Make pair list
       tmp = real(mpi_wtime(),rp)

@@ -302,11 +302,7 @@ contains
     real(rp),intent(in):: aa(3,natm),hi(3,3),dt
 
     integer:: i,is,itot
-    real(rp):: dfrac(3),kappa,fmag,dmag
-    real(rp):: fmag_max,dmag_max
-    integer:: i_fmax,i_dmax
-
-    fmag_max = 0.0_rp; dmag_max = 0.0_rp; i_fmax=0; i_dmax=0
+    real(rp):: dfrac(3),kappa
 
     do i=1,natm
       is = tag_isp(i)
@@ -317,11 +313,7 @@ contains
       dfrac(1) = hi(1,1)*aa(1,i) + hi(1,2)*aa(2,i) + hi(1,3)*aa(3,i)
       dfrac(2) = hi(2,1)*aa(1,i) + hi(2,2)*aa(2,i) + hi(2,3)*aa(3,i)
       dfrac(3) = hi(3,1)*aa(1,i) + hi(3,2)*aa(2,i) + hi(3,3)*aa(3,i)
-      fmag = sqrt(aa(1,i)**2+aa(2,i)**2+aa(3,i)**2)
-      if( fmag.gt.fmag_max ) then; fmag_max=fmag; i_fmax=i; endif
       dfrac(1:3) = kappa * dfrac(1:3)
-      dmag = sqrt(sum(dfrac**2))
-      if( dmag.gt.dmag_max ) then; dmag_max=dmag; i_dmax=i; endif
 !     update shell position (indexed by global atom ID, not array position)
       ra(1:3,i) = xl_theta(1:3,itot) + dfrac(1:3)
 !     θ̈ corrector
@@ -329,11 +321,33 @@ contains
 !     complete θ̇ (xl_thdot currently holds half-step value from xl_predict)
       xl_thdot(1:3,itot) = xl_thdot(1:3,itot) + 0.5_rp*dt*xl_thacc(1:3,itot)
     enddo
-    write(6,'(a,es12.4,a,i6,a,es12.4,a,i6)') &
-         ' XL_GRAD: max |F_shell| =',fmag_max,' atom',i_fmax, &
-         '  max |dra| =',dmag_max,' atom',i_dmax
     return
   end subroutine xl_gradient_step
+!=======================================================================
+  subroutine xl_sync_theta(natm,tag_isp,ra)
+!-----------------------------------------------------------------------
+!  After bamove() wraps shell atoms across periodic boundaries, xl_theta
+!  must be updated to match the wrapped positions.  Without this, the
+!  next xl_gradient_step would write  ra = xl_theta_OLD + kappa*F,
+!  placing the shell on the WRONG side of the boundary, which makes GF2
+!  use positions inconsistent with the pairlist (built after bamove).
+!
+!  We simply copy the current (bamove-corrected) fractional position
+!  into xl_theta.  xl_thdot and xl_thacc are unchanged, because adding
+!  a lattice vector to a fractional coordinate does not affect velocities
+!  or accelerations.
+!-----------------------------------------------------------------------
+    implicit none
+    integer,intent(in):: natm,tag_isp(natm)
+    real(rp),intent(in):: ra(3,natm)
+    integer:: i,itot
+    do i=1,natm
+      if( .not.is_shell_sp(tag_isp(i)) ) cycle
+      itot = tag_itot(i)
+      xl_theta(1:3,itot) = ra(1:3,i)
+    enddo
+    return
+  end subroutine xl_sync_theta
 !=======================================================================
   subroutine read_params_ShellModel(myid_md,mpi_md_world,iprint)
 !
