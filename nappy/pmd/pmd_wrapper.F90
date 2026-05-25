@@ -209,21 +209,27 @@ subroutine wrap_calc_rdf(natm,ra,tag,h,hi,rmax,rmin,l1st, &
   real(8),intent(out):: rdfs(nbin,0:msp,0:msp)
 
   real(8),parameter:: pi = 3.14159265358979d0
-  integer:: iprint,nnmax
+  integer:: i,iprint,nnmax
   real(8):: vol,rho
   integer,allocatable:: lspr(:,:)
+  integer,allocatable:: tag_isp(:)
 
 !.....Estimate nnmax
   vol = get_vol(h)
   rho = max(dble(natm)/vol, 0.2d0)
-  nnmax = 1.2d0 *rho *4d0*pi*rmax**3 /3  ! margin 20 %
+  nnmax = int(1.2d0 *rho *4d0*pi*rmax**3 /3)  ! margin 20 %
   allocate(lspr(0:nnmax,natm))
+  allocate(tag_isp(natm))
+  do i=1,natm
+    tag_isp(i) = int(tag(i))
+  enddo
   
   iprint = 1
-  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rmax,h,hi,lspr,iprint,l1st)
+  call mk_lspr_sngl(natm,natm,nnmax,tag_isp,ra,rmax,h,hi,lspr,iprint,l1st)
 
   call calc_rdf(natm,nnmax,tag,h,ra,rmax,rmin,lspr,iprint,l1st, &
        lpairwise,msp,nbin,dists,rdfs)
+  deallocate(tag_isp)
   deallocate(lspr)
 end subroutine wrap_calc_rdf
 !=======================================================================
@@ -245,22 +251,28 @@ subroutine wrap_calc_adf(natm,ra,tag,h,hi,rmax,ntrpl,itriples, &
   real(8),intent(out):: adfs(nbin,ntrpl)
 
   real(8),parameter:: pi = 3.14159265358979d0
-  integer:: iprint,nnmax
+  integer:: i,iprint,nnmax
   real(8):: vol,rho,dang
   integer,allocatable:: lspr(:,:)
+  integer,allocatable:: tag_isp(:)
 
 !.....Estimate nnmax
   vol = get_vol(h)
   rho = max(dble(natm)/vol, 0.2d0)
   nnmax = int(1.2d0 *rho *4d0*pi*rmax**3 /3)  ! margin 20 %
   allocate(lspr(0:nnmax,natm))
+  allocate(tag_isp(natm))
+  do i=1,natm
+    tag_isp(i) = int(tag(i))
+  enddo
   
   iprint = 1
-  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rmax,h,hi,lspr,iprint,l1st)
+  call mk_lspr_sngl(natm,natm,nnmax,tag_isp,ra,rmax,h,hi,lspr,iprint,l1st)
 
   dang = 180d0 /nbin
   call calc_adf(natm,nnmax,tag,h,ra,rmax,lspr,ntrpl,itriples, &
        dang,nbin,angs,adfs)
+  deallocate(tag_isp)
   deallocate(lspr)
 end subroutine wrap_calc_adf
 !=======================================================================
@@ -271,12 +283,17 @@ subroutine wrap_lspr_sngl(natm,ra,tag,h,hi,rcut,iprint,l1st,nnmax,lspr)
   use pairlist,only: mk_lspr_sngl
   implicit none
   integer,intent(in):: natm,nnmax,iprint
+  integer:: i
   real(8),intent(in):: ra(3,natm),tag(natm),h(3,3),hi(3,3)
   real(8),intent(in):: rcut
   logical,intent(in):: l1st
   integer,intent(out):: lspr(0:nnmax,natm)
+  integer:: tag_isp(natm)
 
-  call mk_lspr_sngl(natm,natm,nnmax,tag,ra,rcut,h,hi,lspr,iprint,l1st)
+  do i=1,natm
+    tag_isp(i) = int(tag(i))
+  enddo
+  call mk_lspr_sngl(natm,natm,nnmax,tag_isp,ra,rcut,h,hi,lspr,iprint,l1st)
 end subroutine wrap_lspr_sngl
 !-----------------------------------------------------------------------
 !     Local Variables:
