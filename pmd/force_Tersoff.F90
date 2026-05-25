@@ -59,7 +59,7 @@ module tersoff
 contains
   subroutine init_tersoff(myid,mpi_world,iprint,specorder)
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp
 
@@ -104,7 +104,7 @@ contains
          ,rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     real(rp),intent(in),optional:: tei(namax)
 
 !.....local variables
@@ -575,14 +575,14 @@ contains
     use util, only: num_data
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: ite,ierr,isp,jsp,ksp,nd
     real(rp):: te,a,b,lmbd1,lmbd2,eta,delta,alpha,beta,h, &
          c1,c2,c3,c4,c5,f0, rc2in,rc2out,rc3in,rc3out
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
-    character(len=3):: cspi,cspj,cspk
+    character(len=5):: cspi,cspj,cspk
 
     if( myid.eq.0 ) then
       interact(:,:) = .false.

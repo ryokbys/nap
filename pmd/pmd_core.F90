@@ -44,6 +44,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   use virtual_wall,only: correct_pos_vwall, write_frc_vwall
   use impulse,only: comp_ptau, write_impulse, set_ia_impls, &
        l_impls, ftaul
+  use ShellModel,only: use_xl, is_shell_sp, xl_init, xl_predict, xl_gradient_step
 
   implicit none
   include "./params_unit.h"
@@ -547,6 +548,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
 !!$  print *,'Time at 4 = ',real(mpi_wtime(),rp) -tcpu0
   i_conv = 0
   lconverged = .false.
+!.....Extended Lagrangian shell model initialisation (once before the VV loop)
+  if( use_xl ) call xl_init(namax,natm,ra,tag_isp,dt)
 !-----velocity-Verlet loop starts---------------------------------------
   do istp=1,nstp
 
@@ -592,6 +595,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
 !-------first kick of velocities (both va and aa are in real unit)
     do i=1,natm
       is = tag_isp(i)
+      if( use_xl .and. is_shell_sp(is) ) cycle   ! shell positions handled by XL
       va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
     enddo
     
@@ -632,6 +636,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     else
 !.....Here va is converted from real to hmat-normalized length scale.
       do i=1,natm
+        if( use_xl .and. is_shell_sp(tag_isp(i)) ) cycle   ! shell positions handled by XL
         ra(1:3,i)=ra(1:3,i) +(hi(1:3,1)*va(1,i) &
              +hi(1:3,2)*va(2,i) +hi(1:3,3)*va(3,i) )*dt
       enddo
@@ -640,8 +645,10 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     ltot_updated = .false.
     if( chgopt_method(1:4).eq.'xlag' ) &
          call update_auxq(aux(iaux_q,:),aux(iaux_vq,:))
+!.....XL shell predictor: set ra_shell = θ(t+dt)
+    if( use_xl ) call xl_predict(natm,tag_isp,ra,dt)
 
-!.....Grouping    
+!.....Grouping
     call grouping(namax,natm,h,tag_isp,tag_igrp,ra,sorg,istp,myid_md,mpi_md_world,iprint)
 
     if( trim(czload_type).eq.'atoms' ) then
@@ -722,6 +729,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     if( chgopt_method(1:4).eq.'xlag' ) then
       call get_aauxq(aux(iaux_chg,:),aux(iaux_q,:))
     endif
+!.....XL shell gradient step: ra_shell = θ + κ*F_shell; update θ̈, θ̇
+    if( use_xl ) then
+      call xl_gradient_step(natm,tag_isp,ra,aa,hi,dt)
+!.....Update ghost atom positions to match new shell positions
+      call bacopy_fixed()
+!.....Second force evaluation at (r_core, r_shell*) for accurate core forces
+      call get_force(.false.,epot,stnsr)
+    endif
     call accum_time('get_force',real(mpi_wtime(),rp)-tmp)
     lcell_updated = .false.
     lstrs = lstrs0
@@ -769,6 +784,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     else
       do i=1,natm
         is = tag_isp(i)
+        if( use_xl .and. is_shell_sp(is) ) cycle   ! shell positions handled by XL
         va(1:3,i)=va(1:3,i) +aa(1:3,i)*fa2v(is)*dt
       enddo
     endif

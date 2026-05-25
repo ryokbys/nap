@@ -69,12 +69,12 @@ contains
 !
     include './const.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
     real(rp):: a,b,c,re,alp,beta,xi,rc,rcin,rcout
     character(len=128):: cline,fname,c1,c2,c3
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
 
     if( myid_md.eq.0 ) then
       ea_a(:) = 0.0_rp

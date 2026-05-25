@@ -38,7 +38,7 @@ module descriptor
   type desc
     integer:: itype
     real(rp):: rcut,rcut2
-    character(len=3):: cspi,cspj,cspk
+    character(len=5):: cspi,cspj,cspk
     integer:: isp,jsp
     integer:: ksp = -1
     integer:: nprm
@@ -1387,7 +1387,7 @@ contains
     implicit none
 
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 !!$    real(rp),intent(in):: rcin
 
     integer:: ierr,i,j,k,nc,ncoeff,nsp,isp,jsp,ksp,isf,ityp &
@@ -1395,7 +1395,7 @@ contains
     real(rp):: rcut2,rcut3,rcut,time0,wgt
     logical:: lexist
     character(len=128):: ctmp,fname,cline,cmode
-    character(len=3):: ccmb(3),csp
+    character(len=5):: ccmb(3),csp
 
     if( lprmset_desc ) return
 

@@ -337,7 +337,7 @@ contains
     integer,save:: ndlmp,ndim
     real(rp),allocatable,save:: dlmp(:,:)
     character(len=3),save:: cndlmp
-    character(len=3):: csp
+    character(len=5):: csp
     character(len=6):: caux
     real(rp),parameter:: tiny = 1e-14_rp
     logical,save:: l1st = .true.
@@ -466,7 +466,7 @@ contains
 
     integer:: ia,ja,ib,l,i,msp,num,is
     real(rp):: atmp(3),ri(3),vi(3),ai(3),epi,eki
-    character(len=3):: csp
+    character(len=5):: csp
     character(len=128):: cftmp,str
     character(len=256):: cpath
     logical:: lopen = .false.

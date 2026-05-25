@@ -52,7 +52,7 @@ contains
     real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(rp),intent(inout):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    character(len=3),intent(in):: specorder(msp)
+    character(len=5),intent(in):: specorder(msp)
     logical,intent(in):: lstrs, l1st
 
 !-----local
@@ -234,13 +234,13 @@ contains
     use util, only: num_data, is_numeric
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(msp)
+    character(len=5),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd,itype
     real(rp):: alp,bet,gmm,shft,rc3
     logical:: lexist
     character(len=128):: cfname,ctmp,cline,ctype
-    character(len=3):: cspi,cspj,cspk
+    character(len=5):: cspi,cspj,cspk
 
 !.....read parameters at the 1st call
     if( myid.eq.0 ) then

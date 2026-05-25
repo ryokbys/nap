@@ -64,7 +64,7 @@ contains
 !-----------------------------------------------------------------------
     include './const.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: is,js,ks,ierr,l,i,j,k,it2,itmp,m,maxm
     integer:: imask(nspmax),jmask(nspmax),kmask(nspmax)
@@ -72,7 +72,7 @@ contains
          pjl(0:lmax),qjl(0:lmax),til(lmax),b(mmax),sr(mmax), &
          bmax,srmax,sgmi
     character(len=128):: cline,fname,c1
-    character(len=3):: cspi,cspj,cspk
+    character(len=5):: cspi,cspj,cspk
     logical:: latomic(nspmax)
 
     if( myid_md.eq.0 ) then

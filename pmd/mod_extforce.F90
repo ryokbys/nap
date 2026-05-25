@@ -9,7 +9,7 @@ module extforce
 
   logical:: lextfrc = .false.  ! flag to apply external force
   logical:: initialized = .false.
-  character(len=3):: cspc_extfrc = 'all' ! [default: 'all']
+  character(len=5):: cspc_extfrc = 'all' ! [default: 'all']
   integer:: ispc_extfrc
   real(rp):: extfrc(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)   ! in [eV/Ang]
   real(rp):: extaa(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)
@@ -18,7 +18,7 @@ contains
 !=======================================================================
   subroutine init_extfrc(specorder,myid,iprint)
     integer,intent(in):: myid,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     if( trim(cspc_extfrc).eq.'all' ) then
       ispc_extfrc = 0
@@ -42,7 +42,7 @@ contains
 !  Add external forces on atoms of specified species
 !
     integer,intent(in):: natm,myid,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     integer,intent(in):: tag_isp(natm)
     real(rp),intent(in):: hi(3,3)
     real(rp),intent(inout):: aa(3,natm)

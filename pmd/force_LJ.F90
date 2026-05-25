@@ -311,11 +311,11 @@ contains
 !
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     real(rp),intent(in):: rc
 
     character(len=128):: cline,cfname
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
     logical:: lexist
     real(rp):: cij,rcij,epsij,sgmij
@@ -401,10 +401,10 @@ contains
 !
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     character(len=128):: cline,cfname
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
     integer:: isp,jsp,nd,ierr,nij
     logical:: lexist
     real(rp):: cij,rcij

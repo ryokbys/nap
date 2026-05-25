@@ -176,7 +176,7 @@ contains
     integer:: isp,jsp,ierr
     real(rp):: a,rho,c
     character(len=128):: cline,fname
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
 
     if( myid_md.eq.0 ) then
       fname = trim(paramsdir)//'/'//trim(cprmfname)

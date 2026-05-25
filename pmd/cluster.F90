@@ -173,7 +173,7 @@ subroutine read_in_cluster(ionum,cfname,maxpair,rcut,lpair,outthd,lrecur)
   integer:: i,nentry,isp1,isp2,npair
   character(len=128):: c1st,cline
   character(len=7):: cpairs(maxpair)
-  character(len=3):: csp1,csp2
+  character(len=5):: csp1,csp2
 
 !.....Set initial lpair as all False
   lpair(:,:) = .false.

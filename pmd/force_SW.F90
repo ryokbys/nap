@@ -74,7 +74,7 @@ contains
     real(rp),intent(in):: ra(3,namax) &
          ,h(3,3),hi(3,3),sv(3,6),rc
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
-    character(len=3),intent(in):: specorder(msp)
+    character(len=5),intent(in):: specorder(msp)
     logical,intent(in):: lstrs
 
 !-----local
@@ -323,13 +323,13 @@ contains
     use util, only: num_data
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(msp)
+    character(len=5),intent(in):: specorder(msp)
 
     integer:: itmp,ierr,isp,jsp,ksp,nd
     real(rp):: rctmp,tswa,tswb,tswp,tswq,tswc,tswrc,tsws,tswt,tswei
     logical:: lexist
     character(len=128):: cfname,ctmp,cline
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
 
 !!$    integer,external:: num_data
 

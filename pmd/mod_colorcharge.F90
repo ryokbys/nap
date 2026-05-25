@@ -15,7 +15,7 @@ module clrchg
 
   logical:: lclrchg = .false.  ! flag to apply external force
   logical:: initialized = .false.
-  character(len=3):: cspc_clrchg = 'non'
+  character(len=5):: cspc_clrchg = 'non'
   integer:: ispc_clrchg
   character(len=20):: clr_set = 'random'
   real(rp):: clrfield(3) = (/ 0.0_rp, 0.0_rp, 0.0_rp /)   ! in [eV/Ang]
@@ -35,7 +35,7 @@ contains
 !
     use force,only: luse_charge
     integer,intent(in):: myid,iprint,ntot
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     integer,intent(in):: tagtot_isp(ntot)
     real(rp),intent(inout):: clrtot(ntot)
 
@@ -189,7 +189,7 @@ contains
 !
     use pmdvars,only: naux,iaux_chg,iaux_clr,ra,sorg
     integer,intent(in):: namax,natm,myid,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: hi(3,3)
     real(rp),intent(inout):: aa(3,namax),aux(naux,namax)

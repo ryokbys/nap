@@ -59,7 +59,7 @@ subroutine set_variable(ionum,cname)
   character(len=*),intent(in):: cname
 
   character(len=128):: ctmp,cval
-  character(len=3):: csp
+  character(len=5):: csp
   integer:: ndata,nrow,is,itmp,ixyz
   real(rp):: tmp
 
@@ -328,6 +328,11 @@ subroutine set_variable(ionum,cname)
   elseif( trim(cname).eq.'reduced_force' .or. &
        trim(cname).eq.'reduce_force' ) then
     call read_l1(ionum,lrdcfrc)
+    return
+  elseif( trim(cname).eq.'shell_dynamics') then
+    backspace(ionum)
+    read(ionum,*) ctmp, cval
+    if( cval(1:2).eq.'xl' ) use_xl_shell = .true.
     return
   elseif( trim(cname).eq.'structure_analysis') then
     backspace(ionum)
@@ -615,7 +620,7 @@ subroutine read_overlay(ionum)
   character(len=1024):: ctmp
   character(len=128):: ctmp1
   integer:: isp,ndat
-  character(len=3):: cspi
+  character(len=5):: cspi
   real(rp):: rin, rout
 
   backspace(ionum)

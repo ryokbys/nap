@@ -58,7 +58,7 @@ program pmd
   real(rp):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
   real(rp):: epot,ekin,stnsr(3,3)
   real(rp):: t0,t1
-  character(len=3):: csp
+  character(len=5):: csp
   type(atom):: elem
 
 !-----initialize the MPI environment
@@ -796,6 +796,8 @@ subroutine bcast_params(nprocs)
 !.....Impulse analysis
   call mpi_bcast(l_impls,1,mpi_logical,0,mpicomm,ierr)
   if( l_impls ) call bcast_impulse(myid_md,mpicomm)
+!.....Extended Lagrangian shell model
+  call mpi_bcast(use_xl_shell,1,mpi_logical,0,mpicomm,ierr)
 
   call bcast_group(mpicomm)
   call bcast_vwall(mpicomm)

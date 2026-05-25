@@ -17,7 +17,7 @@ module pdens
 
   logical:: lpdens = .false.  ! Flag to eval local flux.
   logical:: initialized = .false.
-  character(len=3):: cspc_pdens = 'non'
+  character(len=5):: cspc_pdens = 'non'
   integer:: ispc_pdens
   real(rp):: orig_pdens(3),hmat_pdens(3,3)
   real(rp):: sosub(3),shsub(3,3),shsubi(3,3)
