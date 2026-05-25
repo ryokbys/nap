@@ -63,7 +63,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   integer:: ihour,imin,isec
   integer:: ifwrong  ! for sanity check
   real(rp):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
-       htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3)
+       htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3),eaux_xl
   logical:: l1st
   logical:: lconverged = .false.
 !.....FIRE variables
@@ -255,6 +255,11 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
 !.....Set initial temperature if needed
   if( tinit.gt.1e-5_rp ) then
     call setv(h,hi,natm,tag_isp,va,nspmax,am,tinit,dt)
+    if( use_xl ) then
+      do i=1,natm
+        if( is_shell_sp(tag_isp(i)) ) va(1:3,i) = 0.0_rp
+      enddo
+    endif
   elseif( abs(tinit).le.1e-5_rp ) then
     va(1:3,1:natm)= 0.0_rp
   endif
@@ -487,14 +492,27 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     if( nerg.gt.0 .and. iprint.ge.ipl_basic ) then
 !.....write out energies
       open(ioerg,file="out.erg",status='replace')
-      write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
-           //'   3:etot[eV],  4:ekin,' &
-           //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
+      if( use_xl ) then
+        write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+             //'   3:etot[eV],  4:ekin,  5:epot,' &
+             //'  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa],' &
+             //'  9:eaux_xl[eV],  10:H_XL[eV]'
+      else
+        write(ioerg,'(a)') '# 1:istp, 2:simtime[fs],' &
+             //'   3:etot[eV],  4:ekin,' &
+             //'  5:epot,  6:temp[K],  7:vol[Ang^3],  8:pressure[GPa]'
+      endif
       write(ioerg,'(a,es16.7e3,a)') '#  Epot0 =',epot0,' [eV]'
       if( tave.gt.10000.0_rp) cftave = 'es12.4'
-      write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
-           //','//cftave//',2es16.7e3)') istp &
-           ,simtime,ekin+epot,ekin,epot,tave,vol,prss
+      if( use_xl ) then
+        write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+             //','//cftave//',4es16.7e3)') istp &
+             ,simtime,ekin+epot,ekin,epot,tave,vol,prss,eaux_xl,ekin+epot+eaux_xl
+      else
+        write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+             //','//cftave//',2es16.7e3)') istp &
+             ,simtime,ekin+epot,ekin,epot,tave,vol,prss
+      endif
       call flush(ioerg)
 !.....Write stress components
       open(iostrs,file="out.strs",status='replace')
@@ -550,7 +568,8 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   i_conv = 0
   lconverged = .false.
 !.....Extended Lagrangian shell model initialisation (once before the VV loop)
-  if( use_xl ) call xl_init(namax,natm,ra,tag_isp,dt)
+  eaux_xl = 0.0_rp
+  if( use_xl ) call xl_init(namax,natm,ra,va,tag_isp,dt)
 !-----velocity-Verlet loop starts---------------------------------------
   do istp=1,nstp
 
@@ -734,7 +753,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
     endif
 !.....XL shell gradient step: ra_shell = θ + κ*F_shell; update θ̈, θ̇
     if( use_xl ) then
-      call xl_gradient_step(natm,tag_isp,ra,aa,hi,dt)
+      call xl_gradient_step(natm,tag_isp,ra,aa,hi,h,dt,eaux_xl)
 !.....Update ghost atom positions to match new shell positions
       call bacopy_fixed()
 !.....Second force evaluation at (r_core, r_shell*) for accurate core forces
@@ -884,9 +903,15 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
       if( myid_md.eq.0 .and. iprint.ge.ipl_basic ) then
 !.....write energies
         if( tave.gt.10000.0_rp) cftave = 'es12.4'
-        write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
-             //','//cftave//',2es16.7e3)') istp &
-             ,simtime,ekin+epot,ekin,epot,tave,vol,prss
+        if( use_xl ) then
+          write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+               //','//cftave//',4es16.7e3)') istp &
+               ,simtime,ekin+epot,ekin,epot,tave,vol,prss,eaux_xl,ekin+epot+eaux_xl
+        else
+          write(ioerg,'('//cfistp//','//cfstime//',3es16.7e3' &
+               //','//cftave//',2es16.7e3)') istp &
+               ,simtime,ekin+epot,ekin,epot,tave,vol,prss
+        endif
         call flush(ioerg)
 !.....write stresses
         write(iostrs,'('//cfistp//','//cfstime//',6es12.3e3)') istp &
@@ -2071,7 +2096,8 @@ subroutine get_num_dof()
   use pmdmpi
   use mod_precision
   use pmdvars,only: natm,tag_ifmv,fmv,nfmv,ndof, &
-       myid_md,mpi_md_world,iprint
+       myid_md,mpi_md_world,iprint,tag_isp
+  use ShellModel,only: use_xl, is_shell_sp
   use time,only: accum_time
   implicit none
   include "./const.h"
@@ -2089,6 +2115,7 @@ subroutine get_num_dof()
   do i=1,natm
 !!$    l= int(mod(tag(i)*10,10d0))
     ifmv= tag_ifmv(i)
+    if( use_xl .and. is_shell_sp(tag_isp(i)) ) cycle
     do k=1,3
       if( abs(fmv(k,ifmv)).lt.0.5_rp ) cycle
       ndofl(ifmv)= ndofl(ifmv) +1
@@ -2888,6 +2915,7 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
      ,mpi_md_world,myid_md,iprint)
   use pmdmpi
   use mod_precision
+  use ShellModel,only: use_xl, is_shell_sp
   use time,only: accum_time
   implicit none
   include "./const.h"
@@ -2906,6 +2934,7 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
   amtot=0.0_rp
   do i=1,natm
     is= tag_isp(i)
+    if( use_xl .and. is_shell_sp(is) ) cycle
     amss= am(is)
     sumpx=sumpx+amss*va(1,i)
     sumpy=sumpy+amss*va(2,i)
@@ -2927,9 +2956,8 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
        ,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-ttmp)
   do i=1,natm
-    va(1,i)=va(1,i)-sumpx/amtot
-    va(2,i)=va(2,i)-sumpy/amtot
-    va(3,i)=va(3,i)-sumpz/amtot
+    if( use_xl .and. is_shell_sp(tag_isp(i)) ) cycle
+    va(1:3,i)=va(1:3,i)-sumpx/amtot
   enddo
 
   if( myid_md.eq.0 .and. iprint.ge.ipl_info ) then

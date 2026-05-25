@@ -22,7 +22,7 @@ module ShellModel
 !-----------------------------------------------------------------------
   use pmdmpi
   use mod_precision
-  use pmdvars,only: nspmax,ntot,tag_itot
+  use pmdvars,only: nspmax,ntot,tag_itot,am
   use util,only: csp2isp
   use memory,only: accum_mem
   implicit none
@@ -213,12 +213,15 @@ contains
     return
   end subroutine force_ShellModel
 !=======================================================================
-  subroutine xl_init(namax,natm,ra,tag_isp,dt)
+  subroutine xl_init(namax,natm,ra,va,tag_isp,dt)
 !-----------------------------------------------------------------------
 !  Initialise extended-Lagrangian auxiliary arrays for shell atoms.
 !  Called once before the main VV loop when use_xl = .true.
 !  Sets  θ = ra_shell,  θ̇ = 0,  θ̈ = 0.
 !  Also computes ω² = 2/dt²  and  κ_i = 1/k2s_i per shell species.
+!  Zeroes shell velocities va: in XL mode shells are propagated by the
+!  auxiliary theta dynamics, not by Newton's law, so va_shell must be
+!  zero to avoid a spurious constant contribution to ekin and temperature.
 !
 !  xl_theta/xl_thdot/xl_thacc are indexed by tag_itot(i) (global atom ID)
 !  so they remain valid after any array rearrangement by bamove/bacopy.
@@ -226,6 +229,7 @@ contains
     implicit none
     integer,intent(in):: namax,natm,tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),dt
+    real(rp),intent(inout):: va(3,namax)
 
     integer:: i,is
 
@@ -241,8 +245,11 @@ contains
     xl_thacc(:,:) = 0.0_rp
     do i=1,natm
       is = tag_isp(i)
-      if( is.gt.0 .and. is_shell_sp(is) ) &
-           xl_theta(1:3,tag_itot(i)) = ra(1:3,i)
+      if( is.gt.0 .and. is_shell_sp(is) ) then
+        xl_theta(1:3,tag_itot(i)) = ra(1:3,i)
+!       zero shell velocity: position driven by theta dynamics, not Newton
+        va(1:3,i) = 0.0_rp
+      endif
     enddo
 
     xl_omega2 = xl_K / (dt*dt)
@@ -285,25 +292,32 @@ contains
     return
   end subroutine xl_predict
 !=======================================================================
-  subroutine xl_gradient_step(natm,tag_isp,ra,aa,hi,dt)
+  subroutine xl_gradient_step(natm,tag_isp,ra,aa,hi,h,dt,eaux)
 !-----------------------------------------------------------------------
 !  Extended-Lagrangian gradient step and corrector for shell atoms.
 !  Uses the force aa (eV/Å, Cartesian) computed at (r_core, θ) to:
 !    δra = hi*(κ * aa_shell)    [Cartesian force → fractional displacement]
 !    ra_shell = θ + δra         [one Newton step toward equilibrium]
 !    θ̈(t+dt) = ω² * δra
-!    θ̇(t+dt) = θ̇_half + 0.5*dt*θ̈(t+dt)
+!    θ̇!  Also computes the XL auxiliary energy E_aux = E_coupling + E_kinetic:
+!    E_coupling = 0.5 * κ * |F_cart|²                                [eV]
+!    E_kinetic  = 0.5 / (ω² * κ) * |h*θ̇(t+dt)|²                       [eV]
+!  which is derived from the fictitious mass mu = 1/(ω² * κ) [eV fs²/Å²].
+!  The conserved quantity is H_XL = T_core + V(r_core,r_shell*) + E_aux.
 !
 !  Note: xl_thdot must already contain the half-step value from xl_predict.
 !-----------------------------------------------------------------------
     implicit none
+    include "./params_unit.h"
     integer,intent(in):: natm,tag_isp(natm)
     real(rp),intent(inout):: ra(3,natm)
-    real(rp),intent(in):: aa(3,natm),hi(3,3),dt
-
+    real(rp),intent(in):: aa(3,natm),hi(3,3),h(3,3),dt
+    real(rp),intent(out):: eaux
+ 
     integer:: i,is,itot
-    real(rp):: dfrac(3),kappa
-
+    real(rp):: dfrac(3),kappa,vcart(3)
+ 
+    eaux = 0.0_rp
     do i=1,natm
       is = tag_isp(i)
       if( .not.is_shell_sp(is) ) cycle
@@ -314,12 +328,21 @@ contains
       dfrac(2) = hi(2,1)*aa(1,i) + hi(2,2)*aa(2,i) + hi(2,3)*aa(3,i)
       dfrac(3) = hi(3,1)*aa(1,i) + hi(3,2)*aa(2,i) + hi(3,3)*aa(3,i)
       dfrac(1:3) = kappa * dfrac(1:3)
+!     E_coupling = 0.5*κ*|F_cart|²
+!     (Derived from Lagrangian with fictitious mass mu = 1/(omega^2 * kappa))
+      eaux = eaux + 0.5_rp * kappa * (aa(1,i)**2 + aa(2,i)**2 + aa(3,i)**2)
 !     update shell position (indexed by global atom ID, not array position)
       ra(1:3,i) = xl_theta(1:3,itot) + dfrac(1:3)
 !     θ̈ corrector
       xl_thacc(1:3,itot) = xl_omega2 * dfrac(1:3)
 !     complete θ̇ (xl_thdot currently holds half-step value from xl_predict)
       xl_thdot(1:3,itot) = xl_thdot(1:3,itot) + 0.5_rp*dt*xl_thacc(1:3,itot)
+!     E_kinetic = 0.5*mu*|v_cart|² = 0.5 / (omega^2 * kappa) * |v_cart|²
+      vcart(1) = h(1,1)*xl_thdot(1,itot)+h(1,2)*xl_thdot(2,itot)+h(1,3)*xl_thdot(3,itot)
+      vcart(2) = h(2,1)*xl_thdot(1,itot)+h(2,2)*xl_thdot(2,itot)+h(2,3)*xl_thdot(3,itot)
+      vcart(3) = h(3,1)*xl_thdot(1,itot)+h(3,2)*xl_thdot(2,itot)+h(3,3)*xl_thdot(3,itot)
+      eaux = eaux + 0.5_rp / (xl_omega2 * kappa) &
+           * (vcart(1)**2 + vcart(2)**2 + vcart(3)**2)
     enddo
     return
   end subroutine xl_gradient_step
