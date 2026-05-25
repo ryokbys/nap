@@ -22,7 +22,7 @@ module ShellModel
 !-----------------------------------------------------------------------
   use pmdmpi
   use mod_precision
-  use pmdvars,only: nspmax,ntot,tag_itot,am
+  use pmdvars,only: nspmax,namax,am
   use util,only: csp2isp
   use memory,only: accum_mem
   implicit none
@@ -39,16 +39,16 @@ module ShellModel
   integer :: sm_shell_of(nspmax)    ! sm_shell_of(icore_sp) = ishell_sp
   logical :: is_shell_sp(nspmax)    ! .true. if species is a shell
 
-  real(rp),parameter:: rc_coul_ex  = 1.5_rp
+  real(rp),parameter:: rc_coul_ex  = 1.0_rp
   real(rp),parameter:: rc_coul_ex2 = rc_coul_ex*rc_coul_ex
 
   logical:: lprmset_ShellModel = .false.
 
 !.....Extended Lagrangian variables
   logical :: use_xl = .false.
-  real(rp),allocatable,save:: xl_theta(:,:)   ! (3,namax) auxiliary shell positions (fractional)
-  real(rp),allocatable,save:: xl_thdot(:,:)   ! (3,namax) auxiliary shell velocities
-  real(rp),allocatable,save:: xl_thacc(:,:)   ! (3,namax) auxiliary shell accelerations
+  real(rp),allocatable,save:: xl_theta(:,:)   ! (3,namax) aux shell positions (local index)
+  real(rp),allocatable,save:: xl_thdot(:,:)   ! (3,namax) aux shell velocities (local index)
+  real(rp),allocatable,save:: xl_thacc(:,:)   ! (3,namax) aux shell accelerations (local index)
   real(rp):: xl_omega2 = 0.0_rp               ! = K/dt^2
 !!$  real(rp),parameter:: xl_K = 0.05_rp         ! K = omega^2*dt^2; must satisfy K < 4*k2s/H_total
   real(rp),parameter:: xl_K = 2.0_rp         ! K = omega^2*dt^2; must satisfy K < 4*k2s/H_total
@@ -224,8 +224,8 @@ contains
 !  auxiliary theta dynamics, not by Newton's law, so va_shell must be
 !  zero to avoid a spurious constant contribution to ekin and temperature.
 !
-!  xl_theta/xl_thdot/xl_thacc are indexed by tag_itot(i) (global atom ID)
-!  so they remain valid after any array rearrangement by bamove/bacopy.
+!  xl_theta/xl_thdot/xl_thacc are indexed by local atom index i (1..natm).
+!  bamove() rearranges them in its compression loop to keep indices consistent.
 !-----------------------------------------------------------------------
     implicit none
     integer,intent(in):: namax,natm,tag_isp(namax)
@@ -238,7 +238,7 @@ contains
       call accum_mem('xl_init',-rp*size(xl_theta))
       deallocate(xl_theta,xl_thdot,xl_thacc)
     endif
-    allocate(xl_theta(3,ntot),xl_thdot(3,ntot),xl_thacc(3,ntot))
+    allocate(xl_theta(3,namax),xl_thdot(3,namax),xl_thacc(3,namax))
     call accum_mem('xl_init',rp*size(xl_theta))
 
     xl_theta(:,:) = 0.0_rp
@@ -247,7 +247,7 @@ contains
     do i=1,natm
       is = tag_isp(i)
       if( is.gt.0 .and. is_shell_sp(is) ) then
-        xl_theta(1:3,tag_itot(i)) = ra(1:3,i)
+        xl_theta(1:3,i) = ra(1:3,i)
 !       zero shell velocity: position driven by theta dynamics, not Newton
         va(1:3,i) = 0.0_rp
       endif
@@ -281,14 +281,13 @@ contains
     real(rp),intent(inout):: ra(3,natm)
     real(rp),intent(in):: dt
 
-    integer:: i,itot
+    integer:: i
 
     do i=1,natm
       if( .not.is_shell_sp(tag_isp(i)) ) cycle
-      itot = tag_itot(i)
-      xl_thdot(1:3,itot) = xl_thdot(1:3,itot) + 0.5_rp*dt*xl_thacc(1:3,itot)
-      xl_theta(1:3,itot) = xl_theta(1:3,itot) + dt*xl_thdot(1:3,itot)
-      ra(1:3,i) = xl_theta(1:3,itot)
+      xl_thdot(1:3,i) = xl_thdot(1:3,i) + 0.5_rp*dt*xl_thacc(1:3,i)
+      xl_theta(1:3,i) = xl_theta(1:3,i) + dt*xl_thdot(1:3,i)
+      ra(1:3,i) = xl_theta(1:3,i)
     enddo
     return
   end subroutine xl_predict
@@ -315,14 +314,13 @@ contains
     real(rp),intent(in):: aa(3,natm),hi(3,3),h(3,3),dt
     real(rp),intent(out):: eaux
  
-    integer:: i,is,itot
+    integer:: i,is
     real(rp):: dfrac(3),kappa,vcart(3)
- 
+
     eaux = 0.0_rp
     do i=1,natm
       is = tag_isp(i)
       if( .not.is_shell_sp(is) ) cycle
-      itot = tag_itot(i)
       kappa = xl_kappa_sp(is)
 !     δra in fractional coords = hi * (κ_i * F_cart) with species-dependent κ_i = 1/k2s_i
       dfrac(1) = hi(1,1)*aa(1,i) + hi(1,2)*aa(2,i) + hi(1,3)*aa(3,i)
@@ -332,16 +330,16 @@ contains
 !     E_coupling = 0.5*κ*|F_cart|²
 !     (Derived from Lagrangian with fictitious mass mu = 1/(omega^2 * kappa))
       eaux = eaux + 0.5_rp * kappa * (aa(1,i)**2 + aa(2,i)**2 + aa(3,i)**2)
-!     update shell position (indexed by global atom ID, not array position)
-      ra(1:3,i) = xl_theta(1:3,itot) + dfrac(1:3)
+!     update shell position
+      ra(1:3,i) = xl_theta(1:3,i) + dfrac(1:3)
 !     θ̈ corrector
-      xl_thacc(1:3,itot) = xl_omega2 * dfrac(1:3)
+      xl_thacc(1:3,i) = xl_omega2 * dfrac(1:3)
 !     complete θ̇ (xl_thdot currently holds half-step value from xl_predict)
-      xl_thdot(1:3,itot) = xl_thdot(1:3,itot) + 0.5_rp*dt*xl_thacc(1:3,itot)
+      xl_thdot(1:3,i) = xl_thdot(1:3,i) + 0.5_rp*dt*xl_thacc(1:3,i)
 !     E_kinetic = 0.5*mu*|v_cart|² = 0.5 / (omega^2 * kappa) * |v_cart|²
-      vcart(1) = h(1,1)*xl_thdot(1,itot)+h(1,2)*xl_thdot(2,itot)+h(1,3)*xl_thdot(3,itot)
-      vcart(2) = h(2,1)*xl_thdot(1,itot)+h(2,2)*xl_thdot(2,itot)+h(2,3)*xl_thdot(3,itot)
-      vcart(3) = h(3,1)*xl_thdot(1,itot)+h(3,2)*xl_thdot(2,itot)+h(3,3)*xl_thdot(3,itot)
+      vcart(1) = h(1,1)*xl_thdot(1,i)+h(1,2)*xl_thdot(2,i)+h(1,3)*xl_thdot(3,i)
+      vcart(2) = h(2,1)*xl_thdot(1,i)+h(2,2)*xl_thdot(2,i)+h(2,3)*xl_thdot(3,i)
+      vcart(3) = h(3,1)*xl_thdot(1,i)+h(3,2)*xl_thdot(2,i)+h(3,3)*xl_thdot(3,i)
       eaux = eaux + 0.5_rp / (xl_omega2 * kappa) &
            * (vcart(1)**2 + vcart(2)**2 + vcart(3)**2)
     enddo
@@ -364,11 +362,10 @@ contains
     implicit none
     integer,intent(in):: natm,tag_isp(natm)
     real(rp),intent(in):: ra(3,natm)
-    integer:: i,itot
+    integer:: i
     do i=1,natm
       if( .not.is_shell_sp(tag_isp(i)) ) cycle
-      itot = tag_itot(i)
-      xl_theta(1:3,itot) = ra(1:3,i)
+      xl_theta(1:3,i) = ra(1:3,i)
     enddo
     return
   end subroutine xl_sync_theta

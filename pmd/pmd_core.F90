@@ -2569,6 +2569,7 @@ subroutine bamove()
   use pmdmpi
   use clrchg,only: lclrchg
   use time,only: accum_time
+  use ShellModel,only: use_xl, xl_thdot, xl_thacc
   implicit none
 
   integer:: i,j,m,ku,kd,kdd,kul,kuh,inode,nsd,nrc,ipt,ierr,is,ix,iy,iz,iaux
@@ -2583,6 +2584,7 @@ subroutine bamove()
 
   if( l1st ) then
     ndimbuf = 6 +naux
+    if( use_xl ) ndimbuf = ndimbuf +6  ! xl_thdot(3) + xl_thacc(3)
     if( allocated(dbuf) ) deallocate(dbuf,dbufr)
     if( allocated(ibuf) ) deallocate(ibuf,ibufr)
     allocate(dbuf(ndimbuf,nbmax),dbufr(ndimbuf,nbmax))
@@ -2734,6 +2736,10 @@ subroutine bamove()
         do iaux=1,naux
           dbuf(6+iaux,i) = aux(iaux,j)
         enddo
+        if( use_xl ) then
+          dbuf(6+naux+1:6+naux+3,i) = xl_thdot(1:3,j)
+          dbuf(6+naux+4:6+naux+6,i) = xl_thacc(1:3,j)
+        endif
       enddo
       call mespasd(inode,myparity(kd),dbuf,dbufr,ndimbuf*nsd, &
            ndimbuf*nrc,71,mpi_md_world)
@@ -2749,6 +2755,10 @@ subroutine bamove()
         do iaux=1,naux
           aux(iaux,natm+newim+i) = dbufr(6+iaux,i)
         enddo
+        if( use_xl ) then
+          xl_thdot(1:3,natm+newim+i) = dbufr(6+naux+1:6+naux+3,i)
+          xl_thacc(1:3,natm+newim+i) = dbufr(6+naux+4:6+naux+6,i)
+        endif
       enddo
 
       newim=newim+nrc
@@ -2769,6 +2779,10 @@ subroutine bamove()
       tag_isp(ipt)=tag_isp(i); tag_ifmv(ipt)=tag_ifmv(i)
       tag_igrp(:,ipt)=tag_igrp(:,i); tag_itot(ipt)=tag_itot(i)
       aux(1:naux,ipt) = aux(1:naux,i)
+      if( use_xl ) then
+        xl_thdot(1:3,ipt) = xl_thdot(1:3,i)
+        xl_thacc(1:3,ipt) = xl_thacc(1:3,i)
+      endif
     endif
   enddo
 !-----Update # of resident atoms
