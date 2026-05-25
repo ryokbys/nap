@@ -51,7 +51,7 @@ module Morse
 !.....Atomic descriptor
   type atdesc
     integer:: na            ! atomic number
-    character(len=3):: csym ! Symbol
+    character(len=5):: csym ! Symbol
     real(rp):: eion1, eion2  ! 1st and 2nd ionization energies (eV)
     real(rp):: eaff          ! electron affinity (eV)
     real(rp):: atrad         ! atomic radius (Ang)
@@ -784,10 +784,10 @@ contains
 !  Read pair parameters for Morse potential from file
 !
     integer,intent(in):: myid_md,mpi_md_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     integer:: i,j,isp,jsp,id,ierr,jerr,ndat
     character(len=128):: cline,fname,ctmp,cerr
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
     real(rp):: d,r,a,rct
 
     jerr = 0
@@ -1328,7 +1328,7 @@ contains
     integer,intent(in):: nspt,myid_md,mpi_md_world
 
     integer,allocatable:: nas(:)
-    character(len=3),allocatable:: csyms(:)
+    character(len=5),allocatable:: csyms(:)
     real(rp),allocatable:: eion1s(:),eion2s(:),eaffs(:),enpauls(:),atrads(:)
     integer:: isp,ierr
 

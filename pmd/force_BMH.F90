@@ -51,7 +51,7 @@ contains
          ,sv(3,6)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: l1st
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     logical:: lstrs
 
     integer:: i,j,k,l,m,n,ierr,is,js,ixyz,jxyz
@@ -252,11 +252,11 @@ contains
     implicit none
     include './params_unit.h'
     integer,intent(in):: myid_md,mpi_md_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr,ni,nj,nd
     real(rp):: aij,bij,c6ij,c8ij,fij,rc
-    character(len=3):: cspi,cspj
+    character(len=5):: cspi,cspj
     character(len=128):: cline,cfname,mode,ctmp
 
     if( myid_md.eq.0 ) then

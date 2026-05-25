@@ -15,7 +15,7 @@ module force
        ol_type, ol_force, ol_ranges, ol_alphas, ol_dalphas, ol_pair
 
 !.....Force index list
-  integer,parameter:: N_FORCES = 37
+  integer,parameter:: N_FORCES = 38
   character(len=128):: force_index_list(N_FORCES)
 
   integer:: num_forces = -1
@@ -75,6 +75,7 @@ contains
     force_index_list(35) =  "fdesc"
     force_index_list(36) =  "UF3"
     force_index_list(37) =  "UF3L"
+    force_index_list(38) =  "ShellModel"
 
     luse_force(:) = .false.
 

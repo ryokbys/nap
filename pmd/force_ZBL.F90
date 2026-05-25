@@ -61,7 +61,7 @@ contains
     integer,intent(in):: iprint
 
     integer:: isp,iz
-    character(len=3):: csp
+    character(len=5):: csp
 
 !.....Set qnucl from specorder
     do isp=1,nspmax
@@ -82,7 +82,7 @@ contains
     use util, only: num_data
     implicit none
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ierr
     real(rp):: qnucli,ri,ro

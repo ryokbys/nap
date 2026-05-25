@@ -36,6 +36,7 @@ subroutine get_force(l1st,epot,stnsr)
        chgopt_method, bacopy_auxq_fixed, qtop, qbot
   use Morse, only: force_Morse, force_Morse_repul, force_vcMorse, force_fbMorse
   use Buckingham,only:force_Buckingham
+  use ShellModel,only:force_ShellModel
   use Bonny_WRe,only: force_Bonny_WRe
   use ZBL,only: force_ZBL,force_ZBL_overlay,r_inner
   use cspline,only: force_cspline
@@ -349,6 +350,13 @@ subroutine get_force(l1st,epot,stnsr)
        ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
     call accum_time('force_Buckingham',real(mpi_wtime(),rp) -tmp)
   endif
+  if( use_force('ShellModel') ) then
+    tmp = real(mpi_wtime(),rp)
+    call force_ShellModel(namax,natm,tag_isp,ra,nnmax,aa,strs &
+       ,h,hi,nb,nbmax,lsb,nex,lsrc,myparity,nn,sv,rc,lspr &
+       ,mpi_md_world,myid_md,epi,epot,nspmax,lstrs,iprint,l1st)
+    call accum_time('force_ShellModel',real(mpi_wtime(),rp) -tmp)
+  endif
   if( use_force('Bonny_WRe') ) then
     tmp = real(mpi_wtime(),rp)
     call force_Bonny_WRe(namax,natm,tag_isp,ra,nnmax,aa,strs &
@@ -471,7 +479,7 @@ subroutine init_force(linit)
   use pmdmpi
   use mod_precision
   use pmdvars,only: namax,nspmax,nsp,myid_md,mpi_md_world,iprint, &
-       specorder,rc,lvc,am
+       specorder,rc,lvc,am,use_xl_shell
   use force
   use Coulomb, only: init_coulomb, lprmset_Coulomb
   use Morse, only: read_params_vcMorse, lprmset_Morse, &
@@ -480,6 +488,7 @@ subroutine init_force(linit)
   use EAM, only: init_EAM, read_params_EAM, lprmset_EAM
 !!$  use NN, only: read_const_NN, read_params_NN, update_params_NN, lprmset_NN
   use Buckingham, only: init_Buckingham, read_params_Buckingham, lprmset_Buckingham
+  use ShellModel, only: init_ShellModel, read_params_ShellModel, lprmset_ShellModel, use_xl
   use ZBL, only: read_params_ZBL, init_ZBL
   use LJ, only: read_params_LJ, read_params_LJ_repul
   use linreg, only: read_params_linreg,lprmset_linreg
@@ -506,7 +515,7 @@ subroutine init_force(linit)
 
   integer:: i,j
   real(rp):: ri,ro
-  character(len=3):: cspi,cspj
+  character(len=5):: cspi,cspj
 
   if( .not. linit ) return
 
@@ -645,6 +654,15 @@ subroutine init_force(linit)
     if( .not.lprmset_Buckingham ) then
       call read_params_Buckingham(myid_md,mpi_md_world,iprint)
     endif
+  endif
+!.....ShellModel
+  if( use_force('ShellModel') ) then
+    call init_ShellModel()
+    if( .not.lprmset_ShellModel ) then
+      call read_params_ShellModel(myid_md,mpi_md_world,iprint)
+    endif
+    use_xl = use_xl_shell
+    write(6,'(a,l1,a,l1)') ' DEBUG init_force: use_xl_shell=',use_xl_shell,' use_xl=',use_xl
   endif
 !.....ZBL
   if( use_force('ZBL') ) then

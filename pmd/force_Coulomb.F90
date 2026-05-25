@@ -16,6 +16,7 @@ module Coulomb
   use util,only: csp2isp, itotOf
   use memory,only: accum_mem
   use vector,only: dot,norm,cross
+  use ShellModel,only: is_shell_sp,sm_core_of,lprmset_ShellModel,rc_coul_ex2
   implicit none
   include "./const.h"
   save
@@ -146,7 +147,7 @@ contains
 !  The *_coulombx methods will replace *_coulomb methods in the future.
 !
     integer,intent(in):: myid,mpi_md_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     logical,intent(inout):: lvc
 
     integer:: i,is,ierr,nspl
@@ -347,10 +348,10 @@ contains
 !
     use util, only: num_data
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     character(len=128):: cmode,cline,ctmp,fname,c1st
-    character(len=3):: cname,csp,cspj,cspi
+    character(len=5):: cname,csp,cspj,cspi
     integer:: i,ierr,jerr,isp,jsp,npq,nentry
     real(rp):: chgi,vid,rad,dchi,djii,sgmt,de0,qlow,qup&
          ,vcgjiimin,sgmlim, rin,rout,rhoij, rhoii
@@ -844,7 +845,7 @@ contains
     real(rp),intent(inout):: chg(namax)
     real(rp),intent(inout):: aa(3,namax),epi(namax),strs(3,3,namax),epot
     logical,intent(in):: lstrs,l1st,lcell_updated,lvc
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: i,j,ik,is,js,k1,k2,k3,ierr,jj,ixyz,jxyz
     real(rp):: elrl,elr,esrl,esr,epotl,epott,qi,qj,tmp,ftmp &
@@ -1012,6 +1013,10 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
+        if( lprmset_ShellModel .and. dij.lt.rc_coul_ex2 ) then
+          if( (is_shell_sp(is).and.sm_core_of(is).eq.js) .or. &
+              (is_shell_sp(js).and.sm_core_of(js).eq.is) ) cycle
+        endif
         dij = sqrt(dij)
         diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1090,6 +1095,10 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
+        if( lprmset_ShellModel .and. dij.lt.rc_coul_ex2 ) then
+          if( (is_shell_sp(is).and.sm_core_of(is).eq.js) .or. &
+              (is_shell_sp(js).and.sm_core_of(js).eq.is) ) cycle
+        endif
         dij = sqrt(dij)
         diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1186,6 +1195,10 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij= rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.gt.rc2 ) cycle
+        if( lprmset_ShellModel .and. dij.lt.rc_coul_ex2 ) then
+          if( (is_shell_sp(is).and.sm_core_of(is).eq.js) .or. &
+              (is_shell_sp(js).and.sm_core_of(js).eq.is) ) cycle
+        endif
         dij = sqrt(dij)
         diji= 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1270,6 +1283,10 @@ contains
         rij(1:3)= h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
         dij = rij(1)**2 +rij(2)**2 +rij(3)**2
         if( dij.ge.rc2 ) cycle
+        if( lprmset_ShellModel .and. dij.lt.rc_coul_ex2 ) then
+          if( (is_shell_sp(is).and.sm_core_of(is).eq.js) .or. &
+              (is_shell_sp(js).and.sm_core_of(js).eq.is) ) cycle
+        endif
         dij = sqrt(dij)
         diji = 1.0_rp/dij
         dxdi(1:3)= -rij(1:3)*diji
@@ -1913,12 +1930,12 @@ contains
     integer,intent(in):: natm,nb,myid,mpi_md_world,iprint
     integer,intent(in):: tag_isp(natm+nb)
     real(rp),intent(out):: chg(natm+nb)
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer,allocatable:: nbvsl(:),nbvs(:)
     integer:: i,is,ierr
     real(rp):: sum_anion,sum_cation
-    character(len=3):: csp
+    character(len=5):: csp
 
     allocate(nbvsl(nspmax),nbvs(nspmax))
     nbvsl(1:nspmax) = 0
@@ -2400,7 +2417,7 @@ contains
     integer,intent(in):: ndimp,iprint
     real(rp),intent(in):: prms_in(ndimp)
     character(len=*),intent(in):: ctype
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: isp,jsp,ns,inc,ipr,myid,mpiw,maxisp
 
@@ -2501,7 +2518,7 @@ contains
     integer,intent(in):: ndimp
     real(rp),intent(inout):: gwe(ndimp),gwf(3,ndimp,natm),gws(6,ndimp)
     logical,intent(in):: lematch,lfmatch,lsmatch
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: i,j,k,isp,jsp,ne,nf,ns,maxisp,ixyz,jxyz,jj
     real(rp):: rc2,xi(3),xj(3),xij(3),rij(3),dxdi(3),dxdj(3) &

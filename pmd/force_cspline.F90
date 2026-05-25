@@ -46,7 +46,7 @@ contains
     integer,intent(in):: tag_isp(namax)
     real(rp),intent(in):: ra(3,namax),h(3,3),hi(3,3),sv(3,6) &
          ,rc
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
     real(rp),intent(out):: aa(3,namax),epi(namax),epot,strs(3,3,namax)
     logical,intent(in):: lstrs,l1st
 
@@ -489,13 +489,13 @@ contains
 !
     use util, only: num_data, is_numeric
     integer,intent(in):: myid,mpi_world,iprint
-    character(len=3),intent(in):: specorder(nspmax)
+    character(len=5),intent(in):: specorder(nspmax)
 
     integer:: i,ierr,isp,jsp,ksp,ndat,npnts,ispl
     real(rp):: rcut
     logical:: lexist
     character(len=128):: fname,ctmp,ctmp1,ctmp2,ctype
-    character(len=3):: cspi,cspj,cspk
+    character(len=5):: cspi,cspj,cspk
 !!$    integer,external:: num_data
     
     

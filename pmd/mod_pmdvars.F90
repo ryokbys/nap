@@ -165,7 +165,7 @@ module pmdvars
 !.....charges
   real(rp):: schg(1:nspmax)= 0.0_rp
 !.....species name
-  character(len=3):: specorder(nspmax) = 'x'
+  character(len=5):: specorder(nspmax) = 'x'
   logical:: has_specorder = .false.
 !.....forces in in.pmd [default: false]
   logical:: has_forces = .false.
@@ -291,6 +291,9 @@ module pmdvars
   real(rp):: pka_theta = 0._rp  ! in degree
   real(rp):: pka_phi = 0._rp    ! in degree
   
+!.....Extended Lagrangian shell model
+  logical:: use_xl_shell = .false.
+
 !.....Structure analysis: CNA, a-CNA
   character(len=128):: cstruct = 'none'
   integer:: istruct = 1
