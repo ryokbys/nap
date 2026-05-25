@@ -50,7 +50,8 @@ module ShellModel
   real(rp),allocatable,save:: xl_thdot(:,:)   ! (3,namax) auxiliary shell velocities
   real(rp),allocatable,save:: xl_thacc(:,:)   ! (3,namax) auxiliary shell accelerations
   real(rp):: xl_omega2 = 0.0_rp               ! = K/dt^2
-  real(rp),parameter:: xl_K = 0.05_rp         ! K = omega^2*dt^2; must satisfy K < 4*k2s/H_total
+!!$  real(rp),parameter:: xl_K = 0.05_rp         ! K = omega^2*dt^2; must satisfy K < 4*k2s/H_total
+  real(rp),parameter:: xl_K = 2.0_rp         ! K = omega^2*dt^2; must satisfy K < 4*k2s/H_total
 !  kappa = xl_step_factor/k2s; must satisfy xl_step_factor < k2s/H_total to avoid overshoot.
 !  For strongly-ionic systems (BaTiO3) H_total >> k2s; use xl_step_factor << 1.
   real(rp),parameter:: xl_step_factor = 0.1_rp
