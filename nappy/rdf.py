@@ -335,6 +335,7 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
     tiny = 1.0e-8
     nr = int((rmax-rmin+tiny)/dr) #+1 , no need to add 1
     agr= np.zeros((nspcs+1,nspcs+1,nr),dtype=float)
+    rd = None
     inc = 0
     nsum= 0
     for infname in infiles:
@@ -367,6 +368,11 @@ def rdf_average(infiles,specorder,dr=0.1,rmin=0.0,rmax=3.0,
                 raise ValueError('The shape of radius data is wrong.')
             agr += gr
             nsum += 1
+    if nsum == 0:
+        print(f'[Error] No frames were processed. '
+              f'All {inc} frame(s) were skipped (nskip={nskip}). '
+              f'Reduce --skip value.')
+        sys.exit(1)
     agr /= nsum
     return rd,agr
 
