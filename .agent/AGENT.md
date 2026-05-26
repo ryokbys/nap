@@ -34,3 +34,4 @@ napパッケージには，pmdという分子動力学プログラムと，nappy
 ## 作業報告
 
 - 何かしらの実装や改変を行う際，作業プランを`.agent/plan_NAME_YYMMDD.md`に，その作業のtodoリストを`.agent/todo_NAME_YYMMDD.md`に，その作業ログを`.agent/log_NAME_YYMMDD.md`に保存する．ただし，NAMEは作業を簡潔に表す文言で，YYMMDDは作業を始めた日付．
+- これら `todo_`， `log_` ファイルはgit commitに加えない．
