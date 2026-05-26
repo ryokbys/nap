@@ -1137,58 +1137,158 @@ def write_extxyz(fileobj, nsys,
     return None
 
 
+def _parse_extxyz_header(line):
+    """Parse the comment line of an extxyz frame into a dict of key->value strings."""
+    import re
+    kv = {}
+    # quoted values: key="..."
+    for m in re.finditer(r'(\w+)="([^"]*)"', line):
+        kv[m.group(1)] = m.group(2)
+    # unquoted values: key=value (no spaces, no quotes)
+    for m in re.finditer(r'(\w+)=(-?[^\s"]+)', line):
+        if m.group(1) not in kv:
+            kv[m.group(1)] = m.group(2)
+    return kv
+
+
+def _parse_extxyz_properties(prop_str):
+    """Parse extxyz Properties string into list of (name, type, count) tuples."""
+    parts = prop_str.split(':')
+    props = []
+    i = 0
+    while i + 2 < len(parts):
+        props.append((parts[i], parts[i+1], int(parts[i+2])))
+        i += 3
+    return props
+
+
 def read_extxyz(fname, specorder=[],):
     """
-    Read an extxyz format using ASE package.
+    Read extxyz format file.
     NOTE: extxyz file could contain multiple structures.
 
-    The extxyz format is defined in ASE and is like following:
+    The extxyz format is like following:
     ---
     8
     Lattice="5.44 0.0 0.0 0.0 5.44 0.0 0.0 0.0 5.44" Properties=species:S:1:pos:R:3:forces:R:3
     Si        0.00000000      0.00000000      0.00000000    1.6215e-03   -6.4788e-03    2.6939e-05
-    Si        1.36000000      1.36000000      1.36000000   -9.4438e-05   -5.7187e-04   -2.6944e-04
-    Si        2.72000000      2.72000000      0.00000000   -5.9288e-06   -1.4727e-04   -1.7694e-03
-    Si        4.08000000      4.08000000      1.36000000   -1.7164e-03    2.9652e-04    1.2749e-05
-    Si        2.72000000      0.00000000      2.72000000   -2.8725e-04    5.7220e-04    3.1436e-04
-    Si        4.08000000      1.36000000      4.08000000    3.6347e-04    1.3864e-03    3.4175e-03
-    Si        0.00000000      2.72000000      2.72000000   -6.1324e-04    8.9324e-04   -3.3534e-06
-    Si        1.36000000      4.08000000      4.08000000   -5.0683e-05    1.0324e-04    3.8400e-04
+    ...
     ---
+    Lattice values: a1[0] a1[1] a1[2]  a2[0] a2[1] a2[2]  a3[0] a3[1] a3[2]
+    Properties: name:type:count pairs (type: S=string, R=real, I=integer)
+    Stress in comment line is written by pmd as stnsr_GPa * (-160.218),
+    so conversion on read: nsys.stnsr = -stress_from_file / 160.218 [GPa].
     """
+    _GPa_factor = 160.218  # 1 eV/Ang^3 = 160.218 GPa
 
-    try:
-        import ase.io
-        atoms = ase.io.read(fname,format='extxyz',index=':')
-        if type(atoms) == list:
-            nsyss = []
-            for a in atoms:
-                #...Since usually, stress unit in extxyz is in eV/Ang^3 and the definition of sign is opposite,
-                #...convert it to GPa taking into account the sign.
-                nsys = from_ase(a, stress_factor=-160.218)
-                if specorder != []:
-                    nsys.set_specorder(*specorder)
-                nsyss.append(nsys)
-        else:
-            nsys = from_ase(atoms, stress_factor=-160.218)
-            if specorder != []:
+    myopen, mode = get_open_func(fname, 'r')
+    nsyss = []
+
+    with myopen(fname, mode) as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            line = line.strip()
+            if not line:
+                continue
+
+            natm = int(line)
+
+            header = f.readline().strip()
+            kv = _parse_extxyz_header(header)
+
+            # Lattice: 9 values -> a1, a2, a3
+            lat = [float(x) for x in kv['Lattice'].split()]
+            a1 = np.array(lat[0:3])
+            a2 = np.array(lat[3:6])
+            a3 = np.array(lat[6:9])
+
+            props = _parse_extxyz_properties(kv['Properties'])
+
+            energy = float(kv['energy']) if 'energy' in kv else None
+
+            # Stress: pmd writes sth_GPa * (-160.218); invert to get GPa
+            stress = None
+            if 'stress' in kv:
+                sv = [float(x) for x in kv['stress'].split()]
+                stress = -np.array(sv).reshape(3, 3) / _GPa_factor
+
+            # Read atom lines
+            syms = []
+            poss = np.zeros((natm, 3))
+            vels = np.zeros((natm, 3))
+            frcs = np.zeros((natm, 3))
+            aux = {}  # extra per-atom columns
+
+            for ia in range(natm):
+                tokens = f.readline().split()
+                idx = 0
+                for name, typ, count in props:
+                    if typ == 'S':
+                        val = tokens[idx]
+                        if name == 'species':
+                            syms.append(val)
+                        idx += count
+                    else:
+                        vals = [float(tokens[idx+k]) for k in range(count)]
+                        if name == 'pos':
+                            poss[ia] = vals
+                        elif name == 'vel':
+                            vels[ia] = vals
+                        elif name == 'forces':
+                            frcs[ia] = vals
+                        else:
+                            if name not in aux:
+                                aux[name] = np.zeros((natm, count) if count > 1
+                                                     else natm)
+                            if count == 1:
+                                aux[name][ia] = vals[0]
+                            else:
+                                aux[name][ia] = vals
+                        idx += count
+
+            # Build specorder
+            spcorder = list(specorder)
+            for s in syms:
+                if s not in spcorder:
+                    spcorder.append(s)
+
+            nsys = NAPSystem(specorder=spcorder)
+            nsys.alc = 1.0
+            nsys.a1[:] = a1
+            nsys.a2[:] = a2
+            nsys.a3[:] = a3
+
+            hmat = nsys.get_hmat()
+            hmati = np.linalg.inv(hmat)
+
+            spos = np.dot(poss, hmati.T)
+            sids = [spcorder.index(s) + 1 for s in syms]
+
+            nsys.atoms['sid'] = sids
+            nsys.atoms['ifmv'] = [1] * natm
+            nsys.atoms['x'] = spos[:, 0]
+            nsys.atoms['y'] = spos[:, 1]
+            nsys.atoms['z'] = spos[:, 2]
+            nsys.set_real_velocities(vels)
+            nsys.set_real_forces(frcs)
+
+            if energy is not None:
+                nsys.set_potential_energy(energy)
+            if stress is not None:
+                nsys.set_stress_tensor(stress)
+            for name, vals in aux.items():
+                nsys.atoms[name] = vals
+
+            if specorder:
                 nsys.set_specorder(*specorder)
-    except Exception as e:
-        print(' Failed to load input file even with ase.\n'
-              +f' {e}')
-        raise
 
-    # if specorder != []:
-    #     if type(atoms) == list:
-    #         nsys = nsyss[0]
-    #     if nsys.specorder != specorder:
-    #         print(' specorder specified = ',specorder)
-    #         print(' specorder from file = ',nsys.specorder)
-    #         raise ValueError('Specorder specified and obtained from the file do not match!')
-    if type(atoms) == list:
-        return nsyss
-    else:
-        return nsys
+            nsyss.append(nsys)
+
+    if len(nsyss) == 1:
+        return nsyss[0]
+    return nsyss
 
 def read_CHGCAR(fname='CHGCAR',specorder=[],):
     """
