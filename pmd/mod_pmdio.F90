@@ -525,7 +525,7 @@ contains
       ai(1:3)= h(1:3,1,0)*atot(1,i) +h(1:3,2,0)*atot(2,i) +h(1:3,3,0)*atot(3,i)
       eki = ekitot(1,1,i) +ekitot(2,2,i) +ekitot(3,3,i)
       epi = epitot(i)
-      write(ionum,'(1x,a3,3(1x,f12.5),3(1x,es11.3),3(1x,es11.3),2(1x,f8.4))') &
+      write(ionum,'(1x,a5,3(1x,f12.5),3(1x,es11.3),3(1x,es11.3),2(1x,f8.4))') &
            trim(csp), &
            ri(1:3), vi(1:3), ai(1:3),epi,eki
     enddo
