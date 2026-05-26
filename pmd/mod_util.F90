@@ -421,8 +421,8 @@ contains
       block
         integer,allocatable:: itemp(:,:)
         allocate(itemp(new_size(1),new_size(2)))
-        itemp(:,1:size(iarr)) = iarr(:,1:size(iarr))
-        itemp(:,size(iarr)+1:) = 0
+        itemp(:,1:size(iarr,2)) = iarr(:,1:size(iarr,2))
+        itemp(:,size(iarr,2)+1:) = 0
         call move_alloc(itemp, iarr)
       end block
     endif
@@ -440,7 +440,7 @@ contains
       block
         integer,allocatable:: itemp(:,:,:)
         allocate(itemp(new_size(1),new_size(2),new_size(3)))
-        itemp(:,:,1:size(iarr)) = iarr(:,:,1:size(iarr))
+        itemp(:,:,1:size(iarr,3)) = iarr(:,:,1:size(iarr,3))
         call move_alloc(itemp, iarr)
       end block
     endif
