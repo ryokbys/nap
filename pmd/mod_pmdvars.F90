@@ -169,6 +169,8 @@ module pmdvars
   logical:: has_specorder = .false.
 !.....forces in in.pmd [default: false]
   logical:: has_forces = .false.
+!.....write/read shell as displacement vector attached to core atom
+  logical:: lshell_disp_io = .false.
 
 !.....Boundary condition: p = periodic, f = free, w = wall
   character(len=3):: boundary = 'ppp'

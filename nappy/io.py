@@ -1283,8 +1283,17 @@ def read_extxyz(fname, specorder=[],):
                 nsys.set_potential_energy(energy)
             if stress is not None:
                 nsys.set_stress_tensor(stress)
+            _vec3_names = {'dsh': ('dsx', 'dsy', 'dsz')}
             for name, vals in aux.items():
-                nsys.atoms[name] = vals
+                if vals.ndim == 2:
+                    if name in _vec3_names:
+                        col_names = _vec3_names[name]
+                    else:
+                        col_names = [f'{name}_{k}' for k in range(vals.shape[1])]
+                    for k, col in enumerate(col_names):
+                        nsys.atoms[col] = vals[:, k]
+                else:
+                    nsys.atoms[name] = vals
 
             if specorder:
                 nsys.set_specorder(*specorder)

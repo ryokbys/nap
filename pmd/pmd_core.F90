@@ -45,7 +45,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   use impulse,only: comp_ptau, write_impulse, set_ia_impls, &
        l_impls, ftaul
   use ShellModel,only: use_xl, is_shell_sp, xl_init, xl_predict, &
-       xl_gradient_step, xl_sync_theta
+       xl_gradient_step, xl_sync_theta, get_shell_displ
 
   implicit none
   include "./params_unit.h"
@@ -64,6 +64,7 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   integer:: ifwrong  ! for sanity check
   real(rp):: tmp,hscl(3),aai(3),ami,tave,vi(3),vl(3),epotp, &
        htmp(3,3),prss,dtmax,vmaxt,rbufres,tnow,sth(3,3),eaux_xl
+  real(rp),allocatable:: sdtot(:,:)
   logical:: l1st
   logical:: lconverged = .false.
 !.....FIRE variables
@@ -453,20 +454,42 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
       call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
     endif
     tmp = real(mpi_wtime(),rp)
+    if( lshell_disp_io ) then
+      if( .not.allocated(sdtot) ) allocate(sdtot(3,ntot))
+      call get_shell_displ(ntot, tagtot_isp, rtot, h(:,:,0), sdtot)
+    endif
     if( ifpmd.eq.1 ) then  ! pmd format
       if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
            then
-        call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-             tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
-      elseif( trim(ciofmt).eq.'ascii' ) then
-        if( lcomb_pos ) then
-          call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+        if( lshell_disp_io ) then
+          call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
                tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-               rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+               rtot,vtot,sdtot=sdtot)
         else
-          call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-               rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+          call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+        endif
+      elseif( trim(ciofmt).eq.'ascii' ) then
+        if( lshell_disp_io ) then
+          if( lcomb_pos ) then
+            call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,0,sdtot=sdtot)
+          else
+            call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,0,sdtot=sdtot)
+          endif
+        else
+          if( lcomb_pos ) then
+            call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+          else
+            call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,atot,epot,ekin,sth,loutforce,0)
+          endif
         endif
       endif
     else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
@@ -478,8 +501,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
              rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,0)
       endif
     else if( ifpmd.eq.3 ) then  ! extxyz format
-      call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
-           rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0)
+      if( lshell_disp_io ) then
+        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+             rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0, &
+             sdtot=sdtot)
+      else
+        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+             rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,0)
+      endif
     endif
     call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
   endif
@@ -1012,20 +1041,44 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
           call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
         endif
         tmp = real(mpi_wtime(),rp)
+        if( lshell_disp_io ) then
+          if( .not.allocated(sdtot) ) allocate(sdtot(3,ntot))
+          call get_shell_displ(ntot, tagtot_isp, rtot, h(:,:,0), sdtot)
+        endif
         if( ifpmd.eq.1 ) then  ! pmd format
           if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) &
                then
-            call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
-          elseif( trim(ciofmt).eq.'ascii' ) then
-            if( lcomb_pos ) then
-              call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+            if( lshell_disp_io ) then
+              call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
                    tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+                   rtot,vtot,sdtot=sdtot)
             else
-              call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+              call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+            endif
+          elseif( trim(ciofmt).eq.'ascii' ) then
+            if( lshell_disp_io ) then
+              if( lcomb_pos ) then
+                call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                     tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                     rtot,vtot,atot,epot,ekin,sth,loutforce,istp, &
+                     sdtot=sdtot)
+              else
+                call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                     tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                     rtot,vtot,atot,epot,ekin,sth,loutforce,istp, &
+                     sdtot=sdtot)
+              endif
+            else
+              if( lcomb_pos ) then
+                call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                     tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                     rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+              else
+                call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                     tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                     rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+              endif
             endif
           endif
         else if( ifpmd.eq.2 ) then  ! LAMMPS-dump format
@@ -1037,8 +1090,14 @@ subroutine pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
                  rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
           endif
         else if( ifpmd.eq.3 ) then  ! extxyz format
-          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
-               rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
+          if( lshell_disp_io ) then
+            call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+                 rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp, &
+                 sdtot=sdtot)
+          else
+            call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+                 rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
+          endif
         endif
         call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
       endif
@@ -1443,6 +1502,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
   use pairlist, only: mk_lspr_para
   use Coulomb,only: chgopt_method, update_auxq, update_vauxq, get_aauxq
   use isostat,only: setup_cell_min
+  use ShellModel,only: get_shell_displ
 
   implicit none
   include "./params_unit.h"
@@ -1458,6 +1518,7 @@ subroutine min_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
 
   integer:: ifmv,ierr,i_conv,i
   real(rp):: tmp,tave,prss,epotp,sth(3,3),ekin
+  real(rp),allocatable:: sdtot(:,:)
   logical:: l1st
   logical:: lconverged = .false.
   character:: cnum*128, ctmp*128
@@ -1630,20 +1691,44 @@ subroutine min_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
         call accum_time('sort_by_tag',real(mpi_wtime(),rp)-tmp)
       endif
       tmp = real(mpi_wtime(),rp)
+      if( lshell_disp_io ) then
+        if( .not.allocated(sdtot) ) allocate(sdtot(3,ntot))
+        call get_shell_displ(ntot, tagtot_isp, rtot, h(:,:,0), sdtot)
+      endif
       if( ifpmd.eq.1 ) then  ! pmd format
         if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
-          call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-               tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+          if( lshell_disp_io ) then
+            call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                 rtot,vtot,sdtot=sdtot)
+          else
+            call write_pmdtot_bin(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot)
+          endif
         elseif( trim(ciofmt).eq.'ascii' ) then
           sth(:,:) = stnsr(:,:)*up2gpa
-          if( lcomb_pos ) then
-            call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
-                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-                 rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+          if( lshell_disp_io ) then
+            if( lcomb_pos ) then
+              call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp, &
+                   sdtot=sdtot)
+            else
+              call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp, &
+                   sdtot=sdtot)
+            endif
           else
-            call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
-                 tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
-                 rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+            if( lcomb_pos ) then
+              call write_pmdtot_ascii(20,"pmdtraj",ntot,hunit,h, &
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+            else
+              call write_pmdtot_ascii(20,"pmd_"//trim(cnum),ntot,hunit,h, &
+                   tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot, &
+                   rtot,vtot,atot,epot,ekin,sth,loutforce,istp)
+            endif
           endif
         endif
       else if( ifpmd.eq.2 ) then ! LAMMPS-dump format
@@ -1655,8 +1740,14 @@ subroutine min_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_i
                rtot,vtot,atot,stot,ekitot,epitot,naux,auxtot,istp)
         endif
       else if( ifpmd.eq.3 ) then  ! extxyz format
-        call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
-             rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
+        if( lshell_disp_io ) then
+          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+               rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp, &
+               sdtot=sdtot)
+        else
+          call write_extxyz(20,'traj.extxyz',ntot,hunit,h,tagtot_isp, &
+               rtot,vtot,atot,stot,ekitot,epitot,epot,ekin,sth,istp)
+        endif
       endif
       call accum_time('write_xxx',real(mpi_wtime(),rp) -tmp)
     endif

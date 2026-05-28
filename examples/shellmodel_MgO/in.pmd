@@ -1,0 +1,9 @@
+print_level      4
+num_steps        10
+time_interval    1.0
+num_out_pmd      10
+out_pos_format   extxyz
+io_format        ascii
+force_type       ShellModel
+initial_temperature  300.0
+cutoff_radius    5.0
