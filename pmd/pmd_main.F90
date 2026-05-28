@@ -62,11 +62,7 @@ program pmd
   real(rp):: tmp,hscl(3),aai(3),ami,dt2,tave,vi(3),vl(3),rmin
   real(rp):: epot,ekin,stnsr(3,3)
   real(rp):: t0,t1
-<<<<<<< HEAD
   real(rp):: hmat_inv(3,3)   ! inverse of hmat for expand_shells
-=======
-  real(rp):: hmat_inv(3,3)
->>>>>>> master
   character(len=5):: csp
   type(atom):: elem
   integer(4),allocatable:: tmp_isp(:),tmp_ifmv(:),tmp_igrp(:,:),tmp_itot(:)
@@ -92,11 +88,7 @@ program pmd
     call write_headline()
 
 !.....Read atom configuration file 1st
-<<<<<<< HEAD
     lshell_disp_io = .false.  ! reset before reading to detect from file
-=======
-    lshell_disp_io = .false.
->>>>>>> master
     lini_new_fmt = .false.
     if( trim(ciofmt).eq.'bin' .or. trim(ciofmt).eq.'binary' ) then
       write(6,*) 'Read pmdini in binary mode.'
@@ -106,13 +98,8 @@ program pmd
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
       allocate(sdtot_ini(3,ntot0))
       sdtot_ini = 0.0_rp
-<<<<<<< HEAD
-      call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot, &
-           sdtot=sdtot_ini)
-=======
       call read_pmdtot_bin(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv, &
            tagtot_igrp,tagtot_itot,rtot,vtot,sdtot=sdtot_ini)
->>>>>>> master
     else if( trim(ciofmt).eq.'ascii' ) then
       write(6,*) 'Read pmdini in ascii mode.'
       ntot0 = get_ntot_ascii(20,trim(cpmdini))
@@ -121,23 +108,14 @@ program pmd
            ,ekitot(3,3,ntot0),stot(3,3,ntot0),atot(3,ntot0))
       allocate(sdtot_ini(3,ntot0))
       sdtot_ini = 0.0_rp
-<<<<<<< HEAD
-      call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv,tagtot_igrp,tagtot_itot,rtot,vtot, &
-           sdtot=sdtot_ini)
-=======
       call read_pmdtot_ascii(20,trim(cpmdini),ntot0,hunit,hmat,tagtot_isp,tagtot_ifmv, &
            tagtot_igrp,tagtot_itot,rtot,vtot,sdtot=sdtot_ini)
->>>>>>> master
     else
       write(6,*) 'Error: io_format must be either ascii, ' &
            //'bin or binary.'
       stop
     endif
-<<<<<<< HEAD
-    lini_new_fmt = lshell_disp_io  ! was pmdini in new shell-displacement format?
-=======
     lini_new_fmt = lshell_disp_io  ! true if pmdini had auxiliary_data: sdx
->>>>>>> master
     lshell_disp_io = .false.       ! reset; will be set after init_force
 !.....Check num of atoms.
 !.....Currently this program is limited to handle up to 999_999_999 atoms.
@@ -271,15 +249,9 @@ program pmd
 
 !.....It is required to call init_force and read some in.params.XXX to define aux array
   call init_force(.true.)
-<<<<<<< HEAD
-!.....Set lshell_disp_io flag: write shell positions as displacement vectors
-  if( use_force('ShellModel') ) lshell_disp_io = .true.
-!.....Expand shell atoms from pmdini if it was written in new shell-displacement format
-=======
 !.....Set lshell_disp_io: write/read shell as displacement vector
   if( use_force('ShellModel') ) lshell_disp_io = .true.
 !.....Expand shell atoms from pmdini if it was in new shell-displacement format
->>>>>>> master
   if( myid_md.eq.0 .and. lini_new_fmt .and. lshell_disp_io ) then
     nshell = 0
     do i=1,ntot0
@@ -289,7 +261,6 @@ program pmd
     allocate(tmp_isp(ntot_full),tmp_ifmv(ntot_full), &
          tmp_igrp(ngrpmax,ntot_full),tmp_itot(ntot_full))
     allocate(tmp_r(3,ntot_full),tmp_v(3,ntot_full))
-<<<<<<< HEAD
     tmp_isp(1:ntot0) = tagtot_isp(1:ntot0)
     tmp_ifmv(1:ntot0) = tagtot_ifmv(1:ntot0)
     tmp_igrp(1:ngrpmax,1:ntot0) = tagtot_igrp(1:ngrpmax,1:ntot0)
@@ -297,34 +268,18 @@ program pmd
     tmp_r(1:3,1:ntot0) = rtot(1:3,1:ntot0)
     tmp_v(1:3,1:ntot0) = vtot(1:3,1:ntot0)
 !.....Compute inverse hmat for fractional coordinate conversion
-=======
-    tmp_isp(1:ntot0)            = tagtot_isp(1:ntot0)
-    tmp_ifmv(1:ntot0)           = tagtot_ifmv(1:ntot0)
-    tmp_igrp(1:ngrpmax,1:ntot0) = tagtot_igrp(1:ngrpmax,1:ntot0)
-    tmp_itot(1:ntot0)           = tagtot_itot(1:ntot0)
-    tmp_r(1:3,1:ntot0)          = rtot(1:3,1:ntot0)
-    tmp_v(1:3,1:ntot0)          = vtot(1:3,1:ntot0)
->>>>>>> master
     call invert3x3(hmat(:,:,0), hmat_inv)
     ic = ntot0
     do i=1,ntot0
       is = tagtot_isp(i)
       if( sm_shell_of(is).le.0 ) cycle
       ic = ic +1
-<<<<<<< HEAD
       tmp_isp(ic) = sm_shell_of(is)
       tmp_ifmv(ic) = tagtot_ifmv(i)
       tmp_igrp(1:ngrpmax,ic) = tagtot_igrp(1:ngrpmax,i)
       tmp_itot(ic) = ic
 !.....shell position (Cartesian) = core_cart + sdtot_ini
 !.....r_cart = h * r_frac => r_frac = hmat_inv * r_cart
-=======
-      tmp_isp(ic)            = sm_shell_of(is)
-      tmp_ifmv(ic)           = tagtot_ifmv(i)
-      tmp_igrp(1:ngrpmax,ic) = tagtot_igrp(1:ngrpmax,i)
-      tmp_itot(ic)           = ic
-!.....shell position frac = hmat_inv * (h*r_core + sdtot_ini)
->>>>>>> master
       vi(1:3) = hmat(1:3,1,0)*rtot(1,i) +hmat(1:3,2,0)*rtot(2,i) &
            +hmat(1:3,3,0)*rtot(3,i) +sdtot_ini(1:3,i)
       tmp_r(1,ic) = hmat_inv(1,1)*vi(1) +hmat_inv(1,2)*vi(2) +hmat_inv(1,3)*vi(3)
@@ -332,11 +287,7 @@ program pmd
       tmp_r(3,ic) = hmat_inv(3,1)*vi(1) +hmat_inv(3,2)*vi(2) +hmat_inv(3,3)*vi(3)
       tmp_v(1:3,ic) = 0.0_rp
     enddo
-<<<<<<< HEAD
     call move_alloc(tmp_isp, tagtot_isp)
-=======
-    call move_alloc(tmp_isp,  tagtot_isp)
->>>>>>> master
     call move_alloc(tmp_ifmv, tagtot_ifmv)
     call move_alloc(tmp_igrp, tagtot_igrp)
     call move_alloc(tmp_itot, tagtot_itot)
@@ -346,17 +297,11 @@ program pmd
     allocate(epitot(ntot_full),ekitot(3,3,ntot_full), &
          stot(3,3,ntot_full),atot(3,ntot_full))
     ntot0 = ntot_full
-<<<<<<< HEAD
-    if( iprint.ge.1 ) print '(a,i0)','  Shell atoms added from sdtot; ntot0=',ntot0
-  endif
-  if( allocated(sdtot_ini) ) deallocate(sdtot_ini)
-=======
     if( iprint.ge.1 ) &
          print '(a,i0)',' Shell atoms reconstructed; ntot0=',ntot0
   endif
   if( allocated(sdtot_ini) ) deallocate(sdtot_ini)
   call set_nsp(ntot0,tagtot_isp)
->>>>>>> master
 !.....Before allocating auxiliary array, set naux (num of auxiliary data)
   call set_cauxarr()
 !.....Now allcoate the auxiliary array
@@ -1245,20 +1190,14 @@ subroutine determine_division(h,myid,nnode,rc,nx,ny,nz,iprint)
 end subroutine determine_division
 !=======================================================================
 subroutine invert3x3(a, ai)
-<<<<<<< HEAD
 !  Compute the inverse of a 3x3 matrix a; result in ai.
-=======
->>>>>>> master
   use mod_precision
   implicit none
   real(rp),intent(in):: a(3,3)
   real(rp),intent(out):: ai(3,3)
   real(rp):: det,sgm(3,3)
   integer:: i,j,im,ip,jm,jp
-<<<<<<< HEAD
 
-=======
->>>>>>> master
   do j=1,3
     jm = mod(j+1,3)+1
     jp = mod(j,  3)+1
