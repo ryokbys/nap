@@ -16,9 +16,14 @@ dump_*
 pmdfin
 out.pmd
 out.erg
+out.strs
+out.*.fin
 erg.pmd
 frc.pmd
 strs.pmd
 traj.extxyz
 subdir_[0-9]*
 log_*
+PLAN_*
+TODO_*
+LOG_*

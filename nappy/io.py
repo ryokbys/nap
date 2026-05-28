@@ -1231,7 +1231,12 @@ def read_extxyz(fname, specorder=[],):
                             syms.append(val)
                         idx += count
                     else:
-                        vals = [float(tokens[idx+k]) for k in range(count)]
+                        vals = []
+                        for k in range(count):
+                            try:
+                                vals.append(float(tokens[idx+k]))
+                            except ValueError:
+                                vals.append(0.0)
                         if name == 'pos':
                             poss[ia] = vals
                         elif name == 'vel':
