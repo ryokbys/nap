@@ -22,7 +22,7 @@ module ShellModel
 !-----------------------------------------------------------------------
   use pmdmpi
   use mod_precision
-  use pmdvars,only: nspmax,namax,am
+  use pmdvars,only: nspmax,namax,am,specorder
   use util,only: csp2isp
   use memory,only: accum_mem
   implicit none
@@ -384,7 +384,7 @@ contains
     implicit none
     integer,intent(in):: myid_md,mpi_md_world,iprint
 
-    integer:: isp,jsp,ierr,ios
+    integer:: isp,jsp,ierr,ios,i
     real(rp):: k2s,k4s
     character(len=128):: cline,fname
     character(len=5):: cspi,cspj
@@ -402,6 +402,20 @@ contains
         if( ios.ne.0 ) read(cline,*) cspi,cspj,k2s
         isp = csp2isp(cspi)    ! core species index
         jsp = csp2isp(cspj)    ! shell species index
+!.....If shell species is absent from specorder, add it automatically
+        if( isp.gt.0 .and. jsp.le.0 ) then
+          do i=1,nspmax
+            if( trim(specorder(i)).eq.'x' ) then
+              specorder(i) = cspj
+              jsp = i
+              exit
+            endif
+          enddo
+          if( jsp.le.0 ) then
+            print *,'ERROR: specorder is full; cannot add shell species '//trim(cspj)
+            stop
+          endif
+        endif
         if( isp.gt.0 .and. jsp.gt.0 ) then
           sm_k2s(jsp)     = k2s
           sm_k4s(jsp)     = k4s
@@ -427,6 +441,7 @@ contains
     call mpi_bcast(sm_core_of,nspmax,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(sm_shell_of,nspmax,mpi_integer,0,mpi_md_world,ierr)
     call mpi_bcast(is_shell_sp,nspmax,mpi_logical,0,mpi_md_world,ierr)
+    call mpi_bcast(specorder,5*nspmax,mpi_character,0,mpi_md_world,ierr)
 
     lprmset_ShellModel = .true.
     return
