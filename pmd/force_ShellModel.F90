@@ -431,6 +431,39 @@ contains
     lprmset_ShellModel = .true.
     return
   end subroutine read_params_ShellModel
+!=======================================================================
+  subroutine get_shell_displ(ntot, tagtot_isp, rtot, h, sd)
+!  Compute shell displacement vectors (Cartesian, Angstrom) for all
+!  core atoms in a globally-gathered array.
+!  For core atom i paired with a shell: sd(:,i) = h*(r_shell - r_core)
+!  with minimum-image convention applied.
+!  For non-core or un-paired atoms: sd(:,i) = 0.
+    implicit none
+    integer,intent(in):: ntot, tagtot_isp(ntot)
+    real(rp),intent(in):: rtot(3,ntot), h(3,3)
+    real(rp),intent(out):: sd(3,ntot)
+    integer:: i,j,is,ishell_sp
+    real(rp):: xij(3),rij(3),dij2
+
+    sd(:,:) = 0.0_rp
+    do i=1,ntot
+      is = tagtot_isp(i)
+      if( sm_shell_of(is).le.0 ) cycle
+      ishell_sp = sm_shell_of(is)
+      do j=1,ntot
+        if( tagtot_isp(j).ne.ishell_sp ) cycle
+        xij(1:3) = rtot(1:3,j) -rtot(1:3,i)
+        xij(1:3) = xij(1:3) -nint(xij(1:3))
+        rij(1:3) = h(1:3,1)*xij(1) +h(1:3,2)*xij(2) +h(1:3,3)*xij(3)
+        dij2 = rij(1)**2 +rij(2)**2 +rij(3)**2
+        if( dij2.lt.rc_coul_ex2 ) then
+          sd(1:3,i) = rij(1:3)
+          exit
+        endif
+      enddo
+    enddo
+    return
+  end subroutine get_shell_displ
 
 end module ShellModel
 !-----------------------------------------------------------------------
