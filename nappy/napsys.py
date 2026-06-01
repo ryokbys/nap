@@ -1005,7 +1005,8 @@ class NAPSystem(object):
         """
         Generator of the neighbors of a given atom-i.
         """
-        if 'neighbors' not in self.atoms.columns:
+        if 'neighbors' not in self.atoms.columns or \
+           self.atoms['neighbors'].isnull().any():
             self.make_pair_list(rcut=rcut)
         lspri = self.atoms['neighbors'][ia]
         for jj in range(len(lspri)):
