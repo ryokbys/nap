@@ -159,7 +159,7 @@ lasubs.o: $(premods)
 sort.o: $(premods)
 common_parallel.o: $(premods) mod_pmdmpi.o
 # top-level objects
-pmd_main.o: ${mods}
+pmd_main.o: ${mods} ${forces}
 pmd_core.o: ${mods} ${forces} ${force_common}
 read_input.o: ${mods} ${force_common}
 node_conv.o: ${mods}

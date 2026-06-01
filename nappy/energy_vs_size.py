@@ -126,7 +126,7 @@ def erg_vs_size(fname,al_min,al_max,niter,mdexec):
         os.system('rm -f {0:s} && mv out.pmd {0:s}'.format(outfname))
         # dumpfname = 'dump_0.{0:03d}'.format(i)
         # os.system('rm -f {0:s} && mv dump_0 {0:s}'.format(dumpfname))
-        xyzfname = f'traj_0.{i:03d}'
+        xyzfname = f'traj_{i:03d}.extxyz'
         os.system(f'rm -f {xyzfname:s} && mv traj.extxyz {xyzfname:s}')
     #...revert pmdini
     os.system('rm -f '+fname)
