@@ -144,7 +144,7 @@ mod_colorcharge.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o mod_force.o
 mod_localflux.o: mod_pmdmpi.o mod_pmdvars.o mod_memory.o mod_colorcharge.o
 mod_extforce.o: mod_pmdmpi.o mod_pmdvars.o mod_util.o
 mod_pdens.o: mod_pmdmpi.o mod_memory.o mod_util.o mod_vector.o
-mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o
+mod_pmdio.o: mod_pmdvars.o mod_util.o mod_time.o mod_vector.o force_ShellModel.o
 mod_pairlist.o: mod_memory.o mod_pmdvars.o
 mod_constraints.o: mod_vector.o mod_util.o
 mod_rdcfrc.o: mod_pmdmpi.o mod_structure.o mod_util.o
