@@ -3034,33 +3034,18 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
 
 !-----set center of mass motion to zero
   sump(:) = 0.0_rp
-!!$  sumpx=0.0_rp
-!!$  sumpy=0.0_rp
-!!$  sumpz=0.0_rp
   amtot=0.0_rp
   do i=1,natm
     is= tag_isp(i)
     if( use_xl .and. is_shell_sp(is) ) cycle
     amss= am(is)
     sump(1:3) = sump(1:3) + amss*va(1:3,i)
-!!$    sumpx=sumpx+amss*va(1,i)
-!!$    sumpy=sumpy+amss*va(2,i)
-!!$    sumpz=sumpz+amss*va(3,i)
     amtot= amtot +amss
   enddo
   ttmp = real(mpi_wtime(),rp)
   tmp(:)= sump(:)
   call mpi_allreduce(tmp,sump,3,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
-!!$  tmp= sumpx
-!!$  call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum &
-!!$       ,mpi_md_world,ierr)
-!!$  tmp= sumpy
-!!$  call mpi_allreduce(tmp,sumpy,1,mpi_real_rp,mpi_sum &
-!!$       ,mpi_md_world,ierr)
-!!$  tmp= sumpz
-!!$  call mpi_allreduce(tmp,sumpz,1,mpi_real_rp,mpi_sum &
-!!$       ,mpi_md_world,ierr)
   tmp= amtot
   call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
@@ -3071,8 +3056,6 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
   enddo
 
   if( myid_md.eq.0 .and. iprint.ge.ipl_info ) then
-!!$    write(6,'(a,3es12.4)') ' sumpx,y,z/amtot=' &
-!!$         ,sumpx/amtot,sumpy/amtot,sumpz/amtot
     write(6,'(a,3es12.4)') ' sump(:)/amtot=' &
          ,sump(1:3)/amtot
   endif
