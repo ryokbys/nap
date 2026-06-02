@@ -3030,44 +3030,51 @@ subroutine rm_trans_motion(natm,tag_isp,va,nspmax,am &
   real(rp),intent(out):: va(3,natm)
 
   integer:: i,is,ierr
-  real(rp):: sumpx,sumpy,sumpz,amss,amtot,tmp,ttmp
+  real(rp):: sump(3),amss,amtot,tmp(3),ttmp
 
 !-----set center of mass motion to zero
-  sumpx=0.0_rp
-  sumpy=0.0_rp
-  sumpz=0.0_rp
+  sump(:) = 0.0_rp
+!!$  sumpx=0.0_rp
+!!$  sumpy=0.0_rp
+!!$  sumpz=0.0_rp
   amtot=0.0_rp
   do i=1,natm
     is= tag_isp(i)
     if( use_xl .and. is_shell_sp(is) ) cycle
     amss= am(is)
-    sumpx=sumpx+amss*va(1,i)
-    sumpy=sumpy+amss*va(2,i)
-    sumpz=sumpz+amss*va(3,i)
+    sump(1:3) = sump(1:3) + amss*va(1:3,i)
+!!$    sumpx=sumpx+amss*va(1,i)
+!!$    sumpy=sumpy+amss*va(2,i)
+!!$    sumpz=sumpz+amss*va(3,i)
     amtot= amtot +amss
   enddo
   ttmp = real(mpi_wtime(),rp)
-  tmp= sumpx
-  call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum &
+  tmp(:)= sump(:)
+  call mpi_allreduce(tmp,sump,3,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
-  tmp= sumpy
-  call mpi_allreduce(tmp,sumpy,1,mpi_real_rp,mpi_sum &
-       ,mpi_md_world,ierr)
-  tmp= sumpz
-  call mpi_allreduce(tmp,sumpz,1,mpi_real_rp,mpi_sum &
-       ,mpi_md_world,ierr)
+!!$  tmp= sumpx
+!!$  call mpi_allreduce(tmp,sumpx,1,mpi_real_rp,mpi_sum &
+!!$       ,mpi_md_world,ierr)
+!!$  tmp= sumpy
+!!$  call mpi_allreduce(tmp,sumpy,1,mpi_real_rp,mpi_sum &
+!!$       ,mpi_md_world,ierr)
+!!$  tmp= sumpz
+!!$  call mpi_allreduce(tmp,sumpz,1,mpi_real_rp,mpi_sum &
+!!$       ,mpi_md_world,ierr)
   tmp= amtot
   call mpi_allreduce(tmp,amtot,1,mpi_real_rp,mpi_sum &
        ,mpi_md_world,ierr)
   call accum_time('mpi_allreduce',real(mpi_wtime(),rp)-ttmp)
   do i=1,natm
     if( use_xl .and. is_shell_sp(tag_isp(i)) ) cycle
-    va(1:3,i)=va(1:3,i)-sumpx/amtot
+    va(1:3,i)=va(1:3,i)-sump(1:3)/amtot
   enddo
 
   if( myid_md.eq.0 .and. iprint.ge.ipl_info ) then
-    write(6,'(a,3es12.4)') ' sumpx,y,z/amtot=' &
-         ,sumpx/amtot,sumpy/amtot,sumpz/amtot
+!!$    write(6,'(a,3es12.4)') ' sumpx,y,z/amtot=' &
+!!$         ,sumpx/amtot,sumpy/amtot,sumpz/amtot
+    write(6,'(a,3es12.4)') ' sump(:)/amtot=' &
+         ,sump(1:3)/amtot
   endif
 
 end subroutine rm_trans_motion
