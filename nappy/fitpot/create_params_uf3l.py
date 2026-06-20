@@ -41,7 +41,7 @@ def create_params(config,
                   init3b=0.0):
     pairs = config['pairs']
     pair_cutoffs = [ p['cutoff'] for p in pairs ]
-    trios = config['trios']
+    trios = config.get('trios', None) or []
     trio_cutoffs = [ rc for t in trios for rc in t['cutoffs'] ]
 
     prms = {}
@@ -86,7 +86,7 @@ def create_params(config,
     print(f' Max pair_cutoff = {rmax:.2f}')
 
     ## 3B
-    rmax3 = max(trio_cutoffs)
+    rmax3 = max(trio_cutoffs) if trio_cutoffs else 0.0
     #trio_res = config['trio_resolutions']
     cosmin, cosmax = (-1.0, 1.0)
     for it, t in enumerate(trios):
@@ -108,7 +108,8 @@ def create_params(config,
         d3b['knots'][3:-4] = [ cosmin +dk*i for i in range(res) ]
         d3b['coefs'] = np.array([ init3b for i in range(d3b['ncoef'])])
         prms['3B'].append(d3b)
-    print(f' Max trio_cutoff = {rmax3:.2f}')
+    if trios:
+        print(f' Max trio_cutoff = {rmax3:.2f}')
 
     ans = 'y'
     if os.path.exists(outfname):
