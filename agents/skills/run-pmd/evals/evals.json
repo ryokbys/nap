@@ -1,0 +1,44 @@
+{
+  "skill_name": "run-pmd",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Please run pmd in the current directory.",
+      "expected_output": "Checks input files, shows a settings summary, runs $HOME/bin/pmd, and reports the final temperature/energy/pressure from out.pmd or out.erg.",
+      "files": [],
+      "assertions": [
+        "pmd was actually executed: out.pmd exists in the outputs directory and contains simulation log content",
+        "Normal termination confirmed: transcript or output mentions 'Job finished at' or equivalent",
+        "pmdfin was created and is present in the outputs directory",
+        "Input file validation was performed: the pmd binary and input files (in.pmd, pmdini) were checked before running",
+        "A result summary was reported to the user (final temperature, energy, or pressure values)"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Before running pmd, check in.pmd and tell me what the simulation will do — how many steps, what force field, what temperature control, etc. Then run it.",
+      "expected_output": "Shows a clear summary of key in.pmd parameters (num_iteration, time_interval, force_type, initial_temperature, temperature_control, stress_control), then runs pmd and reports results.",
+      "files": [],
+      "assertions": [
+        "Settings summary was shown before running pmd: transcript mentions num_iteration (100) and force_type (uf3l)",
+        "Settings summary includes temperature control information (temperature_control: none)",
+        "Settings summary includes total simulation time (100 fs = 100 steps × 1.0 fs)",
+        "pmd was actually executed after showing the summary: out.pmd exists in outputs",
+        "Normal termination confirmed in the output or transcript"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run pmd and check if there are any errors or problems with the output.",
+      "expected_output": "Runs pmd, checks out.pmd for error keywords (NaN, Inf, abort, etc.), confirms 'Job finished at' is present and pmdfin was created, reports final values.",
+      "files": [],
+      "assertions": [
+        "pmd was executed: out.pmd exists in outputs directory",
+        "Error keywords were explicitly searched for in out.pmd (grep for error/NaN/Inf/abort/killed)",
+        "Normal termination was explicitly confirmed ('Job finished at' checked)",
+        "pmdfin existence was explicitly checked as part of the error check",
+        "User was informed about whether errors were found (clean result or specific error reported)"
+      ]
+    }
+  ]
+}
