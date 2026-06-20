@@ -1,8 +1,8 @@
-# AI AGENTへの指導書
+# Guidelines for AI Agents
 
-napパッケージをAI Agentが改変する際のルールを記す．
-napパッケージには，pmdという分子動力学プログラムと，nappyという前後処理のpythonパッケージが含まれている．
-ルートディレクトリに存在する次のディレクトリは無視して良い．
+Rules for AI agents modifying the nap package.
+The nap package contains a molecular dynamics program called pmd and a Python pre/post-processing package called nappy.
+The following directories at the root level may be ignored:
 - `JOSS_paper`
 - `mkconf`
 - `neb`
@@ -10,28 +10,28 @@ napパッケージには，pmdという分子動力学プログラムと，nappy
 - `qmcl`
 
 
-## プログラミング言語に関するルール
+## Programming Language Rules
 
 ### pmd
 
-- `pmd/`内には，Fortranプログラムpmdに関するソースコードを置く．
-- Fortranプログラムは基本的にはFortran90に準拠する．ただし，2002の機能も必要であれば用いても良い．
-- インデントはスペース２文字とする．タブは仕様しない．
-- １行をできるだけ78文字とし，長い行は行末に `&` をつけて折り返す．
+- Source code for the Fortran program pmd goes under `pmd/`.
+- Fortran code should conform to Fortran90. Fortran 2002 features may be used when necessary.
+- Indent with 2 spaces. Do not use tabs.
+- Keep lines to 78 characters where possible; wrap long lines with `&` at the end.
 
 ### nappy
 
-- `nappy/`以下にはPythonパッケージnappyが格納されている．
-- 基本的にはpython3系（3.9以上）でコードを書く．
+- The Python package nappy lives under `nappy/`.
+- Write code targeting Python 3.9 or later.
 
 
-## gitに関するルール
+## Git Rules
 
-- ai-devブランチで作業する．
-- git commitをする際には許可を得る．
-- できるだけ作業の塊（１つの機能追加や１つのバグ修正）ごとにcommitする．多くの作業をいくつもこなしてからcommitしない．
+- Work on the `ai-dev` branch.
+- Obtain permission before running `git commit`.
+- Commit in logical units (one feature addition or one bug fix per commit). Do not batch many unrelated changes into a single commit.
+- Use Conventional Commits for commit messages.
 
-## 作業報告
+## Work Reporting
 
-- 何かしらの実装や改変を行う際，作業プランを`.agent/PLAN_NAME_YYMMDD.md`に，その作業のtodoリストを`.agent/TODO_NAME_YYMMDD.md`に，その作業ログを`.agent/log_NAME_YYMMDD.md`に保存する．ただし，NAMEは作業を簡潔に表す文言で，YYMMDDは作業を始めた日付．
-- これら `PLAN_`, `TODO_`, `LOG_` ファイルはgit commitに加えない．
+- When implementing or modifying anything, save the work plan to `agents/dev/plan_YYMMDD_NAME.md`, the todo list to `agents/dev/todo_YYYMMDD_NAME.md`, and the work log to `agents/dev/log_YYMMDD_NAME.md`, where NAME is a brief description of the work and YYMMDD is the date work began.

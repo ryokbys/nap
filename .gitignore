@@ -24,6 +24,4 @@ strs.pmd
 traj.extxyz
 subdir_[0-9]*
 log_*
-PLAN_*
-TODO_*
-LOG_*
+test
