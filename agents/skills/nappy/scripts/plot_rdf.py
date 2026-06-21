@@ -62,12 +62,13 @@ def parse_rdf(fname):
 
 def plot_total(rd, rdfs, prefix, dpi):
     """Plot total g(r) and save to {prefix}_total.png."""
-    fig, ax = plt.subplots(figsize=(6, 4), dpi=dpi)
+    fig, ax = plt.subplots(figsize=(5, 5), dpi=dpi)
     ax.plot(rd, rdfs[('all', 'all')], color='steelblue', lw=1.5)
     ax.set_xlabel('Distance (Å)')
     ax.set_ylabel('g(r)')
     ax.set_title('Total RDF')
     ax.set_xlim(rd[0], rd[-1])
+    ax.set_box_aspect(1)
     plt.tight_layout()
     outname = f'{prefix}_total.png'
     fig.savefig(outname, dpi=dpi, bbox_inches='tight')
@@ -96,7 +97,7 @@ def plot_pairwise(rd, rdfs, pairs, specorder, prefix, dpi):
     nsp = len(specorder)
     fig, axes = plt.subplots(
         nsp, nsp,
-        figsize=(4 * nsp, 3 * nsp),
+        figsize=(5 * nsp, 5 * nsp),
         dpi=dpi,
         sharex=True,
     )
@@ -116,6 +117,7 @@ def plot_pairwise(rd, rdfs, pairs, specorder, prefix, dpi):
                 ax.axis('off')
                 continue
             ax.plot(rd, grdata, color='steelblue', lw=1.5)
+            ax.set_box_aspect(1)
             ax.text(0.05, 0.85, f'{si}-{sj}',
                     transform=ax.transAxes, ha='left', fontsize=10)
 

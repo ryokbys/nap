@@ -13,6 +13,10 @@ Options:
               Offset of the given data. [default: 0]
   --main-SID MAINSID
               Species ID whose MSD is to be extracted. [default: 1]
+  --species SPC
+              Species name (e.g. Li, Ge) to look up by name in the file
+              header. When given, overrides --main-SID and correctly handles
+              files with interleaved error columns (--err mode). [default: None]
   --subtract-SID SUBSID
               Species ID whose MSD is to be subtracted from that of main-SID.
               If this is less than 1, nothing is subtracted. [default: 0]
@@ -33,13 +37,31 @@ Options:
               Charge number (valence) of mobile ions. [default: 1]
 """
 import os
+import re
 import sys
 from docopt import docopt
 import numpy as np
 from nappy.util import parse_option, gen_header
 
 __author__ = "RYO KOBAYASHI"
-__version__ = "260515"
+__version__ = "260620"
+
+def find_column_by_species(fname, species):
+    """Return 0-based column index for msd_{species} from file header.
+
+    Works for both plain out.msd and out.msd produced with --err (interleaved
+    error columns), since it matches by header label rather than position.
+    """
+    with open(fname) as f:
+        for line in f:
+            if line.startswith('#') and 'data_ID' in line:
+                for m in re.finditer(r'(\d+):msd_(\w+)', line):
+                    col = int(m.group(1)) - 1   # 0-based
+                    spc = m.group(2)
+                    if spc == species:
+                        return col
+    raise ValueError(f'Species "{species}" not found in header of {fname}')
+
 
 def read_out_msd(fname='out.msd',offset=0,column=2):
 
@@ -147,6 +169,11 @@ def main():
     dim = int(args['--dim'])
     sidmain = int(args['--main-SID'])
     sidsub = int(args['--subtract-SID'])
+    species_name = args['--species']
+    if species_name not in (None, 'None'):
+        col = find_column_by_species(fnames[0], species_name)
+    else:
+        col = sidmain + 1
     plot = args['--plot']
     out4fp = args['--out4fp']
     out4fpname = args['--out4fp-name']
@@ -179,7 +206,7 @@ def main():
     MSDs = []
     Ts = []
     for fname in fnames:
-        ts,msdmain = read_out_msd(fname,offset,column=sidmain+1)
+        ts,msdmain = read_out_msd(fname,offset,column=col)
         if sidsub > 0:
             tmp, msdsub = read_out_msd(fname,offset,column=sidsub+1)
             msdmain = msdmain -msdsub
@@ -215,7 +242,7 @@ def main():
     if plot:
         import matplotlib.pyplot as plt
         import seaborn as sns
-        sns.set(context='talk',style='ticks')
+        sns.set_theme(context='talk', style='ticks')
         cmap = plt.get_cmap("tab10")
         #...Original time unit == fs
         unit = 'fs'

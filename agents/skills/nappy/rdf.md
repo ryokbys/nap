@@ -1,16 +1,4 @@
----
-name: nappy-rdf
-description: >-
-  Compute the radial distribution function (RDF) from MD trajectory files
-  using nappy/rdf.py and produce publication-quality matplotlib plots.
-  Use this skill whenever the user asks to calculate, compute, or plot RDF,
-  radial distribution function, or g(r) from trajectory or structure files
-  (extxyz, pmd format, etc.). Trigger on phrases like "calculate RDF",
-  "compute RDF", "plot RDF", "radial distribution function", "g(r)",
-  "RDFを計算", "RDFをプロット", "動径分布関数".
----
-
-# nappy-rdf Skill
+# nappy RDF Sub-skill
 
 Compute the radial distribution function (RDF) from one or more MD trajectory
 files and produce publication-quality plots using matplotlib and seaborn.
@@ -85,7 +73,7 @@ If `--fortran` raises an import error, retry without it (pure-Python fallback).
 Read the bundled script from the skill and write it to the working directory:
 
 ```
-Read skill://nappy-rdf/scripts/plot_rdf.py
+Read skill://nappy/scripts/plot_rdf.py
 Write its content verbatim to plot_rdf.py in the current working directory.
 ```
 
