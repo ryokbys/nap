@@ -40,44 +40,53 @@ class PMD:
         # self.params['naux'] = 0
         if nsys is not None:
             self.nsys = copy.deepcopy(nsys)
-            self.params['specorder'] = nsys.specorder
+            self.params['specorder'] = copy.deepcopy(nsys.specorder)
         else:
             self.nsys = None
         return None
 
-    def run(self, nstp=0, dt=1.0, ifdmp=0, dmp=0.99, conveps=1e-5, convnum=3,
-            initialize=True, iprint=0 ):
+    def run(self, nstp=None, dt=None, ifdmp=None, dmp=None,
+            conveps=None, convnum=None, initialize=True, iprint=None):
         """
         Call pmd and store the result to self.result.
         """
-        if self.nsys == None:
+        if self.nsys is None:
             raise ValueError('nsys must be set beofre calling run().')
-        self.set_params(num_iteration=nstp,
-                        time_interval=dt,
-                        flag_damping=ifdmp,
-                        damping_coeff=dmp,
-                        converge_eps=conveps,
-                        converge_num=convnum,
-                        print_level=iprint)
-        # self.params['num_iteration'] = nstp
-        # self.params['time_interval'] = dt
+        overrides = {}
+        if nstp is not None:
+            overrides['num_iteration'] = nstp
+        if dt is not None:
+            overrides['time_interval'] = dt
+        if ifdmp is not None:
+            overrides['flag_damping'] = ifdmp
+        if dmp is not None:
+            overrides['damping_coeff'] = dmp
+        if conveps is not None:
+            overrides['converge_eps'] = conveps
+        if convnum is not None:
+            overrides['converge_num'] = convnum
+        if iprint is not None:
+            overrides['print_level'] = iprint
+        if overrides:
+            self.set_params(**overrides)
         self.update_mpivars()
         self.update_params()
 
-        rtot = self.nsys.get_scaled_positions()
-        vtot = np.zeros(rtot.shape)
+        rtot = np.asarray(self.nsys.get_scaled_positions(), dtype=np.float64)
+        vtot = np.asarray(self.nsys.get_scaled_velocities(), dtype=np.float64)
+        if 'ifmv' in self.nsys.atoms.columns:
+            ifmvs = self.nsys.atoms.ifmv.to_numpy(dtype=np.int32)
+        else:
+            ifmvs = np.ones(len(self.nsys.atoms), dtype=np.int32)
         naux = pw.get_naux()
-        # naux = self.params['naux']
         hmat = np.zeros((3,3,2))
         hmat[0:3,0:3,0] = self.nsys.get_hmat()
-        ispcs = self.nsys.atoms.sid.values
+        ispcs = self.nsys.atoms.sid.to_numpy(dtype=np.int32)
         #...Run pmd by calling fortran-compiled library
-        #print('calling pw.run')
         try:
-            res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,initialize)
+            res = pw.run(rtot.T,vtot.T,naux,hmat,ispcs,ifmvs,initialize)
         except:
             raise
-        #print('out from pw.run')
         self.result = {}
         self.result['rtot'] = res[0]
         self.result['vtot'] = res[1]
@@ -227,6 +236,10 @@ class PMD:
             raise FileNotFoundError(f'The input file ({fname}) does not exist.')
         from .inpmd import read_inpmd
         inputs = read_inpmd(fname)
+        if self.nsys is not None:
+            inputs['specorder'] = copy.deepcopy(self.nsys.specorder)
+        elif 'specorder' in self.params:
+            inputs['specorder'] = copy.deepcopy(self.params['specorder'])
         self.params = copy.deepcopy(inputs)
         return None
 
@@ -238,6 +251,7 @@ class PMD:
 
     def set_system(self,nsys):
         self.nsys = copy.deepcopy(nsys)
+        self.params['specorder'] = copy.deepcopy(nsys.specorder)
         return None
 
     def set_potential(self, potential):

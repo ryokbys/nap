@@ -143,7 +143,7 @@ _bool_keys = [
 ]
 
 def get_default():
-    return _default_params
+    return copy.deepcopy(_default_params)
 
 def correct_fortran_double(arg):
     """
@@ -163,7 +163,7 @@ def read_inpmd(fname='in.pmd'):
     """
     with open(fname,'r') as f:
         lines = f.readlines()
-    inputs = copy.copy(_default_params)
+    inputs = get_default()
     mode = None
     for line in lines:
         if line[0] in ('#','!'):

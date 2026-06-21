@@ -1,47 +1,53 @@
 subroutine run(ntot0,rtot,vtot,atot,stot,ekitot,epitot, &
-     naux,auxtot,hmat,ispcs,ekin,epot,stnsr,linit)
+     naux,auxtot,hmat,ispcs,ifmvs,ekin,epot,stnsr,linit)
   use pmdvars,only: nx,ny,nz,iprint,nstp,ifpmd
+  use util,only: calc_nfmv
   implicit none
-  integer,intent(in):: ntot0,ispcs(ntot0),naux
+  integer,intent(in):: ntot0,ispcs(ntot0),ifmvs(ntot0),naux
   real(8),intent(inout):: rtot(3,ntot0),vtot(3,ntot0),hmat(3,3,0:1)
 !f2py integer,intent(hide),depend(ispcs):: ntot0=shape(ispcs,0)
 !f2py intent(in,out):: rtot,vtot,hmat
-  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0),ekitot(3,3,ntot0), &
-       epitot(ntot0),auxtot(naux,ntot0),ekin,epot,stnsr(3,3)
+  real(8),intent(out):: atot(3,ntot0),stot(3,3,ntot0), &
+       ekitot(3,3,ntot0),epitot(ntot0),auxtot(naux,ntot0),ekin, &
+       epot,stnsr(3,3)
   logical,intent(in):: linit
 
-  integer:: i
-  integer:: ntot
-  real(8):: hunit,tagtot(ntot0)
+  integer:: tagtot_isp(ntot0),tagtot_ifmv(ntot0),tagtot_igrp(4,ntot0)
+  integer:: tagtot_itot(ntot0)
+  real(8):: hunit
   
   if( nx.lt.0 .or. ny.lt.0 .or. nz.lt.0 ) then
     print *,'Some pmdvars should be set before calling run().'
     stop
   endif
 
-  call get_tagtot(ntot0,ispcs,tagtot)
+  call get_tagtot(ntot0,ispcs,ifmvs,tagtot_isp,tagtot_ifmv, &
+       tagtot_igrp,tagtot_itot)
+  call calc_nfmv(ntot0,tagtot_ifmv,tagtot_igrp)
   
   hunit = 1d0
 !!$  print *,'nstp,iprint=',nstp,iprint
 !!$  print *,'iprint,ntot0,rtot(:,ntot0)=',iprint,ntot0,rtot(:,ntot0)
-  call pmd_core(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-       ekitot,epitot,auxtot,epot,ekin,stnsr)
-!!$  call oneshot(hunit,hmat,ntot0,tagtot,rtot,vtot,atot,stot, &
-!!$       ekitot,epitot,auxtot,ekin,epot,stnsr,linit)
+  call pmd_core(hunit,hmat,ntot0,tagtot_isp,tagtot_ifmv, &
+       tagtot_igrp,tagtot_itot,rtot,vtot,atot,stot,ekitot,epitot, &
+       auxtot,epot,ekin,stnsr)
   return
 end subroutine run
 !=======================================================================
-subroutine get_tagtot(ntot,ispcs,tagtot)
+subroutine get_tagtot(ntot,ispcs,ifmvs,tagtot_isp,tagtot_ifmv, &
+     tagtot_igrp,tagtot_itot)
   implicit none 
-  integer,intent(in):: ntot,ispcs(ntot)
-  real(8),intent(out):: tagtot(ntot)
+  integer,intent(in):: ntot,ispcs(ntot),ifmvs(ntot)
+  integer,intent(out):: tagtot_isp(ntot),tagtot_ifmv(ntot)
+  integer,intent(out):: tagtot_igrp(4,ntot),tagtot_itot(ntot)
 
-  integer:: i,ifmv,isp
+  integer:: i
 
   do i=1,ntot
-    isp = ispcs(i)
-    ifmv = 1
-    tagtot(i) = isp*1d0 +ifmv*1d-1 +i*1d-14
+    tagtot_isp(i) = ispcs(i)
+    tagtot_ifmv(i) = ifmvs(i)
+    tagtot_igrp(:,i) = 0
+    tagtot_itot(i) = i
   enddo
   return
 end subroutine get_tagtot
