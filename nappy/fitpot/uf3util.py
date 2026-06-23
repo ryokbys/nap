@@ -293,17 +293,15 @@ def write_params_uf3(uf3prms,
 
     entry_comment = f'#UF3 POT UNITS: metal DATE: {today} AUTHOR: {author} CITATION:\n'
     if data1B is not None:
-        spcs = data1B.keys()
-        for spi in spcs:
-            erg = data1B[spi]
+        for d1 in data1B:
+            spi = d1['species']
+            erg = d1['erg']
             f.write(entry_comment)
             f.write(f'1B  {spi}  {erg:0.4f}\n')
             f.write('#\n')
     if data2B is not None:
-        pairs = data2B.keys()
-        for pair in pairs:
-            spi,spj = pair
-            dp = data2B[pair]
+        for dp in data2B:
+            spi,spj = dp['pair']
             nlead = dp['nlead']
             ntrail= dp['ntrail']
             spacing = dp['spacing']
@@ -324,10 +322,8 @@ def write_params_uf3(uf3prms,
             f.write('\n')
             f.write('#\n')
     if data3B is not None:
-        trios = data3B.keys()
-        for trio in trios:
-            spi,spj,spk = trio
-            d3b = data3B[trio]
+        for d3b in data3B:
+            spi,spj,spk = d3b['trio']
             nlead = d3b['nlead']
             ntrail= d3b['ntrail']
             spacing = d3b['spacing']
