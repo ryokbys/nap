@@ -863,135 +863,88 @@ class NAPSystem(object):
             return None
         except:
             pass
-        rcs2 = np.zeros((len(self.specorder),len(self.specorder)),dtype=float)
-        if rcuts is not None:
-            for i,si in enumerate(self.specorder):
-                for j,sj in enumerate(self.specorder):
-                    if j < i: continue
-                    if (si,sj) in rcuts:
-                        rc2 = rcuts[(si,sj)]**2
-                    elif (sj,si) in rcuts:
-                        rc2 = rcuts[(sj,si)]**2
-                    else:
-                        rc2 = -1.0
-                    rcs2[i,j] = rc2
-                    rcs2[j,i] = rc2
-            rcmax2 = max(rcs2.max(),rcut**2)
-            for i in range(len(self.specorder)):
-                for j in range(len(self.specorder)):
-                    if rcs2[i,j] < 0.0:
-                        rcs2[i,j] = rcmax2
-            rcut = np.sqrt(rcmax2)
-        else:
-            rcs2[:,:] = rcut**2
-        rc2= rcut**2
+        from scipy.spatial import cKDTree
 
-        h= self.get_hmat()
-        hi= np.linalg.inv(h)
-        lcx= int(1.0/np.sqrt(hi[0,0]**2 +hi[1,0]**2 +hi[2,0]**2)/rcut)
-        lcy= int(1.0/np.sqrt(hi[0,1]**2 +hi[1,1]**2 +hi[2,1]**2)/rcut)
-        lcz= int(1.0/np.sqrt(hi[0,2]**2 +hi[1,2]**2 +hi[2,2]**2)/rcut)
-        if lcx == 0: lcx= 1
-        if lcy == 0: lcy= 1
-        if lcz == 0: lcz= 1
-        lcyz= lcy*lcz
-        lcxyz= lcx*lcy*lcz
-        rcx= 1.0/lcx
-        rcy= 1.0/lcy
-        rcz= 1.0/lcz
-        rcxi= 1.0/rcx
-        rcyi= 1.0/rcy
-        rczi= 1.0/rcz
-        lscl= np.zeros((len(self.atoms),),dtype=int)
-        lshd= np.zeros((lcxyz,),dtype=int)
-        lscl[:]= -1
-        lshd[:]= -1
-
-        # Use numpy array instead of accessing pandas series when it will be heavily accessed.
-        poss = self.get_scaled_positions()
-
-        #...make a linked-cell list
         self.assign_pbc()
-        for i in range(self.num_atoms()):
-            pi = poss[i]
-            #...assign a vector cell index
-            mx = int(pi[0]*rcxi)
-            my = int(pi[1]*rcyi)
-            mz = int(pi[2]*rczi)
-            mx = min(max(mx,0),lcx-1)
-            my = min(max(my,0),lcy-1)
-            mz = min(max(mz,0),lcz-1)
-            m= mx*lcyz +my*lcz +mz
-            lscl[i]= lshd[m]
-            lshd[m]= i
+        N = self.num_atoms()
+        hmat = self.get_hmat()
+        spos = self.get_scaled_positions()
+        nsp = len(self.specorder) if self.specorder else 1
+        sids = self.atoms.sid.to_numpy(dtype=int)
 
-        #...Determine possible max of num of neighbors
-        nnmax = 0
-        for icell in range(len(lshd)):
-            inc = 0
-            i = lshd[icell]
-            if i == -1: continue
-            while i >= 0:
-                inc += 1
-                i = lscl[i]
-            nnmax = max(nnmax,inc)
+        # Build per-pair cutoff^2 matrix
+        rcs2 = np.full((nsp, nsp), rcut**2)
+        rcmax = rcut
+        use_rcuts = rcuts is not None and bool(self.specorder)
+        if use_rcuts:
+            for i, si in enumerate(self.specorder):
+                for j, sj in enumerate(self.specorder):
+                    if (si, sj) in rcuts:
+                        v = rcuts[(si, sj)]**2
+                    elif (sj, si) in rcuts:
+                        v = rcuts[(sj, si)]**2
+                    else:
+                        v = -1.0
+                    rcs2[i, j] = v
+                    rcs2[j, i] = v
+            rcmax_sq = max(float(rcs2.max()), rcut**2)
+            rcs2[rcs2 < 0.0] = rcmax_sq
+            rcmax = float(np.sqrt(rcmax_sq))
 
-        #...Initialize lspr
-        # lspr = [ [] for i in range(self.num_atoms()) ]
-        nplspr = np.zeros((self.num_atoms(),nnmax*27),dtype=int)
-        nplspr[:,:] = -1
-        nlspr = np.zeros(self.num_atoms(),dtype=int)
-        # self.atoms['neighbors'] = emptylist
-        sids = self.atoms.sid
+        # Half-space image offsets: (0,0,0) + 13 forward images.
+        # "forward": ix>0, or ix==0 and iy>0, or ix==iy==0 and iz>0.
+        # This ensures every pair is visited exactly once without a
+        # duplicate-tracking set (assuming cell > 2*rcmax in each direction).
+        fwd_offsets = np.array(
+            [[0, 0, 0]] + [
+                [ix, iy, iz]
+                for ix in range(-1, 2)
+                for iy in range(-1, 2)
+                for iz in range(-1, 2)
+                if (ix > 0
+                    or (ix == 0 and iy > 0)
+                    or (ix == 0 and iy == 0 and iz > 0))
+            ], dtype=float)  # (14, 3)
 
-        for ia in range(self.num_atoms()):
-            pi = poss[ia]
-            #...assign a vector cell index
-            mx = int(pi[0]*rcxi)
-            my = int(pi[1]*rcyi)
-            mz = int(pi[2]*rczi)
-            mx = min(max(mx,0),lcx-1)
-            my = min(max(my,0),lcy-1)
-            mz = min(max(mz,0),lcz-1)
-            isp = sids[ia] -1
-            for kuz in (-1,0,1):
-                m1z = mz +kuz
-                if m1z < 0: m1z += lcz
-                if m1z >= lcz: m1z -= lcz
-                for kuy in (-1,0,1):
-                    m1y= my +kuy
-                    if m1y < 0: m1y += lcy
-                    if m1y >= lcy: m1y -= lcy
-                    for kux in (-1,0,1):
-                        m1x= mx +kux
-                        if m1x < 0: m1x += lcx
-                        if m1x >= lcx: m1x -= lcx
-                        m1= m1x*lcyz +m1y*lcz +m1z
-                        if lshd[m1] == -1: continue
+        # Cartesian positions for all 14*N image atoms.
+        # all_rpos[k*N + i] = Cartesian position of atom i in image k.
+        # all_rpos[k*N + i] % N == i  →  original atom id.
+        all_spos = (spos[np.newaxis, :, :]
+                    + fwd_offsets[:, np.newaxis, :]).reshape(-1, 3)
+        all_rpos = all_spos @ hmat.T  # (14N, 3)
 
-                        ja = lshd[m1]
-                        while ja >= 0:
-                            if ja <= ia:
-                                ja = lscl[ja]
-                                continue
-                            jsp = sids[ja] -1
-                            pij = poss[ja] -pi
-                            pij = pij - np.round(pij)
-                            rij = np.dot(h,pij)
-                            rij2 = rij[0]**2 +rij[1]**2 +rij[2]**2
-                            if rij2 < rcs2[isp,jsp] and ja not in nplspr[ia,:]:
-                                nplspr[ia,nlspr[ia]] = ja
-                                nplspr[ja,nlspr[ja]] = ia
-                                dij = np.sqrt(rij2)
-                                nlspr[ia] += 1
-                                nlspr[ja] += 1
+        tree = cKDTree(all_rpos)
+        nbrs_list = tree.query_ball_point(all_rpos[:N], rcmax)
 
-                            ja = lscl[ja]
-        #...Finally add the lspr to atoms DataFrame
-        lspr = []
-        for ia in range(self.num_atoms()):
-            lspr.append([ nplspr[ia,ja] for ja in range(nlspr[ia]) ])
-        self.atoms['neighbors'] = lspr
+        # Use sets to guard against duplicates in very small cells
+        # (cell < 2*rcmax) where both the direct and image path are found.
+        lspr = [set() for _ in range(N)]
+        if use_rcuts:
+            for ia in range(N):
+                isp = sids[ia] - 1
+                for idx in nbrs_list[ia]:
+                    ja = idx % N
+                    if ja == ia:
+                        continue          # skip self and self-images
+                    if idx < N and ja < ia:
+                        continue          # intra-cell: only ja > ia
+                    jsp = sids[ja] - 1
+                    dr = all_rpos[idx] - all_rpos[ia]
+                    if (dr[0]**2 + dr[1]**2 + dr[2]**2) < rcs2[isp, jsp]:
+                        lspr[ia].add(ja)
+                        lspr[ja].add(ia)
+        else:
+            for ia in range(N):
+                for idx in nbrs_list[ia]:
+                    ja = idx % N
+                    if ja == ia:
+                        continue
+                    if idx < N and ja < ia:
+                        continue
+                    lspr[ia].add(ja)
+                    lspr[ja].add(ia)
+
+        self.atoms['neighbors'] = [list(s) for s in lspr]
         return None
 
     def remove_pair_list(self):
