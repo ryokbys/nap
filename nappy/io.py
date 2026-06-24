@@ -1176,8 +1176,13 @@ def read_extxyz(fname, specorder=[],):
     ---
     Lattice values: a1[0] a1[1] a1[2]  a2[0] a2[1] a2[2]  a3[0] a3[1] a3[2]
     Properties: name:type:count pairs (type: S=string, R=real, I=integer)
+    
     Stress in comment line is written by pmd as stnsr_GPa * (-160.218),
     so conversion on read: nsys.stnsr = -stress_from_file / 160.218 [GPa].
+    
+    virial is sometimes given from VASP related data and it is in eV not divided by volume yet.
+    So to convert it to GPa, divide it by volume (Ang^3) and convert it to GPa
+    by multiplying (-160.218).
     """
     _GPa_factor = 160.218  # 1 eV/Ang^3 = 160.218 GPa
 
@@ -1203,6 +1208,7 @@ def read_extxyz(fname, specorder=[],):
             a1 = np.array(lat[0:3])
             a2 = np.array(lat[3:6])
             a3 = np.array(lat[6:9])
+            vol = abs(np.dot(np.cross(a1,a2),a3))
 
             props = _parse_extxyz_properties(kv['Properties'])
 
@@ -1213,6 +1219,9 @@ def read_extxyz(fname, specorder=[],):
             if 'stress' in kv:
                 sv = [float(x) for x in kv['stress'].split()]
                 stress = -np.array(sv).reshape(3, 3) / _GPa_factor
+            elif 'virial' in kv:
+                sv = [float(x) for x in kv['virial'].split()]
+                stress = np.array(sv).reshape(3, 3) * (-_GPa_factor) /vol
 
             # Read atom lines
             syms = []
