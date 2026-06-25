@@ -41,7 +41,7 @@ from nappy.common import get_key
 from nappy.io import read
 
 __author__ = "Ryo KOBAYASHI"
-__version__ = "230107"
+__version__ = "260625"
 
 def norm(vector):
     norm= 0.0
@@ -144,7 +144,12 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
             #                                     dang,na)
             angd,adfs = pw.wrap_calc_adf(poss.T,tags,hmat,hmati,rcut,
                                          itriples.T,na,l1st)
-            return angd, adfs.T
+            adfs_out = adfs.T
+            for it in range(len(triplets)):
+                total = np.sum(adfs_out[it,:]) * dang
+                if total > 0:
+                    adfs_out[it,:] /= total
+            return angd, adfs_out
         except Exception as e:
             print(' Since failed to use the fortran routines, use python instead')
             print(e)
@@ -163,6 +168,11 @@ def adf(nsys,dang,rcut,triplets,fortran=False,nnmax=100):
             adfa= adf_atom(ia,dang,rcut,nsys,poss,lspr,symbols,sj,sk)
             for iang in range(na):
                 anda[it,iang]= anda[it,iang] +adfa[iang]
+    #...Normalize each triplet so that integral over angle equals 1
+    for it in range(len(triplets)):
+        total = np.sum(anda[it,:]) * dang
+        if total > 0:
+            anda[it,:] /= total
     return angd,anda
 
 def adf_average(infiles,dang=1.0,rcut=3.0,triplets=[],
