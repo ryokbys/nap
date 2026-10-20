@@ -167,8 +167,9 @@ def main():
     if 'None' in specorder:
         specorder = None
     if specorder == None and not (files[0].find('POSCAR') > -1 or
-                                  files[0].find('pmd') > -1 ):
-        raise ValueError('ERROR: specorder must be specified, unless files are POSCAR format.')
+                                  files[0].find('pmd') > -1 or
+                                  files[0].find('extxyz') > -1 ):
+        raise ValueError('ERROR: specorder must be specified, unless files are POSCAR, pmd, or extxyz format.')
 
     #files.sort(key=get_key,reverse=True)
 
