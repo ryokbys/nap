@@ -1263,7 +1263,7 @@ def read_extxyz(fname, specorder=[],):
                         idx += count
 
             # Build specorder
-            spcorder = list(specorder)
+            spcorder = list(specorder) if specorder else []
             for s in syms:
                 if s not in spcorder:
                     spcorder.append(s)
